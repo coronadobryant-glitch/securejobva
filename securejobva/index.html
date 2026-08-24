@@ -239,14 +239,6 @@ img{max-width:100%}
 .role__list li::before{content:"";width:6px;height:6px;margin-top:.55rem;flex:none;background:var(--accent);border-radius:50%}
 .role__tools{margin-top:auto;padding-top:1rem;border-top:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);line-height:1.7}
 
-.roles--more{display:grid;gap:1rem;margin-top:1.25rem}
-@media(min-width:760px){.roles--more{grid-template-columns:repeat(3,1fr)}}
-.role--sm{
-  background:transparent;border:1px dashed var(--line);border-radius:10px;padding:1.15rem 1.25rem;
-}
-.role--sm h4{font-size:1.02rem;font-family:"Bricolage Grotesque",sans-serif;font-weight:600;letter-spacing:-.01em}
-.role--sm p{font-size:.88rem;color:var(--muted);margin-top:.35rem}
-
 /* steps */
 .steps{display:grid;gap:0;border-top:1px solid var(--line)}
 .step{
@@ -601,8 +593,8 @@ img{max-width:100%}
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">What we staff</span>
-        <h2>Three roles carry most of the work.</h2>
-        <p class="lede">Nearly every business we talk to is drowning in the same three places. Start there &mdash; add the rest once the first seat is paying for itself.</p>
+        <h2>Three roles, and nothing else.</h2>
+        <p class="lede">Nearly every business we talk to is drowning in the same three places. We staff those three and only those three, so the person you get is a specialist in the work &mdash; not a generalist spread thin.</p>
       </div>
 
       <div class="roles">
@@ -647,21 +639,6 @@ img{max-width:100%}
           </ul>
           <p class="role__tools">Google Workspace &middot; Microsoft 365 &middot; QuickBooks &middot; Notion &middot; Airtable &middot; ServiceTitan</p>
         </article>
-      </div>
-
-      <div class="roles--more">
-        <div class="role--sm">
-          <h4>Bookkeeping &amp; Finance</h4>
-          <p>Reconciliations, payables, payroll prep and month-end packets.</p>
-        </div>
-        <div class="role--sm">
-          <h4>Creative &amp; Multimedia</h4>
-          <p>Short-form video edits, graphics, product retouching, podcast cleanup.</p>
-        </div>
-        <div class="role--sm">
-          <h4>Technical &amp; Back Office</h4>
-          <p>Listing management, QA checks, dispatch support, CRM and automation builds.</p>
-        </div>
       </div>
     </div>
   </section>
@@ -835,8 +812,6 @@ img{max-width:100%}
           <li><a href="#roles">Customer Service</a></li>
           <li><a href="#roles">Sales &amp; Marketing</a></li>
           <li><a href="#roles">Admin Tasks</a></li>
-          <li><a href="#roles">Bookkeeping</a></li>
-          <li><a href="#roles">Creative &amp; Multimedia</a></li>
         </ul>
       </div>
       <div>
@@ -957,21 +932,6 @@ img{max-width:100%}
             <input type="checkbox" name="seat" value="Admin Tasks">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
             <span><span class="opt__t">Admin Tasks</span><span class="opt__d">Inbox, calendar, data, invoicing</span></span>
-          </label>
-          <label class="opt">
-            <input type="checkbox" name="seat" value="Bookkeeping &amp; Finance">
-            <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
-            <span><span class="opt__t">Bookkeeping</span><span class="opt__d">Payables, payroll prep, month-end</span></span>
-          </label>
-          <label class="opt">
-            <input type="checkbox" name="seat" value="Creative &amp; Multimedia">
-            <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
-            <span><span class="opt__t">Creative</span><span class="opt__d">Video edits, graphics, retouching</span></span>
-          </label>
-          <label class="opt">
-            <input type="checkbox" name="seat" value="Technical &amp; Back Office">
-            <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
-            <span><span class="opt__t">Technical</span><span class="opt__d">Listings, QA, dispatch, automations</span></span>
           </label>
         </div>
         <p class="err" id="err-seat" aria-live="polite"></p>
