@@ -1,0 +1,782 @@
+<title>SecureJobVA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --paper:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#F6F1EF;
+  --glow:#FFF7F5;
+  --ink:#231413;
+  --ink-2:#574441;
+  --muted:#8A7772;
+  --line:#ECE3DF;
+  --accent:#D62F27;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#FFF1EE;
+  --accent-deep:#A81E1C;
+  --signal:#FFC233;
+  --signal-ink:#3A2600;
+  --price-bg:#231413;
+  --price-fg:#FFF6F2;
+  --shadow:0 1px 2px rgba(120,45,30,.05), 0 14px 32px -20px rgba(120,45,30,.25);
+
+  --step--1:.8125rem;
+  --step-0:1.0625rem;
+  --step-1:1.3125rem;
+  --step-2:1.75rem;
+  --step-3:2.375rem;
+  --step-4:clamp(2.75rem,1.6rem + 4.6vw,4.75rem);
+
+  --wrap:1140px;
+  --gut:clamp(1.25rem,4vw,2.5rem);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#191110;
+    --surface:#231816;
+    --surface-2:#2F1F1C;
+    --glow:#251A17;
+    --ink:#FCF1ED;
+    --ink-2:#DCC4BD;
+    --muted:#A38982;
+    --line:#3A2723;
+    --accent:#FF6B57;
+    --accent-ink:#1F0705;
+    --accent-soft:#3A211D;
+    --accent-deep:#FF8B78;
+    --signal:#FFCB5C;
+    --signal-ink:#3A2600;
+    --price-bg:#2F1F1C;
+    --price-fg:#FCF1ED;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -20px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#191110;
+  --surface:#231816;
+  --surface-2:#2F1F1C;
+  --glow:#251A17;
+  --ink:#FCF1ED;
+  --ink-2:#DCC4BD;
+  --muted:#A38982;
+  --line:#3A2723;
+  --accent:#FF6B57;
+  --accent-ink:#1F0705;
+  --accent-soft:#3A211D;
+  --accent-deep:#FF8B78;
+  --signal:#FFCB5C;
+  --signal-ink:#3A2600;
+  --price-bg:#2F1F1C;
+  --price-fg:#FCF1ED;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -20px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Karla","Segoe UI",system-ui,sans-serif;
+  font-size:var(--step-0);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{
+  font-family:"Bricolage Grotesque","Karla",system-ui,sans-serif;
+  font-weight:800;
+  line-height:1.04;
+  letter-spacing:-.022em;
+  text-wrap:balance;
+  margin:0;
+}
+p{margin:0}
+a{color:inherit}
+img{max-width:100%}
+
+.wrap{width:min(100% - (var(--gut) * 2),var(--wrap));margin-inline:auto}
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.72rem;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.lede{font-size:var(--step-1);color:var(--ink-2);line-height:1.5;max-width:60ch}
+.small{font-size:var(--step--1);color:var(--muted)}
+
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:.55rem;
+  font-family:"Karla",sans-serif;font-weight:700;font-size:.98rem;
+  padding:.85rem 1.5rem;border-radius:8px;
+  text-decoration:none;border:1.5px solid transparent;
+  transition:transform .16s ease,background-color .16s ease,border-color .16s ease;
+}
+.btn--solid{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn--solid:hover{transform:translateY(-2px)}
+.btn--ghost{border-color:var(--line);color:var(--ink);background:transparent}
+.btn--ghost:hover{border-color:var(--ink);transform:translateY(-2px)}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:40;
+  background:color-mix(in srgb,var(--paper) 88%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.nav__in{display:flex;align-items:center;gap:1.75rem;height:68px}
+.brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
+.brand__mark{width:26px;height:26px;flex:none}
+.nav__links{display:none;gap:1.6rem;margin-left:auto;font-size:.94rem;font-weight:500}
+.nav__links a{text-decoration:none;color:var(--ink-2)}
+.nav__links a:hover{color:var(--accent)}
+.nav__cta{margin-left:0}
+.nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
+.themetog,.navtog{
+  width:38px;height:38px;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);border-radius:8px;
+  background:transparent;color:var(--ink-2);cursor:pointer;
+  transition:border-color .16s ease,color .16s ease;
+}
+.themetog:hover,.navtog:hover{border-color:var(--accent);color:var(--accent)}
+.themetog svg,.navtog svg{display:block}
+.navtog .i-close{display:none}
+.navtog[aria-expanded="true"] .i-open{display:none}
+.navtog[aria-expanded="true"] .i-close{display:block}
+
+.mobnav{border-top:1px solid var(--line);background:var(--paper);padding:.25rem 0 1.15rem}
+.mobnav[hidden]{display:none}
+.mobnav__in{display:grid}
+.mobnav a{
+  padding:.9rem .1rem;text-decoration:none;color:var(--ink-2);
+  border-bottom:1px solid var(--line);font-weight:600;
+}
+.mobnav a:last-child{border-bottom:none}
+.mobnav a:hover{color:var(--accent)}
+
+@media(max-width:559px){
+  .nav__in{gap:.6rem}
+  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+}
+@media(min-width:900px){
+  .nav__links{display:flex}
+  .nav__tools{margin-left:0}
+  .navtog{display:none}
+  .mobnav{display:none}
+}
+
+/* ---------- hero ---------- */
+.hero{
+  padding:clamp(3.5rem,7vw,6rem) 0 clamp(2.5rem,5vw,4rem);
+  position:relative;overflow:hidden;
+  background:
+    radial-gradient(58rem 30rem at 6% -14%,var(--glow),transparent 60%);
+}
+.hero__grid{display:grid;gap:clamp(2rem,4vw,3.5rem)}
+@media(min-width:960px){.hero__grid{grid-template-columns:1.05fr .95fr;align-items:center}}
+.hero h1{font-size:var(--step-4);margin:.9rem 0 1.1rem}
+.hl{
+  background-image:linear-gradient(var(--signal),var(--signal));
+  background-repeat:no-repeat;
+  background-size:100% .16em;
+  background-position:0 100%;
+  padding-bottom:.06em;
+}
+.hero__actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.9rem}
+.hero__note{margin-top:1rem;font-size:var(--step--1);color:var(--muted)}
+
+/* coverage band */
+.cov{
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:1.4rem 1.4rem 1.15rem;box-shadow:var(--shadow);
+}
+.cov__head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:1.15rem}
+.cov__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1rem;letter-spacing:-.01em}
+.cov__row{display:grid;grid-template-columns:5.6rem 1fr;align-items:center;gap:.75rem;margin-bottom:.7rem}
+.cov__label{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right}
+.cov__track{position:relative;height:26px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.cov__fill{position:absolute;top:0;bottom:0;border-radius:6px;transform-origin:left center}
+.cov__fill--you{background:repeating-linear-gradient(135deg,var(--line) 0 5px,transparent 5px 10px);border:1px solid var(--line);left:37.5%;width:33.4%}
+.cov__fill--seat{background:var(--accent);left:66.6%;width:33.4%;animation:grow 1s .25s cubic-bezier(.2,.8,.2,1) both}
+.cov__fill--seat2{background:var(--accent);left:0;width:12.5%;animation:grow 1s .45s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{transform:scaleX(0);opacity:.4}to{transform:scaleX(1);opacity:1}}
+.cov__hours{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--muted);margin-top:.65rem;padding-left:6.35rem}
+.cov__foot{margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--line);font-size:.86rem;color:var(--ink-2)}
+.cov__foot b{color:var(--ink)}
+
+/* stat strip */
+.stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
+.stats__in{display:grid;grid-template-columns:repeat(2,1fr);gap:0}
+.stat{padding:1.5rem clamp(.9rem,2vw,1.6rem);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stat:nth-child(2n){border-right:none}
+@media(min-width:820px){
+  .stats__in{grid-template-columns:repeat(4,1fr)}
+  .stat{border-bottom:none;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:none}
+}
+.stat__n{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:var(--step-2);letter-spacing:-.03em;font-variant-numeric:tabular-nums;display:block}
+.stat__n small{font-size:1rem;font-weight:600}
+.stat__l{font-size:.84rem;color:var(--muted);margin-top:.2rem;display:block}
+
+/* ---------- sections ---------- */
+.sec{padding:clamp(3.75rem,7vw,6.5rem) 0}
+.sec--tint{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sec__head{max-width:62ch;margin-bottom:clamp(2rem,4vw,3rem)}
+.sec__head h2{font-size:var(--step-3);margin:.7rem 0 .9rem}
+
+/* roles */
+.roles{display:grid;gap:1.25rem}
+@media(min-width:900px){.roles{grid-template-columns:repeat(3,1fr)}}
+.role{
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:1.6rem 1.5rem 1.7rem;display:flex;flex-direction:column;gap:.85rem;
+  position:relative;transition:border-color .18s ease,transform .18s ease;
+}
+.sec--tint .role{background:var(--paper)}
+.role:hover{border-color:var(--accent);transform:translateY(-3px)}
+.role__tag{
+  position:absolute;top:-1px;left:1.5rem;
+  background:var(--accent);color:var(--accent-ink);
+  font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;
+  padding:.25rem .6rem;border-radius:0 0 8px 8px;
+}
+.role__tag--hi{background:var(--signal);color:var(--signal-ink)}
+.role h3{font-size:var(--step-1);margin-top:.55rem}
+.role__list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem;font-size:.94rem;color:var(--ink-2)}
+.role__list li{display:flex;gap:.6rem;align-items:flex-start}
+.role__list li::before{content:"";width:6px;height:6px;margin-top:.55rem;flex:none;background:var(--accent);border-radius:50%}
+.role__tools{margin-top:auto;padding-top:1rem;border-top:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);line-height:1.7}
+
+.roles--more{display:grid;gap:1rem;margin-top:1.25rem}
+@media(min-width:760px){.roles--more{grid-template-columns:repeat(3,1fr)}}
+.role--sm{
+  background:transparent;border:1px dashed var(--line);border-radius:10px;padding:1.15rem 1.25rem;
+}
+.role--sm h4{font-size:1.02rem;font-family:"Bricolage Grotesque",sans-serif;font-weight:600;letter-spacing:-.01em}
+.role--sm p{font-size:.88rem;color:var(--muted);margin-top:.35rem}
+
+/* steps */
+.steps{display:grid;gap:0;border-top:1px solid var(--line)}
+.step{
+  display:grid;gap:.35rem 1.5rem;padding:1.6rem 0;border-bottom:1px solid var(--line);
+  grid-template-columns:auto 1fr;align-items:start;
+}
+.step h3{font-size:var(--step-1);grid-column:2/-1}
+.step p{color:var(--ink-2);grid-column:2/-1;font-size:.97rem}
+@media(min-width:820px){
+  .step{grid-template-columns:5.5rem 15rem 1fr;align-items:baseline}
+  .step h3,.step p{grid-column:auto}
+}
+.step__n{
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--accent);
+  font-variant-numeric:tabular-nums;padding-top:.28rem;white-space:nowrap;
+}
+
+/* pricing */
+.price{display:grid;gap:1.5rem}
+@media(min-width:900px){.price{grid-template-columns:1.15fr .85fr;align-items:start}}
+.price__card{
+  background:var(--price-bg);color:var(--price-fg);border-radius:10px;
+  padding:clamp(1.75rem,3vw,2.5rem);
+}
+.price__card .eyebrow{color:var(--price-fg);opacity:.6}
+.price__rate{display:flex;align-items:baseline;gap:.5rem;margin:.6rem 0 .35rem}
+.price__amt{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(3rem,7vw,4.25rem);letter-spacing:-.04em;line-height:1;color:var(--signal)}
+.price__per{font-size:1rem;opacity:.72}
+.price__sub{opacity:.82;font-size:.96rem}
+.price__inc{list-style:none;padding:0;margin:1.5rem 0 0;display:grid;gap:.6rem;font-size:.95rem}
+.price__inc li{display:flex;gap:.7rem;align-items:flex-start;opacity:.92}
+.price__inc svg{flex:none;margin-top:.28rem}
+.compare{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.compare__row{display:flex;justify-content:space-between;gap:1rem;padding:.95rem 1.25rem;border-bottom:1px solid var(--line);font-size:.94rem}
+.compare__row:last-child{border-bottom:none}
+.compare__row b{font-variant-numeric:tabular-nums}
+.compare__head{background:var(--surface-2);font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.compare__row--tot{background:var(--accent-soft);font-weight:700}
+.compare__row--win{background:var(--accent);color:var(--accent-ink);font-weight:700}
+
+/* proof */
+.quotes{display:grid;gap:1.25rem}
+@media(min-width:860px){.quotes{grid-template-columns:repeat(3,1fr)}}
+.quote{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--signal);border-radius:10px;padding:1.4rem 1.4rem 1.25rem;margin:0;display:flex;flex-direction:column;gap:1rem}
+.sec--tint .quote{background:var(--paper)}
+.quote p{font-size:1.02rem;line-height:1.55}
+.quote footer{margin-top:auto;font-size:.82rem;color:var(--muted);font-family:"IBM Plex Mono",monospace;line-height:1.6}
+.placeholder-note{
+  display:inline-block;margin-top:1.5rem;padding:.5rem .8rem;
+  border:1px dashed var(--signal);border-radius:8px;background:var(--surface-2);
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-2);
+}
+
+/* faq */
+.faq{border-top:1px solid var(--line);max-width:75ch}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{
+  cursor:pointer;list-style:none;padding:1.15rem 2rem 1.15rem 0;position:relative;
+  font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.08rem;letter-spacing:-.01em;
+}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{
+  content:"+";position:absolute;right:.25rem;top:1rem;color:var(--accent);
+  font-family:"IBM Plex Mono",monospace;font-size:1.2rem;
+}
+.faq details[open] summary::after{content:"\2212"}
+.faq details p{padding:0 2rem 1.35rem 0;color:var(--ink-2);font-size:.97rem}
+
+/* final cta */
+.cta{background:var(--accent);color:var(--accent-ink);padding:clamp(3rem,6vw,5rem) 0}
+.cta h2{font-size:var(--step-3);max-width:20ch}
+.cta p{margin:1rem 0 2rem;max-width:52ch;opacity:.9}
+.cta .btn--solid{background:var(--accent-ink);color:var(--accent);border-color:var(--accent-ink)}
+.cta .btn--ghost{border-color:currentColor;color:var(--accent-ink)}
+.cta .btn--ghost:hover{border-color:currentColor}
+
+/* footer */
+.foot{padding:3rem 0 3.5rem;border-top:1px solid var(--line)}
+.foot__grid{display:grid;gap:2rem}
+@media(min-width:800px){.foot__grid{grid-template-columns:1.4fr repeat(3,1fr)}}
+.foot h5{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .85rem;font-weight:500}
+.foot ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.92rem}
+.foot a{text-decoration:none;color:var(--ink-2)}
+.foot a:hover{color:var(--accent)}
+.foot__brand{margin-bottom:.75rem}
+.foot__bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;font-size:.82rem;color:var(--muted)}
+</style>
+
+<script>
+/* Restore the saved theme before paint so the page never flashes the wrong one. */
+(function () {
+  try {
+    var saved = localStorage.getItem("sjva-theme");
+    if (saved === "dark" || saved === "light") {
+      document.documentElement.setAttribute("data-theme", saved);
+    }
+  } catch (e) {}
+})();
+</script>
+
+<header class="nav">
+  <div class="wrap nav__in">
+    <a class="brand" href="#top">
+      <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="var(--accent)"></path>
+        <path d="m10.8 16.3 3.6 3.6 7-7.4" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      SecureJobVA
+    </a>
+    <nav class="nav__links" aria-label="Main">
+      <a href="#roles">Roles</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#proof">Results</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav__tools">
+      <button class="navtog" id="navtog" type="button" aria-expanded="false" aria-controls="mobnav" aria-label="Menu">
+        <svg class="i-open" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+        <svg class="i-close" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+      </button>
+      <button class="themetog" id="themetog" type="button" aria-label="Switch between light and dark">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 3a9 9 0 0 1 0 18V3Z" fill="currentColor"></path>
+        </svg>
+      </button>
+      <a class="btn btn--solid nav__cta" href="#book">Book a call</a>
+    </div>
+  </div>
+
+  <div class="mobnav" id="mobnav" hidden>
+    <div class="wrap mobnav__in">
+      <a href="#roles">Roles</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#proof">Results</a>
+      <a href="#faq">FAQ</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="wrap hero__grid">
+      <div>
+        <span class="eyebrow">Dedicated virtual assistants &middot; Philippines-based</span>
+        <h1>Cover <span class="hl">the hours you can&rsquo;t</span>.</h1>
+        <p class="lede">We place trained, full-time virtual assistants in customer service, sales &amp; marketing, and admin roles &mdash; matched to your business in about a week, at a flat hourly rate with nothing to sign.</p>
+        <div class="hero__actions">
+          <a class="btn btn--solid" href="#book">Book a 20-minute call</a>
+          <a class="btn btn--ghost" href="#how">See how it works</a>
+        </div>
+        <p class="hero__note">No setup fee. No recruiting fee. Cancel with two weeks&rsquo; notice.</p>
+      </div>
+
+      <div class="cov" aria-label="Coverage across a 24-hour day">
+        <div class="cov__head">
+          <span class="cov__title">A weekday, hour by hour</span>
+          <span class="eyebrow">Your local time</span>
+        </div>
+
+        <div class="cov__row">
+          <span class="cov__label">In-house</span>
+          <div class="cov__track"><div class="cov__fill cov__fill--you"></div></div>
+        </div>
+        <div class="cov__row">
+          <span class="cov__label">Your seat</span>
+          <div class="cov__track">
+            <div class="cov__fill cov__fill--seat2"></div>
+            <div class="cov__fill cov__fill--seat"></div>
+          </div>
+        </div>
+
+        <div class="cov__hours"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+
+        <p class="cov__foot">Your team works <b>9&ndash;5</b>. Your seat takes the evening and early-morning block &mdash; so quotes, tickets and callbacks are handled <b>before you open</b>, not after you are already behind.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="wrap stats__in">
+      <div class="stat"><span class="stat__n">$9<small>/hr</small></span><span class="stat__l">Flat rate, billed weekly</span></div>
+      <div class="stat"><span class="stat__n">7 days</span><span class="stat__l">Typical time to placement</span></div>
+      <div class="stat"><span class="stat__n">40 hrs</span><span class="stat__l">One dedicated seat, full time</span></div>
+      <div class="stat"><span class="stat__n">0</span><span class="stat__l">Long-term contracts</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="roles">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">What we staff</span>
+        <h2>Three roles carry most of the work.</h2>
+        <p class="lede">Nearly every business we talk to is drowning in the same three places. Start there &mdash; add the rest once the first seat is paying for itself.</p>
+      </div>
+
+      <div class="roles">
+        <article class="role">
+          <span class="role__tag role__tag--hi">Most requested</span>
+          <h3>Customer Service</h3>
+          <ul class="role__list">
+            <li>Inbound calls and voicemail callbacks</li>
+            <li>Live chat, email and ticket queues</li>
+            <li>Appointment booking and confirmations</li>
+            <li>Order status, returns and escalations</li>
+            <li>After-hours and weekend coverage</li>
+            <li>Review responses and follow-up</li>
+          </ul>
+          <p class="role__tools">Zendesk &middot; Gorgias &middot; Intercom &middot; Freshdesk &middot; RingCentral &middot; Shopify</p>
+        </article>
+
+        <article class="role">
+          <span class="role__tag">Revenue side</span>
+          <h3>Sales &amp; Marketing</h3>
+          <ul class="role__list">
+            <li>Speed-to-lead follow-up by call, text and email</li>
+            <li>Outbound prospecting and list building</li>
+            <li>CRM hygiene, pipeline updates, reporting</li>
+            <li>Quote and estimate follow-through</li>
+            <li>Social scheduling and comment moderation</li>
+            <li>Email and SMS campaign setup</li>
+          </ul>
+          <p class="role__tools">HubSpot &middot; GoHighLevel &middot; Klaviyo &middot; Apollo &middot; Salesforce &middot; Meta Business Suite</p>
+        </article>
+
+        <article class="role">
+          <span class="role__tag">Time back</span>
+          <h3>Admin Tasks</h3>
+          <ul class="role__list">
+            <li>Inbox triage and calendar management</li>
+            <li>Data entry, cleanup and migrations</li>
+            <li>Invoicing and accounts-receivable chasing</li>
+            <li>Order processing and vendor coordination</li>
+            <li>Document prep, contracts and filing</li>
+            <li>Research, reporting and travel booking</li>
+          </ul>
+          <p class="role__tools">Google Workspace &middot; Microsoft 365 &middot; QuickBooks &middot; Notion &middot; Airtable &middot; ServiceTitan</p>
+        </article>
+      </div>
+
+      <div class="roles--more">
+        <div class="role--sm">
+          <h4>Bookkeeping &amp; Finance</h4>
+          <p>Reconciliations, payables, payroll prep and month-end packets.</p>
+        </div>
+        <div class="role--sm">
+          <h4>Creative &amp; Multimedia</h4>
+          <p>Short-form video edits, graphics, product retouching, podcast cleanup.</p>
+        </div>
+        <div class="role--sm">
+          <h4>Technical &amp; Back Office</h4>
+          <p>Listing management, QA checks, dispatch support, CRM and automation builds.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec sec--tint" id="how">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">How it works</span>
+        <h2>From first call to first shift in about a week.</h2>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <span class="step__n">Day 1</span>
+          <h3>Scoping call</h3>
+          <p>Twenty minutes. We map the tasks eating your week, agree on the hours you need covered, and tell you honestly whether a virtual assistant is the right fix.</p>
+        </div>
+        <div class="step">
+          <span class="step__n">Day 2&ndash;4</span>
+          <h3>Shortlist</h3>
+          <p>Two or three vetted candidates, each with a recorded intro, a skills assessment and references already checked. You see the same file we do.</p>
+        </div>
+        <div class="step">
+          <span class="step__n">Day 5</span>
+          <h3>You interview, you choose</h3>
+          <p>Meet the shortlist yourself. Not the right fit? We go back out at no cost. You never inherit somebody you did not pick.</p>
+        </div>
+        <div class="step">
+          <span class="step__n">Week 2</span>
+          <h3>Onboarding and handover</h3>
+          <p>We write the SOPs with you, set up tool access and time tracking, and assign an account manager who sits in on the first week of check-ins.</p>
+        </div>
+        <div class="step">
+          <span class="step__n">Ongoing</span>
+          <h3>Managed, not dropped off</h3>
+          <p>Weekly quality reviews, backup coverage when your VA is out, and a free replacement if the fit stops working. You manage the work, we manage the employment.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="pricing">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">Pricing</span>
+        <h2>One rate. No recruiting fee, no markup surprises.</h2>
+        <p class="lede">You are billed for hours worked, every week, at the same number you were quoted on the first call.</p>
+      </div>
+
+      <div class="price">
+        <div class="price__card">
+          <span class="eyebrow">Dedicated seat</span>
+          <div class="price__rate"><span class="price__amt">$9</span><span class="price__per">per hour worked</span></div>
+          <p class="price__sub">Full-time (40 hrs/week) or part-time (20 hrs/week). Overtime only when you approve it.</p>
+          <ul class="price__inc">
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Sourcing, vetting and background checks</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> A dedicated account manager</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Time tracking you can audit yourself</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Backup coverage for sick days and holidays</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Free replacement if the fit stops working</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Payroll, benefits and compliance handled by us</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="compare">
+            <div class="compare__row compare__head"><span>Full-time front desk hire</span><span>Monthly</span></div>
+            <div class="compare__row"><span>Wages at $19/hr</span><b>$3,290</b></div>
+            <div class="compare__row"><span>Payroll tax and insurance</span><b>$560</b></div>
+            <div class="compare__row"><span>Benefits and PTO accrual</span><b>$430</b></div>
+            <div class="compare__row"><span>Desk, equipment, software seats</span><b>$180</b></div>
+            <div class="compare__row compare__row--tot"><span>In-house total</span><b>$4,460</b></div>
+            <div class="compare__row compare__row--win"><span>SecureJobVA seat</span><b>$1,560</b></div>
+          </div>
+          <p class="small" style="margin-top:.9rem">Illustrative comparison based on a 40-hour week. Your numbers will differ by state and role &mdash; we build the real version with you on the call.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec sec--tint" id="proof">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">Results</span>
+        <h2>What changes in the first ninety days.</h2>
+      </div>
+
+      <div class="quotes">
+        <blockquote class="quote">
+          <p>&ldquo;Every quote request gets a callback inside ten minutes now, even the ones that land at nine at night. That alone moved our close rate.&rdquo;</p>
+          <footer>Sample quote<br>Owner, home services company</footer>
+        </blockquote>
+        <blockquote class="quote">
+          <p>&ldquo;I stopped doing invoicing at midnight. That is the whole review. My weekends came back.&rdquo;</p>
+          <footer>Sample quote<br>Founder, e-commerce brand</footer>
+        </blockquote>
+        <blockquote class="quote">
+          <p>&ldquo;We tried two agencies before this one. The difference was interviewing the candidates ourselves instead of being assigned somebody.&rdquo;</p>
+          <footer>Sample quote<br>Operations lead, logistics</footer>
+        </blockquote>
+      </div>
+
+      <p class="placeholder-note">Placeholder content &mdash; replace with real client quotes and written permission before launch.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="faq">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">Questions</span>
+        <h2>The things people actually ask.</h2>
+      </div>
+
+      <div class="faq">
+        <details open>
+          <summary>Will my VA work my hours?</summary>
+          <p>Yes. Your seat is scheduled to your time zone &mdash; a standard business day, an evening block, or split coverage across the morning and night. You set the shift on the scoping call and can change it with a week of notice.</p>
+        </details>
+        <details>
+          <summary>Is this shared or dedicated?</summary>
+          <p>Dedicated. One person, working only for you, in your tools and your systems. Not rotating between five other clients, and not a pooled ticket queue.</p>
+        </details>
+        <details>
+          <summary>What if the person is not working out?</summary>
+          <p>Tell your account manager. We start a replacement search the same day and you are not billed for the overlap. No replacement fee, and no minimum you have to serve out first.</p>
+        </details>
+        <details>
+          <summary>How do you handle passwords and customer data?</summary>
+          <p>Every VA signs an NDA and a data-handling agreement before day one. We recommend a shared password manager rather than sending credentials directly, and we set access to the least level the role needs. You can revoke all of it yourself at any time.</p>
+        </details>
+        <details>
+          <summary>Do I need my processes documented already?</summary>
+          <p>No, and almost nobody does. Documenting them is part of onboarding week &mdash; we sit with you, write the SOPs from how you already work, and hand you the document at the end whether you stay with us or not.</p>
+        </details>
+        <details>
+          <summary>What is the minimum commitment?</summary>
+          <p>None. Billing is weekly and you can end it with two weeks of notice. We would rather earn the next week than lock you into a year.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="book">
+    <div class="wrap">
+      <h2>Tell us what is eating your week.</h2>
+      <p>Twenty minutes, no pitch deck. If a virtual assistant is not the right fix for your problem, we will say so on the call.</p>
+      <div class="hero__actions" style="margin-top:0">
+        <a class="btn btn--solid" href="mailto:hello@securejobva.com">Book a 20-minute call</a>
+        <a class="btn btn--ghost" href="mailto:hello@securejobva.com">Email us instead</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <a class="brand foot__brand" href="#top">
+          <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="var(--accent)"></path>
+            <path d="m10.8 16.3 3.6 3.6 7-7.4" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          SecureJobVA
+        </a>
+        <p class="small" style="max-width:34ch">Dedicated virtual assistants for growing businesses. Customer service, sales and marketing, and admin support &mdash; staffed, trained and managed.</p>
+      </div>
+      <div>
+        <h5>Roles</h5>
+        <ul>
+          <li><a href="#roles">Customer Service</a></li>
+          <li><a href="#roles">Sales &amp; Marketing</a></li>
+          <li><a href="#roles">Admin Tasks</a></li>
+          <li><a href="#roles">Bookkeeping</a></li>
+          <li><a href="#roles">Creative &amp; Multimedia</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#book">Careers</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Contact</h5>
+        <ul>
+          <li><a href="mailto:hello@securejobva.com">hello@securejobva.com</a></li>
+          <li><a href="#book">Book a call</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot__bot">
+      <span>&copy; 2026 SecureJobVA. All rights reserved.</span>
+      <span>Privacy &middot; Terms</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* Mobile menu */
+(function () {
+  var btn = document.getElementById("navtog");
+  var panel = document.getElementById("mobnav");
+  if (!btn || !panel) return;
+
+  function setOpen(open) {
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      panel.removeAttribute("hidden");
+    } else {
+      panel.setAttribute("hidden", "");
+    }
+  }
+
+  btn.addEventListener("click", function () {
+    setOpen(btn.getAttribute("aria-expanded") !== "true");
+  });
+
+  /* Close after tapping a link, so the section you jumped to is visible. */
+  panel.addEventListener("click", function (e) {
+    if (e.target.closest("a")) setOpen(false);
+  });
+
+  window.addEventListener("resize", function () {
+    if (window.innerWidth >= 900) setOpen(false);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setOpen(false);
+  });
+})();
+
+/* Theme toggle */
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById("themetog");
+  if (!btn) return;
+
+  btn.addEventListener("click", function () {
+    var current = root.getAttribute("data-theme");
+    if (!current) {
+      var systemDark = window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      current = systemDark ? "dark" : "light";
+    }
+    var next = current === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("sjva-theme", next);
+    } catch (e) {}
+  });
+})();
+</script>
