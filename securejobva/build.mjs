@@ -70,7 +70,7 @@ function build(page) {
 <meta name="description" content="${page.description}">
 <link rel="canonical" href="${url}">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#191110" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#080F1C" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SecureJobVA">
@@ -80,7 +80,7 @@ function build(page) {
 <meta property="og:image" content="${SITE}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The SecureJobVA shield mark on a red field.">
+<meta property="og:image:alt" content="The SecureJobVA shield mark — a briefcase and a check inside a shield — on a navy field.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${page.ogTitle}">
 <meta name="twitter:description" content="${page.description}">

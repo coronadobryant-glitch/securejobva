@@ -7,21 +7,29 @@
 :root{
   --paper:#FFFFFF;
   --surface:#FFFFFF;
-  --surface-2:#F6F1EF;
-  --glow:#FFF7F5;
-  --ink:#231413;
-  --ink-2:#574441;
-  --muted:#8A7772;
-  --line:#ECE3DF;
-  --accent:#D62F27;
+  --surface-2:#F1F5FA;
+  --glow:#F2F8FF;
+  --ink:#001232;
+  --ink-2:#3B4C66;
+  --muted:#64778F;
+  --line:#E1E8F1;
+  --accent:#0072EE;
   --accent-ink:#FFFFFF;
-  --accent-soft:#FFF1EE;
-  --accent-deep:#A81E1C;
+  --accent-soft:#EAF3FE;
+  --accent-deep:#0053B4;
   --signal:#FFC233;
   --signal-ink:#3A2600;
-  --price-bg:#231413;
-  --price-fg:#FFF6F2;
-  --shadow:0 1px 2px rgba(120,45,30,.05), 0 14px 32px -20px rgba(120,45,30,.25);
+  --price-bg:#001232;
+  --price-fg:#F0F6FE;
+  --shadow:0 1px 2px rgba(0,26,70,.05), 0 14px 32px -20px rgba(0,26,70,.35);
+
+  /* The mark. Its gradient runs from the shield's bright corner to its point,
+     the two ends sampled off the logo file. Held as tokens so the artwork
+     follows the theme instead of carrying a fixed colour into a dark page. */
+  --mark-from:#0072EE;
+  --mark-to:#002E6B;
+  --mark-bg:#FFFFFF;
+  --mark-ink:#FFFFFF;
 
   --step--1:.8125rem;
   --step-0:1.0625rem;
@@ -38,22 +46,28 @@
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --paper:#191110;
-  --surface:#231816;
-  --surface-2:#2F1F1C;
-  --glow:#251A17;
-  --ink:#FCF1ED;
-  --ink-2:#DCC4BD;
-  --muted:#A38982;
-  --line:#3A2723;
-  --accent:#FF6B57;
-  --accent-ink:#1F0705;
-  --accent-soft:#3A211D;
-  --accent-deep:#FF8B78;
+  --paper:#080F1C;
+  --surface:#0F1829;
+  --surface-2:#152034;
+  --glow:#101B2E;
+  --ink:#EAF1FB;
+  --ink-2:#B9C8DE;
+  --muted:#7F91AA;
+  --line:#22304A;
+  --accent:#3B9BFF;
+  --accent-ink:#001232;
+  --accent-soft:#132743;
+  --accent-deep:#6FB6FF;
   --signal:#FFCB5C;
   --signal-ink:#3A2600;
-  --price-bg:#2F1F1C;
-  --price-fg:#FCF1ED;
+  --price-bg:#152034;
+  --price-fg:#EAF1FB;
+
+  /* Both ends lift on dark, or the shield's point dissolves into the page. */
+  --mark-from:#6FBBFF;
+  --mark-to:#2B7FE0;
+  --mark-bg:#0B1424;
+  --mark-ink:#08111F;
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -20px rgba(0,0,0,.9);
 }
 
@@ -118,6 +132,8 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.75rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
+.brand__word{display:inline}
+.brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.6rem;margin-left:auto;font-size:.94rem;font-weight:500}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -336,7 +352,7 @@ img{max-width:100%}
 .intake::backdrop{background:rgba(28,14,12,.58);backdrop-filter:blur(3px)}
 .intake__panel{
   background:var(--surface);border:1px solid var(--line);border-radius:12px;
-  box-shadow:0 2px 4px rgba(120,45,30,.06),0 28px 64px -26px rgba(120,45,30,.55);
+  box-shadow:0 2px 4px rgba(0,26,70,.07),0 28px 64px -26px rgba(0,26,70,.6);
   display:flex;flex-direction:column;max-height:100%;overflow:hidden;
 }
 @keyframes intakeIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
@@ -492,14 +508,27 @@ img{max-width:100%}
 })();
 </script>
 
+<!-- Gradient for the brand mark. Defined once; all three marks point at it. -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+    <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0072EE" style="stop-color:var(--mark-from,#0072EE)"></stop>
+      <stop offset="1" stop-color="#002E6B" style="stop-color:var(--mark-to,#002E6B)"></stop>
+    </linearGradient>
+  </defs>
+</svg>
+
 <header class="nav">
   <div class="wrap nav__in">
     <a class="brand" href="#top">
       <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="var(--accent)"></path>
-        <path d="m10.8 16.3 3.6 3.6 7-7.4" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
+        <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
+        <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
+        <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
+        <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
       </svg>
-      SecureJobVA
+      <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
     </a>
     <nav class="nav__links" aria-label="Main">
       <a href="#roles">Roles</a>
@@ -804,10 +833,13 @@ img{max-width:100%}
       <div>
         <a class="brand foot__brand" href="#top">
           <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="var(--accent)"></path>
-            <path d="m10.8 16.3 3.6 3.6 7-7.4" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
+            <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
+            <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
+            <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
+            <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
-          SecureJobVA
+          <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
         </a>
         <p class="small" style="max-width:34ch">Dedicated virtual assistants for growing businesses. Customer service, sales and marketing, and admin support &mdash; staffed, trained and managed.</p>
       </div>
@@ -899,8 +931,11 @@ img{max-width:100%}
   <div class="intake__panel">
     <div class="intake__head">
       <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="var(--accent)"></path>
-        <path d="m10.8 16.3 3.6 3.6 7-7.4" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
+        <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
+        <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
+        <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
+        <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
       </svg>
       <span class="intake__title" id="intake-title">Book a 20-minute call</span>
       <button class="intake__x" id="intake-x" type="button" aria-label="Close">
