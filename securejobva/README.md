@@ -23,9 +23,96 @@ rewrites the cross-page links from artifact URLs to plain paths.
 
 ## Deploy
 
-`dist/` is the whole site — drag it into Netlify, or point Cloudflare Pages at this
-repo with build command `node build.mjs` and output directory `dist`. Then set
-`securejobva.com` as the custom domain.
+Vercel hosts it. GoDaddy stays the registrar and keeps the DNS — only two
+records there point at Vercel; nameservers do not move.
+
+`vercel.json` holds the whole host config: build command, output directory,
+clean URLs (`/careers`, never `/careers.html`), the `/apply` and `/jobs`
+aliases, security headers and asset caching. Vercel handles HTTPS and the
+certificate itself.
+
+### First deploy
+
+From this folder:
+
+```
+npx vercel login
+npx vercel --prod
+```
+
+Vercel reads `vercel.json`, runs `node build.mjs`, and publishes `dist/`. Accept
+the defaults it offers — do not let it guess a framework, this is plain static
+output and `vercel.json` already says so.
+
+Every later deploy is the same one command.
+
+### The domain
+
+In the Vercel project: **Settings → Domains → Add**, enter `securejobva.com`,
+then add `www.securejobva.com` and choose **Redirect to securejobva.com**.
+
+Vercel then shows the exact DNS records to create. Use the ones it shows you —
+the apex IP has changed more than once, so anything written down here would go
+stale. Add them at GoDaddy under **My Products → Domain → DNS → Manage Zones**:
+
+- an **A** record for `@`, value as shown by Vercel
+- a **CNAME** for `www`, value as shown by Vercel
+
+Delete GoDaddy's parking records for `@` and `www` first, or the new ones will
+not take. Vercel's domain page goes green when it sees them — usually minutes,
+occasionally an hour.
+
+### Check it
+
+- `securejobva.com` loads over HTTPS
+- **Careers** in the nav goes to `/careers`, with no `.html`
+- `/careers.html` redirects to `/careers`
+- `/apply` and `/jobs` land on the careers page
+- `www.securejobva.com` redirects to the bare domain
+
+### Other hosts
+
+`_headers`, `_redirects` and `.htaccess` are kept for Cloudflare Pages, Netlify
+and Apache respectively. They are not copied into `dist/` — add them back to
+`ASSETS` in `build.mjs` if you ever move.
+
+## Forms
+
+Both dialogs POST JSON to Supabase. `supabase.sql` in this folder creates the
+two tables and the policies; paste it into the Supabase SQL editor and run it
+once.
+
+Then fill in `CFG` at the bottom of each page (search for `CFG = {`):
+
+```js
+/* index.html */
+endpoint: "https://<project-ref>.supabase.co/rest/v1/seat_requests",
+headers: {
+  "apikey":        "<anon key>",
+  "Authorization": "Bearer <anon key>",
+  "Prefer":        "return=minimal"
+},
+
+/* careers.html */
+endpoint: "https://<project-ref>.supabase.co/rest/v1/applications",
+headers: { ...the same three... },
+```
+
+Both values are in Supabase under **Settings → API**. Use the **anon** key.
+Never the `service_role` key — that one bypasses every policy and would hand
+the whole table to anyone who viewed source.
+
+With `endpoint` empty the dialogs fall back to handing the visitor a written
+email, and they do the same if a POST fails, so a Supabase outage never costs
+you a lead.
+
+**The one rule.** The anon key is public. It is safe only because RLS on those
+two tables allows INSERT and nothing else. Do not add a SELECT policy for
+`anon` — the tables hold applicants' names, emails, phone numbers and CV links.
+Read the rows in the Supabase dashboard, which bypasses RLS.
+
+Column names match the JSON keys exactly and PostgREST rejects an insert
+carrying a key with no column. Add a field to a form, add the column too.
 
 ## Share image
 
@@ -35,14 +122,21 @@ want the wordmark card instead, then overwrite `og.png`.
 
 ## Still to do before launch
 
+- **`hello@` and `apply@` do not exist.** The domain has no MX records, so both
+  addresses on the pages bounce. Until this is fixed the forms are decorative:
+  every visitor who taps send is writing into a hole. Cheapest fix is a free
+  ImprovMX account (two DNS records at GoDaddy, forwards both to a Gmail); GoDaddy
+  also sells mailboxes. Check with `nslookup -type=MX securejobva.com` — no
+  answer means it is still broken.
 - **Pay bands on `careers.html`** — flagged placeholder, the first thing applicants look for.
 - **Confirm the hardware minimums** on `careers.html`; applicants buy kit against them.
 - **Client quotes on `index.html`** — optional. The first-90-days section stands on its own;
   three real quotes can replace it in the same grid once you have written permission.
-- **A form endpoint.** Both forms hand over a pre-filled email today. Set `CFG.endpoint`
-  in each page's dialog script (search for `CFG = {`) to a Formspree or Web3Forms URL and
-  they submit silently instead. `CFG.scheduler` on `index.html` takes a Cal.com or
-  Calendly link and adds a "Pick your time" step after submit.
+- **Wire the forms to Supabase.** Run `supabase.sql`, then paste the project URL and
+  anon key into `CFG` on both pages — see Forms above. Until then both dialogs just hand
+  the visitor a pre-written email, so you only hear from the ones who tap send.
+- **A booking link** (optional). `CFG.scheduler` on `index.html` takes a Cal.com or
+  Calendly URL and adds a "Pick your time" step after submit.
 
 ## Note
 

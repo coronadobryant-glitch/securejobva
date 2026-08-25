@@ -1160,7 +1160,13 @@ img{max-width:100%}
    Set CFG.endpoint once there is somewhere to POST applications. */
 (function () {
   var CFG = {
-    endpoint: "",                  /* POST target for applications */
+    endpoint: "",                  /* POST target for applications. Supabase:
+                                        https://<project-ref>.supabase.co/rest/v1/applications */
+    headers: {},                   /* Extra request headers. Supabase wants three:
+                                        "apikey": "<anon key>",
+                                        "Authorization": "Bearer <anon key>",
+                                        "Prefer": "return=minimal"
+                                      The anon key is public by design — see supabase.sql. */
     email: "apply@securejobva.com"
   };
 
@@ -1319,9 +1325,15 @@ img{max-width:100%}
 
     next.setAttribute("aria-busy", "true");
     next.textContent = "Sending…";
+    /* Supabase needs an apikey and an Authorization header, so the set is built
+       here rather than written inline. CFG.headers wins on a clash. */
+    var hdrs = { "Content-Type": "application/json", "Accept": "application/json" };
+    for (var hk in CFG.headers) {
+      if (Object.prototype.hasOwnProperty.call(CFG.headers, hk)) hdrs[hk] = CFG.headers[hk];
+    }
     fetch(CFG.endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      headers: hdrs,
       body: JSON.stringify(d)
     }).then(function (r) {
       if (!r.ok) throw new Error(r.status);

@@ -24,7 +24,7 @@ const PAGES = [
   },
   {
     src: "careers.html",
-    path: "/careers.html",
+    path: "/careers",
     title: "Remote virtual assistant jobs, hiring worldwide | SecureJobVA",
     description:
       "Full-time remote seats in customer service, sales and marketing, and admin support. Apply from any country — fixed hours, one client, and no fee to apply, ever.",
@@ -36,7 +36,7 @@ const PAGES = [
    each other; on a real domain they are just files sitting side by side. */
 const REWRITE = [
   ["https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7", "/"],
-  ["https://claude.ai/code/artifact/59e78011-5885-43c0-bd9a-8c4754a13d45", "/careers.html"]
+  ["https://claude.ai/code/artifact/59e78011-5885-43c0-bd9a-8c4754a13d45", "/careers"]
 ];
 
 const ASSETS = ["og.png", "og.svg", "favicon.svg", "robots.txt"];

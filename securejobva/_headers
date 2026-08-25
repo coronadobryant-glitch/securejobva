@@ -1,0 +1,25 @@
+# Response headers for the deployed site.
+# Cloudflare Pages and Netlify both read this file from the publish directory
+# and consume it — it is never served to visitors.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=()
+  Strict-Transport-Security: max-age=31536000
+
+# Deliberately no includeSubDomains or preload above: those commit every future
+# subdomain to HTTPS forever and are painful to walk back. Add them once the
+# domain is settled.
+
+# Fingerprint-free assets that rarely change. HTML is left on the host default,
+# which revalidates and is purged on every deploy.
+/og.png
+  Cache-Control: public, max-age=2592000
+
+/og.svg
+  Cache-Control: public, max-age=2592000
+
+/favicon.svg
+  Cache-Control: public, max-age=2592000

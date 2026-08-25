@@ -1,0 +1,8 @@
+# Path aliases. Cloudflare Pages and Netlify share this format.
+#
+# Do NOT add a "/careers /careers.html" rule. Both hosts already serve
+# careers.html at /careers and 301 the .html form back to it, so that rule
+# builds a redirect loop.
+
+/apply   /careers   301
+/jobs    /careers   301

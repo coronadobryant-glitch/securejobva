@@ -1,0 +1,82 @@
+# Apache config for GoDaddy cPanel hosting. Upload with the rest of dist/ into
+# public_html.
+#
+# Cloudflare Pages and Netlify read _headers and _redirects and give clean URLs,
+# HTTPS and www->apex for free. Apache does none of that on its own and ignores
+# both of those files, so everything they describe is restated here.
+
+RewriteEngine On
+
+# --- Canonical scheme and host ---------------------------------------------
+
+# Force HTTPS.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Drop www.
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+# --- Path aliases -----------------------------------------------------------
+# Short addresses worth printing on a card or an ad. Kept above the clean-URL
+# rules because neither has a matching .html file to be caught by them.
+
+RewriteRule ^apply/?$   /careers [L,R=301]
+RewriteRule ^jobs/?$    /careers [L,R=301]
+
+# --- Clean URLs -------------------------------------------------------------
+# One canonical address per page: /careers, never /careers.html.
+#
+# Both redirects below test THE_REQUEST, which holds the browser's original
+# request line, so they fire only on a real visit and never on the internal
+# rewrite underneath them. Matching on REQUEST_URI instead would loop.
+
+# /index.html -> /
+RewriteCond %{THE_REQUEST} \s/+index\.html[\s?] [NC]
+RewriteRule ^ / [L,R=301]
+
+# /careers.html -> /careers
+RewriteCond %{THE_REQUEST} \s/+(.+?)\.html[\s?] [NC]
+RewriteRule ^ /%1 [L,R=301]
+
+# /careers -> careers.html, served in place with no second round trip.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+?)/?$ $1.html [L]
+
+# --- Response headers -------------------------------------------------------
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
+
+  # No includeSubDomains or preload: those commit every future subdomain to
+  # HTTPS for a year and are painful to walk back. Add them once settled.
+  Header always set Strict-Transport-Security "max-age=31536000" env=HTTPS
+</IfModule>
+
+# --- Caching ----------------------------------------------------------------
+
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png       "access plus 30 days"
+  ExpiresByType image/svg+xml   "access plus 30 days"
+
+  # HTML must revalidate, or an edit you publish stays invisible to anyone who
+  # has already visited.
+  ExpiresByType text/html       "access plus 0 seconds"
+</IfModule>
+
+# --- Housekeeping -----------------------------------------------------------
+
+# _headers and _redirects are Cloudflare/Netlify files. build.mjs leaves them
+# out of dist/, so on a clean deploy there is nothing here to reach. The rule is
+# for the case where someone copies them up by hand: Apache ignores both files
+# but would still hand their contents to anyone who asked.
+<FilesMatch "^_(headers|redirects)$">
+  Require all denied
+</FilesMatch>
+
+Options -Indexes

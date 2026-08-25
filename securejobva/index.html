@@ -507,7 +507,7 @@ img{max-width:100%}
       <a href="#pricing">Pricing</a>
       <a href="#proof">First 90 days</a>
       <a href="#faq">FAQ</a>
-      <!-- Careers is its own page; swap to "careers.html" once both sit on one domain. -->
+      <!-- Careers is its own page. The artifact URL below is rewritten to "/careers" by build.mjs. -->
       <a href="https://claude.ai/code/artifact/59e78011-5885-43c0-bd9a-8c4754a13d45">Careers</a>
     </nav>
     <div class="nav__tools">
@@ -1066,7 +1066,13 @@ img{max-width:100%}
    claiming a form we cannot yet receive. */
 (function () {
   var CFG = {
-    endpoint: "",                  /* POST target for leads, e.g. a Formspree or Web3Forms URL */
+    endpoint: "",                  /* POST target for leads. Supabase:
+                                        https://<project-ref>.supabase.co/rest/v1/seat_requests */
+    headers: {},                   /* Extra request headers. Supabase wants three:
+                                        "apikey": "<anon key>",
+                                        "Authorization": "Bearer <anon key>",
+                                        "Prefer": "return=minimal"
+                                      The anon key is public by design — see supabase.sql. */
     scheduler: "",                 /* Cal.com or Calendly link */
     email: "hello@securejobva.com",
     rate: 9
@@ -1244,9 +1250,15 @@ img{max-width:100%}
 
     next.setAttribute("aria-busy", "true");
     next.textContent = "Sending…";
+    /* Supabase needs an apikey and an Authorization header, so the set is built
+       here rather than written inline. CFG.headers wins on a clash. */
+    var hdrs = { "Content-Type": "application/json", "Accept": "application/json" };
+    for (var hk in CFG.headers) {
+      if (Object.prototype.hasOwnProperty.call(CFG.headers, hk)) hdrs[hk] = CFG.headers[hk];
+    }
     fetch(CFG.endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      headers: hdrs,
       body: JSON.stringify(d)
     }).then(function (r) {
       if (!r.ok) throw new Error(r.status);
