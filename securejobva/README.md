@@ -36,8 +36,9 @@ want the wordmark card instead, then overwrite `og.png`.
 ## Still to do before launch
 
 - **Pay bands on `careers.html`** — flagged placeholder, the first thing applicants look for.
-- **Real testimonials on `index.html`** — the three quotes are placeholders and say so on the page.
 - **Confirm the hardware minimums** on `careers.html`; applicants buy kit against them.
+- **Client quotes on `index.html`** — optional. The first-90-days section stands on its own;
+  three real quotes can replace it in the same grid once you have written permission.
 - **A form endpoint.** Both forms hand over a pre-filled email today. Set `CFG.endpoint`
   in each page's dialog script (search for `CFG = {`) to a Formspree or Web3Forms URL and
   they submit silently instead. `CFG.scheduler` on `index.html` takes a Cal.com or
