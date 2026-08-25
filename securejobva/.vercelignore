@@ -1,0 +1,24 @@
+# What NOT to upload as build input.
+#
+# Vercel serves only `dist/` (outputDirectory in vercel.json), so nothing listed
+# here was ever reachable by a visitor. This keeps the upload to what
+# `node build.mjs` actually reads.
+
+# Built here by the build command, so shipping a local copy only risks a stale one.
+dist/
+node_modules/
+
+# Editor and agent state.
+.claude/
+.vscode/
+
+# Docs and schema — read by people, not by the build.
+README.md
+supabase.sql
+
+# Host configs for Cloudflare Pages, Netlify and Apache. Kept in the repo so the
+# site can move hosts without a rewrite; Vercel reads vercel.json instead and
+# these would only confuse the picture.
+_headers
+_redirects
+.htaccess
