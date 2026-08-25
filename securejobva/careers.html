@@ -1194,14 +1194,15 @@ img{max-width:100%}
 /* Application dialog: track, setup, contact — then hand over a written email.
    Set CFG.endpoint once there is somewhere to POST applications. */
 (function () {
+  /* The publishable key is public by design — it is safe only because RLS on
+     both tables allows INSERT and nothing else. See supabase.sql. */
   var CFG = {
-    endpoint: "",                  /* POST target for applications. Supabase:
-                                        https://<project-ref>.supabase.co/rest/v1/applications */
-    headers: {},                   /* Extra request headers. Supabase wants three:
-                                        "apikey": "<anon key>",
-                                        "Authorization": "Bearer <anon key>",
-                                        "Prefer": "return=minimal"
-                                      The anon key is public by design — see supabase.sql. */
+    endpoint: "https://hmgravlkatfmerzbozct.supabase.co/rest/v1/applications",
+    headers: {
+      "apikey":        "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
+      "Authorization": "Bearer sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
+      "Prefer":        "return=minimal"
+    },
     email: "apply@securejobva.com"
   };
 

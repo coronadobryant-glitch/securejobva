@@ -1100,14 +1100,15 @@ img{max-width:100%}
    Until then the last step hands the visitor a written email rather than
    claiming a form we cannot yet receive. */
 (function () {
+  /* The publishable key is public by design — it is safe only because RLS on
+     both tables allows INSERT and nothing else. See supabase.sql. */
   var CFG = {
-    endpoint: "",                  /* POST target for leads. Supabase:
-                                        https://<project-ref>.supabase.co/rest/v1/seat_requests */
-    headers: {},                   /* Extra request headers. Supabase wants three:
-                                        "apikey": "<anon key>",
-                                        "Authorization": "Bearer <anon key>",
-                                        "Prefer": "return=minimal"
-                                      The anon key is public by design — see supabase.sql. */
+    endpoint: "https://hmgravlkatfmerzbozct.supabase.co/rest/v1/seat_requests",
+    headers: {
+      "apikey":        "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
+      "Authorization": "Bearer sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
+      "Prefer":        "return=minimal"
+    },
     scheduler: "",                 /* Cal.com or Calendly link */
     email: "hello@securejobva.com",
     rate: 9
