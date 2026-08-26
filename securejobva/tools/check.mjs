@@ -441,7 +441,17 @@ await check("anon can still only INSERT", () => {
     const privs = (s.match(/grant\s+([\s\S]*?)\s+on\s/i) || [])[1] || "";
     const clean = privs.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
     if (clean === "insert") continue;
-    if (declaredPublic.has(table)) continue;
+    if (declaredPublic.has(table)) {
+      /* The declaration opens a table to READING. It is not a general waiver:
+         `grant update on client_logos to anon` would otherwise slip through
+         here and let anyone with the page source rewrite who we say we work
+         for. Declared-public means public to read, nothing more. */
+      if (clean !== "select") {
+        offenders.push(clean + " on " + table + " -> " + grantees.join(", ") +
+          " (declared public means readable, not writable)");
+      }
+      continue;
+    }
     offenders.push(clean + " on " + table + " -> " + grantees.join(", "));
   }
   if (offenders.length) {

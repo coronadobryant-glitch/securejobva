@@ -409,6 +409,12 @@ img{max-width:100%}
 .track__ghost{background:var(--surface-2);color:#B3261E;font-weight:600;font-size:.68rem;padding:.14rem .4rem;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
 .pill--pipe{background:var(--ink-2);color:var(--paper)}
 .chk{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--ink-2)}
+.opts--stack{display:grid;grid-template-columns:1fr;gap:.55rem}
+/* Given a whole row each, the description is worth reading rather than a
+   caption squeezed under a chip. */
+.opts--stack .opt{align-items:flex-start;padding:.85rem 1rem}
+.opts--stack .opt__t{font-size:.98rem}
+.opts--stack .opt__d{margin-top:.15rem;line-height:1.5}
 .fld select,.fld textarea{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
 .fld textarea{resize:vertical}
 .edit__h{font-size:1.05rem;margin:0 0 .3rem}
@@ -1197,6 +1203,19 @@ function typeChooser() {
 
   var declined = REQUESTS.filter(function (r) { return r.state === "declined"; })[0];
 
+  var TYPES = [
+    ["applicant", "I am looking for work",
+     "An employee seat. See your application and how far along it is."],
+    ["business", "I am hiring",
+     "An employer account. See the seats you have asked us for."],
+    ["staff", "I work at SecureJobVA",
+     "A staff account. Somebody here approves this one before it does anything."]
+  ];
+
+  var tick = '<span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" ' +
+    'fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>';
+
   return (
     '<div class="card">' +
       '<h2 class="edit__h">What brings you here?</h2>' +
@@ -1204,25 +1223,27 @@ function typeChooser() {
       "You can say more in the box if it helps." +
       (declined ? " Your last request was not approved &mdash; you are welcome to ask again." : "") +
       "</p>" +
-      '<div class="opts opts--2" style="margin-top:1rem">' +
-        '<label class="opt">' +
-          '<input type="radio" name="acct" value="applicant" checked>' +
-          '<span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>' +
-          '<span><span class="opt__t">I am looking for work</span>' +
-          '<span class="opt__d">See your application and how far along it is</span></span>' +
-        "</label>" +
-        '<label class="opt">' +
-          '<input type="radio" name="acct" value="business">' +
-          '<span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>' +
-          '<span><span class="opt__t">I am hiring</span>' +
-          '<span class="opt__d">See the seats you have asked us for</span></span>' +
-        "</span></label>" +
+      /* One per line, full width. Side by side they were read as a row of
+         chips and the descriptions were the first thing to get skipped, which
+         is how somebody picks the wrong account and needs it changed by hand. */
+      '<div class="opts opts--stack" style="margin-top:1rem">' +
+        TYPES.map(function (t, i) {
+          return '<label class="opt">' +
+            '<input type="radio" name="acct" value="' + t[0] + '"' + (i === 0 ? " checked" : "") + ">" +
+            tick +
+            "<span>" +
+              '<span class="opt__t">' + t[1] + "</span>" +
+              '<span class="opt__d">' + t[2] + "</span>" +
+            "</span>" +
+          "</label>";
+        }).join("") +
       "</div>" +
       '<div class="fld" style="margin-top:1rem">' +
         '<label for="acct-note">Anything to add <em>&mdash; optional</em></label>' +
         '<input id="acct-note" type="text" placeholder="Company name, or which role you applied for">' +
       "</div>" +
       '<button class="btn btn--solid" id="acct-go" type="button">Set up my account</button>' +
+      '<p class="msg">Nothing is granted by picking. Every account type is approved by a person first.</p>' +
       '<p class="msg" id="acct-msg"></p>' +
     "</div>"
   );
