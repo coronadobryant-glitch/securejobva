@@ -1194,21 +1194,21 @@ html{scroll-behavior:smooth}
     <form class="intake__body" id="apply-form" novalidate>
 
       <section class="step" data-step="0">
-        <h3 class="q">Which track are you applying for?</h3>
-        <p class="q__sub">Pick one. If two genuinely fit, pick the stronger one &mdash; we will ask about the other.</p>
+        <h3 class="q">Which tracks are you applying for?</h3>
+        <p class="q__sub">Pick every one you could do. More tracks means more seats you can be matched to &mdash; we will ask which you are strongest in.</p>
         <div class="opts">
           <label class="opt">
-            <input type="radio" name="track" value="Customer Service">
+            <input type="checkbox" name="track" value="Customer Service">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
             <span><span class="opt__t">Customer Service</span><span class="opt__d">Calls, chat, tickets, bookings, escalations</span></span>
           </label>
           <label class="opt">
-            <input type="radio" name="track" value="Sales &amp; Marketing">
+            <input type="checkbox" name="track" value="Sales &amp; Marketing">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
             <span><span class="opt__t">Sales &amp; Marketing</span><span class="opt__d">Lead follow-up, outbound, CRM, campaigns</span></span>
           </label>
           <label class="opt">
-            <input type="radio" name="track" value="Admin Tasks">
+            <input type="checkbox" name="track" value="Admin Tasks">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
             <span><span class="opt__t">Admin Tasks</span><span class="opt__d">Inbox, calendar, data, invoicing, documents</span></span>
           </label>
@@ -1478,8 +1478,8 @@ html{scroll-behavior:smooth}
   function valid(step) {
     clearErrors();
     if (step === 0) {
-      if (one("track")) return true;
-      document.getElementById("err-track").textContent = "Choose the track you are applying for.";
+      if (picked("track").length) return true;
+      document.getElementById("err-track").textContent = "Choose at least one track you are applying for.";
       return false;
     }
     if (step === 1) {
@@ -1509,7 +1509,7 @@ html{scroll-behavior:smooth}
 
   function collect() {
     return {
-      track: one("track"),
+      tracks: picked("track"),
       experience: one("exp"),
       shifts: picked("shift"),
       speed: one("speed"),
@@ -1532,7 +1532,7 @@ html{scroll-behavior:smooth}
 
   function letter(d) {
     var lines = [
-      "Track: " + d.track,
+      "Tracks: " + d.tracks.join(", "),
       "Experience: " + d.experience,
       "Shifts I can hold: " + d.shifts.join(", "),
       "Connection: " + d.speed,
@@ -1548,7 +1548,7 @@ html{scroll-behavior:smooth}
 
   function finish(mode, d) {
     document.getElementById("apply-recap").innerHTML =
-      row("Track", esc(d.track)) +
+      row("Tracks", esc(d.tracks.join(", "))) +
       row("Shifts", esc(d.shifts.join(", "))) +
       row("Based in", esc(d.country)) +
       row("Experience", esc(d.experience));
@@ -1564,7 +1564,7 @@ html{scroll-behavior:smooth}
       document.getElementById("apply-done-p").textContent =
         "Your application is written and ready — send it and we reply either way.";
       var href = "mailto:" + CFG.email +
-        "?subject=" + encodeURIComponent("Application — " + d.track + " — " + d.name) +
+        "?subject=" + encodeURIComponent("Application — " + d.tracks.join(" / ") + " — " + d.name) +
         "&body=" + encodeURIComponent(letter(d));
       actions.innerHTML = "<a class=\"btn btn--solid\" href=\"" + href + "\">Send the application</a>";
     }
@@ -1625,6 +1625,12 @@ html{scroll-behavior:smooth}
     try { localStorage.setItem(DRAFT, JSON.stringify(collect())); } catch (e) {}
   }
 
+  /* Older drafts stored one track as a string; newer ones store an array. */
+  function trackList(d) {
+    if (d.tracks && d.tracks.length) return d.tracks;
+    return d.track ? [d.track] : [];
+  }
+
   function restore() {
     var raw;
     try { raw = localStorage.getItem(DRAFT); } catch (e) { return; }
@@ -1634,7 +1640,7 @@ html{scroll-behavior:smooth}
     if (!d || typeof d !== "object") return;
     Array.prototype.forEach.call(form.querySelectorAll("input[type=radio], input[type=checkbox]"), function (el) {
       var v = el.value.replace(/&amp;/g, "&");
-      if (el.name === "track") el.checked = d.track === v;
+      if (el.name === "track") el.checked = trackList(d).indexOf(v) > -1;
       if (el.name === "exp") el.checked = d.experience === v;
       if (el.name === "speed") el.checked = d.speed === v;
       if (el.name === "shift") el.checked = !!(d.shifts && d.shifts.indexOf(v) > -1);
