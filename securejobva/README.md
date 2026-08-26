@@ -48,8 +48,14 @@ Every later deploy is the same one command.
 
 ### The domain
 
-In the Vercel project: **Settings → Domains → Add**, enter `securejobva.com`,
-then add `www.securejobva.com` and choose **Redirect to securejobva.com**.
+In the Vercel project: **Settings → Domains → Add**, enter `securejobva.com`
+and `www.securejobva.com`.
+
+**`www` is the primary host**, and the apex redirects to it — that is what the
+project currently serves, and `SITE` in `build.mjs` is set to match so the
+canonical never names a URL that immediately redirects. If you ever flip the
+primary to the apex in Vercel, flip `SITE` in the same commit;
+`node tools/check.mjs --live` fails when the two disagree.
 
 Vercel then shows the exact DNS records to create. Use the ones it shows you —
 the apex IP has changed more than once, so anything written down here would go
@@ -64,11 +70,13 @@ occasionally an hour.
 
 ### Check it
 
+`node tools/check.mjs --live` checks all of this in one go. By hand:
+
 - `securejobva.com` loads over HTTPS
 - **Careers** in the nav goes to `/careers`, with no `.html`
 - `/careers.html` redirects to `/careers`
 - `/apply` and `/jobs` land on the careers page
-- `www.securejobva.com` redirects to the bare domain
+- `securejobva.com` redirects to `www.securejobva.com`
 
 ### Other hosts
 
@@ -114,6 +122,36 @@ Read the rows in the Supabase dashboard, which bypasses RLS.
 Column names match the JSON keys exactly and PostgREST rejects an insert
 carrying a key with no column. Add a field to a form, add the column too.
 
+## Guards
+
+Three, because every way this site loses data is silent. A rejected insert, a
+readable table and a stale canonical all leave the pages rendering perfectly.
+
+**In the page — a submission survives a failed POST.** `send()` retries once,
+then parks the payload in `localStorage` and re-sends it on the visitor's next
+visit; the written-email handoff still runs, it is just no longer the only net.
+The trade is deliberate and worth knowing: a parked row holds a real name,
+email and phone number on that person's own machine. So the queue is capped at
+20, entries are dropped after a week whether or not they ever went, and a
+stored row is deleted the moment Supabase confirms it.
+
+**Before a deploy — `node tools/check.mjs`.** Runs as part of the Vercel build
+command, so a tree that would lose leads cannot ship. It checks that every
+inline script parses, that every form field has a column, that no unrounded
+arithmetic goes into an integer column, that `supabase.sql` still grants `anon`
+nothing but INSERT, and that `dist/` carries its meta with no artifact URLs
+left in it. Add `--live` to also check the running site's routes, redirects and
+canonical host. It also runs `tools/test-queue.mjs`, which pulls the queue code
+straight out of `index.html` and drives it against a mocked store — parking,
+draining, the cap, the expiry, and storage being blocked outright.
+
+**Against the database — `node tools/guard-rls.mjs`.** Asserts that the
+publishable key still cannot `SELECT` from either table, and that it can still
+insert. This is the one rule below, checked rather than believed: it is a
+single dashboard toggle away from being untrue, and nothing in this repo would
+change when it happened. Nothing it does writes a row — the insert probe names
+a column that does not exist on purpose. Worth running on a schedule.
+
 ## Brand
 
 Four colours, read pixel by pixel out of the supplied logo file. They are the
@@ -157,17 +195,20 @@ want the wordmark card instead, then overwrite `og.png`.
 
 ## Still to do before launch
 
-- **Confirm `support@` receives mail.** Both pages now use one address,
-  `support@securejobva.com`. The domain does have MX records pointing at GoDaddy
-  (`smtp.secureserver.net`, `mailstore1.secureserver.net`), plus SPF and DMARC — but
-  MX records only route mail, they do not create a mailbox. Send a test message from
-  another account and confirm it arrives rather than bounces.
-- **Pay bands on `careers.html`** — flagged placeholder, the first thing applicants look for.
-- **Confirm the hardware minimums** on `careers.html`; applicants buy kit against them.
-- **Client quotes on `index.html`** — optional. The first-90-days section stands on its own;
-  three real quotes can replace it in the same grid once you have written permission.
+- **Confirm `support@` receives mail.** The only one still open, and the only one
+  that cannot be checked from this repo. Mail is on **Zoho**, not GoDaddy, and the
+  DNS side is complete and correct: MX at `mx.zoho.com` (10/20/50), SPF
+  `include:zohomail.com`, DKIM on `zmail._domainkey`, DMARC `p=quarantine` with
+  reports going to `support@`, domain verified. But MX records route mail, they do
+  not create a mailbox. Send a real message from an outside account and confirm it
+  lands in the Zoho inbox rather than bouncing. Every fallback on both pages hands
+  the visitor this address, so a dead box loses the leads the guards just saved.
 - **A booking link** (optional). `CFG.scheduler` on `index.html` takes a Cal.com or
   Calendly URL and adds a "Pick your time" step after submit.
+
+Settled, so they are not on the list any more: hardware minimums on `careers.html`
+are concrete; pay stays at the offer stage by decision, not by oversight; the
+first-90-days grid on `index.html` stays as it is rather than carrying quotes.
 
 ## Note
 

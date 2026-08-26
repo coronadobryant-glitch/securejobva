@@ -1298,7 +1298,7 @@ img{max-width:100%}
       "Authorization": "Bearer sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
       "Prefer":        "return=minimal"
     },
-    scheduler: "",                 /* Cal.com or Calendly link */
+    scheduler: "https://cal.com/securejobva.com/20min",
     email: "support@securejobva.com",
     rate: 7.75
   };
@@ -1342,8 +1342,16 @@ img{max-width:100%}
     var el = document.getElementById(id);
     return el ? el.value.trim() : "";
   }
+  /* 7.75 an hour only lands on a whole dollar when the week divides by four,
+     so 30 hrs is 232.5 and toLocaleString would render that "$232.5" — a price
+     with one decimal place, which reads as a typo. Show the cents when there
+     are cents, and never when there are not. */
   function money(n) {
-    return "$" + n.toLocaleString("en-US");
+    var frac = Math.abs(n % 1) > 0.0001;
+    return "$" + n.toLocaleString("en-US", {
+      minimumFractionDigits: frac ? 2 : 0,
+      maximumFractionDigits: frac ? 2 : 0
+    });
   }
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1414,7 +1422,11 @@ img{max-width:100%}
     return {
       seats: picked("seat"),
       hours: h,
-      weekly: h * CFG.rate,
+      /* seat_requests.weekly is an integer column. Sending 232.5 makes
+         PostgREST reject the whole insert with 22P02 and the lead is lost, so
+         the stored figure is rounded here — the quote the visitor saw is
+         unrounded and unchanged. */
+      weekly: Math.round(h * CFG.rate),
       blocks: picked("block"),
       timezone: val("in-tz"),
       name: val("in-name"),
@@ -1481,29 +1493,105 @@ img{max-width:100%}
     try { localStorage.removeItem(DRAFT); } catch (e) {}
   }
 
+  /* ── Lead guard ─────────────────────────────────────────────────────────
+     A submission has to survive three separate failures: a visitor's bad
+     network, a Supabase blip, and a mailbox that silently bounces. So a failed
+     POST is retried once, then parked in localStorage and re-sent on the next
+     visit — the written-email handoff still runs, it is no longer the only net.
+
+     The parked rows are real contact details, so this is a deliberate trade:
+     a lead that would otherwise vanish is held on the visitor's own machine,
+     capped, and dropped after a week whether or not it ever went. */
+  var QUEUE     = "sjva-queue-intake";
+  var QUEUE_TTL = 7 * 24 * 60 * 60 * 1000;
+  var QUEUE_MAX = 20;
+
+  /* Supabase needs an apikey and an Authorization header, so the set is built
+     here rather than written inline. CFG.headers wins on a clash. */
+  function hdrs() {
+    var h = { "Content-Type": "application/json", "Accept": "application/json" };
+    for (var k in CFG.headers) {
+      if (Object.prototype.hasOwnProperty.call(CFG.headers, k)) h[k] = CFG.headers[k];
+    }
+    return h;
+  }
+
+  /* "ok" | "retry" | "dead". A 4xx that is not 429 is the payload's own fault —
+     a column that does not exist, a policy that says no — and retrying it a
+     hundred times changes nothing, so it is not transient. It is still parked,
+     because a lead we cannot store is exactly the one worth keeping where a
+     human can still get at it. */
+  function post(d) {
+    return fetch(CFG.endpoint, {
+      method: "POST", headers: hdrs(), body: JSON.stringify(d)
+    }).then(function (r) {
+      if (r.ok) return "ok";
+      if (r.status >= 400 && r.status < 500 && r.status !== 429) return "dead";
+      return "retry";
+    })["catch"](function () { return "retry"; }); /* offline, DNS, CORS */
+  }
+
+  function queueRead() {
+    var raw;
+    try { raw = localStorage.getItem(QUEUE); } catch (e) { return []; }
+    if (!raw) return [];
+    var q;
+    try { q = JSON.parse(raw); } catch (e) { return []; }
+    if (!q || !q.length) return [];
+    var cut = Date.now() - QUEUE_TTL;
+    return q.filter(function (row) { return row && row.at > cut; });
+  }
+
+  function queueWrite(q) {
+    try {
+      if (q.length) localStorage.setItem(QUEUE, JSON.stringify(q.slice(-QUEUE_MAX)));
+      else localStorage.removeItem(QUEUE);
+    } catch (e) {}
+  }
+
+  function park(d) {
+    var q = queueRead();
+    q.push({ at: Date.now(), body: d });
+    queueWrite(q);
+  }
+
+  /* Drains on load, one row at a time, never in parallel — a queue this size is
+     not worth a burst of requests. Nothing here touches the page: someone who
+     is only reading must not see anything from a submission they already
+     finished. Rows that still will not go stay parked until they expire. */
+  function drain() {
+    var q = queueRead();
+    if (!q.length || !CFG.endpoint) { queueWrite(q); return; }
+    var keep = [];
+    (function step(i) {
+      if (i >= q.length) { queueWrite(keep); return; }
+      post(q[i].body).then(function (verdict) {
+        if (verdict !== "ok") keep.push(q[i]);
+        step(i + 1);
+      });
+    })(0);
+  }
+
   function send() {
     var d = collect();
     if (!CFG.endpoint) { finish("handoff", d); return; }
 
     next.setAttribute("aria-busy", "true");
     next.textContent = "Sending…";
-    /* Supabase needs an apikey and an Authorization header, so the set is built
-       here rather than written inline. CFG.headers wins on a clash. */
-    var hdrs = { "Content-Type": "application/json", "Accept": "application/json" };
-    for (var hk in CFG.headers) {
-      if (Object.prototype.hasOwnProperty.call(CFG.headers, hk)) hdrs[hk] = CFG.headers[hk];
-    }
-    fetch(CFG.endpoint, {
-      method: "POST",
-      headers: hdrs,
-      body: JSON.stringify(d)
-    }).then(function (r) {
-      if (!r.ok) throw new Error(r.status);
-      finish("sent", d);
-    })["catch"](function () {
+
+    /* One immediate retry covers the ordinary case — a dropped connection, a
+       cold function — without making anyone sit through a real backoff. */
+    post(d).then(function (v) {
+      return v === "retry" ? post(d) : v;
+    }).then(function (v) {
+      if (v === "ok") { finish("sent", d); return; }
+      park(d);
       finish("handoff", d);
       document.getElementById("err-send").textContent =
-        "That did not send. Use the email button below instead.";
+        "That did not send, so we saved it and will keep trying. Use the email button below to reach us now.";
+    })["catch"](function () {
+      park(d);
+      finish("handoff", d);
     }).then(function () {
       next.removeAttribute("aria-busy");
       next.textContent = "Send it";
@@ -1630,6 +1718,10 @@ img{max-width:100%}
     if (tog) tog.setAttribute("aria-expanded", "false");
     open();
   });
+
+  /* Anything a previous visit could not store goes now, before the visitor
+     does anything at all — they may never open this dialog again. */
+  drain();
 })();
 
   /* A mailto: link only does something when the visitor has a desktop mail

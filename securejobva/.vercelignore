@@ -12,9 +12,13 @@ node_modules/
 .claude/
 .vscode/
 
-# Docs and schema — read by people, not by the build.
+# Docs — read by people, not by the build.
 README.md
-supabase.sql
+
+# supabase.sql is NOT ignored. It used to be, because only people read it. The
+# build command now runs tools/check.mjs, which reads it to prove every form
+# field still has a column — so it is a build input, and ignoring it here makes
+# the deploy fail on a missing file rather than pass.
 
 # Host configs for Cloudflare Pages, Netlify and Apache. Kept in the repo so the
 # site can move hosts without a rewrite; Vercel reads vercel.json instead and
