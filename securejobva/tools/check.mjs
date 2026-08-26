@@ -367,24 +367,59 @@ await check("anon can still only INSERT", () => {
   const stmts = sql.match(/grant\b[\s\S]*?;/gi) || [];
   if (!stmts.length) throw new Error("no grants found — has the file been rewritten?");
 
+  /* One table is public on purpose: client_logos holds a company name, a logo
+     URL and a sort order, and the home page reads it with the publishable key
+     to draw the client strip. There is no person in it.
+
+     Named explicitly rather than allowing SELECT generally, because "anon may
+     select" is the exact sentence this check exists to stop anybody writing by
+     accident. Adding a table to this list should feel like a decision. */
+  const PUBLIC_BY_DESIGN = ["client_logos"];
+
   const offenders = [];
   for (const s of stmts) {
     const to = (s.match(/\sto\s+([a-z_, ]+);/i) || [])[1] || "";
     const grantees = to.split(",").map((g) => g.trim().toLowerCase());
     if (!grantees.some((g) => g === "anon" || g === "public")) continue;
+
+    const table = ((s.match(/\son\s+(?:table\s+)?public\.([a-z_]+)/i) || [])[1] || "").toLowerCase();
     const privs = (s.match(/grant\s+([\s\S]*?)\s+on\s/i) || [])[1] || "";
     const clean = privs.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-    if (clean !== "insert") offenders.push(clean + " -> " + grantees.join(", "));
+
+    if (PUBLIC_BY_DESIGN.includes(table)) {
+      /* Even here, only reading. A write grant on the client strip would let
+         anyone with the page source edit who we say we work for. */
+      if (clean !== "select") offenders.push(clean + " -> anon on " + table);
+      continue;
+    }
+    if (clean !== "insert") {
+      offenders.push(clean + " -> " + grantees.join(", ") + " on " + (table || "?"));
+    }
   }
   if (offenders.length) {
     throw new Error("anon/public granted more than insert: " + offenders.join("; ") +
       " — this publishes the applicant list");
   }
-  if (/for\s+select\s+to\s+(anon|public)\b/i.test(sql)) {
-    throw new Error("a SELECT policy for anon would publish the applicant list");
+  /* Same rule for policies: a select policy naming anon has to be on a table
+     from the short list above, and nowhere else.
+
+     Split on the keyword rather than matching `create policy … ;` with a lazy
+     span. Across a concatenated schema that span runs from the first policy in
+     the file to whichever one mentions anon, and the table name it then reads
+     is the wrong one — it accused seat_requests of a policy belonging to
+     client_logos. One chunk per statement cannot do that. */
+  for (const chunk of sql.split(/create\s+policy/i).slice(1)) {
+    const stmt = chunk.slice(0, chunk.indexOf(";") + 1 || chunk.length);
+    if (!/for\s+select\s+to\s+(?:anon|public)\b/i.test(stmt)) continue;
+    const on = ((stmt.match(/\son\s+public\.([a-z_]+)/i) || [])[1] || "").toLowerCase();
+    if (!PUBLIC_BY_DESIGN.includes(on)) {
+      throw new Error("a SELECT policy for anon on " + (on || "?") + " would publish it — only " +
+        PUBLIC_BY_DESIGN.join(", ") + " may be read with the public key");
+    }
   }
   const authed = stmts.filter((s) => /\sto\s+[^;]*authenticated/i.test(s)).length;
-  return stmts.length + " grants — anon insert-only, " + authed + " to signed-in users";
+  return stmts.length + " grants — anon insert-only except " + PUBLIC_BY_DESIGN.join(", ") +
+    " (read), " + authed + " to signed-in users";
 });
 
 /* ── built output ────────────────────────────────────────────────────────── */
