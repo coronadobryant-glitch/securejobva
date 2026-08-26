@@ -178,6 +178,42 @@ for (const p of PAGES) {
   });
 }
 
+/* Every column on applications must be granted, not just the named ones.
+
+   The earlier check below compares the columns a page names in `select=`. That
+   missed the failure that reached production, because nothing named the column:
+   the admin page PATCHes a stage without `Prefer: return=minimal`, PostgREST
+   returns the updated row, and returning a row reads every column in it. One
+   ungranted column — user_id, added by 004 — refused the whole statement, and
+   the operator saw an error about SELECT on an update they had not made.
+
+   So the rule is the stronger one: if a column exists on applications, a
+   signed-in user may read it. Row-level security decides *which rows* they see,
+   which is the part that actually protects anyone. Withholding a column on a
+   row they can already read buys nothing and breaks `select=*`.
+
+   A column that genuinely must be hidden belongs in its own table — that is
+   exactly why 005 put the internal pipeline in application_tracking rather
+   than adding columns here. */
+await check("every applications column is granted", () => {
+  const declared = new Set(Object.keys(columns(sql, "applications")));
+  const granted = new Set();
+  for (const stmt of sql.split(";")) {
+    const m = stmt.match(/grant\s+select\s*\(([^)]*)\)\s*on\s+public\.applications\s+to\s+authenticated/i);
+    if (m) for (const c of m[1].split(",")) {
+      const t = c.trim().replace(/--.*/, "").trim();
+      if (t) granted.add(t);
+    }
+  }
+  const missing = [...declared].filter((c) => !granted.has(c));
+  if (missing.length) {
+    throw new Error(missing.join(", ") + " — declared on applications but never granted SELECT to " +
+      "authenticated. Any select=* against the table refuses the whole statement with 42501. " +
+      "Grant it, or move it to its own table if it truly must be hidden.");
+  }
+  return declared.size + " columns, all granted";
+});
+
 /* The mirror of the form check, for the pages that read rather than write.
 
    Grants on applications are column-level, and PostgREST refuses the whole
@@ -367,59 +403,76 @@ await check("anon can still only INSERT", () => {
   const stmts = sql.match(/grant\b[\s\S]*?;/gi) || [];
   if (!stmts.length) throw new Error("no grants found — has the file been rewritten?");
 
-  /* One table is public on purpose: client_logos holds a company name, a logo
-     URL and a sort order, and the home page reads it with the publishable key
-     to draw the client strip. There is no person in it.
+  /* Insert-only is the rule, and 015 is the first honest exception: client
+     logos are marketing, shown by an <img> to visitors who are not signed in,
+     and signing those URLs would break the strip for everyone it is for.
 
-     Named explicitly rather than allowing SELECT generally, because "anon may
-     select" is the exact sentence this check exists to stop anybody writing by
-     accident. Adding a table to this list should feel like a decision. */
-  const PUBLIC_BY_DESIGN = ["client_logos"];
+     So the exception is allowed, but it has to be *declared*. A table opens to
+     anon reads only when its file says so in as many words:
+
+       -- ANON MAY READ client_logos — public marketing, no personal data
+
+     which means the next one cannot be waved through by whoever is reading the
+     diff in a hurry. A table holding a person's details should never carry that
+     line, and writing it is a decision somebody has to make on purpose. */
+  /* These hold people. No declaration opens them — the line above is for
+     marketing tables, not an override anyone can type over a table of names,
+     emails, phone numbers, CVs or tokens. If one of these ever genuinely has
+     to be readable by anon, that is a conversation, not a comment. */
+  const NEVER_PUBLIC = new Set([
+    "applications", "seat_requests", "contact_messages", "application_notes",
+    "application_tracking", "application_socials", "application_documents",
+    "application_queue", "social_tokens", "admins", "user_roles",
+    "role_requests", "roles", "permissions", "role_permissions"
+  ]);
+
+  const declaredPublic = new Set(
+    [...sql.matchAll(/--\s*ANON MAY READ\s+(\w+)/gi)]
+      .map((m) => m[1].toLowerCase())
+      .filter((t) => !NEVER_PUBLIC.has(t))
+  );
 
   const offenders = [];
   for (const s of stmts) {
     const to = (s.match(/\sto\s+([a-z_, ]+);/i) || [])[1] || "";
     const grantees = to.split(",").map((g) => g.trim().toLowerCase());
     if (!grantees.some((g) => g === "anon" || g === "public")) continue;
-
-    const table = ((s.match(/\son\s+(?:table\s+)?public\.([a-z_]+)/i) || [])[1] || "").toLowerCase();
+    const table = ((s.match(/\son\s+public\.(\w+)/i) || [])[1] || "").toLowerCase();
     const privs = (s.match(/grant\s+([\s\S]*?)\s+on\s/i) || [])[1] || "";
     const clean = privs.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-
-    if (PUBLIC_BY_DESIGN.includes(table)) {
-      /* Even here, only reading. A write grant on the client strip would let
-         anyone with the page source edit who we say we work for. */
-      if (clean !== "select") offenders.push(clean + " -> anon on " + table);
+    if (clean === "insert") continue;
+    if (declaredPublic.has(table)) {
+      /* The declaration opens a table to READING. It is not a general waiver:
+         `grant update on client_logos to anon` would otherwise slip through
+         here and let anyone with the page source rewrite who we say we work
+         for. Declared-public means public to read, nothing more. */
+      if (clean !== "select") {
+        offenders.push(clean + " on " + table + " -> " + grantees.join(", ") +
+          " (declared public means readable, not writable)");
+      }
       continue;
     }
-    if (clean !== "insert") {
-      offenders.push(clean + " -> " + grantees.join(", ") + " on " + (table || "?"));
-    }
+    offenders.push(clean + " on " + table + " -> " + grantees.join(", "));
   }
   if (offenders.length) {
     throw new Error("anon/public granted more than insert: " + offenders.join("; ") +
       " — this publishes the applicant list");
   }
-  /* Same rule for policies: a select policy naming anon has to be on a table
-     from the short list above, and nowhere else.
-
-     Split on the keyword rather than matching `create policy … ;` with a lazy
-     span. Across a concatenated schema that span runs from the first policy in
-     the file to whichever one mentions anon, and the table name it then reads
-     is the wrong one — it accused seat_requests of a policy belonging to
-     client_logos. One chunk per statement cannot do that. */
-  for (const chunk of sql.split(/create\s+policy/i).slice(1)) {
-    const stmt = chunk.slice(0, chunk.indexOf(";") + 1 || chunk.length);
-    if (!/for\s+select\s+to\s+(?:anon|public)\b/i.test(stmt)) continue;
-    const on = ((stmt.match(/\son\s+public\.([a-z_]+)/i) || [])[1] || "").toLowerCase();
-    if (!PUBLIC_BY_DESIGN.includes(on)) {
-      throw new Error("a SELECT policy for anon on " + (on || "?") + " would publish it — only " +
-        PUBLIC_BY_DESIGN.join(", ") + " may be read with the public key");
+  /* Same rule for the policy that pairs with the grant: a SELECT policy aimed
+     at anon is how a table becomes public, so it needs the same declaration. */
+  for (const [, table] of sql.matchAll(
+    /create\s+policy\s+[^\n]*?\son\s+public\.(\w+)\s+for\s+select\s+to\s+(?:anon|public)\b/gi
+  )) {
+    if (!declaredPublic.has(table.toLowerCase())) {
+      offenders.push("a SELECT policy for anon on " + table);
     }
   }
+  if (offenders.length) {
+    throw new Error(offenders.join("; ") + " — declare it with a `-- ANON MAY READ <table>` " +
+      "line if it is genuinely public, or this publishes personal data");
+  }
   const authed = stmts.filter((s) => /\sto\s+[^;]*authenticated/i.test(s)).length;
-  return stmts.length + " grants — anon insert-only except " + PUBLIC_BY_DESIGN.join(", ") +
-    " (read), " + authed + " to signed-in users";
+  return stmts.length + " grants — anon insert-only, " + authed + " to signed-in users";
 });
 
 /* ── built output ────────────────────────────────────────────────────────── */

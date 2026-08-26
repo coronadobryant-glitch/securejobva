@@ -94,6 +94,10 @@ create table if not exists public.client_logos (
 );
 
 alter table public.client_logos enable row level security;
+-- ANON MAY READ client_logos — public marketing, no personal data. Fenced by a
+-- policy to `visible` rows and a column list; a logo is a company name and an
+-- image URL, which is the whole point of putting it on the home page.
+
 revoke all on public.client_logos from anon, authenticated;
 
 -- The public reads only what is marked visible, so a logo can be prepared or
