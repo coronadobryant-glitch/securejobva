@@ -129,12 +129,12 @@ img{max-width:100%}
   backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
-.nav__in{display:flex;align-items:center;gap:1.75rem;height:68px}
+.nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
 .brand__word{display:inline}
 .brand__va{color:var(--accent)}
-.nav__links{display:none;gap:1.6rem;margin-left:auto;font-size:.94rem;font-weight:500}
+.nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
 .nav__cta{margin-left:0}
@@ -346,8 +346,8 @@ img{max-width:100%}
 /* ---------- intake dialog ---------- */
 .intake{
   border:none;padding:0;background:transparent;color:var(--ink);
-  width:min(100% - 1.5rem,34.5rem);max-width:none;
-  max-height:min(92vh,47rem);
+  width:min(100% - 1.5rem,46rem);max-width:none;
+  max-height:min(94vh,56rem);
 }
 .intake::backdrop{background:rgba(28,14,12,.58);backdrop-filter:blur(3px)}
 .intake__panel{
@@ -358,9 +358,9 @@ img{max-width:100%}
 @keyframes intakeIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 .intake[open] .intake__panel{animation:intakeIn .22s cubic-bezier(.2,.8,.2,1) both}
 
-.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.15rem 1.35rem 1rem}
+.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.3rem 1.7rem 1.1rem}
 .intake__head .brand__mark{width:22px;height:22px}
-.intake__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.02em}
+.intake__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.22rem;letter-spacing:-.02em}
 .intake__x{
   margin-left:auto;width:34px;height:34px;flex:none;
   display:inline-flex;align-items:center;justify-content:center;
@@ -371,20 +371,20 @@ img{max-width:100%}
 .intake__x:hover{border-color:var(--accent);color:var(--accent)}
 
 /* three real steps, so the rail is a sequence and not decoration */
-.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;padding:0 1.35rem 1.1rem}
+.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;padding:0 1.7rem 1.2rem}
 .rail__i{display:grid;gap:.45rem}
 .rail__bar{height:3px;border-radius:2px;background:var(--line);transition:background-color .2s ease}
 .rail__i[data-on] .rail__bar{background:var(--accent)}
 .rail__l{
-  font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.1em;
+  font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted);
 }
 .rail__i[data-on] .rail__l{color:var(--ink-2)}
 
-.intake__body{padding:.35rem 1.35rem 1.5rem;overflow-y:auto}
+.intake__body{padding:.35rem 1.7rem 1.75rem;overflow-y:auto}
 .step[hidden]{display:none}
-.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.08rem;letter-spacing:-.01em}
-.q__sub{font-size:.88rem;color:var(--muted);margin:.3rem 0 1.05rem;line-height:1.45}
+.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.24rem;letter-spacing:-.015em}
+.q__sub{font-size:.95rem;color:var(--muted);margin:.35rem 0 1.15rem;line-height:1.5}
 .q--again{margin-top:1.65rem}
 
 .opts{display:grid;gap:.55rem}
@@ -392,7 +392,7 @@ img{max-width:100%}
 .opt{
   position:relative;display:flex;gap:.65rem;align-items:flex-start;
   background:var(--paper);border:1.5px solid var(--line);border-radius:9px;
-  padding:.75rem .85rem;cursor:pointer;
+  padding:.9rem 1rem;cursor:pointer;
   transition:border-color .15s ease,background-color .15s ease;
 }
 .opt:hover{border-color:var(--accent)}
@@ -404,8 +404,8 @@ img{max-width:100%}
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
-.opt__t{font-weight:600;font-size:.96rem;line-height:1.3;display:block}
-.opt__d{font-size:.82rem;color:var(--muted);display:block;margin-top:.15rem;line-height:1.4}
+.opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
+.opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
@@ -413,8 +413,8 @@ img{max-width:100%}
 .seg{display:flex;flex-wrap:wrap;gap:.45rem}
 .seg label{
   position:relative;cursor:pointer;
-  font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums;
-  border:1.5px solid var(--line);border-radius:8px;padding:.55rem .8rem;background:var(--paper);
+  font-family:"IBM Plex Mono",monospace;font-size:.9rem;font-variant-numeric:tabular-nums;
+  border:1.5px solid var(--line);border-radius:8px;padding:.62rem .9rem;background:var(--paper);
   transition:border-color .15s ease,background-color .15s ease,color .15s ease;
 }
 .seg label:hover{border-color:var(--accent)}
@@ -440,30 +440,30 @@ img{max-width:100%}
   .fields2{display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem}
 }
 .field > label{
-  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted);
 }
 .field > label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.8}
 .field input,.field textarea,.field select{
-  font-family:inherit;font-size:.97rem;color:var(--ink);background:var(--paper);
-  border:1.5px solid var(--line);border-radius:8px;padding:.7rem .8rem;width:100%;
+  font-family:inherit;font-size:1.06rem;color:var(--ink);background:var(--paper);
+  border:1.5px solid var(--line);border-radius:8px;padding:.85rem .95rem;width:100%;
   transition:border-color .15s ease;
 }
-.field textarea{min-height:5.5rem;resize:vertical;line-height:1.5}
+.field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
 .field input:hover,.field textarea:hover,.field select:hover{border-color:var(--muted)}
 .field.is-bad input,.field.is-bad select,.field.is-bad textarea{border-color:var(--accent)}
-.err{font-size:.82rem;color:var(--accent);font-weight:600;line-height:1.4}
+.err{font-size:.88rem;color:var(--accent);font-weight:600;line-height:1.4}
 .err:empty{display:none}
 
 .intake__foot{
   display:flex;align-items:center;gap:.7rem;
-  padding:.95rem 1.35rem;border-top:1px solid var(--line);background:var(--surface-2);
+  padding:1.05rem 1.7rem;border-top:1px solid var(--line);background:var(--surface-2);
 }
 .intake__count{
-  font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--muted);
   margin-right:auto;font-variant-numeric:tabular-nums;
 }
-.intake .btn{padding:.7rem 1.2rem;font-size:.92rem}
+.intake .btn{padding:.8rem 1.4rem;font-size:1rem}
 .btn[aria-busy="true"]{opacity:.7;pointer-events:none}
 
 .done{text-align:center;padding:.75rem 0 .25rem}
@@ -472,7 +472,7 @@ img{max-width:100%}
   background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;
 }
 .done h3{font-size:var(--step-2);letter-spacing:-.025em}
-.done > p{color:var(--ink-2);font-size:.97rem;margin-top:.7rem;max-width:44ch;margin-inline:auto}
+.done > p{color:var(--ink-2);font-size:1.03rem;margin-top:.7rem;max-width:46ch;margin-inline:auto}
 .recap{
   text-align:left;border:1px solid var(--line);border-radius:9px;
   background:var(--paper);margin:1.4rem 0 0;overflow:hidden;
@@ -481,17 +481,17 @@ img{max-width:100%}
 .recap__row:last-child{border-bottom:none}
 .recap__row--tot{background:var(--accent-soft)}
 .recap__k{
-  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.09em;
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;
   text-transform:uppercase;color:var(--muted);flex:none;
 }
-.recap__v{font-size:.92rem;font-weight:600;text-align:right}
+.recap__v{font-size:.98rem;font-weight:600;text-align:right}
 .done__actions{display:flex;flex-wrap:wrap;gap:.6rem;justify-content:center;margin-top:1.4rem}
 .done__note{margin-top:1.1rem;font-size:.8rem;color:var(--muted)}
 
 @media(max-width:560px){
   .intake{width:100%;height:100%;max-height:100%;margin:0}
   .intake__panel{border-radius:0;border:none;height:100%}
-  .intake__head,.rail,.intake__body,.intake__foot{padding-inline:1.1rem}
+  .intake__head,.rail,.intake__body,.intake__foot{padding-inline:1.15rem}
   .est__l{text-align:left}
 }
 
@@ -548,6 +548,81 @@ img{max-width:100%}
   font-size:.88rem;color:var(--ink-2);
 }
 .fit b{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem;font-weight:500}
+
+/* ---------- jump tabs ---------- */
+/* Anchored jumps land under the sticky 68px nav rather than behind it. */
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+#top,#tracks,#offer,#paid-training,#requirements,#process,#faq,#apply-now{scroll-margin-top:5.5rem}
+
+.jump{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:1.15rem}
+.jump__l{
+  width:100%;margin-bottom:.15rem;
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);
+}
+.jump a{
+  display:inline-flex;align-items:center;gap:.4rem;
+  font-size:.86rem;font-weight:600;text-decoration:none;color:var(--ink-2);
+  background:var(--surface);border:1.5px solid var(--line);border-radius:999px;
+  padding:.42rem .9rem;
+  transition:border-color .15s ease,color .15s ease,transform .15s ease;
+}
+.jump a::after{content:"\2193";font-size:.82em;opacity:.5}
+.jump a:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+.jump a.jump--hi{
+  background:var(--signal);border-color:var(--signal);color:var(--signal-ink);
+}
+.jump a.jump--hi::after{opacity:.6}
+.jump a.jump--hi:hover{border-color:var(--signal);color:var(--signal-ink)}
+
+/* ---------- top bar: live openings ---------- */
+.bar{
+  background:var(--price-bg);color:var(--price-fg);
+  border-bottom:1px solid var(--line);
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.74rem;letter-spacing:.05em;
+}
+.bar__in{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  gap:.35rem .95rem;padding:.6rem 0;text-align:center;
+}
+.bar__item{display:inline-flex;align-items:center;gap:.45rem;white-space:nowrap}
+.bar b{font-weight:500;color:var(--signal);font-variant-numeric:tabular-nums}
+.bar__sep{opacity:.28;display:none}
+@media(min-width:760px){.bar__sep{display:inline}}
+.bar__dot{
+  width:7px;height:7px;flex:none;border-radius:50%;background:var(--signal);
+  animation:barpulse 2.4s ease-out infinite;
+}
+@keyframes barpulse{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--signal) 65%,transparent)}
+  70%{box-shadow:0 0 0 7px transparent}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+
+/* ---------- paid-training callout ---------- */
+.ptrain{
+  display:flex;gap:.85rem;align-items:flex-start;
+  margin-top:1.5rem;padding:1.05rem 1.2rem;
+  background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  border-left:4px solid var(--signal);
+  border-radius:10px;
+}
+.ptrain__t{max-width:52ch}
+.ptrain__i{
+  width:30px;height:30px;flex:none;border-radius:8px;
+  display:grid;place-items:center;
+  background:var(--signal);color:var(--signal-ink);
+}
+.ptrain__t{font-size:.98rem;color:var(--ink-2);line-height:1.55}
+.ptrain__t b{color:var(--ink);font-weight:700}
+.ptrain__k{
+  display:block;font-family:"IBM Plex Mono",monospace;
+  font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent-deep);font-weight:500;margin-bottom:.25rem;
+}
 </style>
 
 <script>
@@ -572,6 +647,18 @@ img{max-width:100%}
   </defs>
 </svg>
 
+<!-- Live openings bar. The two counts live here and nowhere else on the page,
+     so this is the only line to edit when the numbers move. -->
+<div class="bar">
+  <div class="wrap bar__in">
+    <span class="bar__item"><span class="bar__dot" aria-hidden="true"></span><b>37</b>&nbsp;jobs available now</span>
+    <span class="bar__sep" aria-hidden="true">&middot;</span>
+    <span class="bar__item">Only <b>&nbsp;17&nbsp;</b> seats left in this intake</span>
+    <span class="bar__sep" aria-hidden="true">&middot;</span>
+    <span class="bar__item">Paid training once you pass</span>
+  </div>
+</div>
+
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
@@ -586,6 +673,7 @@ img{max-width:100%}
         <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
       </a>
       <nav class="nav__links">
+        <a href="#paid-training">Paid training</a>
         <a href="#tracks">Tracks</a>
         <a href="#requirements">Requirements</a>
         <a href="#process">How to apply</a>
@@ -613,7 +701,9 @@ img{max-width:100%}
   </div>
   <div class="mobnav" id="mobnav" hidden>
     <div class="wrap mobnav__in">
+      <a href="#paid-training">Paid training</a>
       <a href="#tracks">Tracks</a>
+      <a href="#offer">The seat</a>
       <a href="#requirements">Requirements</a>
       <a href="#process">How to apply</a>
       <a href="#faq">FAQ</a>
@@ -626,19 +716,35 @@ img{max-width:100%}
   <section class="hero">
     <div class="wrap hero__grid">
       <div>
-        <span class="eyebrow">Now hiring worldwide &middot; Full-time remote seats</span>
-        <h1>A <span class="hl">full-time seat</span>, not a gig queue.</h1>
-        <p class="lede">We place you with one business &mdash; customer service, sales and marketing, or admin support &mdash; on fixed hours, with the same client and the same manager every week. Apply from any country.</p>
+        <span class="eyebrow">Now hiring worldwide &middot; 40 hrs/week &middot; American time</span>
+        <h1><span class="hl">Paid training</span>, then a full-time seat.</h1>
+        <p class="lede">Pass the exams and we train you on our payroll, not yours. Then <b>forty hours a week</b> on fixed hours in American time &mdash; customer service, sales and marketing, or admin support. One business, one manager, no gig queue. Apply from any country.</p>
+        <div class="ptrain">
+          <span class="ptrain__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 9 12 4 2 9l10 5 10-5Z"></path><path d="M6 11.5V17c0 1.6 3 3 6 3s6-1.4 6-3v-5.5"></path></svg></span>
+          <p class="ptrain__t">
+            <span class="ptrain__k">Paid training &middot; top of the offer</span>
+            Clear the exams and the qualification checks and your training is <b>paid</b> &mdash; you earn while you learn, and it starts within one week of being approved.
+          </p>
+        </div>
         <div class="hero__actions">
           <a class="btn btn--solid" data-apply href="#apply-now">Apply now</a>
           <a class="btn btn--ghost" href="#requirements">Check the requirements</a>
         </div>
+        <nav class="jump" aria-label="Jump to a section">
+          <span class="jump__l">Or jump to</span>
+          <a class="jump--hi" href="#paid-training">Paid training</a>
+          <a href="#tracks">Tracks</a>
+          <a href="#offer">What the seat gives you</a>
+          <a href="#requirements">Requirements</a>
+          <a href="#process">How to apply</a>
+          <a href="#faq">FAQ</a>
+        </nav>
         <p class="hero__note">Free to apply, always. We never charge a placement fee, and we never take a cut of your pay.</p>
       </div>
 
       <div class="tl">
         <div class="tl__head">
-          <span class="tl__title">Application to first shift</span>
+          <span class="tl__title">Application to paid training</span>
           <span class="eyebrow">Typical</span>
         </div>
         <div class="tl__row">
@@ -651,22 +757,22 @@ img{max-width:100%}
         <div class="tl__row">
           <span class="tl__d">Day 1&ndash;3</span>
           <span>
-            <span class="tl__t">Assessment</span>
-            <span class="tl__s">A short written task and a values check, done in your own time.</span>
+            <span class="tl__t">Exams and assessment</span>
+            <span class="tl__s">A written task in your track, the qualification exams and a values check, in your own time.</span>
           </span>
         </div>
         <div class="tl__row">
           <span class="tl__d">Day 4&ndash;7</span>
           <span>
-            <span class="tl__t">Two interviews</span>
-            <span class="tl__s">One with us. One with the business you would work for.</span>
+            <span class="tl__t">Two interviews, then a decision</span>
+            <span class="tl__s">One with us. One with the business you would work for. Then a yes or a no.</span>
           </span>
         </div>
         <div class="tl__row">
           <span class="tl__d">Day 8+</span>
           <span>
-            <span class="tl__t">Onboarding, then your first shift</span>
-            <span class="tl__s">Tools, handover and your shift in the client&rsquo;s time zone.</span>
+            <span class="tl__t">Approved &mdash; paid training starts</span>
+            <span class="tl__s">Within one week of approval. Tools, scripts and handover, then your first shift on American hours.</span>
           </span>
         </div>
         <p class="tl__foot">You hear from a person at <b>every</b> stage &mdash; including a no. Silence is not how we run this.</p>
@@ -676,9 +782,9 @@ img{max-width:100%}
 
   <section class="stats">
     <div class="wrap stats__in">
-      <div class="stat"><span class="stat__n">3</span><span class="stat__l">Tracks open</span></div>
-      <div class="stat"><span class="stat__n">40 <small>hrs</small></span><span class="stat__l">Full-time seat</span></div>
-      <div class="stat"><span class="stat__n">Any</span><span class="stat__l">Country you apply from</span></div>
+      <div class="stat"><span class="stat__n">40 <small>hrs</small></span><span class="stat__l">Every week, fixed</span></div>
+      <div class="stat"><span class="stat__n">US <small>time</small></span><span class="stat__l">Your shift is set in it</span></div>
+      <div class="stat"><span class="stat__n">Paid</span><span class="stat__l">Training once you pass</span></div>
       <div class="stat"><span class="stat__n">$0</span><span class="stat__l">Fees to apply, ever</span></div>
     </div>
   </section>
@@ -741,7 +847,7 @@ img{max-width:100%}
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">What the seat gives you</span>
-        <h2>One client. Fixed hours. Someone in your corner.</h2>
+        <h2>Forty hours. Fixed American hours. Paid training.</h2>
         <p class="lede">Freelance marketplaces make you re-sell yourself every month. A seat does not work that way.</p>
       </div>
 
@@ -754,17 +860,17 @@ img{max-width:100%}
         <div class="perk">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></div>
           <h4>Full-time, not by the task</h4>
-          <p>Forty hours a week with one business, on a schedule agreed before you start. No bidding, no proposals, no dry weeks.</p>
+          <p>Forty hours a week with one business, on fixed hours in American time, agreed before you start. No bidding, no proposals, no dry weeks.</p>
         </div>
         <div class="perk">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M22 20v-2a4 4 0 0 0-3-3.9"></path></svg></div>
           <h4>A manager who is not the client</h4>
           <p>Someone on our side handles your schedule, your reviews and any escalation, so you are never negotiating alone.</p>
         </div>
-        <div class="perk">
+        <div class="perk" id="paid-training">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V6a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"></path><path d="M9 8h7"></path></svg></div>
-          <h4>Trained on the client&rsquo;s stack</h4>
-          <p>You are onboarded on their tools and their scripts before your first shift, not handed a login and wished luck.</p>
+          <h4>Paid training once you pass</h4>
+          <p>Clear the exams and qualification checks and your training is paid. You are onboarded on the client&rsquo;s tools and scripts before your first shift, not handed a login and wished luck.</p>
         </div>
         <div class="perk">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"></path><path d="M17 6.5c0-2-2.2-3-5-3s-5 1-5 3 2.2 2.8 5 3.5 5 1.5 5 3.5-2.2 3-5 3-5-1-5-3"></path></svg></div>
@@ -836,8 +942,8 @@ img{max-width:100%}
         </div>
         <div class="step">
           <span class="step__n">02</span>
-          <h3>Assessment</h3>
-          <p>A short written task in your track and a values questionnaire. Done in your own time, no live pressure.</p>
+          <h3>Exams and assessment</h3>
+          <p>A short written task in your track, the qualification exams and a values questionnaire. Done in your own time, no live pressure.</p>
         </div>
         <div class="step">
           <span class="step__n">03</span>
@@ -846,8 +952,8 @@ img{max-width:100%}
         </div>
         <div class="step">
           <span class="step__n">04</span>
-          <h3>Onboarding and your first shift</h3>
-          <p>Contract, tools, scripts and a handover. Your manager sets the schedule with you before day one.</p>
+          <h3>Approved &mdash; paid training starts</h3>
+          <p>Pass, and paid training begins within one week. Contract, tools, scripts and a handover, then your first shift on the American hours your manager sets with you.</p>
         </div>
       </div>
     </div>
@@ -866,11 +972,15 @@ img{max-width:100%}
         </details>
         <details>
           <summary>Which countries do you hire from?</summary>
-          <p>Any country where you can legally work as an independent contractor and cover a shift in your client&rsquo;s time zone. What decides it is your English, your connection and your overlap &mdash; not your passport.</p>
+          <p>Any country where you can legally work as an independent contractor and cover a full shift in American time. What decides it is your English, your connection and your overlap &mdash; not your passport.</p>
         </details>
         <details>
           <summary>What hours would I work?</summary>
-          <p>A client&rsquo;s seat is defined in their time zone, so your shift may be evening or overnight where you are. You see the exact hours before you accept, and they do not move without your agreement.</p>
+          <p>Forty hours a week on fixed hours in American time &mdash; Eastern, Central, Mountain or Pacific, depending on the client. That means your shift may be evening or overnight where you are. You see the exact hours before you accept, and they do not move without your agreement.</p>
+        </details>
+        <details>
+          <summary>Is the training really paid?</summary>
+          <p>Yes, once you pass. The exams and qualification checks come first, and those are unpaid like any interview. Clear them and you are approved &mdash; the training that follows is paid, and it starts within one week of your approval.</p>
         </details>
         <details>
           <summary>Do I need virtual assistant experience?</summary>
@@ -891,7 +1001,7 @@ img{max-width:100%}
   <section class="cta" id="apply-now">
     <div class="wrap">
       <h2>Bring the skills. We will bring the seat.</h2>
-      <p>Applications are open in all three tracks. Five minutes now, an answer from a person either way.</p>
+      <p>Applications are open in all three tracks. Five minutes now, an answer from a person either way &mdash; and paid training the week you are approved.</p>
       <div class="hero__actions" style="margin-top:0">
         <a class="btn btn--solid" data-apply href="mailto:apply@securejobva.com">Start your application</a>
         <a class="btn btn--ghost" href="mailto:apply@securejobva.com">Email us instead</a>
@@ -914,7 +1024,7 @@ img{max-width:100%}
           </svg>
           <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
         </a>
-        <p class="small" style="max-width:34ch">Full-time remote seats in customer service, sales and marketing, and admin support. Hiring worldwide, placed with one business at a time.</p>
+        <p class="small" style="max-width:34ch">Forty-hour remote seats in customer service, sales and marketing, and admin support. Fixed hours in American time, paid training once you pass, hiring worldwide.</p>
       </div>
       <div>
         <h5>Tracks</h5>
@@ -1008,22 +1118,22 @@ img{max-width:100%}
 
       <section class="step" data-step="1" hidden>
         <h3 class="q">Which shifts can you commit to?</h3>
-        <p class="q__sub">In the client&rsquo;s time zone, not yours. Pick every block you can genuinely hold.</p>
+        <p class="q__sub">In American time, not yours. Pick every block you can genuinely hold.</p>
         <div class="opts opts--2">
           <label class="opt">
             <input type="checkbox" name="shift" value="Business hours">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
-            <span><span class="opt__t">Business hours</span><span class="opt__d">Their 9 to 5</span></span>
+            <span><span class="opt__t">Business hours</span><span class="opt__d">9 to 5, US</span></span>
           </label>
           <label class="opt">
             <input type="checkbox" name="shift" value="Evenings">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
-            <span><span class="opt__t">Evenings</span><span class="opt__d">Their 5pm to midnight</span></span>
+            <span><span class="opt__t">Evenings</span><span class="opt__d">5pm to midnight, US</span></span>
           </label>
           <label class="opt">
             <input type="checkbox" name="shift" value="Overnight">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
-            <span><span class="opt__t">Overnight</span><span class="opt__d">Their midnight to 8am</span></span>
+            <span><span class="opt__t">Overnight</span><span class="opt__d">Midnight to 8am, US</span></span>
           </label>
           <label class="opt">
             <input type="checkbox" name="shift" value="Weekends">
@@ -1071,22 +1181,22 @@ img{max-width:100%}
       <section class="step" data-step="2" hidden>
         <h3 class="q">How do we reach you?</h3>
         <p class="q__sub">A person reads every application and answers either way.</p>
-        <div class="fields2">
-          <div class="field field--split">
-            <label for="ap-name">Full name</label>
-            <input id="ap-name" name="name" type="text" autocomplete="name">
-            <p class="err" aria-live="polite"></p>
-          </div>
-          <div class="field field--split">
-            <label for="ap-country">Country you live in</label>
-            <input id="ap-country" name="country" type="text" autocomplete="country-name">
-            <p class="err" aria-live="polite"></p>
-          </div>
+        <!-- Name and email run the full width of the dialog: they are the two
+             fields applicants most need to read back before they send. -->
+        <div class="field">
+          <label for="ap-name">Full name</label>
+          <input id="ap-name" name="name" type="text" autocomplete="name">
+          <p class="err" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="ap-email">Email</label>
+          <input id="ap-email" name="email" type="email" autocomplete="email" inputmode="email" spellcheck="false">
+          <p class="err" aria-live="polite"></p>
         </div>
         <div class="fields2">
           <div class="field field--split">
-            <label for="ap-email">Email</label>
-            <input id="ap-email" name="email" type="email" autocomplete="email" inputmode="email" spellcheck="false">
+            <label for="ap-country">Country you live in</label>
+            <input id="ap-country" name="country" type="text" autocomplete="country-name">
             <p class="err" aria-live="polite"></p>
           </div>
           <div class="field field--split">
