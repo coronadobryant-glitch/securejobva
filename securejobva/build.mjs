@@ -30,10 +30,10 @@ const PAGES = [
   {
     src: "careers.html",
     path: "/careers",
-    title: "Remote VA jobs with paid training, hiring worldwide | SecureJobVA",
+    title: "Online jobs: remote VA roles with paid training | SecureJobVA",
     description:
-      "Paid training once you pass the exams, then 40 hours a week on fixed hours in American time. Apply from any country — no fee to apply, ever.",
-    ogTitle: "Paid training, then a full-time seat."
+      "Online jobs hiring worldwide. Training is paid only after you pass the exams and are approved, then 40 hours a week on fixed hours in American time. No fee to apply, ever.",
+    ogTitle: "Online jobs with paid training, then a full-time seat."
   }
 ];
 
