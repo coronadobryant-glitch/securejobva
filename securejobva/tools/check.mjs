@@ -162,6 +162,34 @@ await check("lead queue behaves", async () => {
   }
 });
 
+/* A SECURITY DEFINER function runs as its owner, so it reaches past every
+   policy that applies to the caller. That is the point — is_admin() has to read
+   a table the caller cannot — but it means the function body is the only thing
+   standing between any signed-in user and the data it touches.
+
+   So a definer function executable by `authenticated` must ask who is calling:
+   has_permission(), auth.uid() or auth.jwt(). One that asks nothing is a
+   privilege escalation with a friendly name, and set_role() is the shape that
+   matters — anyone can call it, and only the first line stops them. */
+await check("SECURITY DEFINER functions check the caller", () => {
+  const fns = [...sql.matchAll(
+    /create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)([\s\S]*?)\$fn\$([\s\S]*?)\$fn\$/gi
+  )];
+  if (!fns.length) return "no definer functions defined";
+  const ungated = [];
+  for (const [, name, sig, body] of fns) {
+    if (!/security\s+definer/i.test(sig)) continue;
+    if (!new RegExp("grant\\s+execute\\s+on\\s+function\\s+public\\." + name + "\\b[^;]*authenticated", "i").test(sql)) continue;
+    if (!/has_permission|auth\.uid\(\)|auth\.jwt\(\)/i.test(body)) ungated.push(name);
+  }
+  if (ungated.length) {
+    throw new Error(ungated.join(", ") + " — SECURITY DEFINER, executable by any signed-in " +
+      "user, and never asks who is calling. Gate it with has_permission() or auth.jwt().");
+  }
+  const checked = fns.filter(([, , sig]) => /security\s+definer/i.test(sig)).map((f) => f[1]);
+  return checked.length + " gated: " + checked.join(", ");
+});
+
 /* A view is the quiet way to undo every policy underneath it.
 
    By default a Postgres view runs with its OWNER's rights, not the caller's,
