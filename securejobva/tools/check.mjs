@@ -403,21 +403,63 @@ await check("anon can still only INSERT", () => {
   const stmts = sql.match(/grant\b[\s\S]*?;/gi) || [];
   if (!stmts.length) throw new Error("no grants found — has the file been rewritten?");
 
+  /* Insert-only is the rule, and 015 is the first honest exception: client
+     logos are marketing, shown by an <img> to visitors who are not signed in,
+     and signing those URLs would break the strip for everyone it is for.
+
+     So the exception is allowed, but it has to be *declared*. A table opens to
+     anon reads only when its file says so in as many words:
+
+       -- ANON MAY READ client_logos — public marketing, no personal data
+
+     which means the next one cannot be waved through by whoever is reading the
+     diff in a hurry. A table holding a person's details should never carry that
+     line, and writing it is a decision somebody has to make on purpose. */
+  /* These hold people. No declaration opens them — the line above is for
+     marketing tables, not an override anyone can type over a table of names,
+     emails, phone numbers, CVs or tokens. If one of these ever genuinely has
+     to be readable by anon, that is a conversation, not a comment. */
+  const NEVER_PUBLIC = new Set([
+    "applications", "seat_requests", "contact_messages", "application_notes",
+    "application_tracking", "application_socials", "application_documents",
+    "application_queue", "social_tokens", "admins", "user_roles",
+    "role_requests", "roles", "permissions", "role_permissions"
+  ]);
+
+  const declaredPublic = new Set(
+    [...sql.matchAll(/--\s*ANON MAY READ\s+(\w+)/gi)]
+      .map((m) => m[1].toLowerCase())
+      .filter((t) => !NEVER_PUBLIC.has(t))
+  );
+
   const offenders = [];
   for (const s of stmts) {
     const to = (s.match(/\sto\s+([a-z_, ]+);/i) || [])[1] || "";
     const grantees = to.split(",").map((g) => g.trim().toLowerCase());
     if (!grantees.some((g) => g === "anon" || g === "public")) continue;
+    const table = ((s.match(/\son\s+public\.(\w+)/i) || [])[1] || "").toLowerCase();
     const privs = (s.match(/grant\s+([\s\S]*?)\s+on\s/i) || [])[1] || "";
     const clean = privs.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-    if (clean !== "insert") offenders.push(clean + " -> " + grantees.join(", "));
+    if (clean === "insert") continue;
+    if (declaredPublic.has(table)) continue;
+    offenders.push(clean + " on " + table + " -> " + grantees.join(", "));
   }
   if (offenders.length) {
     throw new Error("anon/public granted more than insert: " + offenders.join("; ") +
       " — this publishes the applicant list");
   }
-  if (/for\s+select\s+to\s+(anon|public)\b/i.test(sql)) {
-    throw new Error("a SELECT policy for anon would publish the applicant list");
+  /* Same rule for the policy that pairs with the grant: a SELECT policy aimed
+     at anon is how a table becomes public, so it needs the same declaration. */
+  for (const [, table] of sql.matchAll(
+    /create\s+policy\s+[^\n]*?\son\s+public\.(\w+)\s+for\s+select\s+to\s+(?:anon|public)\b/gi
+  )) {
+    if (!declaredPublic.has(table.toLowerCase())) {
+      offenders.push("a SELECT policy for anon on " + table);
+    }
+  }
+  if (offenders.length) {
+    throw new Error(offenders.join("; ") + " — declare it with a `-- ANON MAY READ <table>` " +
+      "line if it is genuinely public, or this publishes personal data");
   }
   const authed = stmts.filter((s) => /\sto\s+[^;]*authenticated/i.test(s)).length;
   return stmts.length + " grants — anon insert-only, " + authed + " to signed-in users";
