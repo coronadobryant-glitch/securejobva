@@ -425,6 +425,10 @@ img{max-width:100%}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 
 .seg{display:flex;flex-wrap:wrap;gap:.45rem}
+.seg--sm label{padding:.4rem .65rem;font-size:.82rem}
+.skill{margin-bottom:1.05rem}
+.skill__t{display:block;font-weight:600;font-size:.95rem}
+.skill__d{display:block;font-size:.82rem;color:var(--muted);margin:.1rem 0 .5rem}
 .seg label{
   position:relative;cursor:pointer;
   font-family:"IBM Plex Mono",monospace;font-size:.9rem;font-variant-numeric:tabular-nums;
@@ -1327,6 +1331,12 @@ html{scroll-behavior:smooth}
             <p class="err" aria-live="polite"></p>
           </div>
           <div class="field field--split">
+            <label for="ap-region">State or region <em>&mdash; optional</em></label>
+            <input id="ap-region" name="region" type="text" autocomplete="address-level1">
+          </div>
+        </div>
+        <div class="fields2">
+          <div class="field field--split">
             <label for="ap-phone">WhatsApp or phone</label>
             <input id="ap-phone" name="phone" type="tel" autocomplete="tel">
             <p class="err" aria-live="polite"></p>
@@ -1338,6 +1348,15 @@ html{scroll-behavior:smooth}
           <p class="err" aria-live="polite"></p>
         </div>
         <div class="field">
+          <label for="ap-avail">Hours you can work <em>&mdash; in American time</em></label>
+          <input id="ap-avail" name="availability" type="text" placeholder="e.g. 9am-6pm Eastern, or overnight">
+        </div>
+        <label class="opt" style="margin-bottom:1.05rem">
+          <input type="checkbox" id="ap-kit-own" name="has_equipment">
+          <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
+          <span><span class="opt__t">I have my own computer and internet</span><span class="opt__d">A working machine and a connection you can hold a call on. We check the detail at the technical interview.</span></span>
+        </label>
+        <div class="field">
           <label for="ap-note">Anything we should know? <em>&mdash; optional</em></label>
           <textarea id="ap-note" name="note" placeholder="Four years on a Zendesk queue for a US retailer, overnight shifts&hellip;"></textarea>
         </div>
@@ -1345,7 +1364,56 @@ html{scroll-behavior:smooth}
       </section>
 
       <section class="step" data-step="3" hidden>
-        <h3 class="q">Where can we see your work?</h3>
+        <h3 class="q">How would you rate yourself?</h3>
+        <p class="q__sub">Your own honest read. Nobody is rejected for a beginner &mdash; it tells us which seat to put you in, and the exams settle it either way.</p>
+        <div class="skill">
+          <span class="skill__t">English</span>
+          <span class="skill__d">Reading, writing and speaking on a live call</span>
+          <div class="seg seg--sm">
+            <label><input type="radio" name="skill_english" value="beginner"><span>Beginner</span></label>
+            <label><input type="radio" name="skill_english" value="intermediate"><span>Intermediate</span></label>
+            <label><input type="radio" name="skill_english" value="advanced"><span>Advanced</span></label>
+            <label><input type="radio" name="skill_english" value="fluent"><span>Fluent</span></label>
+          </div>
+        </div>
+        <div class="skill">
+          <span class="skill__t">Customer service</span>
+          <span class="skill__d">Queues, escalations, difficult callers</span>
+          <div class="seg seg--sm">
+            <label><input type="radio" name="skill_customer" value="beginner"><span>Beginner</span></label>
+            <label><input type="radio" name="skill_customer" value="intermediate"><span>Intermediate</span></label>
+            <label><input type="radio" name="skill_customer" value="advanced"><span>Advanced</span></label>
+          </div>
+        </div>
+        <div class="skill">
+          <span class="skill__t">Data entry</span>
+          <span class="skill__d">Accuracy and speed in a spreadsheet or CRM</span>
+          <div class="seg seg--sm">
+            <label><input type="radio" name="skill_data_entry" value="beginner"><span>Beginner</span></label>
+            <label><input type="radio" name="skill_data_entry" value="intermediate"><span>Intermediate</span></label>
+            <label><input type="radio" name="skill_data_entry" value="advanced"><span>Advanced</span></label>
+          </div>
+        </div>
+        <div class="skill">
+          <span class="skill__t">Social media</span>
+          <span class="skill__d">Scheduling, replying, writing captions</span>
+          <div class="seg seg--sm">
+            <label><input type="radio" name="skill_social" value="beginner"><span>Beginner</span></label>
+            <label><input type="radio" name="skill_social" value="intermediate"><span>Intermediate</span></label>
+            <label><input type="radio" name="skill_social" value="advanced"><span>Advanced</span></label>
+          </div>
+        </div>
+        <div class="skill">
+          <span class="skill__t">Bookkeeping and admin</span>
+          <span class="skill__d">Invoices, receivables, records</span>
+          <div class="seg seg--sm">
+            <label><input type="radio" name="skill_bookkeeping" value="beginner"><span>Beginner</span></label>
+            <label><input type="radio" name="skill_bookkeeping" value="intermediate"><span>Intermediate</span></label>
+            <label><input type="radio" name="skill_bookkeeping" value="advanced"><span>Advanced</span></label>
+          </div>
+        </div>
+
+        <h3 class="q q--again">Where can we see your work?</h3>
         <p class="q__sub">Optional, and it helps. Social and admin seats often involve posting, so a profile tells us more about how you write than a CV does.</p>
 
         <div class="field">
@@ -1601,7 +1669,15 @@ html{scroll-behavior:smooth}
       id: DRAFT_ID,
       posting_consent: consent,
       posting_consent_at: consent ? new Date().toISOString() : null,
-      posting_consent_text: consent ? CONSENT_TEXT : null
+      posting_consent_text: consent ? CONSENT_TEXT : null,
+      region: val("ap-region"),
+      availability: val("ap-avail"),
+      has_equipment: checked("ap-kit-own"),
+      skill_english: one("skill_english") || null,
+      skill_customer: one("skill_customer") || null,
+      skill_data_entry: one("skill_data_entry") || null,
+      skill_social: one("skill_social") || null,
+      skill_bookkeeping: one("skill_bookkeeping") || null
     };
   }
 
@@ -1843,9 +1919,15 @@ html{scroll-behavior:smooth}
       if (el.name === "speed") el.checked = d.speed === v;
       if (el.name === "shift") el.checked = !!(d.shifts && d.shifts.indexOf(v) > -1);
       if (el.name === "kit") el.checked = !!(d.kit && d.kit.indexOf(v) > -1);
+      /* The five skill scales all restore the same way, so they are matched by
+         prefix rather than five near-identical lines. */
+      if (el.name.indexOf("skill_") === 0) el.checked = d[el.name] === v;
+      if (el.name === "posting_consent") el.checked = !!d.posting_consent;
+      if (el.name === "has_equipment") el.checked = !!d.has_equipment;
     });
     [["ap-name", d.name], ["ap-country", d.country], ["ap-email", d.email],
-      ["ap-phone", d.phone], ["ap-cv", d.cv], ["ap-note", d.note]
+      ["ap-phone", d.phone], ["ap-cv", d.cv], ["ap-note", d.note],
+      ["ap-region", d.region], ["ap-avail", d.availability]
     ].forEach(function (p) {
       var el = document.getElementById(p[0]);
       if (el && p[1]) el.value = p[1];

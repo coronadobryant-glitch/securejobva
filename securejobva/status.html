@@ -306,6 +306,16 @@ img{max-width:100%}
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+.skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
+.sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
+.sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.track{margin-top:.55rem;display:flex;flex-wrap:wrap;gap:.35rem .7rem;align-items:baseline;font-size:.8rem;color:var(--muted)}
+.track.is-late{color:var(--ink-2)}
+.track__age{font-family:"IBM Plex Mono",monospace;font-size:.7rem}
+.track.is-late .track__age{color:#B3261E;font-weight:600}
+.track__ghost{background:var(--surface-2);color:#B3261E;font-weight:600;font-size:.68rem;padding:.14rem .4rem;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
+.pill--pipe{background:var(--ink-2);color:var(--paper)}
+.chk{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--ink-2)}
 .soc{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);font-size:.85rem;display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:baseline}
 .soc__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .soc a{color:var(--accent)}
@@ -319,6 +329,10 @@ img{max-width:100%}
 .pill--declined{background:var(--surface-2);color:var(--muted)}
 </style>
 
+.copied[data-on]{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){.copied{transition:none}}
+</style>
+
 <script>
 /* Restore the saved theme before paint so the page never flashes the wrong one. */
 (function () {
@@ -327,33 +341,29 @@ img{max-width:100%}
     if (saved === "dark" || saved === "light") {
       document.documentElement.setAttribute("data-theme", saved);
     }
+
   } catch (e) {}
 })();
 </script>
-
 
 <!-- Gradient for the brand mark. Defined once; all three marks point at it. -->
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <defs>
     <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0072EE" style="stop-color:var(--mark-from,#0072EE)"></stop>
-      <stop offset="1" stop-color="#002E6B" style="stop-color:var(--mark-to,#002E6B)"></stop>
-    </linearGradient>
-  </defs>
-</svg>
 
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
       <a class="brand" href="/" aria-label="SecureJobVA home">
+<header class="nav">
+  <div class="wrap">
+    <div class="nav__in">
+      <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
         <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
           <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
-          <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
-          <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
-        </svg>
-        <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
         <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
       </a>
       <nav class="nav__links">
@@ -589,6 +599,39 @@ var STAGES = [
 ];
 var LABEL = { applied: "Applied", assessment: "Assessment", interview: "Interview",
               approved: "Approved", declined: "Declined" };
+
+
+var SKILLS = [
+  ["skill_english", "English"],
+  ["skill_customer", "Customer service"],
+  ["skill_data_entry", "Data entry"],
+  ["skill_social", "Social media"],
+  ["skill_bookkeeping", "Bookkeeping"]
+];
+var LEVELS = ["beginner", "intermediate", "advanced", "fluent"];
+var LEVEL_LABEL = { beginner: "Beginner", intermediate: "Intermediate",
+                    advanced: "Advanced", fluent: "Fluent" };
+
+/* Ordered, so "at least intermediate" is a comparison and not a list. */
+function levelAtLeast(have, want) {
+  if (!want) return true;
+  if (!have) return false;
+  return LEVELS.indexOf(have) >= LEVELS.indexOf(want);
+}
+
+function days(iso) {
+  if (!iso) return null;
+  var d = new Date(iso);
+  if (isNaN(d)) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+
+function waitLabel(n) {
+  if (n === null) return "";
+  if (n === 0) return "today";
+  if (n === 1) return "1 day";
+  return n + " days";
+}
 
 function stageIndex(s) {
   for (var i = 0; i < STAGES.length; i++) if (STAGES[i][0] === s) return i;

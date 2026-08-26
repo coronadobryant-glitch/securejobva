@@ -18,9 +18,10 @@ run it. That is always safer than guessing.
 | `002-tracks.sql` | The `tracks` column, once the form began sending an array |
 | `003-portal.sql` | Google sign-in, applicant stages, the admin view |
 | `004-roles.sql` | Roles and permissions, `user_id` on applications, posting consent, social handles |
+| `005-ats.sql` | Internal pipeline, contact history, skill levels, and the queue view |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001, 002, 003, 004, then `verify.sql` to confirm.
+On a fresh database: 001, 002, 003, 004, 005, then `verify.sql` to confirm.
 
 ## Adding one
 

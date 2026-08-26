@@ -125,6 +125,16 @@ const PAGE_CSS = `
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+.skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
+.sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
+.sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.track{margin-top:.55rem;display:flex;flex-wrap:wrap;gap:.35rem .7rem;align-items:baseline;font-size:.8rem;color:var(--muted)}
+.track.is-late{color:var(--ink-2)}
+.track__age{font-family:"IBM Plex Mono",monospace;font-size:.7rem}
+.track.is-late .track__age{color:#B3261E;font-weight:600}
+.track__ghost{background:var(--surface-2);color:#B3261E;font-weight:600;font-size:.68rem;padding:.14rem .4rem;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
+.pill--pipe{background:var(--ink-2);color:var(--paper)}
+.chk{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--ink-2)}
 .soc{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);font-size:.85rem;display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:baseline}
 .soc__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .soc a{color:var(--accent)}
@@ -321,6 +331,39 @@ var STAGES = [
 ];
 var LABEL = { applied: "Applied", assessment: "Assessment", interview: "Interview",
               approved: "Approved", declined: "Declined" };
+
+
+var SKILLS = [
+  ["skill_english", "English"],
+  ["skill_customer", "Customer service"],
+  ["skill_data_entry", "Data entry"],
+  ["skill_social", "Social media"],
+  ["skill_bookkeeping", "Bookkeeping"]
+];
+var LEVELS = ["beginner", "intermediate", "advanced", "fluent"];
+var LEVEL_LABEL = { beginner: "Beginner", intermediate: "Intermediate",
+                    advanced: "Advanced", fluent: "Fluent" };
+
+/* Ordered, so "at least intermediate" is a comparison and not a list. */
+function levelAtLeast(have, want) {
+  if (!want) return true;
+  if (!have) return false;
+  return LEVELS.indexOf(have) >= LEVELS.indexOf(want);
+}
+
+function days(iso) {
+  if (!iso) return null;
+  var d = new Date(iso);
+  if (isNaN(d)) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+
+function waitLabel(n) {
+  if (n === null) return "";
+  if (n === 0) return "today";
+  if (n === 1) return "1 day";
+  return n + " days";
+}
 
 function stageIndex(s) {
   for (var i = 0; i < STAGES.length; i++) if (STAGES[i][0] === s) return i;
@@ -667,8 +710,19 @@ const ADMIN_BODY = [
 const ADMIN_SCRIPT = `
 var root = document.getElementById("pt-root");
 var lead = document.getElementById("pt-lead");
+/* The internal pipeline. Deliberately not in the shared library: it is how the
+   queue is worked, not a promise shown to anyone, and an applicant should never
+   read the word "Ghosted" about themselves — not on the page and not in its
+   source. */
+var PIPE = ["new", "reviewed", "contacted", "interviewed", "hired", "rejected", "ghosted"];
+var PIPE_LABEL = {
+  new: "New", reviewed: "Reviewed", contacted: "Contacted", interviewed: "Interviewed",
+  hired: "Hired", rejected: "Rejected", ghosted: "Ghosted"
+};
+
 var ALL  = [];
 var PERMS = [];
+var ME = "";
 
 /* Convenience only. Postgres decides; this decides what to draw. */
 function can(p) { return PERMS.indexOf(p) > -1; }
@@ -727,6 +781,46 @@ function socialLink(s) {
   return "<span>" + esc(name) + (shown ? " " + esc(shown) : "") + "</span>";
 }
 
+/* Only the skills they actually answered. A blank is not a beginner, and
+   drawing it as one would put words in their mouth. */
+function skillLine(a) {
+  var given = SKILLS.filter(function (k) { return a[k[0]]; });
+  if (!given.length) return "";
+  return '<div class="skills">' + given.map(function (k) {
+    return '<span class="sk sk--' + esc(a[k[0]]) + '">' + esc(k[1]) + " " +
+           esc(LEVEL_LABEL[a[k[0]]] || a[k[0]]) + "</span>";
+  }).join("") + "</div>";
+}
+
+/* The line that stops people falling through: how long they have waited, who
+   spoke to them last, and whether anything came back. */
+function contactLine(a) {
+  var waited = days(a.waiting_since);
+  var late = a.is_ghosted || (waited !== null && waited >= 7 && !a.response_received);
+  return (
+    '<div class="track' + (late ? " is-late" : "") + '">' +
+      '<span class="pill pill--pipe" data-pipe-pill>' +
+        esc(PIPE_LABEL[a.pipeline] || a.pipeline) + "</span>" +
+      "<span>" +
+        (a.last_contacted_at
+          ? "last contacted " + esc(when(a.last_contacted_at)) +
+            (a.contacted_by ? " by " + esc(a.contacted_by) : "")
+          : "never contacted") +
+      "</span>" +
+      "<span>" + (a.response_received ? "&#10003; replied" : "no reply") + "</span>" +
+      (waited === null ? "" : '<span class="track__age">waiting ' + esc(waitLabel(waited)) + "</span>") +
+      (a.is_ghosted ? '<span class="track__ghost">ghosted</span>' : "") +
+    "</div>"
+  );
+}
+
+function pipeOptions(cur) {
+  return PIPE.map(function (k) {
+    return '<option value="' + k + '"' + (k === cur ? " selected" : "") + ">" +
+           PIPE_LABEL[k] + "</option>";
+  }).join("");
+}
+
 function rowHtml(a) {
   var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "&mdash;";
 
@@ -754,7 +848,12 @@ function rowHtml(a) {
     ctl =
       '<div class="row__ctl">' +
         (can("applications.edit")
-          ? '<select data-status aria-label="Stage">' + options(a.status) + "</select>"
+          ? '<select data-status aria-label="Stage the applicant sees">' + options(a.status) + "</select>" +
+            '<select data-pipe aria-label="Internal pipeline">' + pipeOptions(a.pipeline) + "</select>" +
+            '<label class="chk"><input type="checkbox" data-replied' +
+              (a.response_received ? " checked" : "") + "> replied</label>" +
+            '<button class="btn btn--ghost" data-contacted type="button" ' +
+              'style="padding:.45rem .8rem;font-size:.85rem">Mark contacted</button>'
           : "") +
         (can("applications.note")
           ? '<textarea data-note rows="1" placeholder="Private note (staff only)">' + esc(a.note_text || "") + "</textarea>"
@@ -774,8 +873,10 @@ function rowHtml(a) {
         '<span class="pill pill--' + esc(a.status) + '" data-pill>' + esc(LABEL[a.status] || a.status) + "</span>" +
       "</div>" +
       '<div class="row__tags">' + esc(tracks) + " &middot; " + esc(a.experience || "?") +
-        " &middot; " + esc((a.shifts || []).join(", ") || "no shifts") +
+        (a.region ? " &middot; " + esc(a.region) : "") +
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
+      skillLine(a) +
+      contactLine(a) +
       social +
       ctl +
     "</div>"
@@ -785,10 +886,30 @@ function rowHtml(a) {
 function paint() {
   var q  = (document.getElementById("q").value || "").toLowerCase().trim();
   var st = document.getElementById("filter").value;
+  var sk = document.getElementById("fskill").value;
+  var lv = document.getElementById("flevel").value;
+
   var shown = ALL.filter(function (a) {
-    if (st && a.status !== st) return false;
+    if (st === "__late") {
+      var w = days(a.waiting_since);
+      if (!(a.is_ghosted || (w !== null && w >= 7 && !a.response_received))) return false;
+    } else if (st && a.pipeline !== st) {
+      return false;
+    }
+    /* A level with no skill chosen means "anyone at least this good at
+       anything", which is the reading that matches how people ask for it. */
+    if (lv) {
+      if (sk) {
+        if (!levelAtLeast(a[sk], lv)) return false;
+      } else {
+        var any = SKILLS.some(function (k) { return levelAtLeast(a[k[0]], lv); });
+        if (!any) return false;
+      }
+    } else if (sk && !a[sk]) {
+      return false;
+    }
     if (!q) return true;
-    return [a.name, a.email, a.country, (a.tracks || []).join(" ")]
+    return [a.name, a.email, a.country, a.region, (a.tracks || []).join(" ")]
       .join(" ").toLowerCase().indexOf(q) > -1;
   });
   document.getElementById("count").textContent =
@@ -801,8 +922,12 @@ function save(row) {
   var id  = row.getAttribute("data-id");
   var stEl = row.querySelector("[data-status]");
   var ntEl = row.querySelector("[data-note]");
+  var ppEl = row.querySelector("[data-pipe]");
+  var rpEl = row.querySelector("[data-replied]");
   var st   = stEl ? stEl.value : null;
   var note = ntEl ? ntEl.value : null;
+  var pipe = ppEl ? ppEl.value : null;
+  var replied = rpEl ? rpEl.checked : null;
   var ok  = row.querySelector("[data-ok]");
   var rec = ALL.filter(function (x) { return x.id === id; })[0];
 
@@ -822,6 +947,37 @@ function save(row) {
       body: { application_id: id, note: note, updated_at: new Date().toISOString() }
     }));
   }
+  if (pipe !== null || replied !== null) {
+    var t = { application_id: id, updated_at: new Date().toISOString() };
+    var changed = false;
+    if (pipe !== null && (!rec || rec.pipeline !== pipe)) { t.pipeline = pipe; changed = true; }
+    if (replied !== null && (!rec || !!rec.response_received !== replied)) {
+      t.response_received = replied;
+      changed = true;
+    }
+    /* Marking contacted stamps the time and the person, which is the whole
+       point of the field: "someone reached out" is not answerable later. */
+    if (row.getAttribute("data-mark-contacted") === "1") {
+      t.pipeline = "contacted";
+      t.last_contacted_at = new Date().toISOString();
+      t.contacted_by = ME;
+      changed = true;
+    }
+    if (changed) {
+      jobs.push(api("application_tracking", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: t
+      }).then(function () {
+        if (!rec) return;
+        if (t.pipeline) rec.pipeline = t.pipeline;
+        if (t.last_contacted_at) rec.last_contacted_at = t.last_contacted_at;
+        if (t.contacted_by) rec.contacted_by = t.contacted_by;
+        if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
+      }));
+    }
+  }
+
   if (!jobs.length) { flash(ok, "No change"); return; }
 
   Promise.all(jobs).then(function () {
@@ -833,6 +989,13 @@ function save(row) {
       var pill = row.querySelector("[data-pill]");
       pill.className = "pill pill--" + st;
       pill.textContent = LABEL[st] || st;
+    }
+    row.removeAttribute("data-mark-contacted");
+    if (pipe !== null || replied !== null) {
+      var fresh = rowHtml(rec);
+      var tmp = document.createElement("div");
+      tmp.innerHTML = fresh;
+      row.replaceWith(tmp.firstChild);
     }
     flash(ok, "Saved");
   }).catch(function (e) {
@@ -856,6 +1019,7 @@ function render(email, apps, notes, socials) {
   ALL = apps.map(function (a) {
     a.note_text = byId[a.id] || "";
     a.socials = socById[a.id] || [];
+    a.pipeline = a.pipeline || "new";
     return a;
   });
 
@@ -868,9 +1032,22 @@ function render(email, apps, notes, socials) {
       '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
     "</div>" +
     '<div class="adm__bar">' +
-      '<input id="q" type="search" placeholder="Search name, email, country, track">' +
-      '<select id="filter" aria-label="Filter by stage">' +
-        '<option value="">All stages</option>' + options("") +
+      '<input id="q" type="search" placeholder="Search name, email, country, region, track">' +
+      '<select id="filter" aria-label="Filter by pipeline">' +
+        '<option value="">All pipeline</option>' + pipeOptions("") +
+        '<option value="__late">Waiting 7+ days, no reply</option>' +
+      "</select>" +
+      '<select id="fskill" aria-label="Filter by skill">' +
+        '<option value="">Any skill</option>' +
+        SKILLS.map(function (k) {
+          return '<option value="' + k[0] + '">' + k[1] + "</option>";
+        }).join("") +
+      "</select>" +
+      '<select id="flevel" aria-label="Minimum level">' +
+        '<option value="">Any level</option>' +
+        LEVELS.map(function (l) {
+          return '<option value="' + l + '">' + LEVEL_LABEL[l] + " or better</option>";
+        }).join("") +
       "</select>" +
       '<span class="adm__count" id="count"></span>' +
     "</div>" +
@@ -880,7 +1057,18 @@ function render(email, apps, notes, socials) {
   document.getElementById("out").addEventListener("click", signOut);
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
+  document.getElementById("fskill").addEventListener("change", paint);
+  document.getElementById("flevel").addEventListener("change", paint);
   document.getElementById("rows").addEventListener("click", function (e) {
+    var c = e.target.closest("[data-contacted]");
+    if (c) {
+      /* Flag it and save in one gesture: the button is a shortcut for "set
+         contacted, stamp now, stamp me", not a separate write path. */
+      var r = c.closest(".row");
+      r.setAttribute("data-mark-contacted", "1");
+      save(r);
+      return;
+    }
     var b = e.target.closest("[data-save]");
     if (b) save(b.closest(".row"));
   });
@@ -905,10 +1093,14 @@ function start() {
   api("rpc/my_permissions", { method: "POST", body: {} })
     .then(function (perms) {
       PERMS = perms || [];
+      ME = claims.email;
       if (!can("applications.view_all")) { notAdmin(claims.email); return null; }
 
       var jobs = [
-        api("applications?select=id,created_at,tracks,track,experience,shifts,speed,kit,name,country,email,phone,cv,note,status,status_changed_at,posting_consent,posting_consent_at&order=created_at.desc"),
+        /* The queue view carries the pipeline, the contact history and the
+           derived is_ghosted, already sorted by who has waited longest. It is
+           a security-barrier view, so it shows an applicant nothing. */
+        api("application_queue?select=*&order=waiting_since.asc"),
         can("applications.note")
           ? api("application_notes?select=application_id,note")
           : Promise.resolve([]),
