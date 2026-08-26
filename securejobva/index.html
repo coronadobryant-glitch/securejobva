@@ -221,6 +221,18 @@ img{max-width:100%}
 .swap__steps li::before{content:counter(s);position:absolute;left:1.05rem;top:.95rem;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:"IBM Plex Mono",monospace;font-size:.72rem;display:grid;place-items:center;font-weight:600}
 .swap__steps b{color:var(--ink)}
 
+/* objections, answered */
+.solve{background:var(--surface-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:clamp(3rem,6vw,4.5rem) 0}
+.solve__grid{display:grid;gap:1rem;margin-top:2rem}
+@media(min-width:660px){.solve__grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1040px){.solve__grid{grid-template-columns:repeat(3,1fr)}}
+.sv{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.3rem;display:flex;flex-direction:column;gap:.55rem}
+.sv__n{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;color:var(--muted)}
+.sv h3{font-size:1.02rem;margin:0;letter-spacing:-.01em}
+.sv__p{margin:0;font-size:.89rem;color:var(--muted);line-height:1.55}
+.sv__fix{margin:.2rem 0 0;padding-top:.75rem;border-top:1px dashed var(--line);font-size:.89rem;color:var(--ink-2);line-height:1.55}
+.sv__fix b{color:var(--accent);font-weight:600}
+
 /* stat strip */
 .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
 .stats__in{display:grid;grid-template-columns:repeat(2,1fr);gap:0}
@@ -909,6 +921,61 @@ img{max-width:100%}
           <span class="step__n">Ongoing</span>
           <h3>Managed, not dropped off</h3>
           <p>Weekly quality reviews, backup coverage when your VA is out, and a free replacement if the fit stops working. You manage the work, we manage the employment.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="solve" id="solve">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">The seven things that go wrong</span>
+        <h2>Every way this usually fails, and what we do about it.</h2>
+        <p class="lede">Most people who call us have hired a virtual assistant before and it did not work. These are the seven reasons why, and the specific thing on our side that answers each one &mdash; not a promise to try harder.</p>
+      </div>
+
+      <div class="solve__grid">
+        <div class="sv">
+          <span class="sv__n">01</span>
+          <h3>Communication gaps</h3>
+          <p class="sv__p">Time-zone mismatches, language and accent barriers, replies that take hours, and assistants who never raise a problem until it lands on you.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Your seat works your hours in your time zone, English is tested in a written task and two live interviews before you meet anyone, and you get a summary at the end of every day &mdash; problems flagged the day they appear, not the week after.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">02</span>
+          <h3>Quality control and oversight</h3>
+          <p class="sv__p">No way to verify the work is actually happening, and no clear record of output or time spent. What starts as a question turns into distrust.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Time tracking you can audit yourself, so the hours you are billed are the hours you can see, plus a daily written account of what was handled and what still needs you.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">03</span>
+          <h3>Vetting and skill mismatch</h3>
+          <p class="sv__p">R&eacute;sum&eacute;s and interviews do not reveal real competence. The mismatch shows up once the work starts, and by then it is your problem.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Nobody reaches you without clearing a written task in their track, the qualification exams and a strengths test. Then the free first week shows you real work before you commit.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">04</span>
+          <h3>Training overhead</h3>
+          <p class="sv__p">Onboarding takes far longer than expected, especially on niche tasks &mdash; and that time was exactly what you were trying to buy back.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Training happens on our payroll, not your calendar. Your assistant is onboarded on your tools and your scripts before the first shift, so day one is work, not setup.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">05</span>
+          <h3>Turnover and reliability</h3>
+          <p class="sv__p">Assistants who ghost, quit without notice, or job-hop between clients &mdash; forcing you to re-hire and re-train from zero each time.</p>
+          <p class="sv__fix"><b>How we solve it:</b> One business, one manager, one fixed seat &mdash; no gig queue to hop to. Sick days and holidays get backup coverage, and if the fit stops working we replace the seat free and hand over for you.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">06</span>
+          <h3>Security and confidentiality</h3>
+          <p class="sv__p">Handing a remote worker access to financial accounts, customer records and passwords feels reckless without contracts or safeguards in place.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Every assistant signs a contract and an NDA and clears an ID and background check before they start, and works to written password and data rules from the first shift.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">07</span>
+          <h3>Payment and platform friction</h3>
+          <p class="sv__p">Currency conversion, international payment fees, escrow disputes, and billing that is never quite clear &mdash; hourly, task-based, or something in between.</p>
+          <p class="sv__fix"><b>How we solve it:</b> One flat rate, $7.75 an hour worked, invoiced weekly in US dollars. No escrow, no conversion, no platform cut, and no task-based pricing to argue about &mdash; you pay the number you were quoted on the first call.</p>
         </div>
       </div>
     </div>
