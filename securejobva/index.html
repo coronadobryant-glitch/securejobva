@@ -580,6 +580,19 @@ img{max-width:100%}
   .intake__head,.rail,.intake__body,.intake__foot{padding-inline:1.15rem}
   .est__l{text-align:left}
 }
+
+/* mailto: silently does nothing for anyone without a desktop mail client —
+   webmail users, most phones, shared machines. The click handler copies the
+   address instead and this is what confirms it. */
+.copied{
+  position:fixed;left:50%;bottom:1.4rem;transform:translateX(-50%) translateY(.5rem);
+  background:var(--ink);color:#fff;padding:.62rem 1.05rem;border-radius:.6rem;
+  font-size:.9rem;font-weight:600;letter-spacing:-.005em;
+  box-shadow:0 8px 28px rgba(0,0,0,.22);z-index:99;
+  opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;
+}
+.copied[data-on]{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){.copied{transition:none}}
 </style>
 
 <script>
@@ -1544,4 +1557,51 @@ img{max-width:100%}
     open();
   });
 })();
+
+  /* A mailto: link only does something when the visitor has a desktop mail
+     client registered. Plenty do not — they read mail in a browser — and for
+     them the link fails silently, which reads as a broken button. Copy the
+     address on click as well, so the click always yields something usable.
+     The href is untouched, so a real mail client still opens as before. */
+  (function () {
+    var el = null, timer = null;
+    function toast(msg) {
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "copied";
+        el.setAttribute("role", "status");
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.setAttribute("data-on", "");
+      clearTimeout(timer);
+      timer = setTimeout(function () { el.removeAttribute("data-on"); }, 2800);
+    }
+    function copy(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      /* execCommand is deprecated but is the only path on http: and old Safari. */
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      return ok ? Promise.resolve() : Promise.reject();
+    }
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest ? e.target.closest("a[href^=\"mailto:\"]") : null;
+      if (!a) return;
+      var addr = a.getAttribute("href").slice(7).split("?")[0];
+      copy(addr).then(
+        function () { toast("Copied  " + addr); },
+        function () { toast(addr); }
+      );
+    });
+  })();
 </script>
