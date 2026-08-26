@@ -25,10 +25,10 @@ const PAGES = [
   {
     src: "careers.html",
     path: "/careers",
-    title: "Remote virtual assistant jobs, hiring worldwide | SecureJobVA",
+    title: "Remote VA jobs with paid training, hiring worldwide | SecureJobVA",
     description:
-      "Full-time remote seats in customer service, sales and marketing, and admin support. Apply from any country — fixed hours, one client, and no fee to apply, ever.",
-    ogTitle: "A full-time seat, not a gig queue."
+      "Paid training once you pass the exams, then 40 hours a week on fixed hours in American time. Apply from any country — no fee to apply, ever.",
+    ogTitle: "Paid training, then a full-time seat."
   }
 ];
 
