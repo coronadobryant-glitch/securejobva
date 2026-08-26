@@ -135,6 +135,15 @@ const PAGE_CSS = `
 .track__ghost{background:var(--surface-2);color:#B3261E;font-weight:600;font-size:.68rem;padding:.14rem .4rem;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
 .pill--pipe{background:var(--ink-2);color:var(--paper)}
 .chk{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--ink-2)}
+.fld select,.fld textarea{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.fld textarea{resize:vertical}
+.edit__h{font-size:1.05rem;margin:0 0 .3rem}
+.acctlist{display:grid;gap:.5rem;margin-top:1rem}
+.acct{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;padding:.6rem .8rem;background:var(--surface-2);border-radius:8px}
+.acct__e{font-size:.9rem}
+.acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
+.rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.rolechip:hover{border-color:#B3261E;color:#B3261E}
 .soc{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);font-size:.85rem;display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:baseline}
 .soc__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .soc a{color:var(--accent)}
@@ -323,6 +332,12 @@ function esc(s) {
 
 /* The four stages the careers page promises, in order. Declined is deliberately
    not in this list: it is an end, not a step along it. */
+/* The same sentence the application form shows. Kept identical on purpose: a
+   consent recorded from this page must be answerable to the same wording. */
+var CONSENT_TEXT = "If I am placed in a seat that involves posting, SecureJobVA may " +
+  "publish content to the accounts I listed on my behalf. I can withdraw this at any " +
+  "time by telling my manager.";
+
 var STAGES = [
   ["applied",    "Application received",  "We have it, and a person reads every one."],
   ["assessment", "Exams and strengths test", "A written task in your track, the qualification exams, and the strengths test."],
@@ -332,6 +347,10 @@ var STAGES = [
 var LABEL = { applied: "Applied", assessment: "Assessment", interview: "Interview",
               approved: "Approved", declined: "Declined" };
 
+
+var SKILL_LEVELS = ["beginner", "intermediate", "advanced", "fluent"];
+var SKILL_LEVEL_LABEL = { beginner: "Beginner", intermediate: "Intermediate",
+                          advanced: "Advanced", fluent: "Fluent" };
 
 var SKILLS = [
   ["skill_english", "English"],
@@ -597,6 +616,89 @@ function stages(app) {
   return '<ol class="stg">' + out + "</ol>";
 }
 
+var EDIT_FIELDS = [
+  ["phone",        "WhatsApp or phone", "tel"],
+  ["cv",           "Link to your CV",   "url"],
+  ["region",       "State or region",   "text"],
+  ["availability", "Hours you can work", "text"]
+];
+
+function editForm(a) {
+  var skills = SKILLS.map(function (k) {
+    var opts = SKILL_LEVELS.map(function (l) {
+      if (l === "fluent" && k[0] !== "skill_english") return "";
+      return '<option value="' + l + '"' + (a[k[0]] === l ? " selected" : "") + ">" +
+             SKILL_LEVEL_LABEL[l] + "</option>";
+    }).filter(Boolean).join("");
+    return '<div class="fld"><label for="e-' + k[0] + '">' + esc(k[1]) + "</label>" +
+           '<select id="e-' + k[0] + '"><option value="">Not answered</option>' + opts + "</select></div>";
+  }).join("");
+
+  return (
+    '<div class="card">' +
+      '<h2 class="edit__h">Keep this up to date</h2>' +
+      '<p class="msg" style="margin-top:0">A better phone number or a newer CV helps us reach you. Changes save straight away.</p>' +
+      EDIT_FIELDS.map(function (f) {
+        return '<div class="fld"><label for="e-' + f[0] + '">' + esc(f[1]) + "</label>" +
+               '<input id="e-' + f[0] + '" type="' + f[2] + '" value="' + esc(a[f[0]] || "") + '"></div>';
+      }).join("") +
+      '<div class="fld"><label for="e-note">Anything we should know?</label>' +
+        '<textarea id="e-note" rows="3">' + esc(a.note || "") + "</textarea></div>" +
+      skills +
+      '<label class="chk" style="margin:.5rem 0 .9rem"><input type="checkbox" id="e-kit"' +
+        (a.has_equipment ? " checked" : "") + "> I have my own computer and internet</label>" +
+      '<label class="chk" style="margin-bottom:1rem"><input type="checkbox" id="e-consent"' +
+        (a.posting_consent ? " checked" : "") +
+        "> You may post on my behalf if I am placed</label>" +
+      '<button class="btn btn--solid" id="e-save" type="button">Save changes</button>' +
+      '<span class="row__ok" id="e-ok" style="margin-left:.7rem">Saved</span>' +
+    "</div>"
+  );
+}
+
+function wireEdit(a) {
+  var btn = document.getElementById("e-save");
+  if (!btn) return;
+  btn.addEventListener("click", function () {
+    var ok = document.getElementById("e-ok");
+    var body = {};
+    EDIT_FIELDS.forEach(function (f) {
+      body[f[0]] = document.getElementById("e-" + f[0]).value.trim() || null;
+    });
+    body.note = document.getElementById("e-note").value.trim() || null;
+    body.has_equipment = document.getElementById("e-kit").checked;
+    SKILLS.forEach(function (k) {
+      body[k[0]] = document.getElementById("e-" + k[0]).value || null;
+    });
+
+    /* Consent is sent only when it changes. The database keeps the history of a
+       withdrawal, so this must not blindly restamp it on every save. */
+    var consent = document.getElementById("e-consent").checked;
+    if (consent !== !!a.posting_consent) {
+      body.posting_consent = consent;
+      if (consent) {
+        body.posting_consent_at = new Date().toISOString();
+        body.posting_consent_text = CONSENT_TEXT;
+      }
+    }
+
+    btn.disabled = true;
+    api("applications?id=eq." + encodeURIComponent(a.id), {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: body
+    }).then(function () {
+      Object.keys(body).forEach(function (k) { a[k] = body[k]; });
+      ok.textContent = "Saved";
+      ok.classList.add("is-on");
+      setTimeout(function () { ok.classList.remove("is-on"); }, 1800);
+    }).catch(function (e) {
+      ok.textContent = String(e.message) === "signed out" ? "Signed out" : "Did not save";
+      ok.classList.add("is-on");
+    }).then(function () { btn.disabled = false; });
+  });
+}
+
 function render(user, apps) {
   var initial = (user.email || "?").charAt(0).toUpperCase();
   var who =
@@ -652,9 +754,15 @@ function render(user, apps) {
       "</div>";
   }
 
-  html += '<p class="msg">Something look wrong? Reply to the email we sent you and a person will pick it up.</p>';
+  /* Only the first application is editable. Someone with two open
+     applications is rare enough that quietly editing the wrong one would be
+     worse than making them ask. */
+  html += editForm(apps[0]);
+  html += '<p class="msg">Name and email are fixed here &mdash; they are on your ID check. ' +
+          "Tell us in a reply if either needs changing.</p>";
   view(html);
   document.getElementById("out").addEventListener("click", signOut);
+  wireEdit(apps[0]);
 }
 
 function start() {
@@ -668,7 +776,7 @@ function start() {
 
   view('<div class="card"><span class="spin"></span>Looking up your application&hellip;</div>');
 
-  api("applications?select=id,created_at,tracks,track,experience,shifts,country,status,status_changed_at&order=created_at.desc")
+  api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc")
     .then(function (rows) { render(user, rows || []); })
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
@@ -883,6 +991,103 @@ function rowHtml(a) {
   );
 }
 
+/* ── who may do what ─────────────────────────────────────────────────────
+   Every one of these calls goes through a definer function that re-asks
+   accounts.manage on the server. The grant tables themselves stay sealed --
+   RLS on, no policy -- so this panel cannot read or write them directly, and
+   a forged PERMS array gets an exception rather than a table. */
+var ROLES = [];
+
+function loadRoles() {
+  var box = document.getElementById("roles-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading accounts&hellip;';
+  Promise.all([
+    api("rpc/list_roles", { method: "POST", body: {} }),
+    api("rpc/list_role_grants", { method: "POST", body: {} })
+  ]).then(function (r) {
+    ROLES = r[0] || [];
+    drawRoles(box, r[1] || []);
+  }).catch(function (e) {
+    box.innerHTML = '<p class="msg msg--bad">Could not load accounts. ' + esc(e.message) + "</p>";
+  });
+}
+
+function drawRoles(box, grants) {
+  var opts = ROLES.map(function (r) {
+    return '<option value="' + esc(r.key) + '">' + esc(r.label) + "</option>";
+  }).join("");
+
+  var rows = grants.length
+    ? grants.map(function (g) {
+        return (
+          '<div class="acct" data-email="' + esc(g.user_email) + '">' +
+            '<span class="acct__e">' + esc(g.user_email) + "</span>" +
+            '<span class="acct__r">' +
+              (g.roles || []).map(function (k) {
+                return '<button class="rolechip" data-revoke="' + esc(k) + '" ' +
+                       'title="Remove this role">' + esc(k) + " &times;</button>";
+              }).join("") +
+            "</span>" +
+          "</div>"
+        );
+      }).join("")
+    : '<p class="msg">Nobody has a role yet.</p>';
+
+  box.innerHTML =
+    '<h2 class="edit__h">Who can do what</h2>' +
+    '<p class="msg" style="margin-top:0">A role is granted to an email address. It takes effect the next time that person signs in.</p>' +
+    '<div class="acctlist">' + rows + "</div>" +
+    '<div class="adm__bar" style="margin:1.1rem 0 0">' +
+      '<input id="r-email" type="email" placeholder="person@example.com">' +
+      '<select id="r-role">' + opts + "</select>" +
+      '<button class="btn btn--ghost" id="r-add" type="button" style="padding:.5rem .9rem;font-size:.88rem">Grant</button>' +
+    "</div>" +
+    '<p class="msg" id="r-msg"></p>' +
+    '<details style="margin-top:1rem"><summary class="lnk" style="cursor:pointer">What each role can do</summary>' +
+      '<ul class="meta" style="margin-top:.8rem">' +
+        ROLES.map(function (r) {
+          return "<li><b>" + esc(r.label) + "</b><span>" +
+                 esc((r.permissions || []).join(", ") || "nothing yet") + "</span></li>";
+        }).join("") +
+      "</ul></details>";
+
+  var msg = document.getElementById("r-msg");
+
+  document.getElementById("r-add").addEventListener("click", function () {
+    var em = document.getElementById("r-email").value.trim().toLowerCase();
+    var rk = document.getElementById("r-role").value;
+    if (!em || em.indexOf("@") < 1) { msg.textContent = "Enter an email address."; return; }
+    setRole(em, rk, true, msg);
+  });
+
+  box.querySelectorAll("[data-revoke]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      setRole(b.closest(".acct").getAttribute("data-email"),
+              b.getAttribute("data-revoke"), false, msg);
+    });
+  });
+}
+
+function setRole(email, role, grant, msg) {
+  msg.className = "msg";
+  msg.textContent = grant ? "Granting\u2026" : "Removing\u2026";
+  api("rpc/set_role", {
+    method: "POST",
+    body: { target_email: email, role_key: role, grant_it: grant }
+  }).then(function () {
+    msg.textContent = "";
+    loadRoles();
+  }).catch(function (e) {
+    /* The refusals from set_role are written to be read by a person -- "that
+       is the last administrator" -- so they are shown as they come back. */
+    var t = String(e.message || "");
+    try { t = JSON.parse(t).message || t; } catch (x) {}
+    msg.className = "msg msg--bad";
+    msg.textContent = t.replace(/^.*?not allowed.*$/i, "You cannot manage accounts.");
+  });
+}
+
 function paint() {
   var q  = (document.getElementById("q").value || "").toLowerCase().trim();
   var st = document.getElementById("filter").value;
@@ -1051,10 +1256,14 @@ function render(email, apps, notes, socials) {
       "</select>" +
       '<span class="adm__count" id="count"></span>' +
     "</div>" +
-    '<div class="rows" id="rows"></div>'
+    '<div class="rows" id="rows"></div>' +
+    (can("accounts.manage")
+      ? '<div class="card" id="roles-card" style="margin-top:1.6rem"></div>'
+      : "")
   );
 
   document.getElementById("out").addEventListener("click", signOut);
+  if (can("accounts.manage")) loadRoles();
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
   document.getElementById("fskill").addEventListener("change", paint);
