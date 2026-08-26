@@ -147,6 +147,7 @@ img{max-width:100%}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
+.nav__signin{color:var(--accent);font-weight:600}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
 .themetog,.navtog{
@@ -199,7 +200,6 @@ img{max-width:100%}
 .foot a:hover{color:var(--accent)}
 .foot__brand{margin-bottom:.75rem}
 .foot__bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;font-size:.82rem;color:var(--muted)}
-
 /* ---------- portal ---------- */
 .pt{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem);min-height:60vh}
 .pt__head{margin-bottom:2rem}
@@ -306,6 +306,21 @@ img{max-width:100%}
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+.scores{margin-top:.6rem;border-top:1px dashed var(--line);padding-top:.55rem}
+.scores summary{cursor:pointer;font-size:.8rem;color:var(--muted);list-style:none}
+.scores summary::-webkit-details-marker{display:none}
+.scores summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.scores[open] summary::before{content:"− "}
+.scr__avg{color:var(--accent-deep)}
+.scr__none{opacity:.8}
+.scr__by{font-size:.72rem}
+.scr__hint{margin:.5rem 0 .7rem;font-size:.78rem;color:var(--muted)}
+.scrgrid{display:grid;gap:.4rem}
+@media(min-width:700px){.scrgrid{grid-template-columns:repeat(2,1fr);gap:.4rem .9rem}}
+.scr{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:.5rem;font-size:.82rem}
+.scr__k{color:var(--ink-2)}
+.scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
+.scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -362,6 +377,7 @@ img{max-width:100%}
 .pill--declined{background:var(--surface-2);color:var(--muted)}
 </style>
 
+}
 .copied[data-on]{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(prefers-reduced-motion:reduce){.copied{transition:none}}
 </style>
@@ -373,8 +389,8 @@ img{max-width:100%}
     var saved = localStorage.getItem("sjva-theme");
     if (saved === "dark" || saved === "light") {
       document.documentElement.setAttribute("data-theme", saved);
-    }
 
+    }
   } catch (e) {}
 })();
 </script>
@@ -383,12 +399,12 @@ img{max-width:100%}
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <defs>
     <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0072EE" style="stop-color:var(--mark-from,#0072EE)"></stop>
 
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
       <a class="brand" href="/" aria-label="SecureJobVA home">
+
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
@@ -396,7 +412,6 @@ img{max-width:100%}
         <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
-          <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
         <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
       </a>
       <nav class="nav__links">
@@ -916,19 +931,22 @@ function render(user, apps) {
 
   if (!apps.length) {
     lead.textContent = "Signed in as " + user.email + ".";
-    view(who +
+    view(who + staffBanner() +
       '<div class="card">' +
-        '<div class="note note--warn"><b>No application found for this address.</b> ' +
-        "If you applied with a different email, sign out and use that one. " +
-        "If you have not applied yet, the form is on the careers page.</div>" +
-        '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/careers">Go to the careers page</a></p>' +
+        (STAFF
+          ? '<div class="note"><b>Nothing here under your address.</b> ' +
+            "This page shows your own application, and staff usually do not have one.</div>"
+          : '<div class="note note--warn"><b>No application found for this address.</b> ' +
+            "If you applied with a different email, sign out and use that one. " +
+            "If you have not applied yet, the form is on the careers page.</div>" +
+            '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/careers">Go to the careers page</a></p>') +
       "</div>");
     document.getElementById("out").addEventListener("click", signOut);
     return;
   }
 
   lead.textContent = "Signed in as " + user.email + ".";
-  var html = who;
+  var html = who + staffBanner();
 
   for (var i = 0; i < apps.length; i++) {
     var a = apps[i];
@@ -973,9 +991,33 @@ function start() {
 
   var claims = readToken(session().access_token);
   if (!claims || !claims.email) { clearSession(); signedOut("That sign-in did not carry an email address."); return; }
-  var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
-
   view('<div class="card"><span class="spin"></span>Looking up your application&hellip;</div>');
+
+  /* Everyone signs in through the same link, so a staff member lands here
+     first. Rather than showing them an empty applicant view, ask what they
+     can do and point them at the right page. They may also be an applicant,
+     so this offers rather than redirects. */
+  api("rpc/my_permissions", { method: "POST", body: {} })
+    .then(function (perms) { STAFF = (perms || []).indexOf("applications.view_all") > -1; })
+    .catch(function () { STAFF = false; })
+    .then(loadApplications);
+}
+
+var STAFF = false;
+
+function staffBanner() {
+  if (!STAFF) return "";
+  return (
+    '<div class="note" style="margin-bottom:1.2rem">' +
+      "<b>You have staff access.</b> Applications, stages and interview scores are on the " +
+      '<a href="/admin">admin page</a>.' +
+    "</div>"
+  );
+}
+
+function loadApplications() {
+  var claims = readToken(session().access_token);
+  var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
   api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc")
     .then(function (rows) { render(user, rows || []); })

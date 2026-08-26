@@ -125,6 +125,21 @@ const PAGE_CSS = `
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+.scores{margin-top:.6rem;border-top:1px dashed var(--line);padding-top:.55rem}
+.scores summary{cursor:pointer;font-size:.8rem;color:var(--muted);list-style:none}
+.scores summary::-webkit-details-marker{display:none}
+.scores summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.scores[open] summary::before{content:"− "}
+.scr__avg{color:var(--accent-deep)}
+.scr__none{opacity:.8}
+.scr__by{font-size:.72rem}
+.scr__hint{margin:.5rem 0 .7rem;font-size:.78rem;color:var(--muted)}
+.scrgrid{display:grid;gap:.4rem}
+@media(min-width:700px){.scrgrid{grid-template-columns:repeat(2,1fr);gap:.4rem .9rem}}
+.scr{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:.5rem;font-size:.82rem}
+.scr__k{color:var(--ink-2)}
+.scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
+.scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -739,19 +754,22 @@ function render(user, apps) {
 
   if (!apps.length) {
     lead.textContent = "Signed in as " + user.email + ".";
-    view(who +
+    view(who + staffBanner() +
       '<div class="card">' +
-        '<div class="note note--warn"><b>No application found for this address.</b> ' +
-        "If you applied with a different email, sign out and use that one. " +
-        "If you have not applied yet, the form is on the careers page.</div>" +
-        '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/careers">Go to the careers page</a></p>' +
+        (STAFF
+          ? '<div class="note"><b>Nothing here under your address.</b> ' +
+            "This page shows your own application, and staff usually do not have one.</div>"
+          : '<div class="note note--warn"><b>No application found for this address.</b> ' +
+            "If you applied with a different email, sign out and use that one. " +
+            "If you have not applied yet, the form is on the careers page.</div>" +
+            '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/careers">Go to the careers page</a></p>') +
       "</div>");
     document.getElementById("out").addEventListener("click", signOut);
     return;
   }
 
   lead.textContent = "Signed in as " + user.email + ".";
-  var html = who;
+  var html = who + staffBanner();
 
   for (var i = 0; i < apps.length; i++) {
     var a = apps[i];
@@ -796,9 +814,33 @@ function start() {
 
   var claims = readToken(session().access_token);
   if (!claims || !claims.email) { clearSession(); signedOut("That sign-in did not carry an email address."); return; }
-  var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
-
   view('<div class="card"><span class="spin"></span>Looking up your application&hellip;</div>');
+
+  /* Everyone signs in through the same link, so a staff member lands here
+     first. Rather than showing them an empty applicant view, ask what they
+     can do and point them at the right page. They may also be an applicant,
+     so this offers rather than redirects. */
+  api("rpc/my_permissions", { method: "POST", body: {} })
+    .then(function (perms) { STAFF = (perms || []).indexOf("applications.view_all") > -1; })
+    .catch(function () { STAFF = false; })
+    .then(loadApplications);
+}
+
+var STAFF = false;
+
+function staffBanner() {
+  if (!STAFF) return "";
+  return (
+    '<div class="note" style="margin-bottom:1.2rem">' +
+      "<b>You have staff access.</b> Applications, stages and interview scores are on the " +
+      '<a href="/admin">admin page</a>.' +
+    "</div>"
+  );
+}
+
+function loadApplications() {
+  var claims = readToken(session().access_token);
+  var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
   api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc")
     .then(function (rows) { render(user, rows || []); })
@@ -915,6 +957,43 @@ function socialLink(s) {
 
 /* Only the skills they actually answered. A blank is not a beginner, and
    drawing it as one would put words in their mouth. */
+/* Self-rating and interviewer score side by side, because the gap between
+   them is the useful part. An unscored skill shows a dash, never a 0: nobody
+   has judged it yet, and 0 is a judgement. */
+function scoreLine(a) {
+  if (!can("applications.edit")) return "";
+  var rows = SKILLS.map(function (k) {
+    var col = k[0].replace("skill_", "score_");
+    var have = a[col];
+    var opts = ['<option value="">&mdash;</option>'];
+    for (var n = 1; n <= 10; n++) {
+      opts.push('<option value="' + n + '"' + (Number(have) === n ? " selected" : "") + ">" + n + "</option>");
+    }
+    return (
+      '<label class="scr">' +
+        '<span class="scr__k">' + esc(k[1]) + "</span>" +
+        '<span class="scr__claim">' +
+          (a[k[0]] ? esc(LEVEL_LABEL[a[k[0]]] || a[k[0]]) : "not stated") +
+        "</span>" +
+        '<select data-score="' + esc(col) + '">' + opts.join("") + "</select>" +
+      "</label>"
+    );
+  }).join("");
+
+  return (
+    '<details class="scores"' + (a.score_avg ? " open" : "") + ">" +
+      "<summary>Interview scores" +
+        (a.score_avg
+          ? ' <b class="scr__avg">' + esc(a.score_avg) + "/10 avg</b>"
+          : ' <span class="scr__none">not scored</span>') +
+        (a.scored_by ? ' <span class="scr__by">' + esc(a.scored_by) + "</span>" : "") +
+      "</summary>" +
+      '<p class="scr__hint">Their own rating on the left, your 1&ndash;10 on the right. Leave blank for anything you did not assess.</p>' +
+      '<div class="scrgrid">' + rows + "</div>" +
+    "</details>"
+  );
+}
+
 function skillLine(a) {
   var given = SKILLS.filter(function (k) { return a[k[0]]; });
   if (!given.length) return "";
@@ -1009,6 +1088,7 @@ function rowHtml(a) {
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
       contactLine(a) +
+      scoreLine(a) +
       social +
       ctl +
     "</div>"
@@ -1213,6 +1293,8 @@ function paint() {
     if (st === "__late") {
       var w = days(a.waiting_since);
       if (!(a.is_ghosted || (w !== null && w >= 7 && !a.response_received))) return false;
+    } else if (st === "__unscored") {
+      if (a.pipeline !== "interviewed" || a.score_avg) return false;
     } else if (st && a.pipeline !== st) {
       return false;
     }
@@ -1271,6 +1353,19 @@ function save(row) {
     var t = { application_id: id, updated_at: new Date().toISOString() };
     var changed = false;
     if (pipe !== null && (!rec || rec.pipeline !== pipe)) { t.pipeline = pipe; changed = true; }
+
+    /* scored_by and scored_at are deliberately not sent. The database stamps
+       them, and only when a score actually moves, so re-saving a note does
+       not rewrite who did the assessing. */
+    row.querySelectorAll("[data-score]").forEach(function (el) {
+      var col = el.getAttribute("data-score");
+      var val = el.value === "" ? null : Number(el.value);
+      var was = rec ? (rec[col] === undefined ? null : rec[col]) : undefined;
+      if (was === undefined || (was === null ? val !== null : Number(was) !== val)) {
+        t[col] = val;
+        changed = true;
+      }
+    });
     if (replied !== null && (!rec || !!rec.response_received !== replied)) {
       t.response_received = replied;
       changed = true;
@@ -1294,6 +1389,10 @@ function save(row) {
         if (t.last_contacted_at) rec.last_contacted_at = t.last_contacted_at;
         if (t.contacted_by) rec.contacted_by = t.contacted_by;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
+        SKILLS.forEach(function (k) {
+          var col = k[0].replace("skill_", "score_");
+          if (col in t) rec[col] = t[col];
+        });
       }));
     }
   }
@@ -1312,6 +1411,14 @@ function save(row) {
     }
     row.removeAttribute("data-mark-contacted");
     if (pipe !== null || replied !== null) {
+      /* Recompute the average locally rather than refetching: the row is about
+         to be redrawn and a stale header under a changed score reads as a bug. */
+      var got = SKILLS.map(function (k) { return rec[k[0].replace("skill_", "score_")]; })
+                      .filter(function (v) { return v !== null && v !== undefined && v !== ""; })
+                      .map(Number);
+      rec.score_avg = got.length
+        ? String(Math.round((got.reduce(function (x, y) { return x + y; }, 0) / got.length) * 10) / 10)
+        : null;
       var fresh = rowHtml(rec);
       var tmp = document.createElement("div");
       tmp.innerHTML = fresh;
@@ -1356,6 +1463,7 @@ function render(email, apps, notes, socials) {
       '<select id="filter" aria-label="Filter by pipeline">' +
         '<option value="">All pipeline</option>' + pipeOptions("") +
         '<option value="__late">Waiting 7+ days, no reply</option>' +
+        '<option value="__unscored">Interviewed, not yet scored</option>' +
       "</select>" +
       '<select id="fskill" aria-label="Filter by skill">' +
         '<option value="">Any skill</option>' +
