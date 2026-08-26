@@ -151,6 +151,63 @@ for (const fn of RPCS) {
   }
 }
 
+
+const BUCKET = "applicant-docs";
+const storage = base.replace("/rest/v1", "/storage/v1");
+
+try {
+  const r = await fetch(storage + "/object/public/" + BUCKET + "/probe.pdf");
+  if (r.status === 200) {
+    fails.push(BUCKET + " (public)");
+    console.log("  BREACH  " + BUCKET + ": the bucket is PUBLIC — every CV is readable by URL");
+    console.log("          Fix now:  update storage.buckets set public = false where id = '" + BUCKET + "';");
+  } else {
+    console.log("  ok      " + BUCKET + ": not public (" + r.status + ")");
+  }
+} catch (e) {
+  fails.push(BUCKET);
+  console.log("  ERROR   " + BUCKET + ": " + e.message);
+}
+
+try {
+  const r = await fetch(storage + "/object/list/" + BUCKET, {
+    method: "POST",
+    headers: headers(anonKey),
+    body: JSON.stringify({ prefix: "", limit: 100 })
+  });
+  const rows = r.ok ? await r.json().catch(() => []) : [];
+  /* An empty list is the right answer: RLS filters rows rather than refusing
+     the call, so anon asking politely gets nothing back. Objects appearing
+     here means a select policy was granted to anon. */
+  if (Array.isArray(rows) && rows.length) {
+    fails.push(BUCKET + " (listable)");
+    console.log("  BREACH  " + BUCKET + ": the public key can list " + rows.length + " object(s)");
+    console.log("          Find the select policy naming anon on storage.objects and drop it.");
+  } else {
+    console.log("  ok      " + BUCKET + ": nothing listable with the public key");
+  }
+} catch (e) {
+  fails.push(BUCKET);
+  console.log("  ERROR   " + BUCKET + " list: " + e.message);
+}
+
+try {
+  const r = await fetch(storage + "/object/sign/" + BUCKET + "/probe.pdf", {
+    method: "POST",
+    headers: headers(anonKey),
+    body: JSON.stringify({ expiresIn: 60 })
+  });
+  if (r.ok) {
+    fails.push(BUCKET + " (signable)");
+    console.log("  BREACH  " + BUCKET + ": the public key can mint signed URLs");
+  } else {
+    console.log("  ok      " + BUCKET + ": the public key cannot sign a URL (" + r.status + ")");
+  }
+} catch (e) {
+  fails.push(BUCKET);
+  console.log("  ERROR   " + BUCKET + " sign: " + e.message);
+}
+
 if (fails.length) {
   console.log("FAILED: " + fails.join(", "));
   console.log("");
