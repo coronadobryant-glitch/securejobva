@@ -317,18 +317,32 @@ img{max-width:100%}
 .vs__lab{font-size:.86rem;color:var(--ink-2);text-align:center;line-height:1.35}
 .vs__lab b{display:block;font-weight:700;color:var(--ink)}
 
-.vs__key{list-style:none;padding:0;margin:1.15rem 0 0;border-top:1px solid var(--line)}
-.vs__key li{display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--line);font-size:.9rem;color:var(--ink-2)}
-.vs__key li:last-child{border-bottom:none}
-.vs__key b{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:700}
+.vs__grp{
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);margin:1.3rem 0 .3rem;
+}
+.vs__grp--win{color:var(--ink)}
+.vs__rows{list-style:none;padding:0;margin:0}
+.vs__rows li{display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--line);font-size:.9rem;color:var(--ink-2)}
+.vs__rows li:last-child{border-bottom:none}
+.vs__rows b{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:700}
+.vs__row--tot{font-weight:700;color:var(--ink)}
+.vs__row--tot span{font-weight:700}
+.vs__row--zero b{color:var(--muted)}
+/* The seat's bill sits on its own ground so the eye reads two bills, not one
+   list with a good row at the bottom. */
+.vs__rows--win{
+  background:var(--accent-soft);border-left:3px solid var(--signal);
+  border-radius:0 8px 8px 0;padding:.2rem 1rem;margin-top:.15rem;
+}
+.vs__rows--win li{border-bottom-color:color-mix(in srgb,var(--accent) 18%,transparent)}
 .vs__sw{width:11px;height:11px;flex:none;border-radius:3px}
 .vs__sw--a{background:var(--vs-1)}
 .vs__sw--b{background:var(--vs-2)}
 .vs__sw--c{background:var(--vs-3)}
 .vs__sw--d{background:var(--vs-4)}
 .vs__sw--win{background:var(--signal)}
-.vs__key--tot{font-weight:700;color:var(--ink)}
-.vs__key--tot span{font-weight:700}
+.vs__sw--none{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line)}
 .vs__save{
   margin-top:.9rem;padding:.8rem 1rem;border-radius:8px;
   background:var(--accent-soft);font-size:.95rem;color:var(--ink-2);text-align:center;
@@ -800,13 +814,20 @@ img{max-width:100%}
                 <p class="vs__lab"><b>SecureJobVA seat</b>$7.75/hr flat, nothing on top</p>
               </div>
             </div>
-            <ul class="vs__key">
+            <p class="vs__grp">What an in-house hire costs</p>
+            <ul class="vs__rows">
               <li><i class="vs__sw vs__sw--a" aria-hidden="true"></i><span>Wages at $19/hr</span><b>$3,293</b></li>
               <li><i class="vs__sw vs__sw--b" aria-hidden="true"></i><span>Payroll tax and insurance</span><b>$560</b></li>
               <li><i class="vs__sw vs__sw--c" aria-hidden="true"></i><span>Benefits and PTO accrual</span><b>$430</b></li>
               <li><i class="vs__sw vs__sw--d" aria-hidden="true"></i><span>Desk, equipment, software</span><b>$180</b></li>
-              <li class="vs__key--tot"><i class="vs__sw" aria-hidden="true" style="background:var(--line)"></i><span>In-house total</span><b>$4,463</b></li>
-              <li><i class="vs__sw vs__sw--win" aria-hidden="true"></i><span>SecureJobVA seat, all in</span><b>$1,343</b></li>
+              <li class="vs__row--tot"><i class="vs__sw" aria-hidden="true" style="background:var(--line)"></i><span>Total every month</span><b>$4,463</b></li>
+            </ul>
+
+            <p class="vs__grp vs__grp--win">What a SecureJobVA seat costs</p>
+            <ul class="vs__rows vs__rows--win">
+              <li><i class="vs__sw vs__sw--win" aria-hidden="true"></i><span>173.3 hrs &times; $7.75 flat</span><b>$1,343</b></li>
+              <li class="vs__row--zero"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Payroll tax, benefits, equipment</span><b>$0</b></li>
+              <li class="vs__row--tot"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Total every month</span><b>$1,343</b></li>
             </ul>
             <p class="vs__save">You keep <b>$3,120</b> a month &mdash; <b>$37,440</b> a year.</p>
           </div>
