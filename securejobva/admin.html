@@ -1,0 +1,719 @@
+<title>Applications — SecureJobVA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --paper:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#F1F5FA;
+  --glow:#F2F8FF;
+  --ink:#001232;
+  --ink-2:#3B4C66;
+  --muted:#64778F;
+  --line:#E1E8F1;
+  --accent:#0072EE;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#EAF3FE;
+  --accent-deep:#0053B4;
+  --signal:#FFC233;
+  --signal-ink:#3A2600;
+  --price-bg:#001232;
+  --price-fg:#F0F6FE;
+  --shadow:0 1px 2px rgba(0,26,70,.05), 0 14px 32px -20px rgba(0,26,70,.35);
+
+  /* The mark. Its gradient runs from the shield's bright corner to its point,
+     the two ends sampled off the logo file. Held as tokens so the artwork
+     follows the theme instead of carrying a fixed colour into a dark page. */
+  --mark-from:#0072EE;
+  --mark-to:#002E6B;
+  --mark-bg:#FFFFFF;
+  --mark-ink:#FFFFFF;
+
+  --step--1:.8125rem;
+  --step-0:1.0625rem;
+  --step-1:1.3125rem;
+  --step-2:1.75rem;
+  --step-3:2.375rem;
+  --step-4:clamp(2.75rem,1.6rem + 4.6vw,4.75rem);
+
+  --wrap:1140px;
+  --gut:clamp(1.25rem,4vw,2.5rem);
+
+  /* Light is the default; dark is opt-in through the toggle. */
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#080F1C;
+  --surface:#0F1829;
+  --surface-2:#152034;
+  --glow:#101B2E;
+  --ink:#EAF1FB;
+  --ink-2:#B9C8DE;
+  --muted:#7F91AA;
+  --line:#22304A;
+  --accent:#3B9BFF;
+  --accent-ink:#001232;
+  --accent-soft:#132743;
+  --accent-deep:#6FB6FF;
+  --signal:#FFCB5C;
+  --signal-ink:#3A2600;
+  --price-bg:#152034;
+  --price-fg:#EAF1FB;
+
+  /* Both ends lift on dark, or the shield's point dissolves into the page. */
+  --mark-from:#6FBBFF;
+  --mark-to:#2B7FE0;
+  --mark-bg:#0B1424;
+  --mark-ink:#08111F;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -20px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Karla","Segoe UI",system-ui,sans-serif;
+  font-size:var(--step-0);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{
+  font-family:"Bricolage Grotesque","Karla",system-ui,sans-serif;
+  font-weight:800;
+  line-height:1.04;
+  letter-spacing:-.022em;
+  text-wrap:balance;
+  margin:0;
+}
+p{margin:0}
+a{color:inherit}
+img{max-width:100%}
+
+.wrap{width:min(100% - (var(--gut) * 2),var(--wrap));margin-inline:auto}
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.72rem;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.lede{font-size:var(--step-1);color:var(--ink-2);line-height:1.5;max-width:60ch}
+.small{font-size:var(--step--1);color:var(--muted)}
+
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:.55rem;
+  font-family:"Karla",sans-serif;font-weight:700;font-size:.98rem;
+  padding:.85rem 1.5rem;border-radius:8px;
+  text-decoration:none;border:1.5px solid transparent;
+  transition:transform .16s ease,background-color .16s ease,border-color .16s ease;
+}
+.btn--solid{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn--solid:hover{transform:translateY(-2px)}
+.btn--ghost{border-color:var(--line);color:var(--ink);background:transparent}
+.btn--ghost:hover{border-color:var(--ink);transform:translateY(-2px)}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:40;
+  background:color-mix(in srgb,var(--paper) 88%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
+.brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
+.brand__mark{width:26px;height:26px;flex:none}
+.brand__word{display:inline}
+.brand__va{color:var(--accent)}
+.nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
+/* When the links outrun the bar, scroll them instead of letting the row
+   squash, wrap and push the header taller. min-width:0 is what makes it
+   work: a flex item will not shrink below its content without it, so the
+   row would just overflow and never become scrollable. */
+.nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
+.nav__links::-webkit-scrollbar{display:none}
+.nav__links a{flex:none;white-space:nowrap}
+/* Only the links give way; the brand and the controls keep their size. */
+.brand{flex:none}
+.nav__tools{flex:none}
+.nav__links a{text-decoration:none;color:var(--ink-2)}
+.nav__links a:hover{color:var(--accent)}
+.nav__cta{margin-left:0}
+.nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
+.themetog,.navtog{
+  width:38px;height:38px;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);border-radius:8px;
+  background:transparent;color:var(--ink-2);cursor:pointer;
+  transition:border-color .16s ease,color .16s ease;
+}
+.themetog:hover,.navtog:hover{border-color:var(--accent);color:var(--accent)}
+.themetog svg,.navtog svg{display:block}
+.navtog .i-close{display:none}
+.navtog[aria-expanded="true"] .i-open{display:none}
+.navtog[aria-expanded="true"] .i-close{display:block}
+
+.mobnav{border-top:1px solid var(--line);background:var(--paper);padding:.25rem 0 1.15rem}
+.mobnav[hidden]{display:none}
+.mobnav__in{display:grid}
+.mobnav a{
+  padding:.9rem .1rem;text-decoration:none;color:var(--ink-2);
+  border-bottom:1px solid var(--line);font-weight:600;
+}
+.mobnav a:last-child{border-bottom:none}
+.mobnav a:hover{color:var(--accent)}
+
+@media(max-width:559px){
+  .nav__in{gap:.6rem}
+  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+}
+@media(min-width:900px){
+  .nav__links{display:flex}
+  .nav__tools{margin-left:0}
+  .navtog{display:none}
+  .mobnav{display:none}
+}
+
+/* ---------- sections ---------- */
+.sec{padding:clamp(3.75rem,7vw,6.5rem) 0}
+.sec--tint{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sec__head{max-width:62ch;margin-bottom:clamp(2rem,4vw,3rem)}
+.sec__head h2{font-size:var(--step-3);margin:.7rem 0 .9rem}
+
+/* footer */
+.foot{padding:3rem 0 3.5rem;border-top:1px solid var(--line)}
+.foot__grid{display:grid;gap:2rem}
+@media(min-width:800px){.foot__grid{grid-template-columns:1.4fr repeat(3,1fr)}}
+.foot h5{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .85rem;font-weight:500}
+.foot ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.92rem}
+.foot a{text-decoration:none;color:var(--ink-2)}
+.foot a:hover{color:var(--accent)}
+.foot__brand{margin-bottom:.75rem}
+.foot__bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;font-size:.82rem;color:var(--muted)}
+
+/* ---------- portal ---------- */
+.pt{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem);min-height:60vh}
+.pt__head{margin-bottom:2rem}
+.pt__head h1{font-size:var(--step-3);margin:.5rem 0 .6rem}
+.pt__head p{color:var(--ink-2);max-width:56ch;margin:0}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:clamp(1.4rem,3vw,2rem);box-shadow:var(--shadow)}
+.card + .card{margin-top:1.1rem}
+
+/* Google's mark must keep its own colours, so the button is light in both
+   themes rather than inheriting the page's ink. */
+.gbtn{
+  display:inline-flex;align-items:center;gap:.7rem;
+  padding:.8rem 1.15rem;border-radius:9px;cursor:pointer;
+  background:#FFFFFF;color:#1F1F1F;border:1px solid #DADCE0;
+  font-family:inherit;font-size:.98rem;font-weight:600;
+}
+.gbtn:hover{background:#F7F8F8}
+.gbtn svg{flex:none}
+
+.who{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;justify-content:space-between;margin-bottom:1.5rem}
+.who__id{display:flex;align-items:center;gap:.6rem;min-width:0}
+.who__av{width:34px;height:34px;border-radius:50%;flex:none;background:var(--accent-soft);display:grid;place-items:center;font-weight:700;color:var(--accent-deep);font-size:.9rem}
+.who__t{min-width:0}
+.who__n{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who__e{display:block;font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- the four stages ---------- */
+.stg{list-style:none;padding:0;margin:1.6rem 0 0;display:grid;gap:0}
+.stg li{display:grid;grid-template-columns:2rem 1fr;gap:1rem;padding-bottom:1.6rem;position:relative}
+.stg li:last-child{padding-bottom:0}
+/* The rail is drawn behind the dots, stopping short of the last one. */
+.stg li:not(:last-child)::before{
+  content:"";position:absolute;left:.94rem;top:2rem;bottom:0;
+  width:2px;background:var(--line);
+}
+.stg li.is-done:not(:last-child)::before{background:var(--accent)}
+.stg__dot{
+  width:2rem;height:2rem;border-radius:50%;display:grid;place-items:center;
+  background:var(--surface-2);color:var(--muted);border:2px solid var(--line);
+  font-family:"IBM Plex Mono",monospace;font-size:.75rem;font-weight:600;z-index:1;
+}
+.stg li.is-done .stg__dot{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.stg li.is-now .stg__dot{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.stg__t{font-weight:700;display:block;margin-top:.3rem}
+.stg li:not(.is-done):not(.is-now) .stg__t{color:var(--muted);font-weight:600}
+.stg__d{display:block;font-size:.9rem;color:var(--ink-2);margin-top:.2rem;line-height:1.55}
+.stg__badge{
+  display:inline-block;margin-top:.45rem;
+  background:var(--signal);color:var(--signal-ink);
+  font-family:"IBM Plex Mono",monospace;font-size:.63rem;letter-spacing:.11em;
+  text-transform:uppercase;font-weight:600;padding:.22rem .5rem;border-radius:4px;
+}
+
+.meta{list-style:none;padding:0;margin:1.5rem 0 0;display:grid;gap:.55rem;font-size:.92rem}
+.meta li{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:space-between;padding-bottom:.55rem;border-bottom:1px solid var(--line)}
+.meta li:last-child{border-bottom:0;padding-bottom:0}
+.meta b{color:var(--muted);font-weight:500}
+
+.note{padding:1rem 1.15rem;border-radius:9px;background:var(--accent-soft);border-left:3px solid var(--accent);font-size:.92rem;color:var(--ink-2);line-height:1.55}
+.note--warn{background:#FFF6E5;border-left-color:var(--signal);color:var(--ink-2)}
+:root[data-theme="dark"] .note--warn{background:#2A2110}
+.msg{margin-top:1rem;font-size:.92rem;color:var(--muted)}
+.msg--bad{color:#B3261E}
+:root[data-theme="dark"] .msg--bad{color:#F2B8B5}
+
+.spin{display:inline-block;width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:.5rem}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* ---------- admin ---------- */
+.adm__bar{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1.2rem}
+.adm__bar input,.adm__bar select{
+  font-family:inherit;font-size:.93rem;padding:.55rem .7rem;
+  border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);
+}
+.adm__bar input{flex:1;min-width:12rem}
+.adm__count{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--muted)}
+
+.rows{display:grid;gap:.8rem}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.05rem 1.15rem}
+.row__top{display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:baseline;justify-content:space-between}
+.row__n{font-weight:700}
+.row__meta{font-size:.85rem;color:var(--muted)}
+.row__tags{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--muted);margin-top:.3rem}
+.row__ctl{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-top:.85rem}
+.row__ctl select{font-family:inherit;font-size:.9rem;padding:.45rem .6rem;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+.row__ctl textarea{
+  flex:1;min-width:14rem;font-family:inherit;font-size:.9rem;padding:.5rem .65rem;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
+  resize:vertical;min-height:2.4rem;
+}
+.row__ok{font-size:.8rem;color:var(--accent);opacity:0;transition:opacity .18s ease}
+.row__ok.is-on{opacity:1}
+.pill{
+  display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
+  letter-spacing:.09em;text-transform:uppercase;font-weight:600;
+  padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
+}
+.pill--applied{background:var(--surface-2);color:var(--ink-2)}
+.pill--assessment{background:var(--accent-soft);color:var(--accent-deep)}
+.pill--interview{background:var(--accent);color:var(--accent-ink)}
+.pill--approved{background:var(--signal);color:var(--signal-ink)}
+.pill--declined{background:var(--surface-2);color:var(--muted)}
+</style>
+
+<script>
+/* Restore the saved theme before paint so the page never flashes the wrong one. */
+(function () {
+  try {
+    var saved = localStorage.getItem("sjva-theme");
+    if (saved === "dark" || saved === "light") {
+      document.documentElement.setAttribute("data-theme", saved);
+    }
+  } catch (e) {}
+})();
+</script>
+
+
+<!-- Gradient for the brand mark. Defined once; all three marks point at it. -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+    <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0072EE" style="stop-color:var(--mark-from,#0072EE)"></stop>
+      <stop offset="1" stop-color="#002E6B" style="stop-color:var(--mark-to,#002E6B)"></stop>
+    </linearGradient>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="nav__in">
+      <a class="brand" href="/" aria-label="SecureJobVA home">
+        <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
+          <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
+          <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
+          <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
+          <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
+        <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
+      </a>
+      <nav class="nav__links">
+        <a href="/status">Your application</a>
+        <a href="/careers">Careers</a>
+      </nav>
+      <div class="nav__tools">
+        <button class="themetog" id="themetog" type="button" aria-label="Switch theme">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v18" ></path><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor"></path></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="pt">
+    <div class="wrap" style="max-width:60rem">
+      <div class="pt__head">
+        <span class="eyebrow">Internal</span>
+        <h1>Applications.</h1>
+        <p id="pt-lead">Everyone who has applied, and the stage each one is at.</p>
+      </div>
+      <div id="pt-root"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__bot" style="margin-top:0;border-top:0;padding-top:0">
+      <span>&copy; SecureJobVA</span>
+      <span><a href="/">Home</a> &middot; <a href="/careers">Careers</a></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* Theme toggle, same behaviour as the rest of the site. */
+(function () {
+  var b = document.getElementById("themetog");
+  if (!b) return;
+  b.addEventListener("click", function () {
+    var root = document.documentElement;
+    var next = (root.getAttribute("data-theme") || "light") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("sjva-theme", next); } catch (e) {}
+  });
+})();
+</script>
+
+<script>
+(function () {
+  "use strict";
+/* ── Supabase sign-in, without the SDK ────────────────────────────────────
+   The rest of this site talks to PostgREST with fetch and no dependencies, so
+   the portal does the same. Google is reached through Supabase's authorize
+   endpoint, which hands the tokens back in the URL fragment. A fragment is
+   never sent to a server, which is the property that makes this safe to do on
+   a static page: Vercel never sees the token, only the browser does.
+
+   The token is kept in sessionStorage rather than localStorage. It is a key to
+   someone's personal data on a machine that may be shared, and closing the tab
+   should end the session rather than leave it lying there for the next person. */
+var SB   = "https://hmgravlkatfmerzbozct.supabase.co";
+var ANON = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
+var KEY  = "sjva-session";
+
+function saveSession(s) {
+  try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+}
+function loadSession() {
+  try { return JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { return null; }
+}
+function clearSession() {
+  try { sessionStorage.removeItem(KEY); } catch (e) {}
+}
+
+/* A JWT's payload is base64url in the middle segment. Read locally only to
+   show who is signed in and to pick a landing view — every actual permission
+   decision is made by Postgres against the signature, never here. */
+function readToken(tok) {
+  try {
+    var p = tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (p.length % 4) p += "=";
+    return JSON.parse(decodeURIComponent(escape(atob(p))));
+  } catch (e) { return null; }
+}
+
+function signIn() {
+  var back = location.origin + location.pathname;
+  location.href = SB + "/auth/v1/authorize?provider=google&redirect_to=" +
+    encodeURIComponent(back);
+}
+
+function signOut() {
+  var s = loadSession();
+  clearSession();
+  if (s && s.access_token) {
+    /* Best effort. The local session is already gone either way. */
+    fetch(SB + "/auth/v1/logout", {
+      method: "POST",
+      headers: { apikey: ANON, Authorization: "Bearer " + s.access_token }
+    }).catch(function () {});
+  }
+  location.reload();
+}
+
+/* Supabase returns the tokens in the fragment. Take them, then scrub the URL so
+   a copied link never carries someone's credentials. */
+function captureRedirect() {
+  if (!location.hash || location.hash.indexOf("access_token") === -1) return false;
+  var p = new URLSearchParams(location.hash.slice(1));
+  var tok = p.get("access_token");
+  if (!tok) return false;
+  saveSession({
+    access_token: tok,
+    refresh_token: p.get("refresh_token") || "",
+    expires_at: Date.now() + (parseInt(p.get("expires_in"), 10) || 3600) * 1000
+  });
+  history.replaceState(null, "", location.pathname);
+  return true;
+}
+
+function authError() {
+  if (!location.hash) return "";
+  var p = new URLSearchParams(location.hash.slice(1));
+  var e = p.get("error_description") || p.get("error");
+  if (e) history.replaceState(null, "", location.pathname);
+  return e ? decodeURIComponent(e.replace(/\+/g, " ")) : "";
+}
+
+/* An expired token reads as "not signed in" rather than failing mid-request. */
+function session() {
+  var s = loadSession();
+  if (!s || !s.access_token) return null;
+  if (s.expires_at && Date.now() > s.expires_at - 30000) { clearSession(); return null; }
+  return s;
+}
+
+function api(path, opts) {
+  var s = session();
+  if (!s) return Promise.reject(new Error("signed out"));
+  opts = opts || {};
+  var h = {
+    apikey: ANON,
+    Authorization: "Bearer " + s.access_token,
+    "Content-Type": "application/json"
+  };
+  if (opts.headers) for (var k in opts.headers) h[k] = opts.headers[k];
+  return fetch(SB + "/rest/v1/" + path, {
+    method: opts.method || "GET",
+    headers: h,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    if (r.status === 401) { clearSession(); throw new Error("signed out"); }
+    if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
+    return r.status === 204 ? null : r.json();
+  });
+}
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/* The four stages the careers page promises, in order. Declined is deliberately
+   not in this list: it is an end, not a step along it. */
+var STAGES = [
+  ["applied",    "Application received",  "We have it, and a person reads every one."],
+  ["assessment", "Exams and strengths test", "A written task in your track, the qualification exams, and the strengths test."],
+  ["interview",  "Two interviews",        "One on how you work, one on your setup and connection."],
+  ["approved",   "Approved &mdash; paid training", "You are through. Paid training starts within a week."]
+];
+var LABEL = { applied: "Applied", assessment: "Assessment", interview: "Interview",
+              approved: "Approved", declined: "Declined" };
+
+function stageIndex(s) {
+  for (var i = 0; i < STAGES.length; i++) if (STAGES[i][0] === s) return i;
+  return -1;
+}
+function when(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+var root = document.getElementById("pt-root");
+var lead = document.getElementById("pt-lead");
+var ALL  = [];
+
+function view(html) { root.innerHTML = html; }
+
+function signedOut(msg) {
+  view(
+    '<div class="card">' +
+      (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
+      '<button class="gbtn" id="go" type="button">Sign in with Google</button>' +
+    "</div>"
+  );
+  document.getElementById("go").addEventListener("click", signIn);
+}
+
+/* Being refused here is the normal case for anyone who is not staff, so it
+   reads as a closed door rather than a failure. The refusal is Postgres's:
+   the query returned nothing because no policy let it through. */
+function notAdmin(email) {
+  view(
+    '<div class="card">' +
+      '<div class="note note--warn"><b>' + esc(email) + " is not an administrator.</b> " +
+      "If you are looking for your own application, that is on the status page.</div>" +
+      '<p style="margin-top:1.2rem">' +
+        '<a class="btn btn--solid" href="/status">Go to your application</a> ' +
+        '<button class="btn btn--ghost" id="out" type="button">Sign out</button>' +
+      "</p>" +
+    "</div>"
+  );
+  document.getElementById("out").addEventListener("click", signOut);
+}
+
+function options(cur) {
+  var keys = ["applied", "assessment", "interview", "approved", "declined"];
+  var out = "";
+  for (var i = 0; i < keys.length; i++) {
+    out += '<option value="' + keys[i] + '"' + (keys[i] === cur ? " selected" : "") + ">" +
+           LABEL[keys[i]] + "</option>";
+  }
+  return out;
+}
+
+function rowHtml(a) {
+  var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "&mdash;";
+  return (
+    '<div class="row" data-id="' + esc(a.id) + '">' +
+      '<div class="row__top">' +
+        "<span>" +
+          '<span class="row__n">' + esc(a.name || "(no name)") + "</span> " +
+          '<span class="row__meta">' + esc(a.email || "") + (a.country ? " &middot; " + esc(a.country) : "") + "</span>" +
+        "</span>" +
+        '<span class="pill pill--' + esc(a.status) + '" data-pill>' + esc(LABEL[a.status] || a.status) + "</span>" +
+      "</div>" +
+      '<div class="row__tags">' + esc(tracks) + " &middot; " + esc(a.experience || "?") +
+        " &middot; " + esc((a.shifts || []).join(", ") || "no shifts") +
+        " &middot; applied " + esc(when(a.created_at)) + "</div>" +
+      '<div class="row__ctl">' +
+        '<select data-status aria-label="Stage">' + options(a.status) + "</select>" +
+        '<textarea data-note rows="1" placeholder="Private note (staff only)">' + esc(a.note_text || "") + "</textarea>" +
+        '<button class="btn btn--ghost" data-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
+        '<span class="row__ok" data-ok>Saved</span>' +
+      "</div>" +
+    "</div>"
+  );
+}
+
+function paint() {
+  var q  = (document.getElementById("q").value || "").toLowerCase().trim();
+  var st = document.getElementById("filter").value;
+  var shown = ALL.filter(function (a) {
+    if (st && a.status !== st) return false;
+    if (!q) return true;
+    return [a.name, a.email, a.country, (a.tracks || []).join(" ")]
+      .join(" ").toLowerCase().indexOf(q) > -1;
+  });
+  document.getElementById("count").textContent =
+    shown.length + " of " + ALL.length;
+  document.getElementById("rows").innerHTML =
+    shown.length ? shown.map(rowHtml).join("") : '<p class="msg">Nothing matches that.</p>';
+}
+
+function save(row) {
+  var id  = row.getAttribute("data-id");
+  var st  = row.querySelector("[data-status]").value;
+  var note = row.querySelector("[data-note]").value;
+  var ok  = row.querySelector("[data-ok]");
+  var rec = ALL.filter(function (x) { return x.id === id; })[0];
+
+  var jobs = [];
+  if (!rec || rec.status !== st) {
+    jobs.push(api("applications?id=eq." + encodeURIComponent(id), {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: { status: st, status_changed_at: new Date().toISOString() }
+    }));
+  }
+  if (!rec || (rec.note_text || "") !== note) {
+    /* upsert: one row per application, keyed by its id */
+    jobs.push(api("application_notes", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: { application_id: id, note: note, updated_at: new Date().toISOString() }
+    }));
+  }
+  if (!jobs.length) { flash(ok, "No change"); return; }
+
+  Promise.all(jobs).then(function () {
+    if (rec) { rec.status = st; rec.note_text = note; }
+    var pill = row.querySelector("[data-pill]");
+    pill.className = "pill pill--" + st;
+    pill.textContent = LABEL[st] || st;
+    flash(ok, "Saved");
+  }).catch(function (e) {
+    flash(ok, String(e.message) === "signed out" ? "Signed out" : "Failed");
+  });
+}
+
+function flash(el, text) {
+  el.textContent = text;
+  el.classList.add("is-on");
+  setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+}
+
+function render(email, apps, notes) {
+  var byId = {};
+  (notes || []).forEach(function (n) { byId[n.application_id] = n.note; });
+  ALL = apps.map(function (a) { a.note_text = byId[a.id] || ""; return a; });
+
+  lead.textContent = "Signed in as " + email + ".";
+  view(
+    '<div class="who">' +
+      '<div class="who__id"><span class="who__av">' + esc(email.charAt(0).toUpperCase()) + "</span>" +
+      '<span class="who__t"><span class="who__n">Administrator</span>' +
+      '<span class="who__e">' + esc(email) + "</span></span></div>" +
+      '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
+    "</div>" +
+    '<div class="adm__bar">' +
+      '<input id="q" type="search" placeholder="Search name, email, country, track">' +
+      '<select id="filter" aria-label="Filter by stage">' +
+        '<option value="">All stages</option>' + options("") +
+      "</select>" +
+      '<span class="adm__count" id="count"></span>' +
+    "</div>" +
+    '<div class="rows" id="rows"></div>'
+  );
+
+  document.getElementById("out").addEventListener("click", signOut);
+  document.getElementById("q").addEventListener("input", paint);
+  document.getElementById("filter").addEventListener("change", paint);
+  document.getElementById("rows").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-save]");
+    if (b) save(b.closest(".row"));
+  });
+  paint();
+}
+
+function start() {
+  captureRedirect();
+  var err = authError();
+  if (!session()) { signedOut(err); return; }
+
+  var claims = readToken(session().access_token);
+  if (!claims || !claims.email) { clearSession(); signedOut("That sign-in did not carry an email address."); return; }
+
+  view('<div class="card"><span class="spin"></span>Loading applications&hellip;</div>');
+
+  /* is_admin() is asked of the database rather than decided here. A non-admin
+     gets false, and would in any case see nothing, because the same function
+     gates every row. */
+  api("rpc/is_admin", { method: "POST", body: {} })
+    .then(function (isAdmin) {
+      if (!isAdmin) { notAdmin(claims.email); return null; }
+      return Promise.all([
+        api("applications?select=id,created_at,tracks,track,experience,shifts,speed,kit,name,country,email,phone,cv,note,status,status_changed_at&order=created_at.desc"),
+        api("application_notes?select=application_id,note")
+      ]).then(function (r) { render(claims.email, r[0] || [], r[1] || []); });
+    })
+    .catch(function (e) {
+      if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
+      view('<div class="card"><p class="msg msg--bad">Could not load. ' + esc(e.message) + "</p></div>");
+    });
+}
+
+start();
+})();
+</script>

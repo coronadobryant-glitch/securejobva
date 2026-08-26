@@ -34,6 +34,24 @@ const PAGES = [
     description:
       "Online jobs hiring worldwide. Training is paid only after you pass the exams and are approved, then 40 hours a week on fixed hours in American time. No fee to apply, ever.",
     ogTitle: "Online jobs with paid training, then a full-time seat."
+  },
+  {
+    src: "status.html",
+    path: "/status",
+    title: "Your application — SecureJobVA",
+    description:
+      "Sign in with the Google account you applied with and see which stage your SecureJobVA application has reached.",
+    ogTitle: "Where you are in the process.",
+    /* A signed-in page is for the person signed in, not for search. */
+    noindex: true
+  },
+  {
+    src: "admin.html",
+    path: "/admin",
+    title: "Applications — SecureJobVA",
+    description: "Internal.",
+    ogTitle: "Applications",
+    noindex: true
   }
 ];
 
@@ -74,6 +92,11 @@ function build(page) {
   const body = html.slice(cut).trim();
   const url = SITE + page.path;
 
+  /* Kept out of the template below: a signed-in page has nothing for a crawler. */
+  const robots = page.noindex
+    ? '<meta name="robots" content="noindex, nofollow">'
+    : "";
+
   const doc = `<!doctype html>
 <html lang="en">
 <head>
@@ -97,6 +120,7 @@ function build(page) {
 <meta name="twitter:title" content="${page.ogTitle}">
 <meta name="twitter:description" content="${page.description}">
 <meta name="twitter:image" content="${SITE}/og.png">
+${robots}
 ${head}
 </head>
 <body>
@@ -106,7 +130,7 @@ ${body}
 `;
 
   writeFileSync("dist/" + page.src, doc);
-  return { url, title: page.title || title(html), bytes: doc.length };
+  return { url, title: page.title || title(html), bytes: doc.length, noindex: !!page.noindex };
 }
 
 mkdirSync("dist", { recursive: true });
@@ -117,7 +141,7 @@ writeFileSync(
   "dist/sitemap.xml",
   '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-    built.map((p) => "  <url><loc>" + p.url + "</loc></url>\n").join("") +
+    built.filter((p) => !p.noindex).map((p) => "  <url><loc>" + p.url + "</loc></url>\n").join("") +
     "</urlset>\n"
 );
 
