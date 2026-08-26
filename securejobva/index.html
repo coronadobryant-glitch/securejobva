@@ -192,6 +192,9 @@ img{max-width:100%}
 }
 .hero__grid{display:grid;gap:clamp(2rem,4vw,3.5rem)}
 .hero__grid > div{max-width:64ch}
+.hero__tag{display:inline-block;background:var(--signal);color:var(--signal-ink);font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.11em;text-transform:uppercase;font-weight:600;padding:.32rem .65rem;border-radius:5px}
+.hero h1{font-size:var(--step-4);margin:.95rem 0 0}
+.hero h1 b{color:var(--accent);font-weight:inherit}
 .hero__actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.9rem}
 .hero__note{margin-top:1rem;font-size:var(--step--1);color:var(--muted)}
 
@@ -693,7 +696,8 @@ img{max-width:100%}
   <section class="hero">
     <div class="wrap hero__grid">
       <div>
-        <span class="eyebrow">Dedicated virtual assistants &middot; Your hours, your time zone</span>
+        <span class="hero__tag">Try before you buy</span>
+        <h1>Your first week is <b>free</b>.</h1>
         <div class="adapt">
           <span class="adapt__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
           <p class="adapt__t">
@@ -723,8 +727,8 @@ img{max-width:100%}
   <section class="trial" id="trial">
     <div class="wrap trial__in">
       <div>
-        <span class="trial__tag">Try before you buy</span>
-        <h2>Your first week is <b>free</b>.</h2>
+        <span class="trial__tag">The free week</span>
+        <h2>What the first week <b>covers</b>.</h2>
         <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. If the fit is not right, you walk away and owe nothing.</p>
         <div class="hero__actions">
           <a class="btn btn--solid" data-book href="mailto:support@securejobva.com">Start the free week</a>
