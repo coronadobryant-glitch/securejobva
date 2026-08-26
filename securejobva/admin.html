@@ -726,11 +726,11 @@ function notAdmin(email) {
       "If you are looking for your own application, that is on the status page.</div>" +
       '<p style="margin-top:1.2rem">' +
         '<a class="btn btn--solid" href="/status">Go to your application</a> ' +
-        '<button class="btn btn--ghost" id="out" type="button">Sign out</button>' +
+        '<button class="btn btn--ghost" id="out-denied" type="button">Sign out</button>' +
       "</p>" +
     "</div>"
   );
-  document.getElementById("out").addEventListener("click", signOut);
+  document.getElementById("out-denied").addEventListener("click", signOut);
 }
 
 function options(cur) {
@@ -778,7 +778,8 @@ function scoreLine(a) {
         '<span class="scr__claim">' +
           (a[k[0]] ? esc(LEVEL_LABEL[a[k[0]]] || a[k[0]]) : "not stated") +
         "</span>" +
-        '<select data-score="' + esc(col) + '">' + opts.join("") + "</select>" +
+        '<select data-score="' + esc(col) + '" aria-label="' +
+          esc(k[1]) + ' score out of 10">' + opts.join("") + "</select>" +
       "</label>"
     );
   }).join("");
@@ -870,7 +871,9 @@ function rowHtml(a) {
               'style="padding:.45rem .8rem;font-size:.85rem">Mark contacted</button>'
           : "") +
         (can("applications.note")
-          ? '<textarea data-note rows="1" placeholder="Private note (staff only)">' + esc(a.note_text || "") + "</textarea>"
+          ? '<textarea data-note rows="1" aria-label="Private note about ' +
+            esc(a.name || "this applicant") + '" placeholder="Private note (staff only)">' +
+            esc(a.note_text || "") + "</textarea>"
           : "") +
         '<button class="btn btn--ghost" data-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
         '<span class="row__ok" data-ok>Saved</span>' +
@@ -973,8 +976,9 @@ function drawRoles(box, grants, reqs) {
     '<p class="msg" style="margin-top:0">A role is granted to an email address. It takes effect the next time that person signs in.</p>' +
     '<div class="acctlist">' + rows + "</div>" +
     '<div class="adm__bar" style="margin:1.1rem 0 0">' +
-      '<input id="r-email" type="email" placeholder="person@example.com">' +
-      '<select id="r-role">' + opts + "</select>" +
+      '<input id="r-email" type="email" aria-label="Email address to grant a role to" ' +
+        'placeholder="person@example.com">' +
+      '<select id="r-role" aria-label="Role to grant">' + opts + "</select>" +
       '<button class="btn btn--ghost" id="r-add" type="button" style="padding:.5rem .9rem;font-size:.88rem">Grant</button>' +
     "</div>" +
     '<p class="msg" id="r-msg"></p>' +
@@ -1306,7 +1310,8 @@ function render(email, apps, notes, socials) {
       '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
     "</div>" +
     '<div class="adm__bar">' +
-      '<input id="q" type="search" placeholder="Search name, email, country, region, track">' +
+      '<input id="q" type="search" aria-label="Search applications" ' +
+        'placeholder="Search name, email, country, region, track">' +
       '<select id="filter" aria-label="Filter by pipeline">' +
         '<option value="">All pipeline</option>' + pipeOptions("") +
         '<option value="__late">Waiting 7+ days, no reply</option>' +
