@@ -386,8 +386,8 @@ img{max-width:100%}
 /* ---------- intake dialog ---------- */
 .intake{
   border:none;padding:0;background:transparent;color:var(--ink);
-  width:min(100% - 1.5rem,46rem);max-width:none;
-  max-height:min(94vh,56rem);
+  width:min(100% - 1.5rem,52rem);max-width:none;
+  max-height:min(94vh,58rem);
 }
 .intake::backdrop{background:rgba(28,14,12,.58);backdrop-filter:blur(3px)}
 .intake__panel{
@@ -398,7 +398,7 @@ img{max-width:100%}
 @keyframes intakeIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 .intake[open] .intake__panel{animation:intakeIn .22s cubic-bezier(.2,.8,.2,1) both}
 
-.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.3rem 1.7rem 1.1rem}
+.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.4rem 2rem 1.15rem}
 .intake__head .brand__mark{width:22px;height:22px}
 .intake__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.22rem;letter-spacing:-.02em}
 .intake__x{
@@ -411,7 +411,7 @@ img{max-width:100%}
 .intake__x:hover{border-color:var(--accent);color:var(--accent)}
 
 /* three real steps, so the rail is a sequence and not decoration */
-.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;padding:0 1.7rem 1.2rem}
+.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;padding:0 2rem 1.3rem}
 .rail__i{display:grid;gap:.45rem}
 .rail__bar{height:3px;border-radius:2px;background:var(--line);transition:background-color .2s ease}
 .rail__i[data-on] .rail__bar{background:var(--accent)}
@@ -421,9 +421,9 @@ img{max-width:100%}
 }
 .rail__i[data-on] .rail__l{color:var(--ink-2)}
 
-.intake__body{padding:.35rem 1.7rem 1.75rem;overflow-y:auto}
+.intake__body{padding:.5rem 2rem 2rem;overflow-y:auto}
 .step[hidden]{display:none}
-.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.24rem;letter-spacing:-.015em}
+.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.32rem;letter-spacing:-.018em}
 .q__sub{font-size:.95rem;color:var(--muted);margin:.35rem 0 1.15rem;line-height:1.5}
 .q--again{margin-top:1.65rem}
 
@@ -474,19 +474,20 @@ img{max-width:100%}
 .est__n span{font-size:.9rem;font-weight:600;opacity:.85;letter-spacing:0}
 .est__l{font-family:"IBM Plex Mono",monospace;font-size:.7rem;line-height:1.6;opacity:.78;text-align:right}
 
-.field{display:grid;gap:.35rem;margin-bottom:.85rem}
+.field{display:grid;gap:.4rem;margin-bottom:1.05rem}
 .field--split{margin-bottom:0}
 @media(min-width:470px){
   .fields2{display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem}
 }
 .field > label{
-  font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-2);
 }
 .field > label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.8}
 .field input,.field textarea,.field select{
-  font-family:inherit;font-size:1.06rem;color:var(--ink);background:var(--paper);
-  border:1.5px solid var(--line);border-radius:8px;padding:.85rem .95rem;width:100%;
+  font-family:inherit;font-size:1.12rem;color:var(--ink);background:var(--paper);
+  border:1.5px solid var(--line);border-radius:9px;padding:.95rem 1.05rem;width:100%;
+  text-overflow:ellipsis;
   transition:border-color .15s ease;
 }
 .field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
@@ -497,7 +498,7 @@ img{max-width:100%}
 
 .intake__foot{
   display:flex;align-items:center;gap:.7rem;
-  padding:1.05rem 1.7rem;border-top:1px solid var(--line);background:var(--surface-2);
+  padding:1.1rem 2rem;border-top:1px solid var(--line);background:var(--surface-2);
 }
 .intake__count{
   font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);
@@ -560,7 +561,7 @@ img{max-width:100%}
 
 <header class="nav">
   <div class="wrap nav__in">
-    <a class="brand" href="#top">
+    <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
       <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
         <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -896,7 +897,7 @@ img{max-width:100%}
   <div class="wrap">
     <div class="foot__grid">
       <div>
-        <a class="brand foot__brand" href="#top">
+        <a class="brand foot__brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
           <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
             <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
