@@ -86,9 +86,13 @@ and Apache respectively. They are not copied into `dist/` — add them back to
 
 ## Forms
 
-Both dialogs POST JSON to Supabase. `supabase.sql` in this folder creates the
-two tables and the policies; paste it into the Supabase SQL editor and run it
-once.
+Both dialogs POST JSON to Supabase. Everything the database needs lives in
+**`sql/`** — numbered files you copy and paste into the Supabase SQL editor, in
+order. `sql/README.md` explains the workflow; the short version is that every
+file is safe to run twice, so when in doubt, run it.
+
+That folder is the shared surface between whoever is working on this. Add a
+schema change as the next numbered file, push, and the other person has it.
 
 Then fill in `CFG` at the bottom of each page (search for `CFG = {`):
 
@@ -114,10 +118,17 @@ With `endpoint` empty the dialogs fall back to handing the visitor a written
 email, and they do the same if a POST fails, so a Supabase outage never costs
 you a lead.
 
-**The one rule.** The anon key is public. It is safe only because RLS on those
-two tables allows INSERT and nothing else. Do not add a SELECT policy for
-`anon` — the tables hold applicants' names, emails, phone numbers and CV links.
-Read the rows in the Supabase dashboard, which bypasses RLS.
+**The one rule.** The anon key is public. It is safe only because RLS holds it
+to INSERT and nothing else. Do not add a SELECT policy for `anon` — the tables
+hold applicants' names, emails, phone numbers and CV links.
+
+Reading is for `authenticated`, which is a different thing entirely: a session
+Supabase issues only after Google has vouched for an email, with every read
+still fenced by a policy. An applicant sees their own row and nobody else's;
+anything wider requires being listed in `public.admins`. So grant to
+`authenticated`, never to `anon` — see `sql/003-portal.sql`.
+
+Read the rows yourself in the Supabase dashboard, which bypasses RLS.
 
 Column names match the JSON keys exactly and PostgREST rejects an insert
 carrying a key with no column. Add a field to a form, add the column too.
@@ -138,8 +149,8 @@ stored row is deleted the moment Supabase confirms it.
 **Before a deploy — `node tools/check.mjs`.** Runs as part of the Vercel build
 command, so a tree that would lose leads cannot ship. It checks that every
 inline script parses, that every form field has a column, that no unrounded
-arithmetic goes into an integer column, that `supabase.sql` still grants `anon`
-nothing but INSERT, and that `dist/` carries its meta with no artifact URLs
+arithmetic goes into an integer column, that nothing in `sql/` grants `anon`
+more than INSERT, and that `dist/` carries its meta with no artifact URLs
 left in it. Add `--live` to also check the running site's routes, redirects and
 canonical host. It also runs `tools/test-queue.mjs`, which pulls the queue code
 straight out of `index.html` and drives it against a mocked store — parking,

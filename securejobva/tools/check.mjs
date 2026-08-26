@@ -9,7 +9,7 @@
         node tools/check.mjs --live   also check the running site
 
    Exit status is 1 if anything failed, so it can gate a deploy. */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { Script } from "node:vm";
 
 const LIVE = process.argv.includes("--live");
@@ -40,7 +40,7 @@ function columns(sql, table) {
   const m = sql.match(
     new RegExp("create table if not exists public\\." + table + "\\s*\\(([\\s\\S]*?)\\n\\);", "i")
   );
-  if (!m) throw new Error("no create table for " + table + " in supabase.sql");
+  if (!m) throw new Error("no create table for " + table + " in the sql/ folder");
   const out = {};
   for (const line of m[1].split("\n")) {
     const c = line.trim().replace(/--.*$/, "").trim();
@@ -67,9 +67,6 @@ function payload(html) {
 
 console.log("\nstatic\n");
 
-/* Every inline script has to parse. These files are edited by hand and by
-   script, and a stray brace in the dialog takes the whole form down while the
-   page around it still renders perfectly — so nothing looks wrong. */
 /* Every page that ships, not just the two with forms. admin.html and
    status.html carry a sign-in flow and a stage editor; a stray brace there
    takes the portal down while the markup around it still renders fine. */
@@ -89,7 +86,16 @@ for (const p of SHIPPED.map((file) => ({ file }))) {
   });
 }
 
-const sql = read("supabase.sql");
+/* The schema lives in sql/ as numbered files that get pasted into the Supabase
+   editor one at a time. For checking purposes they are one document — a column
+   added in 002 is just as real as one declared in 001. verify.sql is excluded:
+   it is read-only diagnostics, not schema. */
+const SQL_DIR = "sql";
+const sqlFiles = readdirSync(SQL_DIR)
+  .filter((f) => /^\d+.*\.sql$/.test(f))
+  .sort();
+if (!sqlFiles.length) throw new Error("no numbered .sql files in " + SQL_DIR + "/");
+const sql = sqlFiles.map((f) => read(SQL_DIR + "/" + f)).join("\n");
 
 for (const p of PAGES) {
   const cols = columns(sql, p.table);
@@ -101,7 +107,7 @@ for (const p of PAGES) {
     const missing = Object.keys(keys).filter((k) => !(k in cols));
     if (missing.length) {
       throw new Error("no column in " + p.table + " for: " + missing.join(", ") +
-        " — add them to supabase.sql in this commit");
+        " — add them to a new file in sql/ in this commit");
     }
     return Object.keys(keys).length + " fields -> " + p.table;
   });
@@ -138,7 +144,7 @@ await check("lead queue behaves", async () => {
   }
 });
 
-/* The one rule from supabase.sql, asserted rather than trusted.
+/* The one rule from sql/001-forms.sql, asserted rather than trusted.
 
    The rule is about `anon` — the key that sits in the page source where anyone
    can read it. `authenticated` is a different thing entirely: a session Supabase
