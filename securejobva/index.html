@@ -233,6 +233,7 @@ img{max-width:100%}
 .hero__tag{display:inline-block;background:var(--signal);color:var(--signal-ink);font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.11em;text-transform:uppercase;font-weight:600;padding:.32rem .65rem;border-radius:5px}
 .hero h1{font-size:var(--step-4);margin:.95rem 0 0}
 .hero h1 b{color:var(--accent);font-weight:inherit}
+.hero__then{display:block;margin-top:.35rem;font-size:.62em;font-weight:600;color:var(--ink-2);letter-spacing:-.02em}
 .hero__actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.9rem}
 .hero__note{margin-top:1rem;font-size:var(--step--1);color:var(--muted)}
 
@@ -270,6 +271,37 @@ img{max-width:100%}
 .sv__p{margin:0;font-size:.89rem;color:var(--muted);line-height:1.55}
 .sv__fix{margin:.2rem 0 0;padding-top:.75rem;border-top:1px dashed var(--line);font-size:.89rem;color:var(--ink-2);line-height:1.55}
 .sv__fix b{color:var(--accent);font-weight:600}
+
+/* client logos */
+.logos{padding:2.2rem 0 2.6rem;border-bottom:1px solid var(--line);overflow:hidden}
+.logos[hidden]{display:none}
+.logos__k{
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 1.4rem;text-align:center;
+}
+.logos__track{display:flex;width:max-content;animation:logos-roll 42s linear infinite}
+.logos:hover .logos__track{animation-play-state:paused}
+.logos__set{display:flex;align-items:center;gap:clamp(2.2rem,5vw,4rem);padding-right:clamp(2.2rem,5vw,4rem)}
+.logos__item{flex:none;display:grid;place-items:center;height:44px}
+.logos__item img{
+  max-height:44px;max-width:150px;width:auto;height:auto;display:block;
+  /* Logos arrive in every colour and on every background. Flattening them to
+     one ink keeps the rail from looking like a ransom note, and lets them sit
+     on either theme without a white box behind each one. */
+  filter:grayscale(1) opacity(.62);
+  transition:filter .2s ease;
+}
+.logos__item:hover img{filter:grayscale(0) opacity(1)}
+:root[data-theme="dark"] .logos__item img{filter:grayscale(1) brightness(2.2) opacity(.75)}
+:root[data-theme="dark"] .logos__item:hover img{filter:grayscale(0) brightness(1) opacity(1)}
+@keyframes logos-roll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* Motion here is decoration, and a rail that slides past is exactly the thing
+   that makes some people ill. Stopped, it becomes a centred wrapped row. */
+@media(prefers-reduced-motion:reduce){
+  .logos__track{animation:none;width:100%;flex-wrap:wrap;justify-content:center}
+  .logos__set:last-child{display:none}
+  .logos__set{flex-wrap:wrap;justify-content:center;gap:1.6rem 2.4rem;padding-right:0}
+}
 
 /* stat strip */
 .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
@@ -719,7 +751,7 @@ img{max-width:100%}
     <div class="wrap hero__grid">
       <div>
         <span class="hero__tag">Try before you buy</span>
-        <h1>Your first week is <b>free</b>.</h1>
+        <h1>Your first week is <b>free</b>.<br><span class="hero__then">Now let&rsquo;s help your business make more money.</span></h1>
         <div class="adapt">
           <span class="adapt__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
           <p class="adapt__t">
@@ -746,19 +778,12 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="trial" id="trial">
-    <div class="wrap trial__in">
-      <div>
-        <span class="trial__tag">The free week</span>
-        <h2>How the <b>free week</b> works.</h2>
-        <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. A card and a deposit are set up before the week starts, so the seat can begin the day you approve it, and the week itself is not charged.</p>
-        <div class="hero__actions">
-          <a class="btn btn--solid" data-book href="mailto:support@securejobva.com">Start the free week</a>
-        </div>
-      </div>
+  <section class="logos" id="logos" hidden aria-label="Businesses we staff">
+    <div class="wrap">
+      <p class="logos__k">Businesses we staff</p>
     </div>
+    <div class="logos__track" id="logos-track"></div>
   </section>
-
   <section class="sec" id="pricing">
     <div class="wrap">
       <div class="sec__head">
@@ -1011,6 +1036,19 @@ img{max-width:100%}
     </div>
   </section>
 
+  <section class="trial" id="trial">
+    <div class="wrap trial__in">
+      <div>
+        <span class="trial__tag">The free week</span>
+        <h2>How the <b>free week</b> works.</h2>
+        <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. A card and a deposit are set up before the week starts, so the seat can begin the day you approve it, and the week itself is not charged.</p>
+        <div class="hero__actions">
+          <a class="btn btn--solid" data-book href="mailto:support@securejobva.com">Start the free week</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="cta" id="book">
     <div class="wrap">
       <h2>Tell us what is eating your week.</h2>
@@ -1077,6 +1115,54 @@ img{max-width:100%}
 </footer>
 
 <script>
+/* Client logos.
+
+   Read with the publishable key, which can see only rows marked visible. The
+   section starts hidden and stays hidden unless something comes back, so a
+   failed request or an empty list leaves no empty rail behind. */
+(function () {
+  var ENDPOINT = "https://hmgravlkatfmerzbozct.supabase.co/rest/v1/client_logos" +
+    "?select=name,image_url,link&visible=is.true&order=sort_order.asc,added_at.asc";
+  var KEY = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
+
+  var sec = document.getElementById("logos");
+  var track = document.getElementById("logos-track");
+  if (!sec || !track) return;
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  /* The name and the link come from a staff member typing into a form, which
+     is still not somewhere to take a URL on trust: only http and https become
+     links, anything else stays an image with no anchor around it. */
+  function item(c) {
+    var img = '<img src="' + esc(c.image_url) + '" alt="' + esc(c.name) + '" loading="lazy">';
+    var safe = /^https?:\/\//i.test(String(c.link || ""));
+    return '<span class="logos__item">' +
+      (safe
+        ? '<a href="' + esc(c.link) + '" target="_blank" rel="noopener noreferrer nofollow">' + img + "</a>"
+        : img) +
+      "</span>";
+  }
+
+  fetch(ENDPOINT, { headers: { apikey: KEY, Authorization: "Bearer " + KEY } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    ["catch"](function () { return []; })
+    .then(function (rows) {
+      if (!rows || !rows.length) return;
+      var set = '<div class="logos__set">' + rows.map(item).join("") + "</div>";
+      /* Twice, so translating the rail by half its width lands exactly where it
+         started and the loop has no visible seam. */
+      track.innerHTML = set + set;
+      /* A short list would gallop; scale the duration to how much there is. */
+      track.style.animationDuration = Math.max(18, rows.length * 5) + "s";
+      sec.removeAttribute("hidden");
+    });
+})();
+
 /* Mobile menu */
 (function () {
   var btn = document.getElementById("navtog");

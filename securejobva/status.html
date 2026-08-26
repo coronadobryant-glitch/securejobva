@@ -333,6 +333,32 @@ img{max-width:100%}
 .scr__k{color:var(--ink-2)}
 .scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
 .scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.cl__add{display:grid;gap:0;padding:1.1rem 1.2rem;background:var(--surface-2);border-radius:10px;margin:1rem 0 1.4rem}
+@media(min-width:720px){.cl__add{grid-template-columns:1fr 1fr;gap:0 1rem}
+  .cl__add .fld:nth-child(3),.cl__add #cl-add,.cl__add #cl-msg{grid-column:1/-1}}
+.cl__add input[type=file]{
+  font-family:inherit;font-size:.9rem;padding:.55rem;
+  border:1px dashed var(--line);border-radius:8px;background:var(--surface);color:var(--ink-2);width:100%;
+}
+.cl__list{display:grid;gap:.55rem}
+.cl{
+  display:grid;grid-template-columns:5.5rem 1fr 4.5rem auto auto;
+  gap:.7rem;align-items:center;padding:.6rem .8rem;
+  background:var(--surface);border:1px solid var(--line);border-radius:9px;
+}
+.cl.is-off{opacity:.5}
+.cl__img{display:grid;place-items:center;height:34px}
+.cl__img img{max-height:34px;max-width:5.5rem;width:auto;display:block}
+.cl__meta{min-width:0}
+.cl__n{display:block;font-weight:600;font-size:.92rem}
+.cl__l{display:block;font-size:.76rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl__ord{
+  font-family:"IBM Plex Mono",monospace;font-size:.82rem;text-align:center;
+  padding:.3rem;border:1px solid var(--line);border-radius:6px;
+  background:var(--surface);color:var(--ink);width:100%;
+}
+@media(max-width:620px){.cl{grid-template-columns:4rem 1fr;gap:.5rem}
+  .cl__ord,.cl [data-cl-toggle],.cl [data-cl-del]{grid-column:2}}
 .tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
 .tab{
   font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
@@ -754,11 +780,6 @@ function esc(s) {
 
 /* The four stages the careers page promises, in order. Declined is deliberately
    not in this list: it is an end, not a step along it. */
-/* The same sentence the application form shows. Kept identical on purpose: a
-   consent recorded from this page must be answerable to the same wording. */
-var CONSENT_TEXT = "If I am placed in a seat that involves posting, SecureJobVA may " +
-  "publish content to the accounts I listed on my behalf. I can withdraw this at any " +
-  "time by telling my manager.";
 
 var STAGES = [
   ["applied",    "Application received",  "We have it, and a person reads every one."],
@@ -978,9 +999,6 @@ function editForm(a) {
       skills +
       '<label class="chk" style="margin:.5rem 0 .9rem"><input type="checkbox" id="e-kit"' +
         (a.has_equipment ? " checked" : "") + "> I have my own computer and internet</label>" +
-      '<label class="chk" style="margin-bottom:1rem"><input type="checkbox" id="e-consent"' +
-        (a.posting_consent ? " checked" : "") +
-        "> You may post on my behalf if I am placed</label>" +
       '<button class="btn btn--solid" id="e-save" type="button">Save changes</button>' +
       '<span class="row__ok" id="e-ok" style="margin-left:.7rem">Saved</span>' +
     "</div>"
@@ -1001,17 +1019,6 @@ function wireEdit(a) {
     SKILLS.forEach(function (k) {
       body[k[0]] = document.getElementById("e-" + k[0]).value || null;
     });
-
-    /* Consent is sent only when it changes. The database keeps the history of a
-       withdrawal, so this must not blindly restamp it on every save. */
-    var consent = document.getElementById("e-consent").checked;
-    if (consent !== !!a.posting_consent) {
-      body.posting_consent = consent;
-      if (consent) {
-        body.posting_consent_at = new Date().toISOString();
-        body.posting_consent_text = CONSENT_TEXT;
-      }
-    }
 
     btn.disabled = true;
     api("applications?id=eq." + encodeURIComponent(a.id), {
@@ -1245,7 +1252,7 @@ function loadApplications() {
   var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
   Promise.all([
-    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
+    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
     api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
       .catch(function () { return []; })
   ])
