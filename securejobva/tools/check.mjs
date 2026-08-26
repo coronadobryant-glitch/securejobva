@@ -70,7 +70,13 @@ console.log("\nstatic\n");
 /* Every inline script has to parse. These files are edited by hand and by
    script, and a stray brace in the dialog takes the whole form down while the
    page around it still renders perfectly — so nothing looks wrong. */
-for (const p of PAGES) {
+/* Every page that ships, not just the two with forms. admin.html and
+   status.html carry a sign-in flow and a stage editor; a stray brace there
+   takes the portal down while the markup around it still renders fine. */
+const SHIPPED = [...PAGES.map((p) => p.file), "status.html", "admin.html"]
+  .filter((f) => existsSync(f));
+
+for (const p of SHIPPED.map((file) => ({ file }))) {
   await check(p.file + ": inline JS parses", () => {
     const html = read(p.file);
     const blocks = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -132,16 +138,42 @@ await check("lead queue behaves", async () => {
   }
 });
 
-/* The one rule from supabase.sql, asserted rather than trusted. */
-await check("supabase.sql grants anon insert and nothing else", () => {
-  const grants = [...sql.matchAll(/grant\s+([a-z, ]+?)\s+on\s+public\.(\w+)\s+to\s+([a-z, ]+)/gi)];
-  if (!grants.length) throw new Error("no grants found — has the file been rewritten?");
-  const bad = grants.filter((g) => !/^insert$/i.test(g[1].trim()));
-  if (bad.length) throw new Error("non-insert grant: " + bad.map((b) => b[0].trim()).join("; "));
-  if (/for\s+select\s+to\s+anon/i.test(sql)) {
+/* The one rule from supabase.sql, asserted rather than trusted.
+
+   The rule is about `anon` — the key that sits in the page source where anyone
+   can read it. `authenticated` is a different thing entirely: a session Supabase
+   issues only after Google has vouched for an email, and every read it can do is
+   still fenced by a policy. So grants to `authenticated` are allowed here and
+   grants to `anon` are held to insert-only.
+
+   An earlier version of this check failed any grant that was not insert,
+   whatever the grantee, and flagged the admin portal as a breach. A guard that
+   cries wolf gets switched off, which is worse than not having one. */
+await check("anon can still only INSERT", () => {
+  /* A grant can span lines and carry a column list —
+        grant select ( id, created_at, … ) on public.applications to authenticated;
+     so match to the statement terminator, not to end of line. */
+  const stmts = sql.match(/grant\b[\s\S]*?;/gi) || [];
+  if (!stmts.length) throw new Error("no grants found — has the file been rewritten?");
+
+  const offenders = [];
+  for (const s of stmts) {
+    const to = (s.match(/\sto\s+([a-z_, ]+);/i) || [])[1] || "";
+    const grantees = to.split(",").map((g) => g.trim().toLowerCase());
+    if (!grantees.some((g) => g === "anon" || g === "public")) continue;
+    const privs = (s.match(/grant\s+([\s\S]*?)\s+on\s/i) || [])[1] || "";
+    const clean = privs.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+    if (clean !== "insert") offenders.push(clean + " -> " + grantees.join(", "));
+  }
+  if (offenders.length) {
+    throw new Error("anon/public granted more than insert: " + offenders.join("; ") +
+      " — this publishes the applicant list");
+  }
+  if (/for\s+select\s+to\s+(anon|public)\b/i.test(sql)) {
     throw new Error("a SELECT policy for anon would publish the applicant list");
   }
-  return grants.length + " grants, all insert-only";
+  const authed = stmts.filter((s) => /\sto\s+[^;]*authenticated/i.test(s)).length;
+  return stmts.length + " grants — anon insert-only, " + authed + " to signed-in users";
 });
 
 /* ── built output ────────────────────────────────────────────────────────── */
