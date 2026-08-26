@@ -229,6 +229,25 @@ img{max-width:100%}
 .cov__foot b{color:var(--ink)}
 
 /* stat strip */
+/* rating band + free-week offer */
+.rated{border-top:1px solid var(--line);background:var(--glow)}
+.rated__in{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.5rem .8rem;padding:.95rem clamp(.9rem,2vw,1.6rem)}
+.rated__stars{display:inline-flex;gap:.14rem;color:var(--signal);line-height:0}
+.rated__t{margin:0;font-size:.95rem;color:var(--ink-2);text-align:center}
+.rated__t b{color:var(--ink);font-weight:700}
+
+.trial{background:var(--price-bg);color:var(--price-fg);padding:clamp(2.4rem,5vw,3.6rem) 0}
+.trial__in{display:grid;gap:1.6rem;align-items:center}
+@media(min-width:860px){.trial__in{grid-template-columns:1.25fr .95fr;gap:clamp(2rem,4vw,3.5rem)}}
+.trial__tag{display:inline-block;background:var(--signal);color:var(--signal-ink);font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;font-weight:600;padding:.3rem .6rem;border-radius:5px}
+.trial h2{font-size:var(--step-3);margin:.85rem 0 .9rem;max-width:18ch}
+.trial h2 b{color:var(--signal);font-weight:inherit}
+.trial p{margin:0;opacity:.88;max-width:52ch}
+.trial__card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:1.35rem 1.4rem}
+.trial__list{list-style:none;padding:0;margin:0;display:grid;gap:.7rem;font-size:.94rem}
+.trial__list li{display:flex;gap:.6rem;align-items:flex-start}
+.trial__list svg{flex:none;margin-top:.18rem;color:var(--signal)}
+.trial__fine{margin-top:1.1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.16);font-size:.82rem;opacity:.72}
 .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
 .stats__in{display:grid;grid-template-columns:repeat(2,1fr);gap:0}
 .stat{padding:1.5rem clamp(.9rem,2vw,1.6rem);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -506,6 +525,9 @@ img{max-width:100%}
 .seg input{position:absolute;width:1px;height:1px;opacity:0;margin:0}
 .seg label:has(input:checked),.seg label.is-on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .seg input:focus-visible ~ span{outline:2.5px solid var(--accent);outline-offset:4px;border-radius:3px}
+.seg__custom{margin-top:.7rem;display:none}
+.seg__custom.is-on{display:grid}
+.seg__custom input{max-width:11rem}
 
 .est{
   margin-top:1.3rem;background:var(--price-bg);color:var(--price-fg);
@@ -630,9 +652,9 @@ img{max-width:100%}
       <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
     </a>
     <nav class="nav__links" aria-label="Main">
+      <a href="#pricing">Pricing</a>
       <a href="#roles">Roles</a>
       <a href="#how">How it works</a>
-      <a href="#pricing">Pricing</a>
       <a href="#proof">First 90 days</a>
       <a href="#faq">FAQ</a>
       <!-- Careers is its own page. The artifact URL below is rewritten to "/careers" by build.mjs. -->
@@ -659,9 +681,9 @@ img{max-width:100%}
 
   <div class="mobnav" id="mobnav" hidden>
     <div class="wrap mobnav__in">
+      <a href="#pricing">Pricing</a>
       <a href="#roles">Roles</a>
       <a href="#how">How it works</a>
-      <a href="#pricing">Pricing</a>
       <a href="#proof">First 90 days</a>
       <a href="#faq">FAQ</a>
       <a href="https://claude.ai/code/artifact/59e78011-5885-43c0-bd9a-8c4754a13d45">Careers</a>
@@ -718,6 +740,19 @@ img{max-width:100%}
     </div>
   </section>
 
+  <section class="rated" aria-label="Customer rating">
+    <div class="wrap rated__in">
+      <span class="rated__stars" role="img" aria-label="Rated 5 out of 5 stars">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+      </span>
+      <p class="rated__t"><b>Rated 5 stars</b> by the businesses we staff.</p>
+    </div>
+  </section>
+
   <section class="stats">
     <div class="wrap stats__in">
       <div class="stat"><span class="stat__n">$7.75<small>/hr</small></span><span class="stat__l">Flat rate, billed weekly</span></div>
@@ -727,7 +762,101 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec" id="roles">
+  <section class="sec" id="pricing">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">Pricing</span>
+        <h2>One rate. No recruiting fee, no markup surprises.</h2>
+        <p class="lede">You are billed for hours worked, every week, at the same number you were quoted on the first call.</p>
+      </div>
+
+      <div class="price">
+        <div class="price__card">
+          <span class="eyebrow">Dedicated seat</span>
+          <div class="price__rate"><span class="price__amt">$7.75</span><span class="price__per">per hour worked</span></div>
+          <p class="price__sub">Full-time (40 hrs/week) or part-time (20 hrs/week). Overtime only when you approve it.</p>
+          <ul class="price__inc">
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Sourcing, vetting and background checks</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> A dedicated account manager</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Time tracking you can audit yourself</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Backup coverage for sick days and holidays</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Free replacement if the fit stops working</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Payroll, benefits and compliance handled by us</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="vs">
+            <span class="vs__cap">Cost of one full-time seat &middot; per month</span>
+            <div class="vs__plot">
+              <div class="vs__col">
+                <div class="vs__track">
+                  <div class="vs__bar" style="height:100%">
+                    <i class="vs__seg vs__seg--d" style="height:4.32%" title="Desk, equipment and software: $180"></i>
+                    <i class="vs__seg vs__seg--c" style="height:10.32%" title="Benefits and PTO accrual: $430"></i>
+                    <i class="vs__seg vs__seg--b" style="height:12.41%" title="Payroll tax and insurance: $517"></i>
+                    <i class="vs__seg vs__seg--a" style="height:72.95%" title="Wages at $19/hr: $3,040"></i>
+                  </div>
+                </div>
+                <p class="vs__tot">$4,167</p>
+                <p class="vs__lab"><b>In-house hire</b>$19/hr plus employer costs</p>
+              </div>
+              <div class="vs__col">
+                <div class="vs__track">
+                  <div class="vs__bar" style="height:29.76%">
+                    <i class="vs__seg vs__seg--win" style="height:100%" title="SecureJobVA seat at $7.75/hr flat: $1,240"></i>
+                  </div>
+                </div>
+                <p class="vs__tot">$1,240</p>
+                <p class="vs__lab"><b>SecureJobVA seat</b>$7.75/hr flat, nothing on top</p>
+              </div>
+            </div>
+            <p class="vs__grp">What an in-house hire costs</p>
+            <ul class="vs__rows">
+              <li><i class="vs__sw vs__sw--a" aria-hidden="true"></i><span>Wages at $19/hr</span><b>$3,040</b></li>
+              <li><i class="vs__sw vs__sw--b" aria-hidden="true"></i><span>Payroll tax and insurance</span><b>$517</b></li>
+              <li><i class="vs__sw vs__sw--c" aria-hidden="true"></i><span>Benefits and PTO accrual</span><b>$430</b></li>
+              <li><i class="vs__sw vs__sw--d" aria-hidden="true"></i><span>Desk, equipment, software</span><b>$180</b></li>
+              <li class="vs__row--tot"><i class="vs__sw" aria-hidden="true" style="background:var(--line)"></i><span>Total every month</span><b>$4,167</b></li>
+            </ul>
+
+            <p class="vs__grp vs__grp--win">What a SecureJobVA seat costs</p>
+            <ul class="vs__rows vs__rows--win">
+              <li><i class="vs__sw vs__sw--win" aria-hidden="true"></i><span>160 hrs &times; $7.75 flat</span><b>$1,240</b></li>
+              <li class="vs__row--zero"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Payroll tax, benefits, equipment</span><b>$0</b></li>
+              <li class="vs__row--tot"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Total every month</span><b>$1,240</b></li>
+            </ul>
+            <p class="vs__save">You keep <b>$2,927</b> a month &mdash; <b>$35,124</b> a year.</p>
+          </div>
+          <p class="small" style="margin-top:.9rem">A 40-hour week is 160 hours a month, so the seat is 160 &times; $7.75. The in-house column assumes $19/hr, payroll tax and insurance at 17% of wages, and typical benefit and equipment costs; your figures will differ by state and role &mdash; we build the real version with you on the call.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="trial" id="trial">
+    <div class="wrap trial__in">
+      <div>
+        <span class="trial__tag">Try before you buy</span>
+        <h2>Your first week is <b>free</b>.</h2>
+        <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. If the fit is not right, you walk away and owe nothing.</p>
+        <div class="hero__actions">
+          <a class="btn btn--solid" data-book href="mailto:support@securejobva.com">Start the free week</a>
+        </div>
+      </div>
+      <div class="trial__card">
+        <ul class="trial__list">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>A full 40-hour week, not a trial task</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>The same assistant you would keep</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>No card, no deposit, no contract up front</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>Keep the work whether you continue or not</span></li>
+        </ul>
+        <p class="trial__fine">Billing starts in week two, at $7.75 an hour, only if you say go.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec sec--tint" id="roles">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">What we staff</span>
@@ -781,7 +910,7 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec sec--tint" id="how">
+  <section class="sec" id="how">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">How it works</span>
@@ -813,78 +942,6 @@ img{max-width:100%}
           <span class="step__n">Ongoing</span>
           <h3>Managed, not dropped off</h3>
           <p>Weekly quality reviews, backup coverage when your VA is out, and a free replacement if the fit stops working. You manage the work, we manage the employment.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec" id="pricing">
-    <div class="wrap">
-      <div class="sec__head">
-        <span class="eyebrow">Pricing</span>
-        <h2>One rate. No recruiting fee, no markup surprises.</h2>
-        <p class="lede">You are billed for hours worked, every week, at the same number you were quoted on the first call.</p>
-      </div>
-
-      <div class="price">
-        <div class="price__card">
-          <span class="eyebrow">Dedicated seat</span>
-          <div class="price__rate"><span class="price__amt">$7.75</span><span class="price__per">per hour worked</span></div>
-          <p class="price__sub">Full-time (40 hrs/week) or part-time (20 hrs/week). Overtime only when you approve it.</p>
-          <ul class="price__inc">
-            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Sourcing, vetting and background checks</li>
-            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> A dedicated account manager</li>
-            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Time tracking you can audit yourself</li>
-            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Backup coverage for sick days and holidays</li>
-            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Free replacement if the fit stops working</li>
-            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Payroll, benefits and compliance handled by us</li>
-          </ul>
-        </div>
-
-        <div>
-          <div class="vs">
-            <span class="vs__cap">Cost of one full-time seat &middot; per month</span>
-            <div class="vs__plot">
-              <div class="vs__col">
-                <div class="vs__track">
-                  <div class="vs__bar" style="height:100%">
-                    <i class="vs__seg vs__seg--d" style="height:4.03%" title="Desk, equipment and software: $180"></i>
-                    <i class="vs__seg vs__seg--c" style="height:9.63%" title="Benefits and PTO accrual: $430"></i>
-                    <i class="vs__seg vs__seg--b" style="height:12.55%" title="Payroll tax and insurance: $560"></i>
-                    <i class="vs__seg vs__seg--a" style="height:73.79%" title="Wages at $19/hr: $3,293"></i>
-                  </div>
-                </div>
-                <p class="vs__tot">$4,463</p>
-                <p class="vs__lab"><b>In-house hire</b>$19/hr plus employer costs</p>
-              </div>
-              <div class="vs__col">
-                <div class="vs__track">
-                  <div class="vs__bar" style="height:30.1%">
-                    <i class="vs__seg vs__seg--win" style="height:100%" title="SecureJobVA seat at $7.75/hr flat: $1,343"></i>
-                  </div>
-                </div>
-                <p class="vs__tot">$1,343</p>
-                <p class="vs__lab"><b>SecureJobVA seat</b>$7.75/hr flat, nothing on top</p>
-              </div>
-            </div>
-            <p class="vs__grp">What an in-house hire costs</p>
-            <ul class="vs__rows">
-              <li><i class="vs__sw vs__sw--a" aria-hidden="true"></i><span>Wages at $19/hr</span><b>$3,293</b></li>
-              <li><i class="vs__sw vs__sw--b" aria-hidden="true"></i><span>Payroll tax and insurance</span><b>$560</b></li>
-              <li><i class="vs__sw vs__sw--c" aria-hidden="true"></i><span>Benefits and PTO accrual</span><b>$430</b></li>
-              <li><i class="vs__sw vs__sw--d" aria-hidden="true"></i><span>Desk, equipment, software</span><b>$180</b></li>
-              <li class="vs__row--tot"><i class="vs__sw" aria-hidden="true" style="background:var(--line)"></i><span>Total every month</span><b>$4,463</b></li>
-            </ul>
-
-            <p class="vs__grp vs__grp--win">What a SecureJobVA seat costs</p>
-            <ul class="vs__rows vs__rows--win">
-              <li><i class="vs__sw vs__sw--win" aria-hidden="true"></i><span>173.3 hrs &times; $7.75 flat</span><b>$1,343</b></li>
-              <li class="vs__row--zero"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Payroll tax, benefits, equipment</span><b>$0</b></li>
-              <li class="vs__row--tot"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Total every month</span><b>$1,343</b></li>
-            </ul>
-            <p class="vs__save">You keep <b>$3,120</b> a month &mdash; <b>$37,440</b> a year.</p>
-          </div>
-          <p class="small" style="margin-top:.9rem">A 40-hour week is 173.3 hours a month, so the seat is 173.3 &times; $7.75. The in-house column assumes $19/hr, payroll tax and insurance at 17% of wages, and typical benefit and equipment costs; your figures will differ by state and role &mdash; we build the real version with you on the call.</p>
         </div>
       </div>
     </div>
@@ -1126,6 +1183,11 @@ img{max-width:100%}
           <label><input type="radio" name="hours" value="30"><span>30 hrs</span></label>
           <label><input type="radio" name="hours" value="40" checked><span>40 hrs</span></label>
           <label><input type="radio" name="hours" value="80"><span>80 hrs &middot; 2 seats</span></label>
+          <label><input type="radio" name="hours" value="custom"><span>Custom</span></label>
+        </div>
+        <div class="field seg__custom" id="hours-custom">
+          <label for="in-hours">Hours a week you are looking to hire <em>&mdash; per seat</em></label>
+          <input type="number" id="in-hours" name="hours_custom" min="5" max="200" step="5" value="40" inputmode="numeric" placeholder="e.g. 25">
         </div>
 
         <h3 class="q q--again">Which block is hurting?</h3>
@@ -1170,7 +1232,7 @@ img{max-width:100%}
 
         <div class="est">
           <div class="est__n" id="est-week">$310 <span>/ week</span></div>
-          <div class="est__l" id="est-note">40 hrs &times; $7.75/hr<br>&asymp; $1,343 a month</div>
+          <div class="est__l" id="est-note">40 hrs &times; $7.75/hr<br>&asymp; $1,240 a month</div>
         </div>
       </section>
 
@@ -1275,7 +1337,19 @@ img{max-width:100%}
   }
   function hours() {
     var h = picked("hours")[0];
+    if (h === "custom") {
+      var n = parseInt(val("in-hours"), 10);
+      /* An empty or nonsense box should not blank the quote, so fall back to 40. */
+      if (!n || n < 5) return 40;
+      return Math.min(n, 200);
+    }
     return h ? parseInt(h, 10) : 40;
+  }
+
+  /* Show the number box only while Custom is the pick. */
+  function customHours() {
+    var on = picked("hours")[0] === "custom";
+    document.getElementById("hours-custom").classList.toggle("is-on", on);
   }
   function val(id) {
     var el = document.getElementById(id);
@@ -1301,7 +1375,7 @@ img{max-width:100%}
     var week = h * CFG.rate;
     document.getElementById("est-week").innerHTML = money(week) + " <span>/ week</span>";
     document.getElementById("est-note").innerHTML = h + " hrs &times; $" + CFG.rate + "/hr<br>&asymp; " +
-      money(Math.round(week * 52 / 12)) + " a month";
+      money(week * 4) + " a month";
   }
 
   function mark(el, msg) {
@@ -1483,9 +1557,18 @@ img{max-width:100%}
       var list = el.name === "seat" ? d.seats : d.blocks;
       el.checked = !!(list && list.indexOf(el.value) > -1);
     });
-    Array.prototype.forEach.call(form.querySelectorAll("[name=hours]"), function (el) {
-      el.checked = parseInt(el.value, 10) === d.hours;
+    /* A saved figure that is not one of the presets came from the custom box,
+       so put it back there rather than losing it to the 40-hour default. */
+    var preset = Array.prototype.some.call(form.querySelectorAll("[name=hours]"), function (el) {
+      return parseInt(el.value, 10) === d.hours;
     });
+    Array.prototype.forEach.call(form.querySelectorAll("[name=hours]"), function (el) {
+      el.checked = preset ? parseInt(el.value, 10) === d.hours : el.value === "custom";
+    });
+    if (!preset && d.hours) {
+      var box = document.getElementById("in-hours");
+      if (box) box.value = d.hours;
+    }
     [["in-tz", d.timezone], ["in-name", d.name], ["in-co", d.company],
       ["in-email", d.email], ["in-phone", d.phone], ["in-notes", d.notes]
     ].forEach(function (p) {
@@ -1500,6 +1583,7 @@ img{max-width:100%}
     clearErrors();
     restore();
     paint();
+    customHours();
     estimate();
     dlg.showModal();
     show(0);
@@ -1518,12 +1602,15 @@ img{max-width:100%}
 
   form.addEventListener("change", function () {
     paint();
+    customHours();
     estimate();
     save();
   });
 
   form.addEventListener("input", function (e) {
     if (e.target.closest(".is-bad")) mark(e.target, "");
+    /* Retype the quote as the custom number is typed, not just on blur. */
+    if (e.target.id === "in-hours") { estimate(); save(); }
   });
 
   /* Enter moves forward instead of doing nothing. */
