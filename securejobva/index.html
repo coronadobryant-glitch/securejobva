@@ -192,14 +192,9 @@ img{max-width:100%}
 }
 .hero__grid{display:grid;gap:clamp(2rem,4vw,3.5rem)}
 .hero__grid > div{max-width:64ch}
-.hero h1{font-size:var(--step-4);margin:.9rem 0 1.1rem}
-.hl{
-  background-image:linear-gradient(var(--signal),var(--signal));
-  background-repeat:no-repeat;
-  background-size:100% .16em;
-  background-position:0 100%;
-  padding-bottom:.06em;
-}
+.hero__tag{display:inline-block;background:var(--signal);color:var(--signal-ink);font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.11em;text-transform:uppercase;font-weight:600;padding:.32rem .65rem;border-radius:5px}
+.hero h1{font-size:var(--step-4);margin:.95rem 0 0}
+.hero h1 b{color:var(--accent);font-weight:inherit}
 .hero__actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.9rem}
 .hero__note{margin-top:1rem;font-size:var(--step--1);color:var(--muted)}
 
@@ -213,16 +208,11 @@ img{max-width:100%}
 
 .trial{background:var(--price-bg);color:var(--price-fg);padding:clamp(2.4rem,5vw,3.6rem) 0}
 .trial__in{display:grid;gap:1.6rem;align-items:center}
-@media(min-width:860px){.trial__in{grid-template-columns:1.25fr .95fr;gap:clamp(2rem,4vw,3.5rem)}}
+.trial__in > div{max-width:60ch}
 .trial__tag{display:inline-block;background:var(--signal);color:var(--signal-ink);font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;font-weight:600;padding:.3rem .6rem;border-radius:5px}
 .trial h2{font-size:var(--step-3);margin:.85rem 0 .9rem;max-width:18ch}
 .trial h2 b{color:var(--signal);font-weight:inherit}
 .trial p{margin:0;opacity:.88;max-width:52ch}
-.trial__card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:1.35rem 1.4rem}
-.trial__list{list-style:none;padding:0;margin:0;display:grid;gap:.7rem;font-size:.94rem}
-.trial__list li{display:flex;gap:.6rem;align-items:flex-start}
-.trial__list svg{flex:none;margin-top:.18rem;color:var(--signal)}
-.trial__fine{margin-top:1.1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.16);font-size:.82rem;opacity:.72}
 /* replacement promise */
 .swap{display:grid;gap:clamp(1.6rem,3vw,2.6rem)}
 @media(min-width:900px){.swap{grid-template-columns:1fr 1fr;align-items:start}}
@@ -230,6 +220,18 @@ img{max-width:100%}
 .swap__steps li{counter-increment:s;position:relative;padding:.95rem 1.1rem .95rem 3.1rem;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:.93rem;color:var(--ink-2);line-height:1.55}
 .swap__steps li::before{content:counter(s);position:absolute;left:1.05rem;top:.95rem;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:"IBM Plex Mono",monospace;font-size:.72rem;display:grid;place-items:center;font-weight:600}
 .swap__steps b{color:var(--ink)}
+
+/* objections, answered */
+.solve{background:var(--surface-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:clamp(3rem,6vw,4.5rem) 0}
+.solve__grid{display:grid;gap:1rem;margin-top:2rem}
+@media(min-width:660px){.solve__grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1040px){.solve__grid{grid-template-columns:repeat(3,1fr)}}
+.sv{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.3rem;display:flex;flex-direction:column;gap:.55rem}
+.sv__n{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;color:var(--muted)}
+.sv h3{font-size:1.02rem;margin:0;letter-spacing:-.01em}
+.sv__p{margin:0;font-size:.89rem;color:var(--muted);line-height:1.55}
+.sv__fix{margin:.2rem 0 0;padding-top:.75rem;border-top:1px dashed var(--line);font-size:.89rem;color:var(--ink-2);line-height:1.55}
+.sv__fix b{color:var(--accent);font-weight:600}
 
 /* stat strip */
 .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
@@ -250,29 +252,6 @@ img{max-width:100%}
 .sec--tint{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .sec__head{max-width:62ch;margin-bottom:clamp(2rem,4vw,3rem)}
 .sec__head h2{font-size:var(--step-3);margin:.7rem 0 .9rem}
-
-/* roles */
-.roles{display:grid;gap:1.25rem}
-@media(min-width:900px){.roles{grid-template-columns:repeat(3,1fr)}}
-.role{
-  background:var(--surface);border:1px solid var(--line);border-radius:10px;
-  padding:1.6rem 1.5rem 1.7rem;display:flex;flex-direction:column;gap:.85rem;
-  position:relative;transition:border-color .18s ease,transform .18s ease;
-}
-.sec--tint .role{background:var(--paper)}
-.role:hover{border-color:var(--accent);transform:translateY(-3px)}
-.role__tag{
-  position:absolute;top:-1px;left:1.5rem;
-  background:var(--accent);color:var(--accent-ink);
-  font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;
-  padding:.25rem .6rem;border-radius:0 0 8px 8px;
-}
-.role__tag--hi{background:var(--signal);color:var(--signal-ink)}
-.role h3{font-size:var(--step-1);margin-top:.55rem}
-.role__list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem;font-size:.94rem;color:var(--ink-2)}
-.role__list li{display:flex;gap:.6rem;align-items:flex-start}
-.role__list li::before{content:"";width:6px;height:6px;margin-top:.55rem;flex:none;background:var(--accent);border-radius:50%}
-.role__tools{margin-top:auto;padding-top:1rem;border-top:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);line-height:1.7}
 
 /* steps */
 .steps{display:grid;gap:0;border-top:1px solid var(--line)}
@@ -304,7 +283,7 @@ img{max-width:100%}
      bottom spreads the content down the full height instead of leaving a hole. */
   .price{grid-template-columns:1.15fr .85fr}
   .price__card{display:flex;flex-direction:column}
-  .price__inc{margin-top:auto;padding-top:1.75rem}
+  .price .price__inc{margin-top:auto;padding-top:1.75rem}
 }
 .price__card{
   background:var(--price-bg);color:var(--price-fg);border-radius:10px;
@@ -320,7 +299,7 @@ img{max-width:100%}
 .price__inc svg{flex:none;margin-top:.28rem}
 .adapt{
   display:flex;gap:.85rem;align-items:flex-start;
-  margin-top:1.5rem;padding:1.05rem 1.2rem;
+  margin-top:1.1rem;padding:1.05rem 1.2rem;
   background:var(--accent-soft);
   border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
   border-left:4px solid var(--signal);
@@ -658,7 +637,6 @@ img{max-width:100%}
     </a>
     <nav class="nav__links" aria-label="Main">
       <a href="#pricing">Pricing</a>
-      <a href="#roles">Roles</a>
       <a href="#how">How it works</a>
       <a href="#proof">First 90 days</a>
       <a href="#faq">FAQ</a>
@@ -687,7 +665,6 @@ img{max-width:100%}
   <div class="mobnav" id="mobnav" hidden>
     <div class="wrap mobnav__in">
       <a href="#pricing">Pricing</a>
-      <a href="#roles">Roles</a>
       <a href="#how">How it works</a>
       <a href="#proof">First 90 days</a>
       <a href="#faq">FAQ</a>
@@ -701,9 +678,8 @@ img{max-width:100%}
   <section class="hero">
     <div class="wrap hero__grid">
       <div>
-        <span class="eyebrow">Dedicated virtual assistants &middot; Your hours, your time zone</span>
-        <h1>Cover <span class="hl">the hours you can&rsquo;t</span>.</h1>
-        <p class="lede">We place trained, full-time virtual assistants in customer service, sales &amp; marketing, and admin roles &mdash; working <b>your hours, in your time zone</b>, matched to your business in about a week at a flat hourly rate with nothing to sign.</p>
+        <span class="hero__tag">Try before you buy</span>
+        <h1>Your first week is <b>free</b>.</h1>
         <div class="adapt">
           <span class="adapt__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
           <p class="adapt__t">
@@ -733,21 +709,12 @@ img{max-width:100%}
   <section class="trial" id="trial">
     <div class="wrap trial__in">
       <div>
-        <span class="trial__tag">Try before you buy</span>
-        <h2>Your first week is <b>free</b>.</h2>
-        <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. If the fit is not right, you walk away and owe nothing.</p>
+        <span class="trial__tag">The free week</span>
+        <h2>How the <b>free week</b> works.</h2>
+        <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. A card and a deposit are set up before the week starts, so the seat can begin the day you approve it, and the week itself is not charged.</p>
         <div class="hero__actions">
           <a class="btn btn--solid" data-book href="mailto:support@securejobva.com">Start the free week</a>
         </div>
-      </div>
-      <div class="trial__card">
-        <ul class="trial__list">
-          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>A full 40-hour week, not a trial task</span></li>
-          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>The same assistant you would keep</span></li>
-          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>No card, no deposit, no contract up front</span></li>
-          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg><span>Keep the work whether you continue or not</span></li>
-        </ul>
-        <p class="trial__fine">Billing starts in week two, at $7.75 an hour, only if you say go.</p>
       </div>
     </div>
   </section>
@@ -843,61 +810,7 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec" id="roles">
-    <div class="wrap">
-      <div class="sec__head">
-        <span class="eyebrow">What we staff</span>
-        <h2>Three roles, and nothing else.</h2>
-        <p class="lede">Nearly every business we talk to is drowning in the same three places. We staff those three and only those three, so the person you get is a specialist in the work &mdash; not a generalist spread thin.</p>
-      </div>
-
-      <div class="roles">
-        <article class="role">
-          <span class="role__tag role__tag--hi">Most requested</span>
-          <h3>Customer Service</h3>
-          <ul class="role__list">
-            <li>Inbound calls and voicemail callbacks</li>
-            <li>Live chat, email and ticket queues</li>
-            <li>Appointment booking and confirmations</li>
-            <li>Order status, returns and escalations</li>
-            <li>After-hours and weekend coverage</li>
-            <li>Review responses and follow-up</li>
-          </ul>
-          <p class="role__tools">Zendesk &middot; Gorgias &middot; Intercom &middot; Freshdesk &middot; RingCentral &middot; Shopify</p>
-        </article>
-
-        <article class="role">
-          <span class="role__tag">Revenue side</span>
-          <h3>Sales &amp; Marketing</h3>
-          <ul class="role__list">
-            <li>Speed-to-lead follow-up by call, text and email</li>
-            <li>Outbound prospecting and list building</li>
-            <li>CRM hygiene, pipeline updates, reporting</li>
-            <li>Quote and estimate follow-through</li>
-            <li>Social scheduling and comment moderation</li>
-            <li>Email and SMS campaign setup</li>
-          </ul>
-          <p class="role__tools">HubSpot &middot; GoHighLevel &middot; Klaviyo &middot; Apollo &middot; Salesforce &middot; Meta Business Suite</p>
-        </article>
-
-        <article class="role">
-          <span class="role__tag">Time back</span>
-          <h3>Admin Tasks</h3>
-          <ul class="role__list">
-            <li>Inbox triage and calendar management</li>
-            <li>Data entry, cleanup and migrations</li>
-            <li>Invoicing and accounts-receivable chasing</li>
-            <li>Order processing and vendor coordination</li>
-            <li>Document prep, contracts and filing</li>
-            <li>Research, reporting and travel booking</li>
-          </ul>
-          <p class="role__tools">Google Workspace &middot; Microsoft 365 &middot; QuickBooks &middot; Notion &middot; Airtable &middot; ServiceTitan</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec sec--tint" id="how">
+  <section class="sec" id="how">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">How it works</span>
@@ -934,7 +847,62 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec" id="proof">
+  <section class="solve" id="solve">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">The seven things that go wrong</span>
+        <h2>Every way this usually fails, and what we do about it.</h2>
+        <p class="lede">Most people who call us have hired a virtual assistant before and it did not work. These are the seven reasons why, and the specific thing on our side that answers each one &mdash; not a promise to try harder.</p>
+      </div>
+
+      <div class="solve__grid">
+        <div class="sv">
+          <span class="sv__n">01</span>
+          <h3>Communication gaps</h3>
+          <p class="sv__p">Time-zone mismatches, language and accent barriers, replies that take hours, and assistants who never raise a problem until it lands on you.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Your seat works your hours in your time zone, English is tested in a written task and two live interviews before you meet anyone, and you get a summary at the end of every day &mdash; problems flagged the day they appear, not the week after.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">02</span>
+          <h3>Quality control and oversight</h3>
+          <p class="sv__p">No way to verify the work is actually happening, and no clear record of output or time spent. What starts as a question turns into distrust.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Time tracking you can audit yourself, so the hours you are billed are the hours you can see, plus a daily written account of what was handled and what still needs you.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">03</span>
+          <h3>Vetting and skill mismatch</h3>
+          <p class="sv__p">R&eacute;sum&eacute;s and interviews do not reveal real competence. The mismatch shows up once the work starts, and by then it is your problem.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Nobody reaches you without clearing a written task in their track, the qualification exams and a strengths test. Then the free first week shows you real work before you commit.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">04</span>
+          <h3>Training overhead</h3>
+          <p class="sv__p">Onboarding takes far longer than expected, especially on niche tasks &mdash; and that time was exactly what you were trying to buy back.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Training happens on our payroll, not your calendar. Your assistant is onboarded on your tools and your scripts before the first shift, so day one is work, not setup.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">05</span>
+          <h3>Turnover and reliability</h3>
+          <p class="sv__p">Assistants who ghost, quit without notice, or job-hop between clients &mdash; forcing you to re-hire and re-train from zero each time.</p>
+          <p class="sv__fix"><b>How we solve it:</b> One business, one manager, one fixed seat &mdash; no gig queue to hop to. Sick days and holidays get backup coverage, and if the fit stops working we replace the seat free and hand over for you.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">06</span>
+          <h3>Security and confidentiality</h3>
+          <p class="sv__p">Handing a remote worker access to financial accounts, customer records and passwords feels reckless without contracts or safeguards in place.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Every assistant signs a contract and an NDA and clears an ID and background check before they start, and works to written password and data rules from the first shift.</p>
+        </div>
+        <div class="sv">
+          <span class="sv__n">07</span>
+          <h3>Payment and platform friction</h3>
+          <p class="sv__p">Currency conversion, international payment fees, escrow disputes, and billing that is never quite clear &mdash; hourly, task-based, or something in between.</p>
+          <p class="sv__fix"><b>How we solve it:</b> One flat rate, $7.75 an hour worked, invoiced weekly in US dollars. No escrow, no conversion, no platform cut, and no task-based pricing to argue about &mdash; you pay the number you were quoted on the first call.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec sec--tint" id="proof">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">What to expect</span>
@@ -963,7 +931,7 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec sec--tint" id="faq">
+  <section class="sec" id="faq">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">Questions</span>
@@ -990,6 +958,10 @@ img{max-width:100%}
         <details>
           <summary>Do I need my processes documented already?</summary>
           <p>No, and almost nobody does. Documenting them is part of onboarding week &mdash; we sit with you, write the SOPs from how you already work, and hand you the document at the end whether you stay with us or not.</p>
+        </details>
+        <details>
+          <summary>Is the first week really free?</summary>
+          <p>Yes &mdash; you are not billed for the hours your assistant works in week one. We do set up a card and a deposit before the week starts, so the seat can begin the day you approve it rather than waiting on paperwork. Billing itself starts in week two, at $7.75 an hour worked.</p>
         </details>
         <details>
           <summary>What is the minimum commitment?</summary>
@@ -1030,9 +1002,9 @@ img{max-width:100%}
       <div>
         <h5>Roles</h5>
         <ul>
-          <li><a href="#roles">Customer Service</a></li>
-          <li><a href="#roles">Sales &amp; Marketing</a></li>
-          <li><a href="#roles">Admin Tasks</a></li>
+          <li><a href="#book">Customer Service</a></li>
+          <li><a href="#book">Sales &amp; Marketing</a></li>
+          <li><a href="#book">Admin Tasks</a></li>
         </ul>
       </div>
       <div>

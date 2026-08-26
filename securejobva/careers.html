@@ -555,8 +555,8 @@ img{max-width:100%}
 .req h3{font-size:var(--step-1);margin-bottom:.35rem}
 .req > p{font-size:.88rem;color:var(--muted);margin-bottom:1.1rem}
 .req ul{list-style:none;padding:0;margin:0;display:grid;gap:.6rem;font-size:.94rem;color:var(--ink-2)}
-.req li{display:flex;gap:.65rem;align-items:flex-start}
-.req li::before{content:"";width:6px;height:6px;margin-top:.55rem;flex:none;background:var(--accent);border-radius:50%}
+.req li{position:relative;padding-left:1.3rem}
+.req li::before{content:"";position:absolute;left:0;top:.55rem;width:6px;height:6px;background:var(--accent);border-radius:50%}
 .req b{color:var(--ink);font-weight:600}
 .spec{font-family:"IBM Plex Mono",monospace;font-size:.85rem;letter-spacing:-.01em}
 
@@ -724,7 +724,7 @@ html{scroll-behavior:smooth}
       </a>
       <nav class="nav__links">
         <a href="#paid-training">Paid training</a>
-        <a href="#tracks">Tracks</a>
+        <a href="#tracks">Online job tracks</a>
         <a href="#requirements">Requirements</a>
         <a href="#process">How to apply</a>
         <a href="#faq">FAQ</a>
@@ -767,8 +767,8 @@ html{scroll-behavior:smooth}
     <div class="wrap hero__grid">
       <div>
         <span class="eyebrow">Online jobs &middot; Hiring worldwide &middot; 40 hrs/week &middot; American time</span>
-        <h1><span class="hl">Paid training</span>, then a full-time seat.</h1>
-        <p class="lede">Pass the exams and get approved &mdash; only then do we train you, on our payroll rather than yours. Then <b>forty hours a week</b> on fixed hours in American time &mdash; customer service, sales and marketing, or admin support. These are full-time online jobs &mdash; one business, one manager, no gig queue. Apply from any country.</p>
+        <h1><span class="hl">Online jobs</span> with paid training, then a full-time seat.</h1>
+        <p class="lede">Pass the exams and get approved &mdash; only then do we train you, on our payroll rather than yours. Then <b>forty hours a week</b> on fixed hours in American time &mdash; customer service, sales and marketing, or admin support. These are full-time online jobs.</p>
         <div class="ptrain">
           <span class="ptrain__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 9 12 4 2 9l10 5 10-5Z"></path><path d="M6 11.5V17c0 1.6 3 3 6 3s6-1.4 6-3v-5.5"></path></svg></span>
           <p class="ptrain__t">
@@ -781,7 +781,7 @@ html{scroll-behavior:smooth}
           <a class="btn btn--ghost" href="#requirements">Check the requirements</a>
         </div>
         <nav class="jump" aria-label="Jump to a section">
-          <span class="jump__l">Or jump to</span>
+          <span class="jump__l">Jump to</span>
           <a class="jump--hi" href="#paid-training">Paid training</a>
           <a href="#tracks">Tracks</a>
           <a href="#offer">What the seat gives you</a>
@@ -789,7 +789,7 @@ html{scroll-behavior:smooth}
           <a href="#process">How to apply</a>
           <a href="#faq">FAQ</a>
         </nav>
-        <p class="hero__note">Free to apply, always. We never charge a placement fee, and we never take a cut of your pay.</p>
+        <p class="hero__note">Our online jobs are free to apply to, always. We never charge a placement fee, and we never take a cut of your pay.</p>
       </div>
 
       <div class="tl">
@@ -832,7 +832,7 @@ html{scroll-behavior:smooth}
 
   <section class="stats">
     <div class="wrap stats__in">
-      <div class="stat"><span class="stat__n">40 <small>hrs</small></span><span class="stat__l">Every week, fixed</span></div>
+      <div class="stat"><span class="stat__n">40 <small>hrs</small></span><span class="stat__l">Every week, on a fixed online job</span></div>
       <div class="stat"><span class="stat__n">US <small>time</small></span><span class="stat__l">Your shift is set in it</span></div>
       <div class="stat"><span class="stat__n">Paid</span><span class="stat__l">Training once approved</span></div>
       <div class="stat"><span class="stat__n">$0</span><span class="stat__l">Fees to apply, ever</span></div>
@@ -842,9 +842,9 @@ html{scroll-behavior:smooth}
   <section class="sec" id="tracks">
     <div class="wrap">
       <div class="sec__head">
-        <span class="eyebrow">What we staff</span>
+        <span class="eyebrow">Online jobs we staff</span>
         <h2>Three tracks of online jobs. Pick the one you are already good at.</h2>
-        <p class="lede">These are the seats our clients buy, so these are the seats we hire for. Tools can be taught in a week &mdash; judgment and clear English cannot, so lead with those. Not sure which one is yours? The strengths test in stage two places you where you will excel.</p>
+        <p class="lede">These are the seats our clients buy, so these are the online jobs we hire for. Tools can be taught in a week &mdash; judgment and clear English cannot, so lead with those. Not sure which one is yours? The strengths test in stage two places you where you will excel.</p>
       </div>
 
       <div class="roles">
@@ -896,20 +896,20 @@ html{scroll-behavior:smooth}
   <section class="sec sec--tint" id="offer">
     <div class="wrap">
       <div class="sec__head">
-        <span class="eyebrow">What the seat gives you</span>
+        <span class="eyebrow">What the online job gives you</span>
         <h2>Online jobs with forty fixed hours, and paid training.</h2>
-        <p class="lede">Freelance marketplaces make you re-sell yourself every month. A seat does not work that way.</p>
+        <p class="lede">Freelance marketplaces make you re-sell yourself every month. An online job with us does not work that way.</p>
       </div>
 
       <div class="perks">
         <div class="perk">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-6 9 6v12"></path><path d="M9 21v-7h6v7"></path></svg></div>
-          <h4>Work from home, anywhere</h4>
+          <h4>An online job you work from home</h4>
           <p>No office, no commute, no relocation. Your country is not a filter &mdash; your internet and your English are.</p>
         </div>
         <div class="perk">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></div>
-          <h4>Full-time, not by the task</h4>
+          <h4>A full-time online job, not task work</h4>
           <p>Forty hours a week with one business, on fixed hours in American time, agreed before you start. No bidding, no proposals, no dry weeks.</p>
         </div>
         <div class="perk">
@@ -942,8 +942,8 @@ html{scroll-behavior:smooth}
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">Before you apply</span>
-        <h2>What you need to have.</h2>
-        <p class="lede">We hire on capability, not location. But a seat runs on live calls and shared screens, so the setup below is not negotiable.</p>
+        <h2>What the online job needs from you.</h2>
+        <p class="lede">These online jobs hire on capability, not location. But a seat runs on live calls and shared screens, so the setup below is not negotiable.</p>
       </div>
 
       <div class="reqs">
@@ -982,8 +982,8 @@ html{scroll-behavior:smooth}
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">Why the bar is where it is</span>
-        <h2>Six things businesses have been burned by.</h2>
-        <p class="lede">Every client who calls us has been let down by a virtual assistant before, and it is almost always one of these six. The exams, the strengths test, the fixed hours and the background check all exist to answer them &mdash; which is why clearing them is what makes the seat worth paying for.</p>
+        <h2>Seven things businesses have been burned by.</h2>
+        <p class="lede">Every client who calls us has been let down by someone in an online job before, and it is almost always one of these seven. The exams, the strengths test, the fixed hours and the background check all exist to answer them &mdash; which is why clearing them is what makes the seat worth paying for.</p>
       </div>
 
       <div class="gaps__grid">
@@ -1023,6 +1023,12 @@ html{scroll-behavior:smooth}
           <p class="gap__p">Handing a remote worker access to financial accounts, customer records and passwords feels reckless without a contract and real safeguards.</p>
           <p class="gap__ask"><b>What we ask of you:</b> You sign a contract and an NDA, clear an ID and background check, and follow the password and data rules from day one.</p>
         </div>
+        <div class="gap">
+          <span class="gap__n">07</span>
+          <h3>Payment and platform friction</h3>
+          <p class="gap__p">Currency conversion, international transfer fees, escrow disputes, and billing nobody can read &mdash; hourly one week, per task the next &mdash; turning pay into an argument.</p>
+          <p class="gap__ask"><b>What we ask of you:</b> Keep your timesheet honest and submit it on the weekly cycle. The client is invoiced for hours worked, so your hours are the invoice &mdash; raise anything that looks wrong before the run, not after it.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -1030,13 +1036,13 @@ html{scroll-behavior:smooth}
   <section class="sec sec--tint" id="process">
     <div class="wrap">
       <div class="sec__head">
-        <span class="eyebrow">How to apply</span>
-        <h2>Four stages, about a week.</h2>
+        <span class="eyebrow">How to get the online job</span>
+        <h2>Four stages from application to online job.</h2>
       </div>
       <div class="steps">
         <div class="step">
           <span class="step__n">01</span>
-          <h3>Send the application</h3>
+          <h3>Apply for the online job</h3>
           <p>Your track, your setup, your hours and a way to reach you. Five minutes, from this page.</p>
         </div>
         <div class="step">
@@ -1070,11 +1076,11 @@ html{scroll-behavior:smooth}
           <p>No. Not to apply, not to be trained, not to be placed. Anyone asking a virtual assistant for a fee to be hired is running a scam &mdash; that includes anyone claiming to be us.</p>
         </details>
         <details>
-          <summary>Which countries do you hire from?</summary>
+          <summary>Which countries are these online jobs open to?</summary>
           <p>Any country where you can legally work as an independent contractor and cover a full shift in American time. What decides it is your English, your connection and your overlap &mdash; not your passport.</p>
         </details>
         <details>
-          <summary>What hours would I work?</summary>
+          <summary>What hours does the online job run?</summary>
           <p>Forty hours a week on fixed hours in American time &mdash; Eastern, Central, Mountain or Pacific, depending on the client. That means your shift may be evening or overnight where you are. You see the exact hours before you accept, and they do not move without your agreement.</p>
         </details>
         <details>
@@ -1086,7 +1092,7 @@ html{scroll-behavior:smooth}
           <p>A short assessment of how you actually work &mdash; where you are quick, where you are careful, and how you hold up under pressure. We use it to place you in the track and the seat you will excel in, rather than the first one with a vacancy. There is no pass mark on it and no wrong answer.</p>
         </details>
         <details>
-          <summary>Do I need virtual assistant experience?</summary>
+          <summary>Do I need previous online job experience?</summary>
           <p>Not formally. Most of our placements come from call centers, retail, admin and support roles. The assessment carries more weight than the CV.</p>
         </details>
         <details>
@@ -1103,7 +1109,7 @@ html{scroll-behavior:smooth}
 
   <section class="cta" id="apply-now">
     <div class="wrap">
-      <h2>Bring the skills. We will bring the seat.</h2>
+      <h2>Bring the skills. We will bring the online job.</h2>
       <p>Our online jobs are open in all three tracks. Five minutes now, an answer from a person either way &mdash; and paid training the week you are approved.</p>
       <div class="hero__actions" style="margin-top:0">
         <a class="btn btn--solid" data-apply href="mailto:support@securejobva.com">Start your application</a>
