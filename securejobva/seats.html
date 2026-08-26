@@ -856,7 +856,9 @@ function start() {
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
       view('<div class="card"><p class="msg msg--bad">We could not load your seats just now. ' +
-           "Refresh, or try again in a minute.</p></div>");
+           "Refresh, or try again in a minute.</p>" +
+           '<button class="btn btn--ghost" id="out-error" type="button" style="margin-top:1.1rem">Sign out</button></div>');
+      document.getElementById("out-error").addEventListener("click", signOut);
     });
 }
 
