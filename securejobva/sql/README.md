@@ -30,9 +30,10 @@ run it. That is always safer than guessing.
 | `014-admin.sql` | Adds an administrator |
 | `015-client-logos.sql` | The sliding client strip: a public logo bucket, staff-only uploads |
 | `016-grant-user-id.sql` | Grants `user_id`, the column `select=*` tripped over |
+| `017-staff-requests.sql` | Lets somebody ask to be staff; approval is unchanged |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 016 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 017 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

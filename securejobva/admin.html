@@ -387,6 +387,12 @@ img{max-width:100%}
 .track__ghost{background:var(--surface-2);color:#B3261E;font-weight:600;font-size:.68rem;padding:.14rem .4rem;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
 .pill--pipe{background:var(--ink-2);color:var(--paper)}
 .chk{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--ink-2)}
+.opts--stack{display:grid;grid-template-columns:1fr;gap:.55rem}
+/* Given a whole row each, the description is worth reading rather than a
+   caption squeezed under a chip. */
+.opts--stack .opt{align-items:flex-start;padding:.85rem 1rem}
+.opts--stack .opt__t{font-size:.98rem}
+.opts--stack .opt__d{margin-top:.15rem;line-height:1.5}
 .fld select,.fld textarea{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
 .fld textarea{resize:vertical}
 .edit__h{font-size:1.05rem;margin:0 0 .3rem}
