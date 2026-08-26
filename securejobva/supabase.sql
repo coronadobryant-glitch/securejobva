@@ -56,6 +56,10 @@ create table if not exists public.applications (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz not null default now(),
 
+  -- `tracks` is plural and an array: the form lets an applicant pick more than
+  -- one. `track` is the singular column it replaced, kept so the rows written
+  -- before that change still read. Nothing writes to it any more.
+  tracks      text[],
   track       text,
   experience  text,
   shifts      text[],
@@ -79,6 +83,23 @@ create table if not exists public.applications (
     coalesce(length(page), 0)    <= 500
   )
 );
+
+-- --------------------------------------------------------------------------
+-- Migrations for tables that already exist
+-- --------------------------------------------------------------------------
+--
+-- `create table if not exists` above does nothing to a table that is already
+-- there, so a column added to this file after the first run has to be added
+-- again here. Both statements are idempotent — run the file as often as you
+-- like.
+--
+-- This one matters: the careers form began sending `tracks` (an array, because
+-- an applicant can pick more than one) in place of `track`. Until the column
+-- exists, PostgREST rejects every application with PGRST204 and the applicant
+-- sees only "that did not send". Run this BEFORE deploying the page that sends
+-- it, not after.
+
+alter table public.applications add column if not exists tracks text[];
 
 -- --------------------------------------------------------------------------
 -- Lock both tables down
