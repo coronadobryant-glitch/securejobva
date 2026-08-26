@@ -48,7 +48,10 @@ const ASSETS = ["og.png", "og.svg", "favicon.svg", "robots.txt"];
 
 /* Everything before the page header is head material: <title>, the font links,
    the stylesheet and the pre-paint theme script. */
-const SPLIT = '<header class="nav">';
+/* The header used to be the only marker, but anything rendering above it -- the
+   rating banner on the home page -- then landed inside <head>, which browsers
+   only survive by closing the head early. Whichever marker comes first wins. */
+const BODY_STARTS = ['<section class="rated"', '<header class="nav">'];
 
 function title(html) {
   const m = html.match(/<title>([\s\S]*?)<\/title>/i);
@@ -59,8 +62,12 @@ function build(page) {
   let html = readFileSync(page.src, "utf8");
   for (const [from, to] of REWRITE) html = html.split(from).join(to);
 
-  const cut = html.indexOf(SPLIT);
-  if (cut === -1) throw new Error(page.src + ": no " + SPLIT + " — cannot tell head from body");
+  const cut = BODY_STARTS
+    .map((m) => html.indexOf(m))
+    .filter((i) => i !== -1)
+    .reduce((a, i) => (a === -1 || i < a ? i : a), -1);
+  if (cut === -1)
+    throw new Error(page.src + ": none of " + BODY_STARTS.join(", ") + " — cannot tell head from body");
 
   let head = html.slice(0, cut).trim();
   if (page.title) head = head.replace(/<title>[\s\S]*?<\/title>/i, "<title>" + page.title + "</title>");
