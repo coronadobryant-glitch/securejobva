@@ -253,29 +253,6 @@ img{max-width:100%}
 .sec__head{max-width:62ch;margin-bottom:clamp(2rem,4vw,3rem)}
 .sec__head h2{font-size:var(--step-3);margin:.7rem 0 .9rem}
 
-/* roles */
-.roles{display:grid;gap:1.25rem}
-@media(min-width:900px){.roles{grid-template-columns:repeat(3,1fr)}}
-.role{
-  background:var(--surface);border:1px solid var(--line);border-radius:10px;
-  padding:1.6rem 1.5rem 1.7rem;display:flex;flex-direction:column;gap:.85rem;
-  position:relative;transition:border-color .18s ease,transform .18s ease;
-}
-.sec--tint .role{background:var(--paper)}
-.role:hover{border-color:var(--accent);transform:translateY(-3px)}
-.role__tag{
-  position:absolute;top:-1px;left:1.5rem;
-  background:var(--accent);color:var(--accent-ink);
-  font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;
-  padding:.25rem .6rem;border-radius:0 0 8px 8px;
-}
-.role__tag--hi{background:var(--signal);color:var(--signal-ink)}
-.role h3{font-size:var(--step-1);margin-top:.55rem}
-.role__list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem;font-size:.94rem;color:var(--ink-2)}
-.role__list li{display:flex;gap:.6rem;align-items:flex-start}
-.role__list li::before{content:"";width:6px;height:6px;margin-top:.55rem;flex:none;background:var(--accent);border-radius:50%}
-.role__tools{margin-top:auto;padding-top:1rem;border-top:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);line-height:1.7}
-
 /* steps */
 .steps{display:grid;gap:0;border-top:1px solid var(--line)}
 /* Scoped to .steps on purpose. The dialog also marks its form panes
@@ -660,7 +637,6 @@ img{max-width:100%}
     </a>
     <nav class="nav__links" aria-label="Main">
       <a href="#pricing">Pricing</a>
-      <a href="#roles">Roles</a>
       <a href="#how">How it works</a>
       <a href="#proof">First 90 days</a>
       <a href="#faq">FAQ</a>
@@ -689,7 +665,6 @@ img{max-width:100%}
   <div class="mobnav" id="mobnav" hidden>
     <div class="wrap mobnav__in">
       <a href="#pricing">Pricing</a>
-      <a href="#roles">Roles</a>
       <a href="#how">How it works</a>
       <a href="#proof">First 90 days</a>
       <a href="#faq">FAQ</a>
@@ -835,61 +810,7 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec" id="roles">
-    <div class="wrap">
-      <div class="sec__head">
-        <span class="eyebrow">What we staff</span>
-        <h2>Three roles, and nothing else.</h2>
-        <p class="lede">Nearly every business we talk to is drowning in the same three places. We staff those three and only those three, so the person you get is a specialist in the work &mdash; not a generalist spread thin.</p>
-      </div>
-
-      <div class="roles">
-        <article class="role">
-          <span class="role__tag role__tag--hi">Most requested</span>
-          <h3>Customer Service</h3>
-          <ul class="role__list">
-            <li>Inbound calls and voicemail callbacks</li>
-            <li>Live chat, email and ticket queues</li>
-            <li>Appointment booking and confirmations</li>
-            <li>Order status, returns and escalations</li>
-            <li>After-hours and weekend coverage</li>
-            <li>Review responses and follow-up</li>
-          </ul>
-          <p class="role__tools">Zendesk &middot; Gorgias &middot; Intercom &middot; Freshdesk &middot; RingCentral &middot; Shopify</p>
-        </article>
-
-        <article class="role">
-          <span class="role__tag">Revenue side</span>
-          <h3>Sales &amp; Marketing</h3>
-          <ul class="role__list">
-            <li>Speed-to-lead follow-up by call, text and email</li>
-            <li>Outbound prospecting and list building</li>
-            <li>CRM hygiene, pipeline updates, reporting</li>
-            <li>Quote and estimate follow-through</li>
-            <li>Social scheduling and comment moderation</li>
-            <li>Email and SMS campaign setup</li>
-          </ul>
-          <p class="role__tools">HubSpot &middot; GoHighLevel &middot; Klaviyo &middot; Apollo &middot; Salesforce &middot; Meta Business Suite</p>
-        </article>
-
-        <article class="role">
-          <span class="role__tag">Time back</span>
-          <h3>Admin Tasks</h3>
-          <ul class="role__list">
-            <li>Inbox triage and calendar management</li>
-            <li>Data entry, cleanup and migrations</li>
-            <li>Invoicing and accounts-receivable chasing</li>
-            <li>Order processing and vendor coordination</li>
-            <li>Document prep, contracts and filing</li>
-            <li>Research, reporting and travel booking</li>
-          </ul>
-          <p class="role__tools">Google Workspace &middot; Microsoft 365 &middot; QuickBooks &middot; Notion &middot; Airtable &middot; ServiceTitan</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec sec--tint" id="how">
+  <section class="sec" id="how">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">How it works</span>
@@ -981,7 +902,7 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec" id="proof">
+  <section class="sec sec--tint" id="proof">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">What to expect</span>
@@ -1010,7 +931,7 @@ img{max-width:100%}
     </div>
   </section>
 
-  <section class="sec sec--tint" id="faq">
+  <section class="sec" id="faq">
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">Questions</span>
@@ -1077,9 +998,9 @@ img{max-width:100%}
       <div>
         <h5>Roles</h5>
         <ul>
-          <li><a href="#roles">Customer Service</a></li>
-          <li><a href="#roles">Sales &amp; Marketing</a></li>
-          <li><a href="#roles">Admin Tasks</a></li>
+          <li><a href="#book">Customer Service</a></li>
+          <li><a href="#book">Sales &amp; Marketing</a></li>
+          <li><a href="#book">Admin Tasks</a></li>
         </ul>
       </div>
       <div>
