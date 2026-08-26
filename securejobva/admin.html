@@ -333,6 +333,32 @@ img{max-width:100%}
 .scr__k{color:var(--ink-2)}
 .scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
 .scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.cl__add{display:grid;gap:0;padding:1.1rem 1.2rem;background:var(--surface-2);border-radius:10px;margin:1rem 0 1.4rem}
+@media(min-width:720px){.cl__add{grid-template-columns:1fr 1fr;gap:0 1rem}
+  .cl__add .fld:nth-child(3),.cl__add #cl-add,.cl__add #cl-msg{grid-column:1/-1}}
+.cl__add input[type=file]{
+  font-family:inherit;font-size:.9rem;padding:.55rem;
+  border:1px dashed var(--line);border-radius:8px;background:var(--surface);color:var(--ink-2);width:100%;
+}
+.cl__list{display:grid;gap:.55rem}
+.cl{
+  display:grid;grid-template-columns:5.5rem 1fr 4.5rem auto auto;
+  gap:.7rem;align-items:center;padding:.6rem .8rem;
+  background:var(--surface);border:1px solid var(--line);border-radius:9px;
+}
+.cl.is-off{opacity:.5}
+.cl__img{display:grid;place-items:center;height:34px}
+.cl__img img{max-height:34px;max-width:5.5rem;width:auto;display:block}
+.cl__meta{min-width:0}
+.cl__n{display:block;font-weight:600;font-size:.92rem}
+.cl__l{display:block;font-size:.76rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl__ord{
+  font-family:"IBM Plex Mono",monospace;font-size:.82rem;text-align:center;
+  padding:.3rem;border:1px solid var(--line);border-radius:6px;
+  background:var(--surface);color:var(--ink);width:100%;
+}
+@media(max-width:620px){.cl{grid-template-columns:4rem 1fr;gap:.5rem}
+  .cl__ord,.cl [data-cl-toggle],.cl [data-cl-del]{grid-column:2}}
 .tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
 .tab{
   font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
@@ -1258,6 +1284,171 @@ function drawStats() {
     "</div>";
 }
 
+/* ── client logos ──
+   The strip on the home page reads from the same table. Uploading here is the
+   whole workflow: no deploy, no HTML edit. */
+function loadClients() {
+  var box = document.getElementById("clients-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading clients&hellip;';
+  api("client_logos?select=id,name,image_url,link,sort_order,visible&order=sort_order.asc,added_at.asc")
+    .then(function (rows) { drawClients(box, rows || []); })
+    .catch(function (e) {
+      box.innerHTML = '<p class="msg msg--bad">Could not load clients. ' + esc(e.message) + "</p>";
+    });
+}
+
+function drawClients(box, rows) {
+  box.innerHTML =
+    '<h2 class="edit__h">Businesses on the home page</h2>' +
+    '<p class="msg" style="margin-top:0">These slide across the home page. Hidden ones stay here but are not shown to visitors. Drag order is the number beside each one &mdash; lower goes first.</p>' +
+
+    '<div class="cl__add">' +
+      '<div class="fld"><label for="cl-name">Business name</label>' +
+        '<input id="cl-name" type="text" placeholder="Acme Plumbing"></div>' +
+      '<div class="fld"><label for="cl-link">Their website <em>&mdash; optional</em></label>' +
+        '<input id="cl-link" type="url" placeholder="https://"></div>' +
+      '<div class="fld"><label for="cl-file">Logo</label>' +
+        '<input id="cl-file" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp">' +
+        '<p class="fileinfo" id="cl-info">PNG, JPG, SVG or WebP, up to 2 MB. A transparent PNG looks best.</p></div>' +
+      '<button class="btn btn--solid" id="cl-add" type="button">Add business</button>' +
+      '<p class="msg" id="cl-msg"></p>' +
+    "</div>" +
+
+    (rows.length
+      ? '<div class="cl__list">' + rows.map(function (c) {
+          return (
+            '<div class="cl' + (c.visible ? "" : " is-off") + '" data-cl="' + esc(c.id) + '">' +
+              '<span class="cl__img"><img src="' + esc(c.image_url) + '" alt="' + esc(c.name) + '"></span>' +
+              '<span class="cl__meta">' +
+                '<span class="cl__n">' + esc(c.name) + "</span>" +
+                (c.link ? '<span class="cl__l">' + esc(c.link) + "</span>" : "") +
+              "</span>" +
+              '<input class="cl__ord" type="number" data-cl-order value="' + esc(c.sort_order) +
+                '" aria-label="Order for ' + esc(c.name) + '">' +
+              '<button class="btn btn--ghost" data-cl-toggle type="button" style="padding:.35rem .7rem;font-size:.82rem">' +
+                (c.visible ? "Hide" : "Show") + "</button>" +
+              '<button class="btn btn--ghost" data-cl-del type="button" style="padding:.35rem .7rem;font-size:.82rem">Remove</button>' +
+            "</div>"
+          );
+        }).join("") + "</div>"
+      : '<p class="msg">No businesses added yet. The strip stays hidden on the home page until there is at least one.</p>');
+
+  wireClients(box, rows);
+}
+
+function wireClients(box, rows) {
+  var msg = document.getElementById("cl-msg");
+  var info = document.getElementById("cl-info");
+  var MAX = 2 * 1024 * 1024;
+
+  document.getElementById("cl-file").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    if (!f) { info.className = "fileinfo"; info.textContent = "PNG, JPG, SVG or WebP, up to 2 MB."; return; }
+    var bad = f.size > MAX ? "That is over 2 MB — a logo should be far smaller." : "";
+    info.className = "fileinfo" + (bad ? " is-bad" : "");
+    info.textContent = bad || (f.name + " — " + Math.max(1, Math.round(f.size / 1024)) + " KB");
+  });
+
+  document.getElementById("cl-add").addEventListener("click", function () {
+    var btn = this;
+    var name = document.getElementById("cl-name").value.trim();
+    var link = document.getElementById("cl-link").value.trim();
+    var f = document.getElementById("cl-file").files[0];
+
+    msg.className = "msg";
+    if (!name) { msg.className = "msg msg--bad"; msg.textContent = "Give it a name."; return; }
+    if (!f) { msg.className = "msg msg--bad"; msg.textContent = "Choose a logo file."; return; }
+    if (f.size > MAX) { msg.className = "msg msg--bad"; msg.textContent = "That file is over 2 MB."; return; }
+
+    /* The stored name is ours, not theirs: an uploaded filename is text that
+       ends up in a URL, and this one is public. */
+    var dot = f.name.lastIndexOf(".");
+    var ext = dot > -1 ? f.name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) : "png";
+    var path = "logo-" + Date.now() + "." + ext;
+
+    btn.disabled = true;
+    msg.textContent = "Uploading…";
+
+    var sess = session();
+    fetch(SB + "/storage/v1/object/client-logos/" + path, {
+      method: "POST",
+      headers: {
+        apikey: ANON,
+        Authorization: "Bearer " + sess.access_token,
+        "Content-Type": f.type,
+        "x-upsert": "false"
+      },
+      body: f
+    }).then(function (r) {
+      if (!r.ok) throw new Error("the upload was refused");
+      return api("client_logos", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: {
+          name: name,
+          image_url: SB + "/storage/v1/object/public/client-logos/" + path,
+          link: link || null,
+          sort_order: rows.length ? Math.max.apply(null, rows.map(function (x) { return x.sort_order; })) + 1 : 0,
+          added_by: ME
+        }
+      });
+    }).then(function () {
+      msg.textContent = "";
+      loadClients();
+    }).catch(function (e) {
+      btn.disabled = false;
+      msg.className = "msg msg--bad";
+      msg.textContent = e.message || "That did not go through.";
+    });
+  });
+
+  box.querySelectorAll("[data-cl-toggle]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-cl]");
+      var on = b.textContent.trim() === "Show";
+      api("client_logos?id=eq." + encodeURIComponent(row.getAttribute("data-cl")), {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: { visible: on }
+      }).then(loadClients).catch(function () {
+        msg.className = "msg msg--bad";
+        msg.textContent = "Could not change that.";
+      });
+    });
+  });
+
+  box.querySelectorAll("[data-cl-order]").forEach(function (el) {
+    el.addEventListener("change", function () {
+      var row = el.closest("[data-cl]");
+      api("client_logos?id=eq." + encodeURIComponent(row.getAttribute("data-cl")), {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: { sort_order: Number(el.value) || 0 }
+      }).then(loadClients).catch(function () {
+        msg.className = "msg msg--bad";
+        msg.textContent = "Could not reorder that.";
+      });
+    });
+  });
+
+  box.querySelectorAll("[data-cl-del]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-cl]");
+      /* Two clicks rather than a confirm dialog: a browser confirm blocks
+         everything, and this is reversible by re-uploading anyway. */
+      if (b.textContent.trim() !== "Sure?") {
+        b.textContent = "Sure?";
+        setTimeout(function () { if (b.textContent === "Sure?") b.textContent = "Remove"; }, 3000);
+        return;
+      }
+      api("client_logos?id=eq." + encodeURIComponent(row.getAttribute("data-cl")), {
+        method: "DELETE", headers: { Prefer: "return=minimal" }
+      }).then(loadClients).catch(function () {
+        msg.className = "msg msg--bad";
+        msg.textContent = "Could not remove that.";
+      });
+    });
+  });
+}
+
 function wireTabs() {
   var bar = document.getElementById("tabs");
   if (!bar) return;
@@ -1733,6 +1924,7 @@ function render(email, apps, notes, socials, docs) {
       '<button class="tab is-on" data-tab="apps" type="button">Applications</button>' +
       '<button class="tab" data-tab="seats" type="button">Seats</button>' +
       '<button class="tab" data-tab="inbox" type="button">Messages<span class="tab__n" id="tab-unread"></span></button>' +
+      '<button class="tab" data-tab="clients" type="button">Clients</button>' +
       (can("accounts.manage") ? '<button class="tab" data-tab="accts" type="button">Accounts</button>' : "") +
     "</div>" +
     '<div data-pane="apps">' +
@@ -1741,6 +1933,7 @@ function render(email, apps, notes, socials, docs) {
     "</div>" +
     '<div data-pane="seats" hidden><div class="card" id="seats-card"></div></div>' +
     '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div></div>' +
+    '<div data-pane="clients" hidden><div class="card" id="clients-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "")
@@ -1752,6 +1945,7 @@ function render(email, apps, notes, socials, docs) {
   if (can("accounts.manage")) loadRoles();
   loadSeats();
   loadInbox();
+  loadClients();
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
   document.getElementById("fskill").addEventListener("change", paint);

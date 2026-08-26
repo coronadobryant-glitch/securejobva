@@ -28,9 +28,10 @@ run it. That is always safer than guessing.
 | `012-seat-status.sql` | Where a seat request has got to, and the business portal that reads it |
 | `013-documents.sql` | CV uploads: a private bucket, and who may read what |
 | `014-admin.sql` | Adds an administrator |
+| `015-client-logos.sql` | The sliding client strip: a public logo bucket, staff-only uploads |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 014 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 015 in order, then `verify.sql` to confirm.
 
 ## Adding one
 
