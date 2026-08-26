@@ -145,6 +145,16 @@ img{max-width:100%}
 .brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.6rem;margin-left:auto;font-size:.94rem;font-weight:500}
+/* When the links outrun the bar, scroll them instead of letting the row
+   squash, wrap and push the header taller. min-width:0 is what makes it
+   work: a flex item will not shrink below its content without it, so the
+   row would just overflow and never become scrollable. */
+.nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
+.nav__links::-webkit-scrollbar{display:none}
+.nav__links a{flex:none;white-space:nowrap}
+/* Only the links give way; the brand and the controls keep their size. */
+.brand{flex:none}
+.nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
 .nav__cta{margin-left:0}
