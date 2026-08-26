@@ -361,6 +361,7 @@ img{max-width:100%}
 .acctlist{display:grid;gap:.5rem;margin-top:1rem}
 .acct{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;padding:.6rem .8rem;background:var(--surface-2);border-radius:8px}
 .acct__e{font-size:.9rem}
+.acct__note{display:block;font-size:.78rem;color:var(--muted);margin-top:.2rem}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
@@ -928,16 +929,42 @@ function loadRoles() {
   box.innerHTML = '<span class="spin"></span>Loading accounts&hellip;';
   Promise.all([
     api("rpc/list_roles", { method: "POST", body: {} }),
-    api("rpc/list_role_grants", { method: "POST", body: {} })
+    api("rpc/list_role_grants", { method: "POST", body: {} }),
+    api("rpc/list_account_requests", { method: "POST", body: {} }).catch(function () { return []; })
   ]).then(function (r) {
     ROLES = r[0] || [];
-    drawRoles(box, r[1] || []);
+    drawRoles(box, r[1] || [], r[2] || []);
   }).catch(function (e) {
     box.innerHTML = '<p class="msg msg--bad">Could not load accounts. ' + esc(e.message) + "</p>";
   });
 }
 
-function drawRoles(box, grants) {
+function drawRequests(box, reqs) {
+  if (!reqs.length) return "";
+  return (
+    '<h2 class="edit__h" style="margin-top:1.4rem">Waiting for approval</h2>' +
+    '<p class="msg" style="margin-top:0">What somebody says they are is a claim until one of us agrees with it.</p>' +
+    '<div class="acctlist">' +
+      reqs.map(function (r) {
+        return (
+          '<div class="acct" data-req="' + esc(r.user_email) + '" data-role="' + esc(r.requested_role) + '">' +
+            "<span>" +
+              '<span class="acct__e">' + esc(r.user_email) + "</span> " +
+              '<span class="pill">' + esc(r.requested_role) + "</span>" +
+              (r.note ? '<span class="acct__note">' + esc(r.note) + "</span>" : "") +
+            "</span>" +
+            '<span class="acct__r">' +
+              '<button class="btn btn--ghost" data-decide="yes" style="padding:.35rem .7rem;font-size:.82rem">Approve</button> ' +
+              '<button class="btn btn--ghost" data-decide="no" style="padding:.35rem .7rem;font-size:.82rem">Decline</button>' +
+            "</span>" +
+          "</div>"
+        );
+      }).join("") +
+    "</div>"
+  );
+}
+
+function drawRoles(box, grants, reqs) {
   var opts = ROLES.map(function (r) {
     return '<option value="' + esc(r.key) + '">' + esc(r.label) + "</option>";
   }).join("");
@@ -959,7 +986,8 @@ function drawRoles(box, grants) {
     : '<p class="msg">Nobody has a role yet.</p>';
 
   box.innerHTML =
-    '<h2 class="edit__h">Who can do what</h2>' +
+    drawRequests(box, reqs || []) +
+    '<h2 class="edit__h"' + ((reqs || []).length ? ' style="margin-top:1.6rem"' : "") + ">Who can do what</h2>" +
     '<p class="msg" style="margin-top:0">A role is granted to an email address. It takes effect the next time that person signs in.</p>' +
     '<div class="acctlist">' + rows + "</div>" +
     '<div class="adm__bar" style="margin:1.1rem 0 0">' +
@@ -983,6 +1011,23 @@ function drawRoles(box, grants) {
     var rk = document.getElementById("r-role").value;
     if (!em || em.indexOf("@") < 1) { msg.textContent = "Enter an email address."; return; }
     setRole(em, rk, true, msg);
+  });
+
+  box.querySelectorAll("[data-decide]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-req]");
+      api("rpc/decide_account_request", {
+        method: "POST",
+        body: {
+          target_email: row.getAttribute("data-req"),
+          role_key: row.getAttribute("data-role"),
+          approve: b.getAttribute("data-decide") === "yes"
+        }
+      }).then(loadRoles).catch(function (e) {
+        msg.className = "msg msg--bad";
+        msg.textContent = e.message || "That did not go through.";
+      });
+    });
   });
 
   box.querySelectorAll("[data-revoke]").forEach(function (b) {
