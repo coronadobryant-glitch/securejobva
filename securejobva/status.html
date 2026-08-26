@@ -319,6 +319,30 @@ img{max-width:100%}
 .fld select,.fld textarea{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
 .fld textarea{resize:vertical}
 .edit__h{font-size:1.05rem;margin:0 0 .3rem}
+
+/* Stat tiles. The hero numbers are the answer for three of these four; a chart
+   of a single figure would be a chart of nothing. */
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin:1rem 0 0}
+@media(min-width:720px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--surface-2);border-radius:9px;padding:.9rem 1rem}
+.tile__n{display:block;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.8rem;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.tile__l{display:block;font-size:.8rem;color:var(--muted);margin-top:.3rem}
+.tile--warn{background:#FDECEA}
+.tile--warn .tile__n{color:#B3261E}
+.tile--warn .tile__l{color:#B3261E}
+:root[data-theme="dark"] .tile--warn{background:#2B1512}
+:root[data-theme="dark"] .tile--warn .tile__n,
+:root[data-theme="dark"] .tile--warn .tile__l{color:#F2B8B5}
+
+.barsgrid{display:grid;gap:1.4rem;margin-top:1.5rem}
+@media(min-width:760px){.barsgrid{grid-template-columns:repeat(3,1fr)}}
+.bars__t{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:0 0 .6rem;font-weight:500}
+.bar{display:grid;grid-template-columns:5.5rem 1fr 2rem;align-items:center;gap:.5rem;margin-bottom:2px;font-size:.82rem}
+.bar__l{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The track is the recessive part; the fill is the mark. */
+.bar__track{background:var(--surface-2);border-radius:4px;height:14px;overflow:hidden}
+.bar__fill{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0;min-width:2px}
+.bar__n{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
 .acctlist{display:grid;gap:.5rem;margin-top:1rem}
 .acct{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;padding:.6rem .8rem;background:var(--surface-2);border-radius:8px}
 .acct__e{font-size:.9rem}

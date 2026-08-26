@@ -138,6 +138,30 @@ const PAGE_CSS = `
 .fld select,.fld textarea{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
 .fld textarea{resize:vertical}
 .edit__h{font-size:1.05rem;margin:0 0 .3rem}
+
+/* Stat tiles. The hero numbers are the answer for three of these four; a chart
+   of a single figure would be a chart of nothing. */
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin:1rem 0 0}
+@media(min-width:720px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--surface-2);border-radius:9px;padding:.9rem 1rem}
+.tile__n{display:block;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.8rem;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.tile__l{display:block;font-size:.8rem;color:var(--muted);margin-top:.3rem}
+.tile--warn{background:#FDECEA}
+.tile--warn .tile__n{color:#B3261E}
+.tile--warn .tile__l{color:#B3261E}
+:root[data-theme="dark"] .tile--warn{background:#2B1512}
+:root[data-theme="dark"] .tile--warn .tile__n,
+:root[data-theme="dark"] .tile--warn .tile__l{color:#F2B8B5}
+
+.barsgrid{display:grid;gap:1.4rem;margin-top:1.5rem}
+@media(min-width:760px){.barsgrid{grid-template-columns:repeat(3,1fr)}}
+.bars__t{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:0 0 .6rem;font-weight:500}
+.bar{display:grid;grid-template-columns:5.5rem 1fr 2rem;align-items:center;gap:.5rem;margin-bottom:2px;font-size:.82rem}
+.bar__l{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The track is the recessive part; the fill is the mark. */
+.bar__track{background:var(--surface-2);border-radius:4px;height:14px;overflow:hidden}
+.bar__fill{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0;min-width:2px}
+.bar__n{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
 .acctlist{display:grid;gap:.5rem;margin-top:1rem}
 .acct{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;padding:.6rem .8rem;background:var(--surface-2);border-radius:8px}
 .acct__e{font-size:.9rem}
@@ -1088,6 +1112,97 @@ function setRole(email, role, grant, msg) {
   });
 }
 
+/* ── the numbers ─────────────────────────────────────────────────────────
+   Computed from the rows already fetched rather than a second round trip:
+   the queue is a few hundred rows at most, and a figure derived from exactly
+   what is on screen cannot disagree with it.
+
+   Deliberately not a time series. That needs enough history to have a shape,
+   and a sparkline over eleven applications is decoration pretending to be
+   evidence. Counts and a breakdown are what this actually answers. */
+
+function countBy(rows, key) {
+  var out = {};
+  rows.forEach(function (r) {
+    var v = typeof key === "function" ? key(r) : r[key];
+    if (v === null || v === undefined || v === "") return;
+    if (Array.isArray(v)) v.forEach(function (x) { out[x] = (out[x] || 0) + 1; });
+    else out[v] = (out[v] || 0) + 1;
+  });
+  return out;
+}
+
+/* One hue for every bar. The bars compare magnitude across labelled rows, so
+   colour carries no identity here — the label does — and a second hue would
+   imply a difference that is not in the data. #0072EE clears 4.5:1 on the
+   light surface and its dark step clears 6.2:1, both checked rather than
+   eyeballed. */
+function bars(title, counts, order, label) {
+  var keys = (order || Object.keys(counts).sort()).filter(function (k) {
+    return counts[k];
+  });
+  if (!keys.length) return "";
+  var max = Math.max.apply(null, keys.map(function (k) { return counts[k]; }));
+  return (
+    '<div class="bars">' +
+      '<h3 class="bars__t">' + esc(title) + "</h3>" +
+      keys.map(function (k) {
+        var n = counts[k];
+        var pct = Math.round((n / max) * 100);
+        var name = label ? (label[k] || k) : k;
+        return (
+          '<div class="bar" title="' + esc(name) + ": " + n + '">' +
+            '<span class="bar__l">' + esc(name) + "</span>" +
+            '<span class="bar__track"><span class="bar__fill" style="width:' + pct + '%"></span></span>' +
+            '<span class="bar__n">' + n + "</span>" +
+          "</div>"
+        );
+      }).join("") +
+    "</div>"
+  );
+}
+
+function drawStats() {
+  var box = document.getElementById("stats-card");
+  if (!box) return;
+
+  var total = ALL.length;
+  var late = ALL.filter(function (a) {
+    var w = days(a.waiting_since);
+    return a.is_ghosted || (w !== null && w >= 7 && !a.response_received);
+  }).length;
+  var hired = ALL.filter(function (a) { return a.pipeline === "hired"; }).length;
+  var week = ALL.filter(function (a) {
+    var d = days(a.created_at);
+    return d !== null && d <= 7;
+  }).length;
+
+  /* The one number that is a call to action rather than a fact, so it is the
+     only one that changes colour — and it says "all clear" at zero rather than
+     going quiet, because a blank is ambiguous. */
+  var lateCls = late > 0 ? " tile--warn" : "";
+
+  var tiles =
+    '<div class="tiles">' +
+      '<div class="tile"><span class="tile__n">' + total + '</span><span class="tile__l">Applications</span></div>' +
+      '<div class="tile' + lateCls + '"><span class="tile__n">' + late + "</span>" +
+        '<span class="tile__l">' + (late > 0 ? "Waiting 7+ days, no reply" : "None waiting on us") + "</span></div>" +
+      '<div class="tile"><span class="tile__n">' + hired + '</span><span class="tile__l">Hired</span></div>' +
+      '<div class="tile"><span class="tile__n">' + week + '</span><span class="tile__l">Applied this week</span></div>' +
+    "</div>";
+
+  box.className = "card";
+  box.style.marginBottom = "1.6rem";
+  box.innerHTML =
+    '<h2 class="edit__h">At a glance</h2>' +
+    tiles +
+    '<div class="barsgrid">' +
+      bars("Pipeline", countBy(ALL, "pipeline"), PIPE, PIPE_LABEL) +
+      bars("Track", countBy(ALL, "tracks")) +
+      bars("English", countBy(ALL, "skill_english"), LEVELS, LEVEL_LABEL) +
+    "</div>";
+}
+
 function paint() {
   var q  = (document.getElementById("q").value || "").toLowerCase().trim();
   var st = document.getElementById("filter").value;
@@ -1256,6 +1371,7 @@ function render(email, apps, notes, socials) {
       "</select>" +
       '<span class="adm__count" id="count"></span>' +
     "</div>" +
+    (can("analytics.view") ? '<div id="stats-card"></div>' : "") +
     '<div class="rows" id="rows"></div>' +
     (can("accounts.manage")
       ? '<div class="card" id="roles-card" style="margin-top:1.6rem"></div>'
@@ -1263,6 +1379,7 @@ function render(email, apps, notes, socials) {
   );
 
   document.getElementById("out").addEventListener("click", signOut);
+  if (can("analytics.view")) drawStats();
   if (can("accounts.manage")) loadRoles();
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
