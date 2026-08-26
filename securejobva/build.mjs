@@ -22,9 +22,9 @@ const PAGES = [
     path: "/",
     /* The <title> in the page file names the Claude artifact; a search result
        wants more than the brand on its own, so dist gets this instead. */
-    title: "Dedicated virtual assistants from $9/hr | SecureJobVA",
+    title: "Dedicated virtual assistants at $7.75/hr flat | SecureJobVA",
     description:
-      "Dedicated virtual assistants in customer service, sales and marketing, and admin support — matched to your business in about a week at $9 an hour flat. No setup fee, no recruiting fee, no long-term contract.",
+      "Dedicated virtual assistants in customer service, sales and marketing, and admin support — matched to your business in about a week at $7.75 an hour flat. No setup fee, no recruiting fee, no long-term contract.",
     ogTitle: "Cover the hours you can't."
   },
   {

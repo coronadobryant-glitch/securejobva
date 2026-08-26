@@ -23,6 +23,11 @@
   --price-fg:#F0F6FE;
   --shadow:0 1px 2px rgba(0,26,70,.05), 0 14px 32px -20px rgba(0,26,70,.35);
 
+  --vs-1:#0053B4;
+  --vs-2:#0F7BEF;
+  --vs-3:#63A9F6;
+  --vs-4:#A9CFFA;
+
   /* The mark. Its gradient runs from the shield's bright corner to its point,
      the two ends sampled off the logo file. Held as tokens so the artwork
      follows the theme instead of carrying a fixed colour into a dark page. */
@@ -69,6 +74,11 @@
   --mark-bg:#0B1424;
   --mark-ink:#08111F;
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -20px rgba(0,0,0,.9);
+
+  --vs-1:#2B7FE0;
+  --vs-2:#3B9BFF;
+  --vs-3:#6FB6FF;
+  --vs-4:#A6D2FF;
 }
 
 *{box-sizing:border-box}
@@ -200,6 +210,12 @@ img{max-width:100%}
 }
 .cov__head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:1.15rem}
 .cov__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1rem;letter-spacing:-.01em}
+.cov__lead{
+  margin:-.5rem 0 1.1rem;padding:.75rem .9rem;
+  background:var(--accent-soft);border-left:3px solid var(--signal);border-radius:0 8px 8px 0;
+  font-size:.9rem;color:var(--ink-2);line-height:1.5;
+}
+.cov__lead b{color:var(--ink);font-weight:700}
 .cov__row{display:grid;grid-template-columns:5.6rem 1fr;align-items:center;gap:.75rem;margin-bottom:.7rem}
 .cov__label{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right}
 .cov__track{position:relative;height:26px;background:var(--surface-2);border-radius:6px;overflow:hidden}
@@ -285,19 +301,84 @@ img{max-width:100%}
 }
 .price__card .eyebrow{color:var(--price-fg);opacity:.6}
 .price__rate{display:flex;align-items:baseline;gap:.5rem;margin:.6rem 0 .35rem}
-.price__amt{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(3rem,7vw,4.25rem);letter-spacing:-.04em;line-height:1;color:var(--signal)}
+.price__amt{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(2.6rem,6vw,3.7rem);letter-spacing:-.04em;line-height:1;color:var(--signal)}
 .price__per{font-size:1rem;opacity:.72}
 .price__sub{opacity:.82;font-size:.96rem}
 .price__inc{list-style:none;padding:0;margin:1.5rem 0 0;display:grid;gap:.6rem;font-size:.95rem}
 .price__inc li{display:flex;gap:.7rem;align-items:flex-start;opacity:.92}
 .price__inc svg{flex:none;margin-top:.28rem}
-.compare{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
-.compare__row{display:flex;justify-content:space-between;gap:1rem;padding:.95rem 1.25rem;border-bottom:1px solid var(--line);font-size:.94rem}
-.compare__row:last-child{border-bottom:none}
-.compare__row b{font-variant-numeric:tabular-nums}
-.compare__head{background:var(--surface-2);font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.compare__row--tot{background:var(--accent-soft);font-weight:700}
-.compare__row--win{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.adapt{
+  display:flex;gap:.85rem;align-items:flex-start;
+  margin-top:1.5rem;padding:1.05rem 1.2rem;
+  background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  border-left:4px solid var(--signal);
+  border-radius:10px;
+}
+.adapt__i{
+  width:30px;height:30px;flex:none;border-radius:8px;
+  display:grid;place-items:center;
+  background:var(--signal);color:var(--signal-ink);
+}
+.adapt__t{font-size:.98rem;color:var(--ink-2);line-height:1.55;max-width:52ch}
+.adapt__t b{color:var(--ink);font-weight:700}
+.adapt__k{
+  display:block;font-family:"IBM Plex Mono",monospace;
+  font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent-deep);font-weight:500;margin-bottom:.25rem;
+}
+
+/* Cost comparison. Both bars share one scale: the tallest is the in-house
+   total, and every height below is that cost as a share of it. */
+.vs{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:1.35rem 1.35rem 1.15rem}
+.vs__cap{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.vs__plot{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,4vw,2.25rem);margin:1.1rem 0 .3rem}
+.vs__col{display:flex;flex-direction:column;align-items:center;gap:.55rem;min-width:0}
+.vs__track{height:210px;width:min(100%,5.5rem);display:flex;align-items:flex-end}
+.vs__bar{width:100%;display:flex;flex-direction:column;gap:2px}
+.vs__seg{display:block;border-radius:2px;min-height:3px}
+.vs__seg:first-child{border-radius:4px 4px 2px 2px}
+.vs__seg:last-child{border-radius:2px 2px 0 0}
+.vs__seg--a{background:var(--vs-1)}
+.vs__seg--b{background:var(--vs-2)}
+.vs__seg--c{background:var(--vs-3)}
+.vs__seg--d{background:var(--vs-4)}
+.vs__seg--win{background:var(--signal)}
+.vs__tot{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.45rem;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.vs__lab{font-size:.86rem;color:var(--ink-2);text-align:center;line-height:1.35}
+.vs__lab b{display:block;font-weight:700;color:var(--ink)}
+
+.vs__grp{
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);margin:1.3rem 0 .3rem;
+}
+.vs__grp--win{color:var(--ink)}
+.vs__rows{list-style:none;padding:0;margin:0}
+.vs__rows li{display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--line);font-size:.9rem;color:var(--ink-2)}
+.vs__rows li:last-child{border-bottom:none}
+.vs__rows b{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:700}
+.vs__row--tot{font-weight:700;color:var(--ink)}
+.vs__row--tot span{font-weight:700}
+.vs__row--zero b{color:var(--muted)}
+/* The seat's bill sits on its own ground so the eye reads two bills, not one
+   list with a good row at the bottom. */
+.vs__rows--win{
+  background:var(--accent-soft);border-left:3px solid var(--signal);
+  border-radius:0 8px 8px 0;padding:.2rem 1rem;margin-top:.15rem;
+}
+.vs__rows--win li{border-bottom-color:color-mix(in srgb,var(--accent) 18%,transparent)}
+.vs__sw{width:11px;height:11px;flex:none;border-radius:3px}
+.vs__sw--a{background:var(--vs-1)}
+.vs__sw--b{background:var(--vs-2)}
+.vs__sw--c{background:var(--vs-3)}
+.vs__sw--d{background:var(--vs-4)}
+.vs__sw--win{background:var(--signal)}
+.vs__sw--none{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line)}
+.vs__save{
+  margin-top:.9rem;padding:.8rem 1rem;border-radius:8px;
+  background:var(--accent-soft);font-size:.95rem;color:var(--ink-2);text-align:center;
+}
+.vs__save b{color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
 
 /* proof */
 .quotes{display:grid;gap:1.25rem}
@@ -350,8 +431,8 @@ img{max-width:100%}
 /* ---------- intake dialog ---------- */
 .intake{
   border:none;padding:0;background:transparent;color:var(--ink);
-  width:min(100% - 1.5rem,34.5rem);max-width:none;
-  max-height:min(92vh,47rem);
+  width:min(100% - 1.5rem,52rem);max-width:none;
+  max-height:min(94vh,58rem);
 }
 .intake::backdrop{background:rgba(28,14,12,.58);backdrop-filter:blur(3px)}
 .intake__panel{
@@ -362,9 +443,9 @@ img{max-width:100%}
 @keyframes intakeIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 .intake[open] .intake__panel{animation:intakeIn .22s cubic-bezier(.2,.8,.2,1) both}
 
-.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.15rem 1.35rem 1rem}
+.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.4rem 2rem 1.15rem}
 .intake__head .brand__mark{width:22px;height:22px}
-.intake__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.02em}
+.intake__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.22rem;letter-spacing:-.02em}
 .intake__x{
   margin-left:auto;width:34px;height:34px;flex:none;
   display:inline-flex;align-items:center;justify-content:center;
@@ -375,7 +456,7 @@ img{max-width:100%}
 .intake__x:hover{border-color:var(--accent);color:var(--accent)}
 
 /* three real steps, so the rail is a sequence and not decoration */
-.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;padding:0 1.35rem 1.1rem}
+.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;padding:0 2rem 1.3rem}
 .rail__i{display:grid;gap:.45rem}
 .rail__bar{height:3px;border-radius:2px;background:var(--line);transition:background-color .2s ease}
 .rail__i[data-on] .rail__bar{background:var(--accent)}
@@ -385,10 +466,10 @@ img{max-width:100%}
 }
 .rail__i[data-on] .rail__l{color:var(--ink-2)}
 
-.intake__body{padding:.35rem 1.35rem 1.5rem;overflow-y:auto}
+.intake__body{padding:.5rem 2rem 2rem;overflow-y:auto}
 .step[hidden]{display:none}
-.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.08rem;letter-spacing:-.01em}
-.q__sub{font-size:.88rem;color:var(--muted);margin:.3rem 0 1.05rem;line-height:1.45}
+.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.32rem;letter-spacing:-.018em}
+.q__sub{font-size:.95rem;color:var(--muted);margin:.35rem 0 1.15rem;line-height:1.5}
 .q--again{margin-top:1.65rem}
 
 .opts{display:grid;gap:.55rem}
@@ -396,7 +477,7 @@ img{max-width:100%}
 .opt{
   position:relative;display:flex;gap:.65rem;align-items:flex-start;
   background:var(--paper);border:1.5px solid var(--line);border-radius:9px;
-  padding:.75rem .85rem;cursor:pointer;
+  padding:.9rem 1rem;cursor:pointer;
   transition:border-color .15s ease,background-color .15s ease;
 }
 .opt:hover{border-color:var(--accent)}
@@ -408,8 +489,8 @@ img{max-width:100%}
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
-.opt__t{font-weight:600;font-size:.96rem;line-height:1.3;display:block}
-.opt__d{font-size:.82rem;color:var(--muted);display:block;margin-top:.15rem;line-height:1.4}
+.opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
+.opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
@@ -417,8 +498,8 @@ img{max-width:100%}
 .seg{display:flex;flex-wrap:wrap;gap:.45rem}
 .seg label{
   position:relative;cursor:pointer;
-  font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums;
-  border:1.5px solid var(--line);border-radius:8px;padding:.55rem .8rem;background:var(--paper);
+  font-family:"IBM Plex Mono",monospace;font-size:.9rem;font-variant-numeric:tabular-nums;
+  border:1.5px solid var(--line);border-radius:8px;padding:.62rem .9rem;background:var(--paper);
   transition:border-color .15s ease,background-color .15s ease,color .15s ease;
 }
 .seg label:hover{border-color:var(--accent)}
@@ -438,36 +519,37 @@ img{max-width:100%}
 .est__n span{font-size:.9rem;font-weight:600;opacity:.85;letter-spacing:0}
 .est__l{font-family:"IBM Plex Mono",monospace;font-size:.7rem;line-height:1.6;opacity:.78;text-align:right}
 
-.field{display:grid;gap:.35rem;margin-bottom:.85rem}
+.field{display:grid;gap:.4rem;margin-bottom:1.05rem}
 .field--split{margin-bottom:0}
 @media(min-width:470px){
   .fields2{display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem}
 }
 .field > label{
-  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-2);
 }
 .field > label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.8}
 .field input,.field textarea,.field select{
-  font-family:inherit;font-size:.97rem;color:var(--ink);background:var(--paper);
-  border:1.5px solid var(--line);border-radius:8px;padding:.7rem .8rem;width:100%;
+  font-family:inherit;font-size:1.12rem;color:var(--ink);background:var(--paper);
+  border:1.5px solid var(--line);border-radius:9px;padding:.95rem 1.05rem;width:100%;
+  text-overflow:ellipsis;
   transition:border-color .15s ease;
 }
-.field textarea{min-height:5.5rem;resize:vertical;line-height:1.5}
+.field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
 .field input:hover,.field textarea:hover,.field select:hover{border-color:var(--muted)}
 .field.is-bad input,.field.is-bad select,.field.is-bad textarea{border-color:var(--accent)}
-.err{font-size:.82rem;color:var(--accent);font-weight:600;line-height:1.4}
+.err{font-size:.88rem;color:var(--accent);font-weight:600;line-height:1.4}
 .err:empty{display:none}
 
 .intake__foot{
   display:flex;align-items:center;gap:.7rem;
-  padding:.95rem 1.35rem;border-top:1px solid var(--line);background:var(--surface-2);
+  padding:1.1rem 2rem;border-top:1px solid var(--line);background:var(--surface-2);
 }
 .intake__count{
   font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);
   margin-right:auto;font-variant-numeric:tabular-nums;
 }
-.intake .btn{padding:.7rem 1.2rem;font-size:.92rem}
+.intake .btn{padding:.8rem 1.4rem;font-size:1rem}
 .btn[aria-busy="true"]{opacity:.7;pointer-events:none}
 
 .done{text-align:center;padding:.75rem 0 .25rem}
@@ -495,7 +577,7 @@ img{max-width:100%}
 @media(max-width:560px){
   .intake{width:100%;height:100%;max-height:100%;margin:0}
   .intake__panel{border-radius:0;border:none;height:100%}
-  .intake__head,.rail,.intake__body,.intake__foot{padding-inline:1.1rem}
+  .intake__head,.rail,.intake__body,.intake__foot{padding-inline:1.15rem}
   .est__l{text-align:left}
 }
 </style>
@@ -524,7 +606,7 @@ img{max-width:100%}
 
 <header class="nav">
   <div class="wrap nav__in">
-    <a class="brand" href="#top">
+    <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
       <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
         <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -579,9 +661,16 @@ img{max-width:100%}
   <section class="hero">
     <div class="wrap hero__grid">
       <div>
-        <span class="eyebrow">Dedicated virtual assistants &middot; Hired worldwide</span>
+        <span class="eyebrow">Dedicated virtual assistants &middot; Your hours, your time zone</span>
         <h1>Cover <span class="hl">the hours you can&rsquo;t</span>.</h1>
-        <p class="lede">We place trained, full-time virtual assistants in customer service, sales &amp; marketing, and admin roles &mdash; matched to your business in about a week, at a flat hourly rate with nothing to sign.</p>
+        <p class="lede">We place trained, full-time virtual assistants in customer service, sales &amp; marketing, and admin roles &mdash; working <b>your hours, in your time zone</b>, matched to your business in about a week at a flat hourly rate with nothing to sign.</p>
+        <div class="adapt">
+          <span class="adapt__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+          <p class="adapt__t">
+            <span class="adapt__k">Your seat adapts to you</span>
+            Your VA works <b>when you need them</b>, scheduled to your time zone &mdash; a standard business day, an evening block, overnight, or split across morning and night. You set the shift on the call and can move it with a week&rsquo;s notice.
+          </p>
+        </div>
         <div class="hero__actions">
           <a class="btn btn--solid" data-book href="#book">Book a 20-minute call</a>
           <a class="btn btn--ghost" href="#how">See how it works</a>
@@ -594,6 +683,8 @@ img{max-width:100%}
           <span class="cov__title">A weekday, hour by hour</span>
           <span class="eyebrow">Your local time</span>
         </div>
+
+        <p class="cov__lead"><b>Your VA adapts to your time.</b> They work the hours you need covered, in your time zone &mdash; you pick the block, and it is yours to change.</p>
 
         <div class="cov__row">
           <span class="cov__label">In-house</span>
@@ -609,14 +700,14 @@ img{max-width:100%}
 
         <div class="cov__hours"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
 
-        <p class="cov__foot">Your team works <b>9&ndash;5</b>. Your seat takes the evening and early-morning block &mdash; so quotes, tickets and callbacks are handled <b>before you open</b>, not after you are already behind.</p>
+        <p class="cov__foot">This is one shape, not the shape. Your team works <b>9&ndash;5</b>, so here the seat takes the evening and early-morning block and quotes, tickets and callbacks are handled <b>before you open</b>. Need it over your own day instead, or across the weekend? That is the schedule you set.</p>
       </div>
     </div>
   </section>
 
   <section class="stats">
     <div class="wrap stats__in">
-      <div class="stat"><span class="stat__n">$9<small>/hr</small></span><span class="stat__l">Flat rate, billed weekly</span></div>
+      <div class="stat"><span class="stat__n">$7.75<small>/hr</small></span><span class="stat__l">Flat rate, billed weekly</span></div>
       <div class="stat"><span class="stat__n">7 days</span><span class="stat__l">Typical time to placement</span></div>
       <div class="stat"><span class="stat__n">40 hrs</span><span class="stat__l">One dedicated seat, full time</span></div>
       <div class="stat"><span class="stat__n">0</span><span class="stat__l">Long-term contracts</span></div>
@@ -725,7 +816,7 @@ img{max-width:100%}
       <div class="price">
         <div class="price__card">
           <span class="eyebrow">Dedicated seat</span>
-          <div class="price__rate"><span class="price__amt">$9</span><span class="price__per">per hour worked</span></div>
+          <div class="price__rate"><span class="price__amt">$7.75</span><span class="price__per">per hour worked</span></div>
           <p class="price__sub">Full-time (40 hrs/week) or part-time (20 hrs/week). Overtime only when you approve it.</p>
           <ul class="price__inc">
             <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Sourcing, vetting and background checks</li>
@@ -738,16 +829,49 @@ img{max-width:100%}
         </div>
 
         <div>
-          <div class="compare">
-            <div class="compare__row compare__head"><span>Full-time front desk hire</span><span>Monthly</span></div>
-            <div class="compare__row"><span>Wages at $19/hr</span><b>$3,290</b></div>
-            <div class="compare__row"><span>Payroll tax and insurance</span><b>$560</b></div>
-            <div class="compare__row"><span>Benefits and PTO accrual</span><b>$430</b></div>
-            <div class="compare__row"><span>Desk, equipment, software seats</span><b>$180</b></div>
-            <div class="compare__row compare__row--tot"><span>In-house total</span><b>$4,460</b></div>
-            <div class="compare__row compare__row--win"><span>SecureJobVA seat</span><b>$1,560</b></div>
+          <div class="vs">
+            <span class="vs__cap">Cost of one full-time seat &middot; per month</span>
+            <div class="vs__plot">
+              <div class="vs__col">
+                <div class="vs__track">
+                  <div class="vs__bar" style="height:100%">
+                    <i class="vs__seg vs__seg--d" style="height:4.03%" title="Desk, equipment and software: $180"></i>
+                    <i class="vs__seg vs__seg--c" style="height:9.63%" title="Benefits and PTO accrual: $430"></i>
+                    <i class="vs__seg vs__seg--b" style="height:12.55%" title="Payroll tax and insurance: $560"></i>
+                    <i class="vs__seg vs__seg--a" style="height:73.79%" title="Wages at $19/hr: $3,293"></i>
+                  </div>
+                </div>
+                <p class="vs__tot">$4,463</p>
+                <p class="vs__lab"><b>In-house hire</b>$19/hr plus employer costs</p>
+              </div>
+              <div class="vs__col">
+                <div class="vs__track">
+                  <div class="vs__bar" style="height:30.1%">
+                    <i class="vs__seg vs__seg--win" style="height:100%" title="SecureJobVA seat at $7.75/hr flat: $1,343"></i>
+                  </div>
+                </div>
+                <p class="vs__tot">$1,343</p>
+                <p class="vs__lab"><b>SecureJobVA seat</b>$7.75/hr flat, nothing on top</p>
+              </div>
+            </div>
+            <p class="vs__grp">What an in-house hire costs</p>
+            <ul class="vs__rows">
+              <li><i class="vs__sw vs__sw--a" aria-hidden="true"></i><span>Wages at $19/hr</span><b>$3,293</b></li>
+              <li><i class="vs__sw vs__sw--b" aria-hidden="true"></i><span>Payroll tax and insurance</span><b>$560</b></li>
+              <li><i class="vs__sw vs__sw--c" aria-hidden="true"></i><span>Benefits and PTO accrual</span><b>$430</b></li>
+              <li><i class="vs__sw vs__sw--d" aria-hidden="true"></i><span>Desk, equipment, software</span><b>$180</b></li>
+              <li class="vs__row--tot"><i class="vs__sw" aria-hidden="true" style="background:var(--line)"></i><span>Total every month</span><b>$4,463</b></li>
+            </ul>
+
+            <p class="vs__grp vs__grp--win">What a SecureJobVA seat costs</p>
+            <ul class="vs__rows vs__rows--win">
+              <li><i class="vs__sw vs__sw--win" aria-hidden="true"></i><span>173.3 hrs &times; $7.75 flat</span><b>$1,343</b></li>
+              <li class="vs__row--zero"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Payroll tax, benefits, equipment</span><b>$0</b></li>
+              <li class="vs__row--tot"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Total every month</span><b>$1,343</b></li>
+            </ul>
+            <p class="vs__save">You keep <b>$3,120</b> a month &mdash; <b>$37,440</b> a year.</p>
           </div>
-          <p class="small" style="margin-top:.9rem">Illustrative comparison based on a 40-hour week. Your numbers will differ by state and role &mdash; we build the real version with you on the call.</p>
+          <p class="small" style="margin-top:.9rem">A 40-hour week is 173.3 hours a month, so the seat is 173.3 &times; $7.75. The in-house column assumes $19/hr, payroll tax and insurance at 17% of wages, and typical benefit and equipment costs; your figures will differ by state and role &mdash; we build the real version with you on the call.</p>
         </div>
       </div>
     </div>
@@ -779,7 +903,6 @@ img{max-width:100%}
         </div>
       </div>
 
-      <p class="placeholder-note">Client quotes go here once you have permission in writing &mdash; this section is built to take three of them without a redesign.</p>
     </div>
   </section>
 
@@ -835,7 +958,7 @@ img{max-width:100%}
   <div class="wrap">
     <div class="foot__grid">
       <div>
-        <a class="brand foot__brand" href="#top">
+        <a class="brand foot__brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
           <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
             <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -1033,8 +1156,8 @@ img{max-width:100%}
         </div>
 
         <div class="est">
-          <div class="est__n" id="est-week">$360 <span>/ week</span></div>
-          <div class="est__l" id="est-note">40 hrs &times; $9/hr<br>&asymp; $1,560 a month</div>
+          <div class="est__n" id="est-week">$310 <span>/ week</span></div>
+          <div class="est__l" id="est-note">40 hrs &times; $7.75/hr<br>&asymp; $1,343 a month</div>
         </div>
       </section>
 
@@ -1115,7 +1238,7 @@ img{max-width:100%}
     },
     scheduler: "",                 /* Cal.com or Calendly link */
     email: "support@securejobva.com",
-    rate: 9
+    rate: 7.75
   };
 
   var dlg = document.getElementById("intake");
@@ -1165,7 +1288,7 @@ img{max-width:100%}
     var week = h * CFG.rate;
     document.getElementById("est-week").innerHTML = money(week) + " <span>/ week</span>";
     document.getElementById("est-note").innerHTML = h + " hrs &times; $" + CFG.rate + "/hr<br>&asymp; " +
-      money(Math.round(week * 52 / 120) * 10) + " a month";
+      money(Math.round(week * 52 / 12)) + " a month";
   }
 
   function mark(el, msg) {

@@ -350,8 +350,8 @@ img{max-width:100%}
 /* ---------- intake dialog ---------- */
 .intake{
   border:none;padding:0;background:transparent;color:var(--ink);
-  width:min(100% - 1.5rem,46rem);max-width:none;
-  max-height:min(94vh,56rem);
+  width:min(100% - 1.5rem,52rem);max-width:none;
+  max-height:min(94vh,58rem);
 }
 .intake::backdrop{background:rgba(28,14,12,.58);backdrop-filter:blur(3px)}
 .intake__panel{
@@ -362,7 +362,7 @@ img{max-width:100%}
 @keyframes intakeIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 .intake[open] .intake__panel{animation:intakeIn .22s cubic-bezier(.2,.8,.2,1) both}
 
-.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.3rem 1.7rem 1.1rem}
+.intake__head{display:flex;align-items:center;gap:.7rem;padding:1.4rem 2rem 1.15rem}
 .intake__head .brand__mark{width:22px;height:22px}
 .intake__title{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:1.22rem;letter-spacing:-.02em}
 .intake__x{
@@ -375,7 +375,7 @@ img{max-width:100%}
 .intake__x:hover{border-color:var(--accent);color:var(--accent)}
 
 /* three real steps, so the rail is a sequence and not decoration */
-.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;padding:0 1.7rem 1.2rem}
+.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;padding:0 2rem 1.3rem}
 .rail__i{display:grid;gap:.45rem}
 .rail__bar{height:3px;border-radius:2px;background:var(--line);transition:background-color .2s ease}
 .rail__i[data-on] .rail__bar{background:var(--accent)}
@@ -385,9 +385,9 @@ img{max-width:100%}
 }
 .rail__i[data-on] .rail__l{color:var(--ink-2)}
 
-.intake__body{padding:.35rem 1.7rem 1.75rem;overflow-y:auto}
+.intake__body{padding:.5rem 2rem 2rem;overflow-y:auto}
 .step[hidden]{display:none}
-.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.24rem;letter-spacing:-.015em}
+.q{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.32rem;letter-spacing:-.018em}
 .q__sub{font-size:.95rem;color:var(--muted);margin:.35rem 0 1.15rem;line-height:1.5}
 .q--again{margin-top:1.65rem}
 
@@ -438,19 +438,20 @@ img{max-width:100%}
 .est__n span{font-size:.9rem;font-weight:600;opacity:.85;letter-spacing:0}
 .est__l{font-family:"IBM Plex Mono",monospace;font-size:.7rem;line-height:1.6;opacity:.78;text-align:right}
 
-.field{display:grid;gap:.35rem;margin-bottom:.85rem}
+.field{display:grid;gap:.4rem;margin-bottom:1.05rem}
 .field--split{margin-bottom:0}
 @media(min-width:470px){
   .fields2{display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem}
 }
 .field > label{
-  font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-2);
 }
 .field > label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.8}
 .field input,.field textarea,.field select{
-  font-family:inherit;font-size:1.06rem;color:var(--ink);background:var(--paper);
-  border:1.5px solid var(--line);border-radius:8px;padding:.85rem .95rem;width:100%;
+  font-family:inherit;font-size:1.12rem;color:var(--ink);background:var(--paper);
+  border:1.5px solid var(--line);border-radius:9px;padding:.95rem 1.05rem;width:100%;
+  text-overflow:ellipsis;
   transition:border-color .15s ease;
 }
 .field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
@@ -461,7 +462,7 @@ img{max-width:100%}
 
 .intake__foot{
   display:flex;align-items:center;gap:.7rem;
-  padding:1.05rem 1.7rem;border-top:1px solid var(--line);background:var(--surface-2);
+  padding:1.1rem 2rem;border-top:1px solid var(--line);background:var(--surface-2);
 }
 .intake__count{
   font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--muted);
@@ -585,18 +586,33 @@ html{scroll-behavior:smooth}
   background:var(--price-bg);color:var(--price-fg);
   border-bottom:1px solid var(--line);
   font-family:"IBM Plex Mono",ui-monospace,monospace;
-  font-size:.74rem;letter-spacing:.05em;
 }
 .bar__in{
-  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
-  gap:.35rem .95rem;padding:.6rem 0;text-align:center;
+  display:grid;justify-items:center;gap:.6rem;
+  padding:1.05rem 0 1.1rem;text-align:center;
 }
-.bar__item{display:inline-flex;align-items:center;gap:.45rem;white-space:nowrap}
-.bar b{font-weight:500;color:var(--signal);font-variant-numeric:tabular-nums}
-.bar__sep{opacity:.28;display:none}
-@media(min-width:760px){.bar__sep{display:inline}}
+.bar__lead{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  gap:.25rem .6rem;font-size:.95rem;letter-spacing:.02em;line-height:1.35;
+}
+.bar__lead b{font-weight:500;color:var(--signal)}
+.bar__n{
+  font-family:"Bricolage Grotesque",sans-serif;font-weight:800;
+  font-size:1.6rem;letter-spacing:-.035em;line-height:1;
+  color:var(--signal);font-variant-numeric:tabular-nums;
+}
+/* Seats already taken, drawn to scale: 23 of 40. */
+.bar__meter{
+  width:min(100%,30rem);height:7px;border-radius:999px;overflow:hidden;
+  background:color-mix(in srgb,var(--price-fg) 16%,transparent);
+}
+.bar__meter i{display:block;height:100%;background:var(--signal);border-radius:999px}
+.bar__sub{
+  font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;
+  opacity:.74;line-height:1.6;max-width:56ch;
+}
 .bar__dot{
-  width:7px;height:7px;flex:none;border-radius:50%;background:var(--signal);
+  width:9px;height:9px;flex:none;border-radius:50%;background:var(--signal);
   animation:barpulse 2.4s ease-out infinite;
 }
 @keyframes barpulse{
@@ -651,22 +667,27 @@ html{scroll-behavior:smooth}
   </defs>
 </svg>
 
-<!-- Live openings bar. The two counts live here and nowhere else on the page,
-     so this is the only line to edit when the numbers move. -->
+<!-- Live openings bar. The seat counts live here and nowhere else on the page,
+     so this block is the only place to edit when the numbers move. The meter
+     width is the filled share: 23 of 40 taken is 57.5%. -->
 <div class="bar">
   <div class="wrap bar__in">
-    <span class="bar__item"><span class="bar__dot" aria-hidden="true"></span><b>37</b>&nbsp;jobs available now</span>
-    <span class="bar__sep" aria-hidden="true">&middot;</span>
-    <span class="bar__item">Only <b>&nbsp;17&nbsp;</b> seats left in this intake</span>
-    <span class="bar__sep" aria-hidden="true">&middot;</span>
-    <span class="bar__item">Paid training once you pass</span>
+    <p class="bar__lead">
+      <span class="bar__dot" aria-hidden="true"></span>
+      Currently open slots for qualified candidates &mdash; only
+      <span class="bar__n">17</span> <b>of 40 seats left this month</b>
+    </p>
+    <div class="bar__meter" role="img" aria-label="23 of the 40 seats for this month are already taken">
+      <i style="width:57.5%"></i>
+    </div>
+    <p class="bar__sub">Training is paid once you pass the exams and are approved &middot; A strengths test places you where you will excel</p>
   </div>
 </div>
 
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
-      <a class="brand" href="#top">
+      <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
         <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -722,12 +743,12 @@ html{scroll-behavior:smooth}
       <div>
         <span class="eyebrow">Now hiring worldwide &middot; 40 hrs/week &middot; American time</span>
         <h1><span class="hl">Paid training</span>, then a full-time seat.</h1>
-        <p class="lede">Pass the exams and we train you on our payroll, not yours. Then <b>forty hours a week</b> on fixed hours in American time &mdash; customer service, sales and marketing, or admin support. One business, one manager, no gig queue. Apply from any country.</p>
+        <p class="lede">Pass the exams, get approved, and we train you on our payroll rather than yours. Then <b>forty hours a week</b> on fixed hours in American time &mdash; customer service, sales and marketing, or admin support. One business, one manager, no gig queue. Apply from any country.</p>
         <div class="ptrain">
           <span class="ptrain__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 9 12 4 2 9l10 5 10-5Z"></path><path d="M6 11.5V17c0 1.6 3 3 6 3s6-1.4 6-3v-5.5"></path></svg></span>
           <p class="ptrain__t">
-            <span class="ptrain__k">Paid training &middot; top of the offer</span>
-            Clear the exams and the qualification checks and your training is <b>paid</b> &mdash; you earn while you learn, and it starts within one week of being approved.
+            <span class="ptrain__k">Paid training</span>
+            Pass the exams and get approved, and your training is <b>paid</b> &mdash; you earn while you learn, starting within one week. A strengths test places you in the seat you will excel in, not the first one with a vacancy.
           </p>
         </div>
         <div class="hero__actions">
@@ -761,8 +782,8 @@ html{scroll-behavior:smooth}
         <div class="tl__row">
           <span class="tl__d">Day 1&ndash;3</span>
           <span>
-            <span class="tl__t">Exams and assessment</span>
-            <span class="tl__s">A written task in your track, the qualification exams and a values check, in your own time.</span>
+            <span class="tl__t">Exams and strengths test</span>
+            <span class="tl__s">A written task, the qualification exams, and a strengths test that finds where you will excel. In your own time.</span>
           </span>
         </div>
         <div class="tl__row">
@@ -776,7 +797,7 @@ html{scroll-behavior:smooth}
           <span class="tl__d">Day 8+</span>
           <span>
             <span class="tl__t">Approved &mdash; paid training starts</span>
-            <span class="tl__s">Within one week of approval. Tools, scripts and handover, then your first shift on American hours.</span>
+            <span class="tl__s">Paid, and within one week of approval. Tools, scripts and handover, then your first shift on American hours.</span>
           </span>
         </div>
         <p class="tl__foot">You hear from a person at <b>every</b> stage &mdash; including a no. Silence is not how we run this.</p>
@@ -788,7 +809,7 @@ html{scroll-behavior:smooth}
     <div class="wrap stats__in">
       <div class="stat"><span class="stat__n">40 <small>hrs</small></span><span class="stat__l">Every week, fixed</span></div>
       <div class="stat"><span class="stat__n">US <small>time</small></span><span class="stat__l">Your shift is set in it</span></div>
-      <div class="stat"><span class="stat__n">Paid</span><span class="stat__l">Training once you pass</span></div>
+      <div class="stat"><span class="stat__n">Paid</span><span class="stat__l">Training once approved</span></div>
       <div class="stat"><span class="stat__n">$0</span><span class="stat__l">Fees to apply, ever</span></div>
     </div>
   </section>
@@ -798,7 +819,7 @@ html{scroll-behavior:smooth}
       <div class="sec__head">
         <span class="eyebrow">What we staff</span>
         <h2>Three tracks. Pick the one you are already good at.</h2>
-        <p class="lede">These are the seats our clients buy, so these are the seats we hire for. Tools can be taught in a week &mdash; judgment and clear English cannot, so lead with those.</p>
+        <p class="lede">These are the seats our clients buy, so these are the seats we hire for. Tools can be taught in a week &mdash; judgment and clear English cannot, so lead with those. Not sure which one is yours? The strengths test in stage two places you where you will excel.</p>
       </div>
 
       <div class="roles">
@@ -888,7 +909,7 @@ html{scroll-behavior:smooth}
         </div>
       </div>
 
-      <p class="placeholder-note">Pay bands, bonuses, paid leave and payout method are the first thing every applicant scrolls for &mdash; send me your real numbers and terms and I will put them here.</p>
+      <p class="placeholder-note">Pay is set per seat and agreed before you accept. You see the rate, the schedule and the terms in writing at the offer stage, and nothing changes without you signing off on it.</p>
     </div>
   </section>
 
@@ -922,13 +943,13 @@ html{scroll-behavior:smooth}
             <li><span class="spec">8 GB RAM</span> minimum, <span class="spec">60 GB</span> free storage</li>
             <li><span class="spec">Windows 10/11</span> or <span class="spec">macOS 12</span> and newer</li>
             <li><b>Wired broadband</b>, <span class="spec">10 Mbps down / 5 Mbps up</span> or better &mdash; a mobile hotspot cannot be your main connection</li>
-            <li><b>Noise-cancelling headset</b> and an <b>HD webcam</b></li>
+            <li><b>Noise-canceling headset</b> and an <b>HD webcam</b></li>
             <li><b>A backup plan</b> for power and internet, because your shift still starts</li>
           </ul>
         </div>
       </div>
 
-      <p class="placeholder-note">Draft minimums &mdash; confirm the specs you actually enforce before this goes live, since applicants will buy hardware against them.</p>
+      <p class="placeholder-note">Close but not exact? Apply anyway and tell us what you have. We will tell you what needs upgrading before you spend anything on it.</p>
     </div>
   </section>
 
@@ -946,8 +967,8 @@ html{scroll-behavior:smooth}
         </div>
         <div class="step">
           <span class="step__n">02</span>
-          <h3>Exams and assessment</h3>
-          <p>A short written task in your track, the qualification exams and a values questionnaire. Done in your own time, no live pressure.</p>
+          <h3>Exams and strengths test</h3>
+          <p>A short written task in your track, the qualification exams, and a strengths test that shows which seat suits how you actually work. Done in your own time, no live pressure.</p>
         </div>
         <div class="step">
           <span class="step__n">03</span>
@@ -957,7 +978,7 @@ html{scroll-behavior:smooth}
         <div class="step">
           <span class="step__n">04</span>
           <h3>Approved &mdash; paid training starts</h3>
-          <p>Pass, and paid training begins within one week. Contract, tools, scripts and a handover, then your first shift on the American hours your manager sets with you.</p>
+          <p>Pass the exams, clear approval, and paid training begins within one week. Contract, tools, scripts and a handover, then your first shift on the American hours your manager sets with you.</p>
         </div>
       </div>
     </div>
@@ -984,11 +1005,15 @@ html{scroll-behavior:smooth}
         </details>
         <details>
           <summary>Is the training really paid?</summary>
-          <p>Yes, once you pass. The exams and qualification checks come first, and those are unpaid like any interview. Clear them and you are approved &mdash; the training that follows is paid, and it starts within one week of your approval.</p>
+          <p>Yes &mdash; once you pass the exams and are approved. Those two steps come first and they are unpaid, like any interview. Clear them both and the training that follows is paid work, starting within one week of your approval.</p>
+        </details>
+        <details>
+          <summary>What is the strengths test?</summary>
+          <p>A short assessment of how you actually work &mdash; where you are quick, where you are careful, and how you hold up under pressure. We use it to place you in the track and the seat you will excel in, rather than the first one with a vacancy. There is no pass mark on it and no wrong answer.</p>
         </details>
         <details>
           <summary>Do I need virtual assistant experience?</summary>
-          <p>Not formally. Most of our placements come from call centres, retail, admin and support roles. The assessment carries more weight than the CV.</p>
+          <p>Not formally. Most of our placements come from call centers, retail, admin and support roles. The assessment carries more weight than the CV.</p>
         </details>
         <details>
           <summary>Am I employed by you or by the client?</summary>
@@ -996,7 +1021,7 @@ html{scroll-behavior:smooth}
         </details>
         <details>
           <summary>What happens if the client stops?</summary>
-          <p>You go back into the pool with our reference and we prioritise you for the next matching seat. You are not left to restart from an empty profile.</p>
+          <p>You go back into the pool with our reference and we prioritize you for the next matching seat. You are not left to restart from an empty profile.</p>
         </details>
       </div>
     </div>
@@ -1018,7 +1043,7 @@ html{scroll-behavior:smooth}
   <div class="wrap">
     <div class="foot__grid">
       <div>
-        <a class="brand foot__brand" href="#top">
+        <a class="brand foot__brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
           <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
             <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -1111,7 +1136,7 @@ html{scroll-behavior:smooth}
         <p class="err" id="err-track" aria-live="polite"></p>
 
         <h3 class="q q--again">How long have you done this kind of work?</h3>
-        <p class="q__sub">Paid work in any setting &mdash; office, call centre or remote.</p>
+        <p class="q__sub">Paid work in any setting &mdash; office, call center or remote.</p>
         <div class="seg">
           <label><input type="radio" name="exp" value="Under 1 year"><span>Under 1 yr</span></label>
           <label><input type="radio" name="exp" value="1 to 3 years" checked><span>1&ndash;3 yrs</span></label>
@@ -1165,9 +1190,9 @@ html{scroll-behavior:smooth}
             <span><span class="opt__t">Computer</span><span class="opt__d">i3/Ryzen 3+, 8 GB RAM</span></span>
           </label>
           <label class="opt">
-            <input type="checkbox" name="kit" value="Noise-cancelling headset">
+            <input type="checkbox" name="kit" value="Noise-canceling headset">
             <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
-            <span><span class="opt__t">Headset</span><span class="opt__d">Noise-cancelling mic</span></span>
+            <span><span class="opt__t">Headset</span><span class="opt__d">Noise-canceling mic</span></span>
           </label>
           <label class="opt">
             <input type="checkbox" name="kit" value="HD webcam">
