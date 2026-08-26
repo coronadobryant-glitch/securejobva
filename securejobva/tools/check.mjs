@@ -47,6 +47,24 @@ function columns(sql, table) {
     const f = c.match(/^([a-z_][a-z0-9_]*)\s+(text\[\]|timestamptz|integer|uuid|text|boolean|numeric)/i);
     if (f && !/^constraint$/i.test(f[1])) out[f[1]] = f[2].toLowerCase();
   }
+
+  /* A column can also arrive by ALTER, which is how every migration after the
+     first adds one. The note above says a column added in 002 counts the same
+     as one declared in 001, and until now that was only true when the column
+     also appeared in the create table — `tracks` does, which is why nothing
+     caught it. A migration that only alters would have been invisible.
+
+     Cheap to be wrong in the safe direction here: a column this finds that is
+     not really there shows up immediately as a rejected insert, whereas one it
+     misses blocks a form field that is perfectly fine. */
+  const alterRe = new RegExp(
+    "alter\\s+table\\s+(?:only\\s+)?public\\." + table +
+      "\\s+add\\s+column\\s+(?:if\\s+not\\s+exists\\s+)?" +
+      "([a-z_][a-z0-9_]*)\\s+(text\\[\\]|timestamptz|integer|uuid|text|boolean|numeric)",
+    "gi"
+  );
+  let a;
+  while ((a = alterRe.exec(sql)) !== null) out[a[1]] = a[2].toLowerCase();
   return out;
 }
 

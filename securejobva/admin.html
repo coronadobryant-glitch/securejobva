@@ -220,6 +220,13 @@ img{max-width:100%}
 .gbtn:hover{background:#F7F8F8}
 .gbtn svg{flex:none}
 
+.or{display:flex;align-items:center;gap:.8rem;margin:1.25rem 0;color:var(--muted);font-size:.8rem}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.fld{display:grid;gap:.35rem;margin-bottom:.85rem}
+.fld label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
+.fld input{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.fld input:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
+.lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit;font-size:.87rem;text-decoration:underline}
 .who{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;justify-content:space-between;margin-bottom:1.5rem}
 .who__id{display:flex;align-items:center;gap:.6rem;min-width:0}
 .who__av{width:34px;height:34px;border-radius:50%;flex:none;background:var(--accent-soft);display:grid;place-items:center;font-weight:700;color:var(--accent-deep);font-size:.9rem}
@@ -434,6 +441,64 @@ function signIn() {
   var back = location.origin + location.pathname;
   location.href = SB + "/auth/v1/authorize?provider=google&redirect_to=" +
     encodeURIComponent(back);
+}
+
+/* ── Email and password ───────────────────────────────────────────────────
+   Supabase hashes with bcrypt, issues the JWT and sends the reset mail. None
+   of that is reimplemented here and none of it should be: a hand-rolled
+   version of any one of them would be strictly worse than the one that has
+   been attacked in the open for years.
+
+   What is here is three POSTs and the error handling around them. */
+
+function authPost(path, body) {
+  return fetch(SB + "/auth/v1/" + path, {
+    method: "POST",
+    headers: { apikey: ANON, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) {
+        throw new Error(j.error_description || j.msg || j.message || ("Something went wrong (" + r.status + ")"));
+      }
+      return j;
+    });
+  });
+}
+
+function keepSession(j) {
+  if (!j || !j.access_token) throw new Error("That did not return a session.");
+  saveSession({
+    access_token: j.access_token,
+    refresh_token: j.refresh_token || "",
+    expires_at: Date.now() + (j.expires_in || 3600) * 1000
+  });
+  return j;
+}
+
+function signInPassword(email, password) {
+  return authPost("token?grant_type=password", { email: email, password: password }).then(keepSession);
+}
+
+/* Supabase may or may not return a session depending on whether the project
+   requires email confirmation, so the caller is told which happened rather
+   than being left to guess from a missing token. */
+function signUpPassword(email, password) {
+  return authPost("signup", {
+    email: email,
+    password: password,
+    options: { emailRedirectTo: location.origin + location.pathname }
+  }).then(function (j) {
+    if (j && j.access_token) { keepSession(j); return "in"; }
+    return "confirm";
+  });
+}
+
+function resetPassword(email) {
+  return authPost("recover", {
+    email: email,
+    options: { redirectTo: location.origin + location.pathname }
+  });
 }
 
 function signOut() {

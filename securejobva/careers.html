@@ -1206,6 +1206,7 @@ html{scroll-behavior:smooth}
       <div class="rail__i" data-on><div class="rail__bar"></div><div class="rail__l">1 &middot; Track</div></div>
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">2 &middot; Setup</div></div>
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">3 &middot; You</div></div>
+      <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">4 &middot; Social</div></div>
     </div>
 
     <form class="intake__body" id="apply-form" novalidate>
@@ -1344,6 +1345,40 @@ html{scroll-behavior:smooth}
       </section>
 
       <section class="step" data-step="3" hidden>
+        <h3 class="q">Where can we see your work?</h3>
+        <p class="q__sub">Optional, and it helps. Social and admin seats often involve posting, so a profile tells us more about how you write than a CV does.</p>
+
+        <div class="field">
+          <label for="ap-fb">Facebook <em>&mdash; profile or page link</em></label>
+          <input id="ap-fb" name="social_facebook" type="url" inputmode="url" spellcheck="false" placeholder="https://facebook.com/&hellip;">
+        </div>
+        <div class="fields2">
+          <div class="field field--split">
+            <label for="ap-ig">Instagram <em>&mdash; handle</em></label>
+            <input id="ap-ig" name="social_instagram" type="text" spellcheck="false" placeholder="@yourhandle">
+          </div>
+          <div class="field field--split">
+            <label for="ap-tt">TikTok <em>&mdash; handle</em></label>
+            <input id="ap-tt" name="social_tiktok" type="text" spellcheck="false" placeholder="@yourhandle">
+          </div>
+        </div>
+        <div class="field">
+          <label for="ap-li">LinkedIn <em>&mdash; optional</em></label>
+          <input id="ap-li" name="social_linkedin" type="url" inputmode="url" spellcheck="false" placeholder="https://linkedin.com/in/&hellip;">
+        </div>
+
+        <!-- Consent is its own decision, worded plainly, and never pre-ticked.
+             What is stored is the tick, the moment, and the exact sentence
+             below, because consent wording gets edited and "they agreed" is
+             worth little without a record of what they agreed to. -->
+        <label class="opt" style="margin-top:.4rem">
+          <input type="checkbox" id="ap-consent" name="posting_consent">
+          <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
+          <span><span class="opt__t">You may post on my behalf</span><span class="opt__d">If I am placed in a seat that involves posting, SecureJobVA may publish content to the accounts above on my behalf. I can withdraw this at any time by telling my manager.</span></span>
+        </label>
+        <p class="q__sub" style="margin-top:.8rem">Leaving this unticked does not affect your application. It only decides whether we can post for you if you are placed.</p>
+      </section>
+      <section class="step" data-step="4" hidden>
         <div class="done">
           <div class="done__mark">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1456,6 +1491,7 @@ html{scroll-behavior:smooth}
   var at = 0;
   var opener = null;
   var DRAFT = "sjva-apply";
+  var DRAFT_ID = newId();
 
   function picked(name) {
     return Array.prototype.slice.call(form.querySelectorAll("[name=" + name + "]:checked"))
@@ -1524,7 +1560,31 @@ html{scroll-behavior:smooth}
     return true;
   }
 
+  /* The exact sentence beside the consent box. Recorded with the tick, because
+     this wording will be edited one day and every stored consent has to stay
+     answerable to the version its owner actually saw. */
+  var CONSENT_TEXT = "If I am placed in a seat that involves posting, SecureJobVA may " +
+    "publish content to the accounts I listed on my behalf. I can withdraw this at any " +
+    "time by telling my manager.";
+
+  /* PostgREST is asked to return nothing, which means the row id never comes
+     back, and the social handles need one to hang off. So the id is minted here
+     and sent with the application: the same value then keys both inserts. */
+  function newId() {
+    try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0;
+      return (c === "x" ? r : ((r & 0x3) | 0x8)).toString(16);
+    });
+  }
+
+  function checked(id) {
+    var el = document.getElementById(id);
+    return !!(el && el.checked);
+  }
+
   function collect() {
+    var consent = checked("ap-consent");
     return {
       tracks: picked("track"),
       experience: one("exp"),
@@ -1537,8 +1597,37 @@ html{scroll-behavior:smooth}
       phone: val("ap-phone"),
       cv: val("ap-cv"),
       note: val("ap-note"),
-      page: location.href
+      page: location.href,
+      id: DRAFT_ID,
+      posting_consent: consent,
+      posting_consent_at: consent ? new Date().toISOString() : null,
+      posting_consent_text: consent ? CONSENT_TEXT : null
     };
+  }
+
+  /* Handles live in their own table, so they are a second insert rather than
+     more columns on the application. Sent after the application lands, and
+     never instead of it: a failed handle must not cost us the applicant. */
+  function socials() {
+    var map = [
+      ["facebook",  "ap-fb"],
+      ["instagram", "ap-ig"],
+      ["tiktok",    "ap-tt"],
+      ["linkedin",  "ap-li"]
+    ];
+    var out = [];
+    for (var i = 0; i < map.length; i++) {
+      var v = val(map[i][1]);
+      if (!v) continue;
+      var isUrl = v.indexOf("http") === 0;
+      out.push({
+        application_id: DRAFT_ID,
+        platform: map[i][0],
+        handle: isUrl ? null : v,
+        url: isUrl ? v : null
+      });
+    }
+    return out;
   }
 
   function row(k, v) {
@@ -1619,6 +1708,14 @@ html{scroll-behavior:smooth}
      hundred times changes nothing, so it is not transient. It is still parked,
      because a lead we cannot store is exactly the one worth keeping where a
      human can still get at it. */
+  function postSocials() {
+    var rows = socials();
+    if (!rows.length) return;
+    fetch(CFG.endpoint.replace("/applications", "/application_socials"), {
+      method: "POST", headers: hdrs(), body: JSON.stringify(rows)
+    })["catch"](function () {});
+  }
+
   function post(d) {
     return fetch(CFG.endpoint, {
       method: "POST", headers: hdrs(), body: JSON.stringify(d)
@@ -1682,7 +1779,15 @@ html{scroll-behavior:smooth}
     post(d).then(function (v) {
       return v === "retry" ? post(d) : v;
     }).then(function (v) {
-      if (v === "ok") { finish("sent", d); return; }
+      if (v === "ok") {
+        /* Deliberately not awaited and deliberately unable to fail loudly. The
+           application is already saved; a handle that does not attach is worth
+           a gap in the admin view, never a failure screen for someone who has
+           just finished applying. */
+        postSocials();
+        finish("sent", d);
+        return;
+      }
       park(d);
       finish("handoff", d);
       document.getElementById("err-apply").textContent =

@@ -39,6 +39,13 @@ const PAGE_CSS = `
 .gbtn:hover{background:#F7F8F8}
 .gbtn svg{flex:none}
 
+.or{display:flex;align-items:center;gap:.8rem;margin:1.25rem 0;color:var(--muted);font-size:.8rem}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.fld{display:grid;gap:.35rem;margin-bottom:.85rem}
+.fld label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
+.fld input{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.fld input:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
+.lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit;font-size:.87rem;text-decoration:underline}
 .who{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;justify-content:space-between;margin-bottom:1.5rem}
 .who__id{display:flex;align-items:center;gap:.6rem;min-width:0}
 .who__av{width:34px;height:34px;border-radius:50%;flex:none;background:var(--accent-soft);display:grid;place-items:center;font-weight:700;color:var(--accent-deep);font-size:.9rem}
@@ -166,6 +173,64 @@ function signIn() {
   var back = location.origin + location.pathname;
   location.href = SB + "/auth/v1/authorize?provider=google&redirect_to=" +
     encodeURIComponent(back);
+}
+
+/* ── Email and password ───────────────────────────────────────────────────
+   Supabase hashes with bcrypt, issues the JWT and sends the reset mail. None
+   of that is reimplemented here and none of it should be: a hand-rolled
+   version of any one of them would be strictly worse than the one that has
+   been attacked in the open for years.
+
+   What is here is three POSTs and the error handling around them. */
+
+function authPost(path, body) {
+  return fetch(SB + "/auth/v1/" + path, {
+    method: "POST",
+    headers: { apikey: ANON, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) {
+        throw new Error(j.error_description || j.msg || j.message || ("Something went wrong (" + r.status + ")"));
+      }
+      return j;
+    });
+  });
+}
+
+function keepSession(j) {
+  if (!j || !j.access_token) throw new Error("That did not return a session.");
+  saveSession({
+    access_token: j.access_token,
+    refresh_token: j.refresh_token || "",
+    expires_at: Date.now() + (j.expires_in || 3600) * 1000
+  });
+  return j;
+}
+
+function signInPassword(email, password) {
+  return authPost("token?grant_type=password", { email: email, password: password }).then(keepSession);
+}
+
+/* Supabase may or may not return a session depending on whether the project
+   requires email confirmation, so the caller is told which happened rather
+   than being left to guess from a missing token. */
+function signUpPassword(email, password) {
+  return authPost("signup", {
+    email: email,
+    password: password,
+    options: { emailRedirectTo: location.origin + location.pathname }
+  }).then(function (j) {
+    if (j && j.access_token) { keepSession(j); return "in"; }
+    return "confirm";
+  });
+}
+
+function resetPassword(email) {
+  return authPost("recover", {
+    email: email,
+    options: { redirectTo: location.origin + location.pathname }
+  });
 }
 
 function signOut() {
@@ -358,23 +423,108 @@ var lead = document.getElementById("pt-lead");
 
 function view(html) { root.innerHTML = html; }
 
-function signedOut(msg) {
+function signedOut(msg, mode) {
+  /* One card, three states: sign in, create an account, reset. They share the
+     email field and most of the markup, so they are one function rather than
+     three that drift apart. */
+  mode = mode || "in";
+  var isUp    = mode === "up";
+  var isReset = mode === "reset";
+
   view(
     '<div class="card">' +
-      (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
+      (msg ? '<p class="msg msg--bad" id="err">' + esc(msg) + "</p>" : "") +
       '<button class="gbtn" id="go" type="button">' +
         '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">' +
-          '<path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.400 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"></path>' +
+          '<path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"></path>' +
           '<path fill="#4285F4" d="M46.98 24.55c0-1.6-.15-3.15-.42-4.65H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.6 5.9c4.44-4.1 7.22-10.15 7.22-17.45z"></path>' +
           '<path fill="#FBBC05" d="M10.42 28.68A14.4 14.4 0 0 1 9.66 24c0-1.63.28-3.2.76-4.68l-7.8-6.1A24 24 0 0 0 0 24c0 3.87.92 7.52 2.62 10.78l7.8-6.1z"></path>' +
           '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.8l-7.6-5.9c-2.12 1.42-4.84 2.26-8.3 2.26-6.3 0-11.7-3.7-13.6-9.8l-7.8 6.1C6.44 42.6 14.55 48 24 48z"></path>' +
         "</svg>" +
         "Continue with Google" +
       "</button>" +
-      '<p class="msg">We only read your email address, to find the application you already sent. We cannot see your Google account for anything else.</p>' +
+      '<div class="or">or</div>' +
+      '<form id="pw" novalidate>' +
+        '<div class="fld">' +
+          '<label for="em">Email</label>' +
+          '<input id="em" type="email" autocomplete="email" required placeholder="you@example.com">' +
+        "</div>" +
+        (isReset ? "" :
+          '<div class="fld">' +
+            '<label for="pwd">Password</label>' +
+            '<input id="pwd" type="password" autocomplete="' +
+              (isUp ? "new-password" : "current-password") +
+              '" required minlength="8" placeholder="' +
+              (isUp ? "At least 8 characters" : "Your password") + '">' +
+          "</div>") +
+        '<button class="btn btn--solid" id="sub" type="submit" style="width:100%;justify-content:center">' +
+          (isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in") +
+        "</button>" +
+      "</form>" +
+      '<p class="msg" id="alt">' +
+        (isReset
+          ? '<button class="lnk" data-mode="in" type="button">Back to signing in</button>'
+          : isUp
+            ? 'Already applied and have an account? <button class="lnk" data-mode="in" type="button">Sign in</button>'
+            : 'No account yet? <button class="lnk" data-mode="up" type="button">Create one</button>' +
+              ' &middot; <button class="lnk" data-mode="reset" type="button">Forgot password</button>') +
+      "</p>" +
+      '<p class="msg">Use the same address you applied with &mdash; that is how we find your application.</p>' +
     "</div>"
   );
+
   document.getElementById("go").addEventListener("click", signIn);
+
+  root.querySelectorAll("[data-mode]").forEach(function (b) {
+    b.addEventListener("click", function () { signedOut("", b.getAttribute("data-mode")); });
+  });
+
+  function fail(t) {
+    var e = document.getElementById("err");
+    if (!e) {
+      e = document.createElement("p");
+      e.className = "msg msg--bad";
+      e.id = "err";
+      root.querySelector(".card").insertBefore(e, root.querySelector(".card").firstChild);
+    }
+    e.textContent = t;
+  }
+
+  document.getElementById("pw").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var em  = document.getElementById("em").value.trim();
+    var el  = document.getElementById("pwd");
+    var pwd = el ? el.value : "";
+    var sub = document.getElementById("sub");
+
+    if (!em || em.indexOf("@") < 1) { fail("Enter the email address you applied with."); return; }
+    if (!isReset && pwd.length < 8) { fail("Passwords are at least 8 characters."); return; }
+
+    sub.disabled = true;
+    sub.textContent = isReset ? "Sending…" : isUp ? "Creating…" : "Signing in…";
+
+    var job = isReset ? resetPassword(em)
+            : isUp    ? signUpPassword(em, pwd)
+                      : signInPassword(em, pwd);
+
+    job.then(function (r) {
+      if (isReset) {
+        view('<div class="card"><div class="note"><b>Check your email.</b> ' +
+             "If an account exists for " + esc(em) + ", a reset link is on its way.</div></div>");
+        return;
+      }
+      if (r === "confirm") {
+        view('<div class="card"><div class="note"><b>Confirm your address.</b> ' +
+             "We sent a link to " + esc(em) + ". Open it and you are in.</div></div>");
+        return;
+      }
+      start();
+    }).catch(function (e) {
+      sub.disabled = false;
+      sub.textContent = isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in";
+      fail(e.message || "That did not work.");
+    });
+  });
 }
 
 function stages(app) {
