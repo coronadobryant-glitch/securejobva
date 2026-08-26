@@ -395,6 +395,16 @@ img{max-width:100%}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
+.docs{margin-top:.6rem;padding-top:.55rem;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.docs__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:.2rem}
+.doclink{
+  font-family:inherit;font-size:.82rem;cursor:pointer;
+  padding:.3rem .6rem;border-radius:6px;
+  border:1px solid var(--line);background:var(--surface);color:var(--accent);
+}
+.doclink:hover{border-color:var(--accent)}
+.doclink[disabled]{opacity:.6;cursor:default}
+.doclink__s{color:var(--muted)}
 .soc{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);font-size:.85rem;display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:baseline}
 .soc__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .soc a{color:var(--accent)}
@@ -663,6 +673,70 @@ function api(path, opts) {
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
     return r.status === 204 ? null : r.json();
   });
+}
+
+/* Storage lives beside PostgREST on the same project. */
+function storageBase() {
+  return SB + "/storage/v1";
+}
+
+/* Returns a URL good for one minute. Opened immediately, never stored. */
+function signDoc(path) {
+  var sess = session();
+  if (!sess) return Promise.reject(new Error("signed out"));
+  return fetch(storageBase() + "/object/sign/" + path, {
+    method: "POST",
+    headers: {
+      apikey: ANON,
+      Authorization: "Bearer " + sess.access_token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ expiresIn: 60 })
+  }).then(function (r) {
+    if (!r.ok) throw new Error("could not open that file");
+    return r.json();
+  }).then(function (j) {
+    if (!j || !j.signedURL) throw new Error("no link came back");
+    return SB + j.signedURL;
+  });
+}
+
+function openDoc(btn) {
+  var path = btn.getAttribute("data-doc");
+  var was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Opening…";
+  signDoc(path).then(function (url) {
+    window.open(url, "_blank", "noopener");
+  }).catch(function (e) {
+    btn.textContent = e.message === "signed out" ? "Signed out" : "Could not open";
+    setTimeout(function () { btn.textContent = was; btn.disabled = false; }, 2200);
+    return;
+  }).then(function () {
+    if (btn.disabled) { btn.textContent = was; btn.disabled = false; }
+  });
+}
+
+function kb(n) {
+  if (!n) return "";
+  return n < 1048576
+    ? Math.max(1, Math.round(n / 1024)) + " KB"
+    : (n / 1048576).toFixed(1) + " MB";
+}
+
+function docList(docs) {
+  if (!docs || !docs.length) return "";
+  return (
+    '<div class="docs">' +
+      '<span class="docs__k">Documents</span>' +
+      docs.map(function (d) {
+        return '<button class="doclink" type="button" data-doc="' + esc(d.path) + '">' +
+          esc(d.filename || "document") +
+          (d.bytes ? ' <span class="doclink__s">' + esc(kb(d.bytes)) + "</span>" : "") +
+          "</button>";
+      }).join("") +
+    "</div>"
+  );
 }
 
 function esc(s) {

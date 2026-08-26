@@ -196,6 +196,16 @@ const PAGE_CSS = `
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
+.docs{margin-top:.6rem;padding-top:.55rem;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.docs__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:.2rem}
+.doclink{
+  font-family:inherit;font-size:.82rem;cursor:pointer;
+  padding:.3rem .6rem;border-radius:6px;
+  border:1px solid var(--line);background:var(--surface);color:var(--accent);
+}
+.doclink:hover{border-color:var(--accent)}
+.doclink[disabled]{opacity:.6;cursor:default}
+.doclink__s{color:var(--muted)}
 .soc{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);font-size:.85rem;display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:baseline}
 .soc__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .soc a{color:var(--accent)}
@@ -380,6 +390,70 @@ function api(path, opts) {
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
     return r.status === 204 ? null : r.json();
   });
+}
+
+/* Storage lives beside PostgREST on the same project. */
+function storageBase() {
+  return SB + "/storage/v1";
+}
+
+/* Returns a URL good for one minute. Opened immediately, never stored. */
+function signDoc(path) {
+  var sess = session();
+  if (!sess) return Promise.reject(new Error("signed out"));
+  return fetch(storageBase() + "/object/sign/" + path, {
+    method: "POST",
+    headers: {
+      apikey: ANON,
+      Authorization: "Bearer " + sess.access_token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ expiresIn: 60 })
+  }).then(function (r) {
+    if (!r.ok) throw new Error("could not open that file");
+    return r.json();
+  }).then(function (j) {
+    if (!j || !j.signedURL) throw new Error("no link came back");
+    return SB + j.signedURL;
+  });
+}
+
+function openDoc(btn) {
+  var path = btn.getAttribute("data-doc");
+  var was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Opening\u2026";
+  signDoc(path).then(function (url) {
+    window.open(url, "_blank", "noopener");
+  }).catch(function (e) {
+    btn.textContent = e.message === "signed out" ? "Signed out" : "Could not open";
+    setTimeout(function () { btn.textContent = was; btn.disabled = false; }, 2200);
+    return;
+  }).then(function () {
+    if (btn.disabled) { btn.textContent = was; btn.disabled = false; }
+  });
+}
+
+function kb(n) {
+  if (!n) return "";
+  return n < 1048576
+    ? Math.max(1, Math.round(n / 1024)) + " KB"
+    : (n / 1048576).toFixed(1) + " MB";
+}
+
+function docList(docs) {
+  if (!docs || !docs.length) return "";
+  return (
+    '<div class="docs">' +
+      '<span class="docs__k">Documents</span>' +
+      docs.map(function (d) {
+        return '<button class="doclink" type="button" data-doc="' + esc(d.path) + '">' +
+          esc(d.filename || "document") +
+          (d.bytes ? ' <span class="doclink__s">' + esc(kb(d.bytes)) + "</span>" : "") +
+          "</button>";
+      }).join("") +
+    "</div>"
+  );
 }
 
 function esc(s) {
@@ -827,6 +901,7 @@ function render(user, apps) {
           "<li><b>Based in</b><span>" + esc(a.country || "&mdash;") + "</span></li>" +
           "<li><b>Last updated</b><span>" + esc(when(a.status_changed_at) || when(a.created_at)) + "</span></li>" +
         "</ul>" +
+        docList(a.docs) +
       "</div>";
   }
 
@@ -838,6 +913,10 @@ function render(user, apps) {
           "Tell us in a reply if either needs changing.</p>";
   view(html);
   document.getElementById("out").addEventListener("click", signOut);
+  root.addEventListener("click", function (e) {
+    var d = e.target.closest("[data-doc]");
+    if (d) openDoc(d);
+  });
   wireEdit(apps[0]);
 }
 
@@ -966,8 +1045,20 @@ function loadApplications() {
   var claims = readToken(session().access_token);
   var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
-  api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc")
-    .then(function (rows) { render(user, rows || []); })
+  Promise.all([
+    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
+    api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
+      .catch(function () { return []; })
+  ])
+    .then(function (r) {
+      var rows = r[0] || [];
+      var byId = {};
+      (r[1] || []).forEach(function (d) {
+        (byId[d.application_id] = byId[d.application_id] || []).push(d);
+      });
+      rows.forEach(function (a) { a.docs = byId[a.id] || []; });
+      render(user, rows);
+    })
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
       view('<div class="card"><p class="msg msg--bad">We could not load your application just now. ' +
@@ -1216,6 +1307,7 @@ function rowHtml(a) {
         (a.region ? " &middot; " + esc(a.region) : "") +
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
+      docList(a.docs) +
       contactLine(a) +
       scoreLine(a) +
       social +
@@ -1878,16 +1970,21 @@ function flash(el, text) {
   setTimeout(function () { el.classList.remove("is-on"); }, 1600);
 }
 
-function render(email, apps, notes, socials) {
+function render(email, apps, notes, socials, docs) {
   var byId = {};
   (notes || []).forEach(function (n) { byId[n.application_id] = n.note; });
   var socById = {};
   (socials || []).forEach(function (s) {
     (socById[s.application_id] = socById[s.application_id] || []).push(s);
   });
+  var docById = {};
+  (docs || []).forEach(function (d) {
+    (docById[d.application_id] = docById[d.application_id] || []).push(d);
+  });
   ALL = apps.map(function (a) {
     a.note_text = byId[a.id] || "";
     a.socials = socById[a.id] || [];
+    a.docs = docById[a.id] || [];
     a.pipeline = a.pipeline || "new";
     return a;
   });
@@ -1952,6 +2049,8 @@ function render(email, apps, notes, socials) {
   document.getElementById("csv").addEventListener("click", exportCsv);
   document.getElementById("flevel").addEventListener("change", paint);
   document.getElementById("rows").addEventListener("click", function (e) {
+    var doc = e.target.closest("[data-doc]");
+    if (doc) { openDoc(doc); return; }
     var c = e.target.closest("[data-contacted]");
     if (c) {
       /* Flag it and save in one gesture: the button is a shortcut for "set
@@ -1998,10 +2097,12 @@ function start() {
           : Promise.resolve([]),
         can("social.view")
           ? api("application_socials?select=application_id,platform,handle,url")
-          : Promise.resolve([])
+          : Promise.resolve([]),
+        api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
+          .catch(function () { return []; })
       ];
       return Promise.all(jobs).then(function (r) {
-        render(claims.email, r[0] || [], r[1] || [], r[2] || []);
+        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || []);
       });
     })
     .catch(function (e) {

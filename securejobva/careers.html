@@ -457,6 +457,17 @@ img{max-width:100%}
 .skill{margin-bottom:1.05rem}
 .skill__t{display:block;font-weight:600;font-size:.95rem}
 .skill__d{display:block;font-size:.82rem;color:var(--muted);margin:.1rem 0 .5rem}
+.field input[type=file]{
+  font-family:inherit;font-size:.92rem;padding:.6rem;
+  border:1px dashed var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink-2);width:100%;
+}
+.field input[type=file]::file-selector-button{
+  font-family:inherit;font-size:.86rem;font-weight:600;cursor:pointer;
+  margin-right:.7rem;padding:.4rem .7rem;border-radius:6px;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);
+}
+.fileinfo{margin:.3rem 0 0;font-size:.8rem;color:var(--muted)}
+.fileinfo.is-bad{color:#B3261E}
 .seg label{
   position:relative;cursor:pointer;
   font-family:"IBM Plex Mono",monospace;font-size:.9rem;font-variant-numeric:tabular-nums;
@@ -1378,7 +1389,13 @@ html{scroll-behavior:smooth}
           </div>
         </div>
         <div class="field">
-          <label for="ap-cv">Link to your CV <em>&mdash; Drive, Dropbox or LinkedIn</em></label>
+          <label for="ap-file">Your CV <em>&mdash; PDF, Word or a photo</em></label>
+          <input id="ap-file" type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg">
+          <p class="fileinfo" id="ap-file-info">Up to 10 MB. A photo of a printed CV is fine.</p>
+          <p class="err" data-for="ap-file" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="ap-cv">Or a link to it <em>&mdash; Drive, Dropbox or LinkedIn</em></label>
           <input id="ap-cv" name="cv" type="url" inputmode="url" spellcheck="false" placeholder="https://">
           <p class="err" aria-live="polite"></p>
         </div>
@@ -1819,6 +1836,74 @@ html{scroll-behavior:smooth}
      hundred times changes nothing, so it is not transient. It is still parked,
      because a lead we cannot store is exactly the one worth keeping where a
      human can still get at it. */
+  /* Mirrors the bucket in sql/013. Checked here so somebody picking a 40MB
+     scan is told immediately rather than after filling in the rest of the form
+     and watching the upload fail silently. */
+  var MAX_BYTES = 10 * 1024 * 1024;
+  var OK_TYPES = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/png",
+    "image/jpeg"
+  ];
+
+  function pickedFile() {
+    var el = document.getElementById("ap-file");
+    return el && el.files && el.files[0] ? el.files[0] : null;
+  }
+
+  function fileProblem(f) {
+    if (!f) return "";
+    if (f.size > MAX_BYTES) return "That file is over 10 MB. Send a link instead, or a smaller scan.";
+    if (OK_TYPES.indexOf(f.type) < 0) return "PDF, Word or an image, please.";
+    return "";
+  }
+
+  /* The stored name is deliberately not the one they chose. A filename is
+     attacker-controlled text that ends up in a URL and in a Content-Disposition
+     header, so it is reduced to something safe and the original is kept in a
+     column where it is only ever printed as text. */
+  function safeName(name) {
+    var dot = name.lastIndexOf(".");
+    var ext = dot > -1 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+    return "cv-" + Date.now() + (ext ? "." + ext.slice(0, 8) : "");
+  }
+
+  function uploadFile() {
+    var f = pickedFile();
+    if (!f || fileProblem(f)) return Promise.resolve(null);
+
+    var path = DRAFT_ID + "/" + safeName(f.name);
+    var base = CFG.endpoint.replace("/rest/v1/applications", "/storage/v1/object");
+
+    return fetch(base + "/applicant-docs/" + path, {
+      method: "POST",
+      headers: {
+        apikey: CFG.headers.apikey,
+        Authorization: CFG.headers.Authorization,
+        "Content-Type": f.type,
+        "x-upsert": "false"
+      },
+      body: f
+    }).then(function (r) {
+      if (!r.ok) return null;
+      /* Recorded in a table so the admin page can show the original filename
+         without listing a bucket. */
+      return fetch(CFG.endpoint.replace("/applications", "/application_documents"), {
+        method: "POST",
+        headers: hdrs(),
+        body: JSON.stringify({
+          application_id: DRAFT_ID,
+          path: "applicant-docs/" + path,
+          filename: f.name.slice(0, 260),
+          content_type: f.type,
+          bytes: f.size
+        })
+      })["catch"](function () { return null; });
+    })["catch"](function () { return null; });
+  }
+
   function postSocials() {
     var rows = socials();
     if (!rows.length) return;
@@ -1896,6 +1981,7 @@ html{scroll-behavior:smooth}
            a gap in the admin view, never a failure screen for someone who has
            just finished applying. */
         postSocials();
+        uploadFile();
         finish("sent", d);
         return;
       }
@@ -1993,6 +2079,19 @@ html{scroll-behavior:smooth}
   form.addEventListener("change", function () {
     paint();
     save();
+  });
+
+  form.addEventListener("change", function (e) {
+    if (e.target.id !== "ap-file") return;
+    var info = document.getElementById("ap-file-info");
+    var f = pickedFile();
+    var bad = fileProblem(f);
+    info.className = "fileinfo" + (bad ? " is-bad" : "");
+    info.textContent = bad
+      ? bad
+      : f
+        ? f.name + " — " + Math.max(1, Math.round(f.size / 1024)) + " KB, ready to send"
+        : "Up to 10 MB. A photo of a printed CV is fine.";
   });
 
   form.addEventListener("input", function (e) {
