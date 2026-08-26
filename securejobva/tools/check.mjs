@@ -104,6 +104,34 @@ for (const p of SHIPPED.map((file) => ({ file }))) {
   });
 }
 
+/* An unbalanced <style> is invisible to every check above. The JS still parses,
+   the markup still renders, and the page simply prints the rest of its own
+   stylesheet as text across the top with everything below it unstyled.
+
+   It shipped exactly that way: build-portal.mjs spliced blocks out of
+   careers.html by hardcoded line number, careers.html grew, and one slice
+   drifted into the stylesheet and carried a closing tag with it. */
+for (const p of SHIPPED.map((file) => ({ file }))) {
+  await check(p.file + ": style and script tags balance", () => {
+    const html = read(p.file);
+    const pairs = [["<style", "</style>"], ["<script", "</script>"]];
+    for (const [open, close] of pairs) {
+      const o = (html.match(new RegExp(open + "\\b", "gi")) || []).length;
+      const c = (html.match(new RegExp(close, "gi")) || []).length;
+      if (o !== c) {
+        throw new Error(o + " " + open + "> against " + c + " " + close +
+          " — the extra tag closes the block early and prints the rest as text");
+      }
+    }
+    /* A CSS rule sitting outside any style block is the shape of that failure
+       even when the counts happen to balance. */
+    const body = html.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<script[\s\S]*?<\/script>/gi, "");
+    const stray = body.match(/^\s*[.#@][a-zA-Z][\w-]*[^\n]*\{/m);
+    if (stray) throw new Error("a CSS rule is loose in the document: " + stray[0].trim().slice(0, 60));
+    return "balanced";
+  });
+}
+
 /* The schema lives in sql/ as numbered files that get pasted into the Supabase
    editor one at a time. For checking purposes they are one document — a column
    added in 002 is just as real as one declared in 001. verify.sql is excluded:
@@ -148,6 +176,46 @@ for (const p of PAGES) {
     return ints.length ? ints.join(", ") + " guarded" : "no integer columns";
   });
 }
+
+/* The mirror of the form check, for the pages that read rather than write.
+
+   Grants on applications are column-level, and PostgREST refuses the whole
+   statement over a single ungranted column rather than returning the rest.
+   That is the safe direction to fail in, but it means one missing column looks
+   identical to a broken database: /status showed "We could not load your
+   application just now" and /admin showed 42501, both because posting_consent
+   was granted for UPDATE in 006 and never for SELECT. */
+await check("portal reads only columns it is granted", () => {
+  const granted = new Set();
+  for (const stmt of sql.split(";")) {
+    const m = stmt.match(/grant\s+select\s*\(([^)]*)\)\s*on\s+public\.applications\s+to\s+authenticated/i);
+    if (m) {
+      for (const c of m[1].split(",")) {
+        const t = c.trim().replace(/--.*/, "").trim();
+        if (t) granted.add(t);
+      }
+    }
+  }
+  if (!granted.size) throw new Error("no column-level SELECT grant on applications found");
+
+  const asked = new Set();
+  for (const f of ["status.html", "admin.html"]) {
+    if (!existsSync(f)) continue;
+    for (const q of read(f).match(/applications\?select=([^"'`&]+)/g) || []) {
+      for (const c of q.replace(/^applications\?select=/, "").split(",")) {
+        const t = c.trim();
+        if (t && t !== "*") asked.add(t);
+      }
+    }
+  }
+  const missing = [...asked].filter((c) => !granted.has(c));
+  if (missing.length) {
+    throw new Error("selected but not granted: " + missing.join(", ") +
+      " — PostgREST refuses the whole query with 42501, so the page shows nothing at all. " +
+      "Add them to a grant select (...) on public.applications to authenticated.");
+  }
+  return asked.size + " columns read, all granted";
+});
 
 /* The queue is the last thing standing between a failed POST and a lost lead,
    so its behaviour is driven, not just parsed. tools/test-queue.mjs pulls the

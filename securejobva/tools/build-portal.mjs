@@ -8,15 +8,39 @@ const L = src.split(/\r?\n/);
 const nl = "\r\n";
 const slice = (a, b) => L.slice(a - 1, b).join(nl);
 
+/* Line numbers into a file two people edit all day are a countdown.
+   THEME_SCRIPT was slice(683, 694); careers.html grew, 683 became the tail of
+   the stylesheet, and the portal shipped `.copied{...}</style>` as visible text
+   at the top of both pages with everything below it unstyled. Nothing failed —
+   the build was perfectly happy.
+
+   So the blocks that are whole elements are found by what they contain. */
+function block(startRe, endRe, what) {
+  const from = L.findIndex((l) => startRe.test(l));
+  if (from < 0) throw new Error("build-portal: could not find the start of " + what + " in " + SRC);
+  const to = L.findIndex((l, i) => i > from && endRe.test(l));
+  if (to < 0) throw new Error("build-portal: could not find the end of " + what + " in " + SRC);
+  return L.slice(from, to + 1).join(nl);
+}
+
+/* A slice that has drifted into the stylesheet takes a tag with it, and that
+   is the failure that shipped. Nothing spliced in may carry either tag. */
+function clean(text, what) {
+  if (/<\/?style\b/i.test(text)) {
+    throw new Error("build-portal: " + what + " contains a <style> tag — the slice has drifted");
+  }
+  return text;
+}
+
 /* Lifted verbatim rather than retyped: tokens, base, buttons, nav, the section
    helper, the footer, and the two things that must run before paint. */
-const TOKENS_TO_NAV = slice(7, 185);
-const SECTIONS      = slice(239, 244);
-const FOOTER_CSS    = slice(349, 359);
-const FONTS         = slice(2, 4);
-const THEME_SCRIPT  = slice(683, 694);
-const SVG_DEFS      = slice(695, 703);
-const BRAND_SVG     = slice(726, 733);
+const TOKENS_TO_NAV = clean(slice(7, 185),   "TOKENS_TO_NAV");
+const SECTIONS      = clean(slice(239, 244), "SECTIONS");
+const FOOTER_CSS    = clean(slice(349, 359), "FOOTER_CSS");
+const FONTS         = clean(slice(2, 4),     "FONTS");
+const THEME_SCRIPT  = clean(block(/<script>/, /<\/script>/, "the theme script"), "THEME_SCRIPT");
+const SVG_DEFS      = clean(block(/Gradient for the brand mark/, /<\/svg>/, "the gradient defs"), "SVG_DEFS");
+const BRAND_SVG     = clean(block(/<svg class="brand__mark"/, /<\/svg>/, "the brand mark"), "BRAND_SVG");
 
 const PAGE_CSS = `
 /* ---------- portal ---------- */

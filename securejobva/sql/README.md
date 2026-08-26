@@ -21,9 +21,10 @@ run it. That is always safer than guessing.
 | `005-ats.sql` | Internal pipeline, contact history, skill levels, and the queue view |
 | `006-applicant-edit.sql` | Lets an applicant correct their own answers, and keeps consent history |
 | `007-manage-roles.sql` | Grant and revoke roles from the admin page |
+| `008-consent-select.sql` | Lets an applicant read back the consent they gave |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 007 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 008 in order, then `verify.sql` to confirm.
 
 ## Adding one
 
