@@ -152,6 +152,19 @@ for (const p of PAGES) {
 /* The queue is the last thing standing between a failed POST and a lost lead,
    so its behaviour is driven, not just parsed. tools/test-queue.mjs pulls the
    real block out of index.html and runs it against a mocked store. */
+/* Chart geometry fails silently: a bar of width NaN simply does not paint, and
+   nobody notices until a number is wrong in a meeting. tools/test-charts.mjs
+   pulls countBy() and bars() out of the built page and drives them. */
+await check("admin charts compute", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-charts.mjs"], { stdio: "pipe" });
+    return "16 checks";
+  } catch (e) {
+    throw new Error("tools/test-charts.mjs failed — run it directly for the detail");
+  }
+});
+
 await check("lead queue behaves", async () => {
   const { execFileSync } = await import("node:child_process");
   try {
