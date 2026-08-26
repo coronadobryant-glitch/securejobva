@@ -313,7 +313,15 @@ img{max-width:100%}
 
 /* pricing */
 .price{display:grid;gap:1.5rem}
-@media(min-width:900px){.price{grid-template-columns:1.15fr .85fr;align-items:start}}
+@media(min-width:900px){
+  /* Deliberately no align-items:start. The cost chart in the right column runs
+     far taller than the card on the left, so top-aligning left a tall empty
+     column beside it. Letting the card stretch and pushing its list to the
+     bottom spreads the content down the full height instead of leaving a hole. */
+  .price{grid-template-columns:1.15fr .85fr}
+  .price__card{display:flex;flex-direction:column}
+  .price__inc{margin-top:auto;padding-top:1.75rem}
+}
 .price__card{
   background:var(--price-bg);color:var(--price-fg);border-radius:10px;
   padding:clamp(1.75rem,3vw,2.5rem);
