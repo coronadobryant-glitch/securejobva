@@ -1642,7 +1642,85 @@ function drawInbox(box, rows) {
   });
 }
 
-function paint() {
+/* ── CSV ──────────────────────────────────────────────────────────────────
+   Exports what is on screen, not the whole table. Someone who has filtered to
+   "advanced English, waiting 7+ days" wants those rows; handing them everything
+   and letting them re-filter in a spreadsheet is how the wrong list gets
+   emailed to somebody.
+
+   Two things about the escaping below are not decoration.
+
+   A field is wrapped in quotes and its own quotes doubled, which is the actual
+   CSV rule -- a name like O"Brien or any note containing a comma or a newline
+   destroys the column alignment otherwise, and these are free-text fields
+   filled in by strangers.
+
+   A leading =, +, - or @ is prefixed with a single quote. Excel and Sheets
+   treat those as the start of a formula, so an applicant who types
+   =HYPERLINK(...) into their note has written code that runs when a staff
+   member opens the export. It is a real attack with a dull name; the leading
+   apostrophe is the standard defence and is invisible in the cell. */
+function csvCell(v) {
+  if (v === null || v === undefined) return "";
+  if (Array.isArray(v)) v = v.join("; ");
+  var t = String(v);
+  if (/^[=+\\-@\\t\\r]/.test(t)) t = "'" + t;
+  return '"' + t.replace(/"/g, '""') + '"';
+}
+
+var CSV_COLUMNS = [
+  ["Name", "name"],
+  ["Email", "email"],
+  ["Country", "country"],
+  ["Region", "region"],
+  ["Tracks", "tracks"],
+  ["Applied", function (a) { return when(a.created_at); }],
+  ["Applicant stage", function (a) { return LABEL[a.status] || a.status; }],
+  ["Pipeline", function (a) { return PIPE_LABEL[a.pipeline] || a.pipeline; }],
+  ["Last contacted", function (a) { return when(a.last_contacted_at); }],
+  ["Contacted by", "contacted_by"],
+  ["Replied", function (a) { return a.response_received ? "yes" : "no"; }],
+  ["Days waiting", function (a) { var d = days(a.waiting_since); return d === null ? "" : d; }],
+  ["Ghosted", function (a) { return a.is_ghosted ? "yes" : "no"; }],
+  ["English (self)", "skill_english"],
+  ["Customer (self)", "skill_customer"],
+  ["Data entry (self)", "skill_data_entry"],
+  ["Social (self)", "skill_social"],
+  ["Bookkeeping (self)", "skill_bookkeeping"],
+  ["English (score)", "score_english"],
+  ["Customer (score)", "score_customer"],
+  ["Data entry (score)", "score_data_entry"],
+  ["Social (score)", "score_social"],
+  ["Bookkeeping (score)", "score_bookkeeping"],
+  ["Average score", "score_avg"],
+  ["Scored by", "scored_by"]
+];
+
+function exportCsv() {
+  var rows = shownRows();
+  if (!rows.length) return;
+
+  var out = [CSV_COLUMNS.map(function (c) { return csvCell(c[0]); }).join(",")];
+  rows.forEach(function (a) {
+    out.push(CSV_COLUMNS.map(function (c) {
+      return csvCell(typeof c[1] === "function" ? c[1](a) : a[c[1]]);
+    }).join(","));
+  });
+
+  /* A byte order mark, so Excel reads it as UTF-8. Without one, every name
+     it -- which is most of them -- arrives mangled. */
+  var blob = new Blob(["\\ufeff" + out.join("\\r\\n")], { type: "text/csv;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "applications-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+}
+
+function shownRows() {
   var q  = (document.getElementById("q").value || "").toLowerCase().trim();
   var st = document.getElementById("filter").value;
   var sk = document.getElementById("fskill").value;
@@ -1673,6 +1751,11 @@ function paint() {
     return [a.name, a.email, a.country, a.region, (a.tracks || []).join(" ")]
       .join(" ").toLowerCase().indexOf(q) > -1;
   });
+  return shown;
+}
+
+function paint() {
+  var shown = shownRows();
   document.getElementById("count").textContent =
     shown.length + " of " + ALL.length;
   document.getElementById("rows").innerHTML =
@@ -1838,6 +1921,7 @@ function render(email, apps, notes, socials) {
         }).join("") +
       "</select>" +
       '<span class="adm__count" id="count"></span>' +
+      '<button class="btn btn--ghost" id="csv" type="button" style="padding:.5rem .8rem;font-size:.85rem">Export CSV</button>' +
     "</div>" +
     '<div class="tabs" id="tabs">' +
       '<button class="tab is-on" data-tab="apps" type="button">Applications</button>' +
@@ -1865,6 +1949,7 @@ function render(email, apps, notes, socials) {
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
   document.getElementById("fskill").addEventListener("change", paint);
+  document.getElementById("csv").addEventListener("click", exportCsv);
   document.getElementById("flevel").addEventListener("change", paint);
   document.getElementById("rows").addEventListener("click", function (e) {
     var c = e.target.closest("[data-contacted]");
