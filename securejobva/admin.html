@@ -306,6 +306,12 @@ img{max-width:100%}
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+.soc{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);font-size:.85rem;display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:baseline}
+.soc__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.soc a{color:var(--accent)}
+.soc__none{color:var(--muted)}
+.soc__ok{color:var(--accent-deep);font-weight:600}
+.soc__no{color:var(--muted)}
 .pill--applied{background:var(--surface-2);color:var(--ink-2)}
 .pill--assessment{background:var(--accent-soft);color:var(--accent-deep)}
 .pill--interview{background:var(--accent);color:var(--accent-ink)}
@@ -598,6 +604,10 @@ function when(iso) {
 var root = document.getElementById("pt-root");
 var lead = document.getElementById("pt-lead");
 var ALL  = [];
+var PERMS = [];
+
+/* Convenience only. Postgres decides; this decides what to draw. */
+function can(p) { return PERMS.indexOf(p) > -1; }
 
 function view(html) { root.innerHTML = html; }
 
@@ -638,8 +648,58 @@ function options(cur) {
   return out;
 }
 
+/* A handle is shown as a link only when it is one. Anything typed into those
+   boxes is a stranger's text, so a link is built from an http(s) URL and
+   nothing else -- a "handle" of javascript:... stays inert text. */
+function socialLink(s) {
+  var name = s.platform.charAt(0).toUpperCase() + s.platform.slice(1);
+  var href = String(s.url || "");
+  var safe = /^https?:///i.test(href);
+  var shown = s.handle || href || "";
+  if (safe) {
+    return '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer nofollow">' +
+           esc(name) + "</a>";
+  }
+  return "<span>" + esc(name) + (shown ? " " + esc(shown) : "") + "</span>";
+}
+
 function rowHtml(a) {
   var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "&mdash;";
+
+  var social = "";
+  if (can("social.view")) {
+    var list = a.socials || [];
+    social =
+      '<div class="soc">' +
+        '<span class="soc__k">Social</span>' +
+        (list.length
+          ? list.map(socialLink).join(" &middot; ")
+          : '<span class="soc__none">none given</span>') +
+        (a.posting_consent
+          ? '<span class="soc__ok" title="Consented ' + esc(when(a.posting_consent_at)) + '">' +
+            "&#10003; may post</span>"
+          : '<span class="soc__no">no consent to post</span>') +
+      "</div>";
+  }
+
+  /* Controls appear only for what this account may actually do. The policies
+     refuse the rest regardless; this just avoids offering a button that would
+     fail. */
+  var ctl = "";
+  if (can("applications.edit") || can("applications.note")) {
+    ctl =
+      '<div class="row__ctl">' +
+        (can("applications.edit")
+          ? '<select data-status aria-label="Stage">' + options(a.status) + "</select>"
+          : "") +
+        (can("applications.note")
+          ? '<textarea data-note rows="1" placeholder="Private note (staff only)">' + esc(a.note_text || "") + "</textarea>"
+          : "") +
+        '<button class="btn btn--ghost" data-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
+        '<span class="row__ok" data-ok>Saved</span>' +
+      "</div>";
+  }
+
   return (
     '<div class="row" data-id="' + esc(a.id) + '">' +
       '<div class="row__top">' +
@@ -652,12 +712,8 @@ function rowHtml(a) {
       '<div class="row__tags">' + esc(tracks) + " &middot; " + esc(a.experience || "?") +
         " &middot; " + esc((a.shifts || []).join(", ") || "no shifts") +
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
-      '<div class="row__ctl">' +
-        '<select data-status aria-label="Stage">' + options(a.status) + "</select>" +
-        '<textarea data-note rows="1" placeholder="Private note (staff only)">' + esc(a.note_text || "") + "</textarea>" +
-        '<button class="btn btn--ghost" data-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
-        '<span class="row__ok" data-ok>Saved</span>' +
-      "</div>" +
+      social +
+      ctl +
     "</div>"
   );
 }
@@ -679,20 +735,22 @@ function paint() {
 
 function save(row) {
   var id  = row.getAttribute("data-id");
-  var st  = row.querySelector("[data-status]").value;
-  var note = row.querySelector("[data-note]").value;
+  var stEl = row.querySelector("[data-status]");
+  var ntEl = row.querySelector("[data-note]");
+  var st   = stEl ? stEl.value : null;
+  var note = ntEl ? ntEl.value : null;
   var ok  = row.querySelector("[data-ok]");
   var rec = ALL.filter(function (x) { return x.id === id; })[0];
 
   var jobs = [];
-  if (!rec || rec.status !== st) {
+  if (st !== null && (!rec || rec.status !== st)) {
     jobs.push(api("applications?id=eq." + encodeURIComponent(id), {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
       body: { status: st, status_changed_at: new Date().toISOString() }
     }));
   }
-  if (!rec || (rec.note_text || "") !== note) {
+  if (note !== null && (!rec || (rec.note_text || "") !== note)) {
     /* upsert: one row per application, keyed by its id */
     jobs.push(api("application_notes", {
       method: "POST",
@@ -703,10 +761,15 @@ function save(row) {
   if (!jobs.length) { flash(ok, "No change"); return; }
 
   Promise.all(jobs).then(function () {
-    if (rec) { rec.status = st; rec.note_text = note; }
-    var pill = row.querySelector("[data-pill]");
-    pill.className = "pill pill--" + st;
-    pill.textContent = LABEL[st] || st;
+    if (rec) {
+      if (st !== null) rec.status = st;
+      if (note !== null) rec.note_text = note;
+    }
+    if (st !== null) {
+      var pill = row.querySelector("[data-pill]");
+      pill.className = "pill pill--" + st;
+      pill.textContent = LABEL[st] || st;
+    }
     flash(ok, "Saved");
   }).catch(function (e) {
     flash(ok, String(e.message) === "signed out" ? "Signed out" : "Failed");
@@ -719,10 +782,18 @@ function flash(el, text) {
   setTimeout(function () { el.classList.remove("is-on"); }, 1600);
 }
 
-function render(email, apps, notes) {
+function render(email, apps, notes, socials) {
   var byId = {};
   (notes || []).forEach(function (n) { byId[n.application_id] = n.note; });
-  ALL = apps.map(function (a) { a.note_text = byId[a.id] || ""; return a; });
+  var socById = {};
+  (socials || []).forEach(function (s) {
+    (socById[s.application_id] = socById[s.application_id] || []).push(s);
+  });
+  ALL = apps.map(function (a) {
+    a.note_text = byId[a.id] || "";
+    a.socials = socById[a.id] || [];
+    return a;
+  });
 
   lead.textContent = "Signed in as " + email + ".";
   view(
@@ -762,16 +833,28 @@ function start() {
 
   view('<div class="card"><span class="spin"></span>Loading applications&hellip;</div>');
 
-  /* is_admin() is asked of the database rather than decided here. A non-admin
-     gets false, and would in any case see nothing, because the same function
-     gates every row. */
-  api("rpc/is_admin", { method: "POST", body: {} })
-    .then(function (isAdmin) {
-      if (!isAdmin) { notAdmin(claims.email); return null; }
-      return Promise.all([
-        api("applications?select=id,created_at,tracks,track,experience,shifts,speed,kit,name,country,email,phone,cv,note,status,status_changed_at&order=created_at.desc"),
-        api("application_notes?select=application_id,note")
-      ]).then(function (r) { render(claims.email, r[0] || [], r[1] || []); });
+  /* What this account may do is asked of the database, not decided here. The
+     answer only shapes what gets drawn: every one of these permissions is also
+     enforced by a policy, so hiding a control is a courtesy and not the
+     safeguard. Someone who forges a permission into this array still gets
+     nothing back from Postgres. */
+  api("rpc/my_permissions", { method: "POST", body: {} })
+    .then(function (perms) {
+      PERMS = perms || [];
+      if (!can("applications.view_all")) { notAdmin(claims.email); return null; }
+
+      var jobs = [
+        api("applications?select=id,created_at,tracks,track,experience,shifts,speed,kit,name,country,email,phone,cv,note,status,status_changed_at,posting_consent,posting_consent_at&order=created_at.desc"),
+        can("applications.note")
+          ? api("application_notes?select=application_id,note")
+          : Promise.resolve([]),
+        can("social.view")
+          ? api("application_socials?select=application_id,platform,handle,url")
+          : Promise.resolve([])
+      ];
+      return Promise.all(jobs).then(function (r) {
+        render(claims.email, r[0] || [], r[1] || [], r[2] || []);
+      });
     })
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
