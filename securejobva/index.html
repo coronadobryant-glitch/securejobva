@@ -297,6 +297,27 @@ img{max-width:100%}
 .price__inc{list-style:none;padding:0;margin:1.5rem 0 0;display:grid;gap:.6rem;font-size:.95rem}
 .price__inc li{display:flex;gap:.7rem;align-items:flex-start;opacity:.92}
 .price__inc svg{flex:none;margin-top:.28rem}
+.adapt{
+  display:flex;gap:.85rem;align-items:flex-start;
+  margin-top:1.5rem;padding:1.05rem 1.2rem;
+  background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  border-left:4px solid var(--signal);
+  border-radius:10px;
+}
+.adapt__i{
+  width:30px;height:30px;flex:none;border-radius:8px;
+  display:grid;place-items:center;
+  background:var(--signal);color:var(--signal-ink);
+}
+.adapt__t{font-size:.98rem;color:var(--ink-2);line-height:1.55;max-width:52ch}
+.adapt__t b{color:var(--ink);font-weight:700}
+.adapt__k{
+  display:block;font-family:"IBM Plex Mono",monospace;
+  font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent-deep);font-weight:500;margin-bottom:.25rem;
+}
+
 /* Cost comparison. Both bars share one scale: the tallest is the in-house
    total, and every height below is that cost as a share of it. */
 .vs{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:1.35rem 1.35rem 1.15rem}
@@ -630,9 +651,16 @@ img{max-width:100%}
   <section class="hero">
     <div class="wrap hero__grid">
       <div>
-        <span class="eyebrow">Dedicated virtual assistants &middot; Hired worldwide</span>
+        <span class="eyebrow">Dedicated virtual assistants &middot; Your hours, your time zone</span>
         <h1>Cover <span class="hl">the hours you can&rsquo;t</span>.</h1>
-        <p class="lede">We place trained, full-time virtual assistants in customer service, sales &amp; marketing, and admin roles &mdash; matched to your business in about a week, at a flat hourly rate with nothing to sign.</p>
+        <p class="lede">We place trained, full-time virtual assistants in customer service, sales &amp; marketing, and admin roles &mdash; working <b>your hours, in your time zone</b>, matched to your business in about a week at a flat hourly rate with nothing to sign.</p>
+        <div class="adapt">
+          <span class="adapt__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+          <p class="adapt__t">
+            <span class="adapt__k">Your seat adapts to you</span>
+            Your VA works <b>when you need them</b>, scheduled to your time zone &mdash; a standard business day, an evening block, overnight, or split across morning and night. You set the shift on the call and can move it with a week&rsquo;s notice.
+          </p>
+        </div>
         <div class="hero__actions">
           <a class="btn btn--solid" data-book href="#book">Book a 20-minute call</a>
           <a class="btn btn--ghost" href="#how">See how it works</a>
@@ -660,7 +688,7 @@ img{max-width:100%}
 
         <div class="cov__hours"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
 
-        <p class="cov__foot">Your team works <b>9&ndash;5</b>. Your seat takes the evening and early-morning block &mdash; so quotes, tickets and callbacks are handled <b>before you open</b>, not after you are already behind.</p>
+        <p class="cov__foot">This is one shape, not the shape. Your team works <b>9&ndash;5</b>, so here the seat takes the evening and early-morning block and quotes, tickets and callbacks are handled <b>before you open</b>. Need it over your own day instead, or across the weekend? That is the schedule you set.</p>
       </div>
     </div>
   </section>
