@@ -306,6 +306,24 @@ img{max-width:100%}
 .scr__k{color:var(--ink-2)}
 .scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
 .scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
+.tab{
+  font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
+  background:none;border:0;border-bottom:2px solid transparent;
+  padding:.6rem .85rem;color:var(--muted);margin-bottom:-1px;
+}
+.tab:hover{color:var(--ink-2)}
+.tab.is-on{color:var(--accent);border-bottom-color:var(--accent)}
+.tab__n{
+  display:inline-block;margin-left:.4rem;min-width:1.15rem;padding:0 .3rem;
+  background:var(--accent);color:var(--accent-ink);border-radius:99px;
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;line-height:1.15rem;text-align:center;
+}
+.tab__n:empty{display:none}
+.seat__note{margin:.5rem 0 0;font-size:.86rem;color:var(--ink-2);line-height:1.55;white-space:pre-wrap}
+.msg__body{margin:.6rem 0 0;font-size:.9rem;color:var(--ink-2);line-height:1.6;white-space:pre-wrap}
+/* An answered message stays readable but stops competing for attention. */
+.row.is-done{opacity:.62}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -1140,6 +1158,191 @@ function drawStats() {
     "</div>";
 }
 
+function wireTabs() {
+  var bar = document.getElementById("tabs");
+  if (!bar) return;
+  bar.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-tab]");
+    if (!b) return;
+    var want = b.getAttribute("data-tab");
+    bar.querySelectorAll("[data-tab]").forEach(function (x) {
+      x.classList.toggle("is-on", x === b);
+    });
+    root.querySelectorAll("[data-pane]").forEach(function (p) {
+      if (p.getAttribute("data-pane") === want) p.removeAttribute("hidden");
+      else p.setAttribute("hidden", "");
+    });
+  });
+}
+
+/* ── seat requests ──
+   The client side of the same job. Staff can move one along; they cannot edit
+   what was asked for, which is the client's record of the conversation. */
+var SEAT_PIPE = ["received", "call_booked", "matching", "shortlist", "running", "closed"];
+var SEAT_LABEL = {
+  received: "Received", call_booked: "Call booked", matching: "Matching",
+  shortlist: "Shortlist", running: "Running", closed: "Closed"
+};
+
+function loadSeats() {
+  var box = document.getElementById("seats-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading seat requests&hellip;';
+  api("seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,name,company,email,phone,notes,status,status_changed_at&order=created_at.desc")
+    .then(function (rows) { drawSeats(box, rows || []); })
+    .catch(function (e) {
+      box.innerHTML = '<p class="msg msg--bad">Could not load seat requests. ' + esc(e.message) + "</p>";
+    });
+}
+
+function drawSeats(box, rows) {
+  if (!rows.length) {
+    box.innerHTML = '<h2 class="edit__h">Seat requests</h2><p class="msg">Nobody has asked for a seat yet.</p>';
+    return;
+  }
+  box.innerHTML =
+    '<h2 class="edit__h">Seat requests</h2>' +
+    '<p class="msg" style="margin-top:0">' + rows.length + " in total. Newest first.</p>" +
+    '<div class="rows" style="margin-top:1rem">' +
+      rows.map(function (r) {
+        var opts = SEAT_PIPE.map(function (k) {
+          return '<option value="' + k + '"' + (r.status === k ? " selected" : "") + ">" +
+                 SEAT_LABEL[k] + "</option>";
+        }).join("");
+        return (
+          '<div class="row" data-seat="' + esc(r.id) + '">' +
+            '<div class="row__top">' +
+              "<span>" +
+                '<span class="row__n">' + esc(r.company || r.name || "(no company)") + "</span> " +
+                '<span class="row__meta">' + esc(r.email || "") + "</span>" +
+              "</span>" +
+              '<span class="pill pill--' + esc(r.status) + '">' +
+                esc(SEAT_LABEL[r.status] || r.status) + "</span>" +
+            "</div>" +
+            '<div class="row__tags">' +
+              esc((r.seats || []).join(" + ") || "no roles") + " &middot; " +
+              esc(r.hours || "?") + " hrs" +
+              (r.weekly ? " &middot; $" + esc(r.weekly) + "/wk quoted" : "") +
+              " &middot; " + esc(r.timezone || "?") +
+              " &middot; asked " + esc(when(r.created_at)) +
+            "</div>" +
+            (r.notes ? '<p class="seat__note">' + esc(r.notes) + "</p>" : "") +
+            (can("applications.edit")
+              ? '<div class="row__ctl">' +
+                  '<select data-seat-status aria-label="Stage of this seat request">' + opts + "</select>" +
+                  '<button class="btn btn--ghost" data-seat-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
+                  '<span class="row__ok" data-seat-ok>Saved</span>' +
+                "</div>"
+              : "") +
+          "</div>"
+        );
+      }).join("") +
+    "</div>";
+
+  box.querySelectorAll("[data-seat-save]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-seat]");
+      var id = row.getAttribute("data-seat");
+      var st = row.querySelector("[data-seat-status]").value;
+      var ok = row.querySelector("[data-seat-ok]");
+      api("seat_requests?id=eq." + encodeURIComponent(id), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: { status: st, status_changed_at: new Date().toISOString() }
+      }).then(function () {
+        var pill = row.querySelector(".pill");
+        pill.className = "pill pill--" + st;
+        pill.textContent = SEAT_LABEL[st] || st;
+        flash(ok, "Saved");
+      }).catch(function (e) {
+        flash(ok, String(e.message) === "signed out" ? "Signed out" : "Failed");
+      });
+    });
+  });
+}
+
+/* ── the inbox ──
+   010 stored contact messages and gave staff a policy to read them, and there
+   was nowhere to do it. A form that writes to a table nobody opens is a form
+   that loses messages politely. */
+function loadInbox() {
+  var box = document.getElementById("inbox-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading messages&hellip;';
+  api("contact_messages?select=id,created_at,name,email,phone,reason,message,handled_at,handled_by&order=created_at.desc")
+    .then(function (rows) { drawInbox(box, rows || []); })
+    .catch(function (e) {
+      box.innerHTML = '<p class="msg msg--bad">Could not load messages. ' + esc(e.message) + "</p>";
+    });
+}
+
+function drawInbox(box, rows) {
+  var open = rows.filter(function (r) { return !r.handled_at; });
+  var badge = document.getElementById("tab-unread");
+  if (badge) badge.textContent = open.length ? String(open.length) : "";
+
+  if (!rows.length) {
+    box.innerHTML = '<h2 class="edit__h">Messages</h2><p class="msg">Nothing yet.</p>';
+    return;
+  }
+
+  box.innerHTML =
+    '<h2 class="edit__h">Messages</h2>' +
+    '<p class="msg" style="margin-top:0">' +
+      (open.length ? open.length + " unanswered" : "All answered") +
+      " &middot; " + rows.length + " in total.</p>" +
+    '<div class="rows" style="margin-top:1rem">' +
+      rows.map(function (r) {
+        return (
+          '<div class="row' + (r.handled_at ? " is-done" : "") + '" data-msg="' + esc(r.id) + '">' +
+            '<div class="row__top">' +
+              "<span>" +
+                '<span class="row__n">' + esc(r.name || "(no name)") + "</span> " +
+                '<span class="row__meta">' +
+                  '<a href="mailto:' + esc(r.email) + '">' + esc(r.email) + "</a>" +
+                  (r.phone ? " &middot; " + esc(r.phone) : "") +
+                "</span>" +
+              "</span>" +
+              '<span class="pill">' + esc(r.reason || "General") + "</span>" +
+            "</div>" +
+            '<div class="row__tags">' + esc(when(r.created_at)) +
+              (r.handled_at ? " &middot; answered by " + esc(r.handled_by || "someone") : "") +
+            "</div>" +
+            '<p class="msg__body">' + esc(r.message || "") + "</p>" +
+            '<div class="row__ctl">' +
+              '<a class="btn btn--ghost" style="padding:.45rem .8rem;font-size:.85rem" href="mailto:' +
+                esc(r.email) + "?subject=" + encodeURIComponent("Re: " + (r.reason || "your message")) +
+                '">Reply</a>' +
+              (r.handled_at
+                ? '<button class="btn btn--ghost" data-msg-open type="button" style="padding:.45rem .8rem;font-size:.85rem">Mark unanswered</button>'
+                : '<button class="btn btn--ghost" data-msg-done type="button" style="padding:.45rem .8rem;font-size:.85rem">Mark answered</button>') +
+              '<span class="row__ok" data-msg-ok>Saved</span>' +
+            "</div>" +
+          "</div>"
+        );
+      }).join("") +
+    "</div>";
+
+  box.querySelectorAll("[data-msg-done], [data-msg-open]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-msg]");
+      var id = row.getAttribute("data-msg");
+      var done = b.hasAttribute("data-msg-done");
+      api("contact_messages?id=eq." + encodeURIComponent(id), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: done
+          ? { handled_at: new Date().toISOString(), handled_by: ME }
+          : { handled_at: null, handled_by: null }
+      }).then(loadInbox)
+        .catch(function (e) {
+          flash(row.querySelector("[data-msg-ok]"),
+                String(e.message) === "signed out" ? "Signed out" : "Failed");
+        });
+    });
+  });
+}
+
 function paint() {
   var q  = (document.getElementById("q").value || "").toLowerCase().trim();
   var st = document.getElementById("filter").value;
@@ -1337,16 +1540,29 @@ function render(email, apps, notes, socials) {
       "</select>" +
       '<span class="adm__count" id="count"></span>' +
     "</div>" +
+    '<div class="tabs" id="tabs">' +
+      '<button class="tab is-on" data-tab="apps" type="button">Applications</button>' +
+      '<button class="tab" data-tab="seats" type="button">Seats</button>' +
+      '<button class="tab" data-tab="inbox" type="button">Messages<span class="tab__n" id="tab-unread"></span></button>' +
+      (can("accounts.manage") ? '<button class="tab" data-tab="accts" type="button">Accounts</button>' : "") +
+    "</div>" +
+    '<div data-pane="apps">' +
     (can("analytics.view") ? '<div id="stats-card"></div>' : "") +
     '<div class="rows" id="rows"></div>' +
+    "</div>" +
+    '<div data-pane="seats" hidden><div class="card" id="seats-card"></div></div>' +
+    '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div></div>' +
     (can("accounts.manage")
-      ? '<div class="card" id="roles-card" style="margin-top:1.6rem"></div>'
+      ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "")
   );
 
   document.getElementById("out").addEventListener("click", signOut);
+  wireTabs();
   if (can("analytics.view")) drawStats();
   if (can("accounts.manage")) loadRoles();
+  loadSeats();
+  loadInbox();
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
   document.getElementById("fskill").addEventListener("change", paint);

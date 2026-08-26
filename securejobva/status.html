@@ -306,6 +306,24 @@ img{max-width:100%}
 .scr__k{color:var(--ink-2)}
 .scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
 .scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
+.tab{
+  font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
+  background:none;border:0;border-bottom:2px solid transparent;
+  padding:.6rem .85rem;color:var(--muted);margin-bottom:-1px;
+}
+.tab:hover{color:var(--ink-2)}
+.tab.is-on{color:var(--accent);border-bottom-color:var(--accent)}
+.tab__n{
+  display:inline-block;margin-left:.4rem;min-width:1.15rem;padding:0 .3rem;
+  background:var(--accent);color:var(--accent-ink);border-radius:99px;
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;line-height:1.15rem;text-align:center;
+}
+.tab__n:empty{display:none}
+.seat__note{margin:.5rem 0 0;font-size:.86rem;color:var(--ink-2);line-height:1.55;white-space:pre-wrap}
+.msg__body{margin:.6rem 0 0;font-size:.9rem;color:var(--ink-2);line-height:1.6;white-space:pre-wrap}
+/* An answered message stays readable but stops competing for attention. */
+.row.is-done{opacity:.62}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
