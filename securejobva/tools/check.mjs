@@ -162,6 +162,30 @@ await check("lead queue behaves", async () => {
   }
 });
 
+/* A view is the quiet way to undo every policy underneath it.
+
+   By default a Postgres view runs with its OWNER's rights, not the caller's,
+   so a view over `applications` granted to `authenticated` hands every row to
+   every signed-in applicant — RLS on the table below is simply not consulted.
+   Nothing errors, nothing logs, and the page looks like it is working.
+
+   `security_invoker = true` runs it as the caller, which puts the policies
+   back. application_queue has it. Any view added later must too. */
+await check("views run as the caller, not the owner", () => {
+  const views = [...sql.matchAll(
+    /create\s+(?:or\s+replace\s+)?view\s+public\.(\w+)([\s\S]*?)\sas\s/gi
+  )];
+  if (!views.length) return "no views defined";
+  const unsafe = views
+    .filter(([, , opts]) => !/security_invoker\s*=\s*true/i.test(opts))
+    .map(([, name]) => name);
+  if (unsafe.length) {
+    throw new Error(unsafe.join(", ") + " — a view without security_invoker = true runs as its " +
+      "owner and ignores the RLS underneath it, handing every row to every signed-in user");
+  }
+  return views.map((v) => v[1]).join(", ") + " — security_invoker set";
+});
+
 /* The one rule from sql/001-forms.sql, asserted rather than trusted.
 
    The rule is about `anon` — the key that sits in the page source where anyone
