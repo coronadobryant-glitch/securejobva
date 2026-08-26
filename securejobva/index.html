@@ -157,7 +157,34 @@ img{max-width:100%}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
-.nav__signin{color:var(--accent);font-weight:600}
+/* The sign-in is a filled button, like the call-to-action beside it.
+
+   Gold rather than the accent blue so the two are told apart at a glance: the
+   blue button is the thing this page is selling, this one is the way back into
+   an account, and two identical blue buttons make you read both to find out
+   which is which.
+
+   Selector is .nav__links a.nav__signin, not .nav__signin. `.nav__links a` sets
+   colour at one class plus one element, which outranks a lone class no matter
+   what order they appear in — the plain version of this rule rendered a gold
+   button with grey text.
+
+   The border is not decoration either. Gold on white is 1.61:1, so the filled
+   shape has almost no edge in the light theme even though the text on it is
+   8.9:1. The dark rim gives the button a boundary you can see. */
+.nav__links a.nav__signin,
+.mobnav__in a.nav__signin{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:.52rem .95rem;border-radius:8px;
+  background:var(--signal);color:var(--signal-ink);
+  border:1.5px solid var(--signal-ink);
+  font-weight:700;line-height:1;
+  transition:filter .16s ease;
+}
+.nav__links a.nav__signin:hover,
+.mobnav__in a.nav__signin:hover{color:var(--signal-ink);filter:brightness(1.07)}
+.nav__links a.nav__signin:focus-visible{outline:2.5px solid var(--ink);outline-offset:2px}
+.mobnav__in a.nav__signin{margin-top:.5rem}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
 .themetog,.navtog{
