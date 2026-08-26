@@ -23,9 +23,10 @@ run it. That is always safer than guessing.
 | `007-manage-roles.sql` | Grant and revoke roles from the admin page |
 | `008-interview-scores.sql` | Interviewer scores, 1-10, on the staff-only side |
 | `009-account-types.sql` | Account types asked for at sign-up and granted by a person |
+| `010-contact.sql` | The contact form table — public writes, staff read |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 009 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 010 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

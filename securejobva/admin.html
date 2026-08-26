@@ -184,22 +184,7 @@ img{max-width:100%}
   .mobnav{display:none}
 }
 
-/* ---------- sections ---------- */
-.sec{padding:clamp(3.75rem,7vw,6.5rem) 0}
-.sec--tint{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.sec__head{max-width:62ch;margin-bottom:clamp(2rem,4vw,3rem)}
-.sec__head h2{font-size:var(--step-3);margin:.7rem 0 .9rem}
 
-/* footer */
-.foot{padding:3rem 0 3.5rem;border-top:1px solid var(--line)}
-.foot__grid{display:grid;gap:2rem}
-@media(min-width:800px){.foot__grid{grid-template-columns:1.4fr repeat(3,1fr)}}
-.foot h5{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .85rem;font-weight:500}
-.foot ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.92rem}
-.foot a{text-decoration:none;color:var(--ink-2)}
-.foot a:hover{color:var(--accent)}
-.foot__brand{margin-bottom:.75rem}
-.foot__bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;font-size:.82rem;color:var(--muted)}
 /* ---------- portal ---------- */
 .pt{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem);min-height:60vh}
 .pt__head{margin-bottom:2rem}
@@ -378,11 +363,6 @@ img{max-width:100%}
 .pill--declined{background:var(--surface-2);color:var(--muted)}
 </style>
 
-}
-.copied[data-on]{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(prefers-reduced-motion:reduce){.copied{transition:none}}
-</style>
-
 <script>
 /* Restore the saved theme before paint so the page never flashes the wrong one. */
 (function () {
@@ -390,29 +370,31 @@ img{max-width:100%}
     var saved = localStorage.getItem("sjva-theme");
     if (saved === "dark" || saved === "light") {
       document.documentElement.setAttribute("data-theme", saved);
-
     }
   } catch (e) {}
 })();
 </script>
 
-<!-- Gradient for the brand mark. Defined once; all three marks point at it. -->
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <defs>
     <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0072EE" style="stop-color:var(--mark-from,#0072EE)"></stop>
+      <stop offset="1" stop-color="#002E6B" style="stop-color:var(--mark-to,#002E6B)"></stop>
+    </linearGradient>
+  </defs>
+</svg>
 
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
       <a class="brand" href="/" aria-label="SecureJobVA home">
-
-<header class="nav">
-  <div class="wrap">
-    <div class="nav__in">
-      <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
-        <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+<svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
+          <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
+          <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
+          <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
         <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
       </a>
       <nav class="nav__links">

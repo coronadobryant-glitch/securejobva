@@ -2,21 +2,15 @@
    already use, so the portal cannot drift away from the site around it. */
 import { readFileSync, writeFileSync } from "node:fs";
 
-const SRC = "careers.html";
-const src = readFileSync(SRC, "utf8");
-const L = src.split(/\r?\n/);
-const nl = "\r\n";
-const slice = (a, b) => L.slice(a - 1, b).join(nl);
+import { chrome } from "./lib-chrome.mjs";
 
-/* Lifted verbatim rather than retyped: tokens, base, buttons, nav, the section
-   helper, the footer, and the two things that must run before paint. */
-const TOKENS_TO_NAV = slice(7, 185);
-const SECTIONS      = slice(239, 244);
-const FOOTER_CSS    = slice(349, 359);
-const FONTS         = slice(2, 4);
-const THEME_SCRIPT  = slice(683, 694);
-const SVG_DEFS      = slice(695, 703);
-const BRAND_SVG     = slice(726, 733);
+const { fonts: FONTS, css: TOKENS_TO_NAV, themeScript: THEME_SCRIPT,
+        svgDefs: SVG_DEFS, brandSvg: BRAND_SVG, nl } = chrome();
+
+/* The old build lifted these by line number out of careers.html, which broke
+   silently the moment that file grew a step. Anchors move with the file. */
+const SECTIONS = "";
+const FOOTER_CSS = "";
 
 const PAGE_CSS = `
 /* ---------- portal ---------- */
