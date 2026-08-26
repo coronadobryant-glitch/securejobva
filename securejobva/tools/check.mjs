@@ -221,6 +221,18 @@ await check("portal reads only columns it is granted", () => {
 /* The queue is the last thing standing between a failed POST and a lost lead,
    so its behaviour is driven, not just parsed. tools/test-queue.mjs pulls the
    real block out of index.html and runs it against a mocked store. */
+/* The CSV is the one place applicant-typed text leaves this system and is
+   opened in a program that executes formulas. Both failure modes are silent. */
+await check("CSV escaping holds", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-csv.mjs"], { stdio: "pipe" });
+    return "16 checks, injection guarded";
+  } catch (e) {
+    throw new Error("tools/test-csv.mjs failed — run it directly");
+  }
+});
+
 /* A sweep for the bug classes that do not announce themselves: colliding ids,
    anchors and links that go nowhere, JS reaching for an element the markup no
    longer has, controls with no accessible name. All of them render fine. */

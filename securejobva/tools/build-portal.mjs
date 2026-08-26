@@ -196,6 +196,16 @@ const PAGE_CSS = `
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
+.docs{margin-top:.6rem;padding-top:.55rem;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.docs__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:.2rem}
+.doclink{
+  font-family:inherit;font-size:.82rem;cursor:pointer;
+  padding:.3rem .6rem;border-radius:6px;
+  border:1px solid var(--line);background:var(--surface);color:var(--accent);
+}
+.doclink:hover{border-color:var(--accent)}
+.doclink[disabled]{opacity:.6;cursor:default}
+.doclink__s{color:var(--muted)}
 .soc{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);font-size:.85rem;display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:baseline}
 .soc__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .soc a{color:var(--accent)}
@@ -380,6 +390,70 @@ function api(path, opts) {
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
     return r.status === 204 ? null : r.json();
   });
+}
+
+/* Storage lives beside PostgREST on the same project. */
+function storageBase() {
+  return SB + "/storage/v1";
+}
+
+/* Returns a URL good for one minute. Opened immediately, never stored. */
+function signDoc(path) {
+  var sess = session();
+  if (!sess) return Promise.reject(new Error("signed out"));
+  return fetch(storageBase() + "/object/sign/" + path, {
+    method: "POST",
+    headers: {
+      apikey: ANON,
+      Authorization: "Bearer " + sess.access_token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ expiresIn: 60 })
+  }).then(function (r) {
+    if (!r.ok) throw new Error("could not open that file");
+    return r.json();
+  }).then(function (j) {
+    if (!j || !j.signedURL) throw new Error("no link came back");
+    return SB + j.signedURL;
+  });
+}
+
+function openDoc(btn) {
+  var path = btn.getAttribute("data-doc");
+  var was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Opening\u2026";
+  signDoc(path).then(function (url) {
+    window.open(url, "_blank", "noopener");
+  }).catch(function (e) {
+    btn.textContent = e.message === "signed out" ? "Signed out" : "Could not open";
+    setTimeout(function () { btn.textContent = was; btn.disabled = false; }, 2200);
+    return;
+  }).then(function () {
+    if (btn.disabled) { btn.textContent = was; btn.disabled = false; }
+  });
+}
+
+function kb(n) {
+  if (!n) return "";
+  return n < 1048576
+    ? Math.max(1, Math.round(n / 1024)) + " KB"
+    : (n / 1048576).toFixed(1) + " MB";
+}
+
+function docList(docs) {
+  if (!docs || !docs.length) return "";
+  return (
+    '<div class="docs">' +
+      '<span class="docs__k">Documents</span>' +
+      docs.map(function (d) {
+        return '<button class="doclink" type="button" data-doc="' + esc(d.path) + '">' +
+          esc(d.filename || "document") +
+          (d.bytes ? ' <span class="doclink__s">' + esc(kb(d.bytes)) + "</span>" : "") +
+          "</button>";
+      }).join("") +
+    "</div>"
+  );
 }
 
 function esc(s) {
@@ -827,6 +901,7 @@ function render(user, apps) {
           "<li><b>Based in</b><span>" + esc(a.country || "&mdash;") + "</span></li>" +
           "<li><b>Last updated</b><span>" + esc(when(a.status_changed_at) || when(a.created_at)) + "</span></li>" +
         "</ul>" +
+        docList(a.docs) +
       "</div>";
   }
 
@@ -838,6 +913,10 @@ function render(user, apps) {
           "Tell us in a reply if either needs changing.</p>";
   view(html);
   document.getElementById("out").addEventListener("click", signOut);
+  root.addEventListener("click", function (e) {
+    var d = e.target.closest("[data-doc]");
+    if (d) openDoc(d);
+  });
   wireEdit(apps[0]);
 }
 
@@ -966,8 +1045,20 @@ function loadApplications() {
   var claims = readToken(session().access_token);
   var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
-  api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc")
-    .then(function (rows) { render(user, rows || []); })
+  Promise.all([
+    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
+    api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
+      .catch(function () { return []; })
+  ])
+    .then(function (r) {
+      var rows = r[0] || [];
+      var byId = {};
+      (r[1] || []).forEach(function (d) {
+        (byId[d.application_id] = byId[d.application_id] || []).push(d);
+      });
+      rows.forEach(function (a) { a.docs = byId[a.id] || []; });
+      render(user, rows);
+    })
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
       /* Keep a way out. Without this the page is a dead end: signed in, unable
@@ -1220,6 +1311,7 @@ function rowHtml(a) {
         (a.region ? " &middot; " + esc(a.region) : "") +
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
+      docList(a.docs) +
       contactLine(a) +
       scoreLine(a) +
       social +
@@ -1646,7 +1738,85 @@ function drawInbox(box, rows) {
   });
 }
 
-function paint() {
+/* ── CSV ──────────────────────────────────────────────────────────────────
+   Exports what is on screen, not the whole table. Someone who has filtered to
+   "advanced English, waiting 7+ days" wants those rows; handing them everything
+   and letting them re-filter in a spreadsheet is how the wrong list gets
+   emailed to somebody.
+
+   Two things about the escaping below are not decoration.
+
+   A field is wrapped in quotes and its own quotes doubled, which is the actual
+   CSV rule -- a name like O"Brien or any note containing a comma or a newline
+   destroys the column alignment otherwise, and these are free-text fields
+   filled in by strangers.
+
+   A leading =, +, - or @ is prefixed with a single quote. Excel and Sheets
+   treat those as the start of a formula, so an applicant who types
+   =HYPERLINK(...) into their note has written code that runs when a staff
+   member opens the export. It is a real attack with a dull name; the leading
+   apostrophe is the standard defence and is invisible in the cell. */
+function csvCell(v) {
+  if (v === null || v === undefined) return "";
+  if (Array.isArray(v)) v = v.join("; ");
+  var t = String(v);
+  if (/^[=+\\-@\\t\\r]/.test(t)) t = "'" + t;
+  return '"' + t.replace(/"/g, '""') + '"';
+}
+
+var CSV_COLUMNS = [
+  ["Name", "name"],
+  ["Email", "email"],
+  ["Country", "country"],
+  ["Region", "region"],
+  ["Tracks", "tracks"],
+  ["Applied", function (a) { return when(a.created_at); }],
+  ["Applicant stage", function (a) { return LABEL[a.status] || a.status; }],
+  ["Pipeline", function (a) { return PIPE_LABEL[a.pipeline] || a.pipeline; }],
+  ["Last contacted", function (a) { return when(a.last_contacted_at); }],
+  ["Contacted by", "contacted_by"],
+  ["Replied", function (a) { return a.response_received ? "yes" : "no"; }],
+  ["Days waiting", function (a) { var d = days(a.waiting_since); return d === null ? "" : d; }],
+  ["Ghosted", function (a) { return a.is_ghosted ? "yes" : "no"; }],
+  ["English (self)", "skill_english"],
+  ["Customer (self)", "skill_customer"],
+  ["Data entry (self)", "skill_data_entry"],
+  ["Social (self)", "skill_social"],
+  ["Bookkeeping (self)", "skill_bookkeeping"],
+  ["English (score)", "score_english"],
+  ["Customer (score)", "score_customer"],
+  ["Data entry (score)", "score_data_entry"],
+  ["Social (score)", "score_social"],
+  ["Bookkeeping (score)", "score_bookkeeping"],
+  ["Average score", "score_avg"],
+  ["Scored by", "scored_by"]
+];
+
+function exportCsv() {
+  var rows = shownRows();
+  if (!rows.length) return;
+
+  var out = [CSV_COLUMNS.map(function (c) { return csvCell(c[0]); }).join(",")];
+  rows.forEach(function (a) {
+    out.push(CSV_COLUMNS.map(function (c) {
+      return csvCell(typeof c[1] === "function" ? c[1](a) : a[c[1]]);
+    }).join(","));
+  });
+
+  /* A byte order mark, so Excel reads it as UTF-8. Without one, every name
+     it -- which is most of them -- arrives mangled. */
+  var blob = new Blob(["\\ufeff" + out.join("\\r\\n")], { type: "text/csv;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "applications-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+}
+
+function shownRows() {
   var q  = (document.getElementById("q").value || "").toLowerCase().trim();
   var st = document.getElementById("filter").value;
   var sk = document.getElementById("fskill").value;
@@ -1677,6 +1847,11 @@ function paint() {
     return [a.name, a.email, a.country, a.region, (a.tracks || []).join(" ")]
       .join(" ").toLowerCase().indexOf(q) > -1;
   });
+  return shown;
+}
+
+function paint() {
+  var shown = shownRows();
   document.getElementById("count").textContent =
     shown.length + " of " + ALL.length;
   document.getElementById("rows").innerHTML =
@@ -1799,16 +1974,21 @@ function flash(el, text) {
   setTimeout(function () { el.classList.remove("is-on"); }, 1600);
 }
 
-function render(email, apps, notes, socials) {
+function render(email, apps, notes, socials, docs) {
   var byId = {};
   (notes || []).forEach(function (n) { byId[n.application_id] = n.note; });
   var socById = {};
   (socials || []).forEach(function (s) {
     (socById[s.application_id] = socById[s.application_id] || []).push(s);
   });
+  var docById = {};
+  (docs || []).forEach(function (d) {
+    (docById[d.application_id] = docById[d.application_id] || []).push(d);
+  });
   ALL = apps.map(function (a) {
     a.note_text = byId[a.id] || "";
     a.socials = socById[a.id] || [];
+    a.docs = docById[a.id] || [];
     a.pipeline = a.pipeline || "new";
     return a;
   });
@@ -1842,6 +2022,7 @@ function render(email, apps, notes, socials) {
         }).join("") +
       "</select>" +
       '<span class="adm__count" id="count"></span>' +
+      '<button class="btn btn--ghost" id="csv" type="button" style="padding:.5rem .8rem;font-size:.85rem">Export CSV</button>' +
     "</div>" +
     '<div class="tabs" id="tabs">' +
       '<button class="tab is-on" data-tab="apps" type="button">Applications</button>' +
@@ -1869,8 +2050,11 @@ function render(email, apps, notes, socials) {
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
   document.getElementById("fskill").addEventListener("change", paint);
+  document.getElementById("csv").addEventListener("click", exportCsv);
   document.getElementById("flevel").addEventListener("change", paint);
   document.getElementById("rows").addEventListener("click", function (e) {
+    var doc = e.target.closest("[data-doc]");
+    if (doc) { openDoc(doc); return; }
     var c = e.target.closest("[data-contacted]");
     if (c) {
       /* Flag it and save in one gesture: the button is a shortcut for "set
@@ -1917,10 +2101,12 @@ function start() {
           : Promise.resolve([]),
         can("social.view")
           ? api("application_socials?select=application_id,platform,handle,url")
-          : Promise.resolve([])
+          : Promise.resolve([]),
+        api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
+          .catch(function () { return []; })
       ];
       return Promise.all(jobs).then(function (r) {
-        render(claims.email, r[0] || [], r[1] || [], r[2] || []);
+        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || []);
       });
     })
     .catch(function (e) {
