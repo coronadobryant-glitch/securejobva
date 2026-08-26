@@ -21,10 +21,13 @@ run it. That is always safer than guessing.
 | `005-ats.sql` | Internal pipeline, contact history, skill levels, and the queue view |
 | `006-applicant-edit.sql` | Lets an applicant correct their own answers, and keeps consent history |
 | `007-manage-roles.sql` | Grant and revoke roles from the admin page |
-| `008-consent-select.sql` | Lets an applicant read back the consent they gave |
+| `008-interview-scores.sql` | Interviewer scores, 1-10, on the staff-only side |
+| `009-account-types.sql` | Account types asked for at sign-up and granted by a person |
+| `010-contact.sql` | The contact form table — public writes, staff read |
+| `011-consent-select.sql` | Lets an applicant read back the consent they gave |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 008 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 011 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

@@ -2,45 +2,15 @@
    already use, so the portal cannot drift away from the site around it. */
 import { readFileSync, writeFileSync } from "node:fs";
 
-const SRC = "careers.html";
-const src = readFileSync(SRC, "utf8");
-const L = src.split(/\r?\n/);
-const nl = "\r\n";
-const slice = (a, b) => L.slice(a - 1, b).join(nl);
+import { chrome } from "./lib-chrome.mjs";
 
-/* Line numbers into a file two people edit all day are a countdown.
-   THEME_SCRIPT was slice(683, 694); careers.html grew, 683 became the tail of
-   the stylesheet, and the portal shipped `.copied{...}</style>` as visible text
-   at the top of both pages with everything below it unstyled. Nothing failed —
-   the build was perfectly happy.
+const { fonts: FONTS, css: TOKENS_TO_NAV, themeScript: THEME_SCRIPT,
+        svgDefs: SVG_DEFS, brandSvg: BRAND_SVG, nl } = chrome();
 
-   So the blocks that are whole elements are found by what they contain. */
-function block(startRe, endRe, what) {
-  const from = L.findIndex((l) => startRe.test(l));
-  if (from < 0) throw new Error("build-portal: could not find the start of " + what + " in " + SRC);
-  const to = L.findIndex((l, i) => i > from && endRe.test(l));
-  if (to < 0) throw new Error("build-portal: could not find the end of " + what + " in " + SRC);
-  return L.slice(from, to + 1).join(nl);
-}
-
-/* A slice that has drifted into the stylesheet takes a tag with it, and that
-   is the failure that shipped. Nothing spliced in may carry either tag. */
-function clean(text, what) {
-  if (/<\/?style\b/i.test(text)) {
-    throw new Error("build-portal: " + what + " contains a <style> tag — the slice has drifted");
-  }
-  return text;
-}
-
-/* Lifted verbatim rather than retyped: tokens, base, buttons, nav, the section
-   helper, the footer, and the two things that must run before paint. */
-const TOKENS_TO_NAV = clean(slice(7, 185),   "TOKENS_TO_NAV");
-const SECTIONS      = clean(slice(239, 244), "SECTIONS");
-const FOOTER_CSS    = clean(slice(349, 359), "FOOTER_CSS");
-const FONTS         = clean(slice(2, 4),     "FONTS");
-const THEME_SCRIPT  = clean(block(/<script>/, /<\/script>/, "the theme script"), "THEME_SCRIPT");
-const SVG_DEFS      = clean(block(/Gradient for the brand mark/, /<\/svg>/, "the gradient defs"), "SVG_DEFS");
-const BRAND_SVG     = clean(block(/<svg class="brand__mark"/, /<\/svg>/, "the brand mark"), "BRAND_SVG");
+/* The old build lifted these by line number out of careers.html, which broke
+   silently the moment that file grew a step. Anchors move with the file. */
+const SECTIONS = "";
+const FOOTER_CSS = "";
 
 const PAGE_CSS = `
 /* ---------- portal ---------- */
@@ -149,6 +119,21 @@ const PAGE_CSS = `
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+.scores{margin-top:.6rem;border-top:1px dashed var(--line);padding-top:.55rem}
+.scores summary{cursor:pointer;font-size:.8rem;color:var(--muted);list-style:none}
+.scores summary::-webkit-details-marker{display:none}
+.scores summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.scores[open] summary::before{content:"− "}
+.scr__avg{color:var(--accent-deep)}
+.scr__none{opacity:.8}
+.scr__by{font-size:.72rem}
+.scr__hint{margin:.5rem 0 .7rem;font-size:.78rem;color:var(--muted)}
+.scrgrid{display:grid;gap:.4rem}
+@media(min-width:700px){.scrgrid{grid-template-columns:repeat(2,1fr);gap:.4rem .9rem}}
+.scr{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:.5rem;font-size:.82rem}
+.scr__k{color:var(--ink-2)}
+.scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
+.scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -189,6 +174,7 @@ const PAGE_CSS = `
 .acctlist{display:grid;gap:.5rem;margin-top:1rem}
 .acct{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;padding:.6rem .8rem;background:var(--surface-2);border-radius:8px}
 .acct__e{font-size:.9rem}
+.acct__note{display:block;font-size:.78rem;color:var(--muted);margin-top:.2rem}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
@@ -761,21 +747,34 @@ function render(user, apps) {
       '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
     "</div>";
 
+  if (!apps.length && !STAFF && !BUSINESS) {
+    /* No role, no application: they are new. Ask before showing them an
+       empty page that explains nothing. */
+    lead.textContent = "Signed in as " + user.email + ".";
+    view(who + typeChooser());
+    document.getElementById("out").addEventListener("click", signOut);
+    wireChooser();
+    return;
+  }
+
   if (!apps.length) {
     lead.textContent = "Signed in as " + user.email + ".";
-    view(who +
+    view(who + staffBanner() +
       '<div class="card">' +
-        '<div class="note note--warn"><b>No application found for this address.</b> ' +
-        "If you applied with a different email, sign out and use that one. " +
-        "If you have not applied yet, the form is on the careers page.</div>" +
-        '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/careers">Go to the careers page</a></p>' +
+        (STAFF
+          ? '<div class="note"><b>Nothing here under your address.</b> ' +
+            "This page shows your own application, and staff usually do not have one.</div>"
+          : '<div class="note note--warn"><b>No application found for this address.</b> ' +
+            "If you applied with a different email, sign out and use that one. " +
+            "If you have not applied yet, the form is on the careers page.</div>" +
+            '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/careers">Go to the careers page</a></p>') +
       "</div>");
     document.getElementById("out").addEventListener("click", signOut);
     return;
   }
 
   lead.textContent = "Signed in as " + user.email + ".";
-  var html = who;
+  var html = who + staffBanner();
 
   for (var i = 0; i < apps.length; i++) {
     var a = apps[i];
@@ -820,9 +819,114 @@ function start() {
 
   var claims = readToken(session().access_token);
   if (!claims || !claims.email) { clearSession(); signedOut("That sign-in did not carry an email address."); return; }
-  var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
-
   view('<div class="card"><span class="spin"></span>Looking up your application&hellip;</div>');
+
+  /* Everyone signs in through the same link, so a staff member lands here
+     first. Rather than showing them an empty applicant view, ask what they
+     can do and point them at the right page. They may also be an applicant,
+     so this offers rather than redirects. */
+  Promise.all([
+    api("rpc/my_permissions", { method: "POST", body: {} }).catch(function () { return []; }),
+    api("rpc/my_account_requests", { method: "POST", body: {} }).catch(function () { return []; })
+  ]).then(function (r) {
+    var perms = r[0] || [];
+    STAFF = perms.indexOf("applications.view_all") > -1;
+    BUSINESS = perms.indexOf("seats.view") > -1;
+    REQUESTS = r[1] || [];
+    loadApplications();
+  });
+}
+
+var STAFF = false;
+var BUSINESS = false;
+var REQUESTS = [];
+
+/* Somebody who has just signed up holds nothing, so every page is empty and
+   none of them says why. Ask them once.
+
+   What they pick is a request, not a grant: choosing "Business" from a menu
+   cannot be the only thing standing between a stranger and other people's
+   data. A person approves it. */
+function typeChooser() {
+  var pending = REQUESTS.filter(function (r) { return r.state === "pending"; })[0];
+  if (pending) {
+    return (
+      '<div class="card">' +
+        '<div class="note"><b>Waiting on us.</b> You asked for a ' +
+        esc(pending.requested_role) + " account. Somebody reviews these by hand, " +
+        "usually within a working day, and you will get an email either way.</div>" +
+      "</div>"
+    );
+  }
+
+  var declined = REQUESTS.filter(function (r) { return r.state === "declined"; })[0];
+
+  return (
+    '<div class="card">' +
+      '<h2 class="edit__h">What brings you here?</h2>' +
+      '<p class="msg" style="margin-top:0">Pick one and we will set your account up. ' +
+      "You can say more in the box if it helps." +
+      (declined ? " Your last request was not approved &mdash; you are welcome to ask again." : "") +
+      "</p>" +
+      '<div class="opts opts--2" style="margin-top:1rem">' +
+        '<label class="opt">' +
+          '<input type="radio" name="acct" value="applicant" checked>' +
+          '<span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>' +
+          '<span><span class="opt__t">I am looking for work</span>' +
+          '<span class="opt__d">See your application and how far along it is</span></span>' +
+        "</label>" +
+        '<label class="opt">' +
+          '<input type="radio" name="acct" value="business">' +
+          '<span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>' +
+          '<span><span class="opt__t">I am hiring</span>' +
+          '<span class="opt__d">See the seats you have asked us for</span></span>' +
+        "</span></label>" +
+      "</div>" +
+      '<div class="fld" style="margin-top:1rem">' +
+        '<label for="acct-note">Anything to add <em>&mdash; optional</em></label>' +
+        '<input id="acct-note" type="text" placeholder="Company name, or which role you applied for">' +
+      "</div>" +
+      '<button class="btn btn--solid" id="acct-go" type="button">Set up my account</button>' +
+      '<p class="msg" id="acct-msg"></p>' +
+    "</div>"
+  );
+}
+
+function wireChooser() {
+  var b = document.getElementById("acct-go");
+  if (!b) return;
+  b.addEventListener("click", function () {
+    var picked = document.querySelector("[name=acct]:checked");
+    var msg = document.getElementById("acct-msg");
+    if (!picked) { msg.textContent = "Pick one."; return; }
+    b.disabled = true;
+    api("rpc/request_account_type", {
+      method: "POST",
+      body: { role_key: picked.value, note: document.getElementById("acct-note").value.trim() || null }
+    }).then(function () { start(); })
+      .catch(function (e) {
+        b.disabled = false;
+        msg.className = "msg msg--bad";
+        msg.textContent = e.message || "That did not go through.";
+      });
+  });
+}
+
+var STAFF = false;
+
+function staffBanner() {
+  if (!STAFF) return "";
+  return (
+    '<div class="note" style="margin-bottom:1.2rem">' +
+      "<b>You have staff access.</b> Applications, stages and interview scores are on the " +
+      '<a href="/admin">admin page</a>.' +
+    "</div>"
+  );
+}
+
+function loadApplications() {
+  var claims = readToken(session().access_token);
+  var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
   api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc")
     .then(function (rows) { render(user, rows || []); })
@@ -939,6 +1043,43 @@ function socialLink(s) {
 
 /* Only the skills they actually answered. A blank is not a beginner, and
    drawing it as one would put words in their mouth. */
+/* Self-rating and interviewer score side by side, because the gap between
+   them is the useful part. An unscored skill shows a dash, never a 0: nobody
+   has judged it yet, and 0 is a judgement. */
+function scoreLine(a) {
+  if (!can("applications.edit")) return "";
+  var rows = SKILLS.map(function (k) {
+    var col = k[0].replace("skill_", "score_");
+    var have = a[col];
+    var opts = ['<option value="">&mdash;</option>'];
+    for (var n = 1; n <= 10; n++) {
+      opts.push('<option value="' + n + '"' + (Number(have) === n ? " selected" : "") + ">" + n + "</option>");
+    }
+    return (
+      '<label class="scr">' +
+        '<span class="scr__k">' + esc(k[1]) + "</span>" +
+        '<span class="scr__claim">' +
+          (a[k[0]] ? esc(LEVEL_LABEL[a[k[0]]] || a[k[0]]) : "not stated") +
+        "</span>" +
+        '<select data-score="' + esc(col) + '">' + opts.join("") + "</select>" +
+      "</label>"
+    );
+  }).join("");
+
+  return (
+    '<details class="scores"' + (a.score_avg ? " open" : "") + ">" +
+      "<summary>Interview scores" +
+        (a.score_avg
+          ? ' <b class="scr__avg">' + esc(a.score_avg) + "/10 avg</b>"
+          : ' <span class="scr__none">not scored</span>') +
+        (a.scored_by ? ' <span class="scr__by">' + esc(a.scored_by) + "</span>" : "") +
+      "</summary>" +
+      '<p class="scr__hint">Their own rating on the left, your 1&ndash;10 on the right. Leave blank for anything you did not assess.</p>' +
+      '<div class="scrgrid">' + rows + "</div>" +
+    "</details>"
+  );
+}
+
 function skillLine(a) {
   var given = SKILLS.filter(function (k) { return a[k[0]]; });
   if (!given.length) return "";
@@ -1033,6 +1174,7 @@ function rowHtml(a) {
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
       contactLine(a) +
+      scoreLine(a) +
       social +
       ctl +
     "</div>"
@@ -1052,16 +1194,42 @@ function loadRoles() {
   box.innerHTML = '<span class="spin"></span>Loading accounts&hellip;';
   Promise.all([
     api("rpc/list_roles", { method: "POST", body: {} }),
-    api("rpc/list_role_grants", { method: "POST", body: {} })
+    api("rpc/list_role_grants", { method: "POST", body: {} }),
+    api("rpc/list_account_requests", { method: "POST", body: {} }).catch(function () { return []; })
   ]).then(function (r) {
     ROLES = r[0] || [];
-    drawRoles(box, r[1] || []);
+    drawRoles(box, r[1] || [], r[2] || []);
   }).catch(function (e) {
     box.innerHTML = '<p class="msg msg--bad">Could not load accounts. ' + esc(e.message) + "</p>";
   });
 }
 
-function drawRoles(box, grants) {
+function drawRequests(box, reqs) {
+  if (!reqs.length) return "";
+  return (
+    '<h2 class="edit__h" style="margin-top:1.4rem">Waiting for approval</h2>' +
+    '<p class="msg" style="margin-top:0">What somebody says they are is a claim until one of us agrees with it.</p>' +
+    '<div class="acctlist">' +
+      reqs.map(function (r) {
+        return (
+          '<div class="acct" data-req="' + esc(r.user_email) + '" data-role="' + esc(r.requested_role) + '">' +
+            "<span>" +
+              '<span class="acct__e">' + esc(r.user_email) + "</span> " +
+              '<span class="pill">' + esc(r.requested_role) + "</span>" +
+              (r.note ? '<span class="acct__note">' + esc(r.note) + "</span>" : "") +
+            "</span>" +
+            '<span class="acct__r">' +
+              '<button class="btn btn--ghost" data-decide="yes" style="padding:.35rem .7rem;font-size:.82rem">Approve</button> ' +
+              '<button class="btn btn--ghost" data-decide="no" style="padding:.35rem .7rem;font-size:.82rem">Decline</button>' +
+            "</span>" +
+          "</div>"
+        );
+      }).join("") +
+    "</div>"
+  );
+}
+
+function drawRoles(box, grants, reqs) {
   var opts = ROLES.map(function (r) {
     return '<option value="' + esc(r.key) + '">' + esc(r.label) + "</option>";
   }).join("");
@@ -1083,7 +1251,8 @@ function drawRoles(box, grants) {
     : '<p class="msg">Nobody has a role yet.</p>';
 
   box.innerHTML =
-    '<h2 class="edit__h">Who can do what</h2>' +
+    drawRequests(box, reqs || []) +
+    '<h2 class="edit__h"' + ((reqs || []).length ? ' style="margin-top:1.6rem"' : "") + ">Who can do what</h2>" +
     '<p class="msg" style="margin-top:0">A role is granted to an email address. It takes effect the next time that person signs in.</p>' +
     '<div class="acctlist">' + rows + "</div>" +
     '<div class="adm__bar" style="margin:1.1rem 0 0">' +
@@ -1107,6 +1276,23 @@ function drawRoles(box, grants) {
     var rk = document.getElementById("r-role").value;
     if (!em || em.indexOf("@") < 1) { msg.textContent = "Enter an email address."; return; }
     setRole(em, rk, true, msg);
+  });
+
+  box.querySelectorAll("[data-decide]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-req]");
+      api("rpc/decide_account_request", {
+        method: "POST",
+        body: {
+          target_email: row.getAttribute("data-req"),
+          role_key: row.getAttribute("data-role"),
+          approve: b.getAttribute("data-decide") === "yes"
+        }
+      }).then(loadRoles).catch(function (e) {
+        msg.className = "msg msg--bad";
+        msg.textContent = e.message || "That did not go through.";
+      });
+    });
   });
 
   box.querySelectorAll("[data-revoke]").forEach(function (b) {
@@ -1237,6 +1423,8 @@ function paint() {
     if (st === "__late") {
       var w = days(a.waiting_since);
       if (!(a.is_ghosted || (w !== null && w >= 7 && !a.response_received))) return false;
+    } else if (st === "__unscored") {
+      if (a.pipeline !== "interviewed" || a.score_avg) return false;
     } else if (st && a.pipeline !== st) {
       return false;
     }
@@ -1295,6 +1483,19 @@ function save(row) {
     var t = { application_id: id, updated_at: new Date().toISOString() };
     var changed = false;
     if (pipe !== null && (!rec || rec.pipeline !== pipe)) { t.pipeline = pipe; changed = true; }
+
+    /* scored_by and scored_at are deliberately not sent. The database stamps
+       them, and only when a score actually moves, so re-saving a note does
+       not rewrite who did the assessing. */
+    row.querySelectorAll("[data-score]").forEach(function (el) {
+      var col = el.getAttribute("data-score");
+      var val = el.value === "" ? null : Number(el.value);
+      var was = rec ? (rec[col] === undefined ? null : rec[col]) : undefined;
+      if (was === undefined || (was === null ? val !== null : Number(was) !== val)) {
+        t[col] = val;
+        changed = true;
+      }
+    });
     if (replied !== null && (!rec || !!rec.response_received !== replied)) {
       t.response_received = replied;
       changed = true;
@@ -1318,6 +1519,10 @@ function save(row) {
         if (t.last_contacted_at) rec.last_contacted_at = t.last_contacted_at;
         if (t.contacted_by) rec.contacted_by = t.contacted_by;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
+        SKILLS.forEach(function (k) {
+          var col = k[0].replace("skill_", "score_");
+          if (col in t) rec[col] = t[col];
+        });
       }));
     }
   }
@@ -1336,6 +1541,14 @@ function save(row) {
     }
     row.removeAttribute("data-mark-contacted");
     if (pipe !== null || replied !== null) {
+      /* Recompute the average locally rather than refetching: the row is about
+         to be redrawn and a stale header under a changed score reads as a bug. */
+      var got = SKILLS.map(function (k) { return rec[k[0].replace("skill_", "score_")]; })
+                      .filter(function (v) { return v !== null && v !== undefined && v !== ""; })
+                      .map(Number);
+      rec.score_avg = got.length
+        ? String(Math.round((got.reduce(function (x, y) { return x + y; }, 0) / got.length) * 10) / 10)
+        : null;
       var fresh = rowHtml(rec);
       var tmp = document.createElement("div");
       tmp.innerHTML = fresh;
@@ -1380,6 +1593,7 @@ function render(email, apps, notes, socials) {
       '<select id="filter" aria-label="Filter by pipeline">' +
         '<option value="">All pipeline</option>' + pipeOptions("") +
         '<option value="__late">Waiting 7+ days, no reply</option>' +
+        '<option value="__unscored">Interviewed, not yet scored</option>' +
       "</select>" +
       '<select id="fskill" aria-label="Filter by skill">' +
         '<option value="">Any skill</option>' +

@@ -88,7 +88,8 @@ console.log("\nstatic\n");
 /* Every page that ships, not just the two with forms. admin.html and
    status.html carry a sign-in flow and a stage editor; a stray brace there
    takes the portal down while the markup around it still renders fine. */
-const SHIPPED = [...PAGES.map((p) => p.file), "status.html", "admin.html"]
+const SHIPPED = [...PAGES.map((p) => p.file), "status.html", "admin.html",
+  "privacy.html", "terms.html", "refunds.html", "contact.html"]
   .filter((f) => existsSync(f));
 
 for (const p of SHIPPED.map((file) => ({ file }))) {
@@ -280,6 +281,34 @@ await check("SECURITY DEFINER functions check the caller", () => {
 
    `security_invoker = true` runs it as the caller, which puts the policies
    back. application_queue has it. Any view added later must too. */
+/* CREATE OR REPLACE VIEW may only APPEND columns to the end of an existing
+   view. Rename one, reorder them, or insert in the middle and Postgres refuses
+   with 42P16 — which is not caught until someone pastes the file and the
+   migration stops halfway, leaving the database in neither state.
+
+   008 rewrote application_queue with the score columns where is_ghosted had
+   been, and failed exactly that way. So a file rewriting a view an earlier file
+   already created must drop it first. */
+await check("a rewritten view is dropped first", () => {
+  const created = new Map();          /* view name -> file that first created it */
+  const offenders = [];
+  for (const f of sqlFiles) {
+    const text = read(SQL_DIR + "/" + f);
+    for (const [, name] of text.matchAll(/create\s+(?:or\s+replace\s+)?view\s+public\.(\w+)/gi)) {
+      if (created.has(name) && created.get(name) !== f) {
+        const drops = new RegExp("drop\\s+view\\s+if\\s+exists\\s+public\\." + name + "\\b", "i").test(text);
+        if (!drops) offenders.push(f + " rewrites " + name + " (first made in " + created.get(name) + ")");
+      }
+      if (!created.has(name)) created.set(name, f);
+    }
+  }
+  if (offenders.length) {
+    throw new Error(offenders.join("; ") + " — add `drop view if exists` before it, " +
+      "or the paste fails with 42P16 partway through and re-grant what the drop takes with it");
+  }
+  return created.size ? created.size + " view(s) tracked" : "no views";
+});
+
 await check("views run as the caller, not the owner", () => {
   const views = [...sql.matchAll(
     /create\s+(?:or\s+replace\s+)?view\s+public\.(\w+)([\s\S]*?)\sas\s/gi

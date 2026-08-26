@@ -1,0 +1,339 @@
+<title>Terms of Service — SecureJobVA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --paper:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#F1F5FA;
+  --glow:#F2F8FF;
+  --ink:#001232;
+  --ink-2:#3B4C66;
+  --muted:#64778F;
+  --line:#E1E8F1;
+  --accent:#0072EE;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#EAF3FE;
+  --accent-deep:#0053B4;
+  --signal:#FFC233;
+  --signal-ink:#3A2600;
+  --price-bg:#001232;
+  --price-fg:#F0F6FE;
+  --shadow:0 1px 2px rgba(0,26,70,.05), 0 14px 32px -20px rgba(0,26,70,.35);
+
+  /* The mark. Its gradient runs from the shield's bright corner to its point,
+     the two ends sampled off the logo file. Held as tokens so the artwork
+     follows the theme instead of carrying a fixed colour into a dark page. */
+  --mark-from:#0072EE;
+  --mark-to:#002E6B;
+  --mark-bg:#FFFFFF;
+  --mark-ink:#FFFFFF;
+
+  --step--1:.8125rem;
+  --step-0:1.0625rem;
+  --step-1:1.3125rem;
+  --step-2:1.75rem;
+  --step-3:2.375rem;
+  --step-4:clamp(2.75rem,1.6rem + 4.6vw,4.75rem);
+
+  --wrap:1140px;
+  --gut:clamp(1.25rem,4vw,2.5rem);
+
+  /* Light is the default; dark is opt-in through the toggle. */
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#080F1C;
+  --surface:#0F1829;
+  --surface-2:#152034;
+  --glow:#101B2E;
+  --ink:#EAF1FB;
+  --ink-2:#B9C8DE;
+  --muted:#7F91AA;
+  --line:#22304A;
+  --accent:#3B9BFF;
+  --accent-ink:#001232;
+  --accent-soft:#132743;
+  --accent-deep:#6FB6FF;
+  --signal:#FFCB5C;
+  --signal-ink:#3A2600;
+  --price-bg:#152034;
+  --price-fg:#EAF1FB;
+
+  /* Both ends lift on dark, or the shield's point dissolves into the page. */
+  --mark-from:#6FBBFF;
+  --mark-to:#2B7FE0;
+  --mark-bg:#0B1424;
+  --mark-ink:#08111F;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -20px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Karla","Segoe UI",system-ui,sans-serif;
+  font-size:var(--step-0);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{
+  font-family:"Bricolage Grotesque","Karla",system-ui,sans-serif;
+  font-weight:800;
+  line-height:1.04;
+  letter-spacing:-.022em;
+  text-wrap:balance;
+  margin:0;
+}
+p{margin:0}
+a{color:inherit}
+img{max-width:100%}
+
+.wrap{width:min(100% - (var(--gut) * 2),var(--wrap));margin-inline:auto}
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.72rem;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.lede{font-size:var(--step-1);color:var(--ink-2);line-height:1.5;max-width:60ch}
+.small{font-size:var(--step--1);color:var(--muted)}
+
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:.55rem;
+  font-family:"Karla",sans-serif;font-weight:700;font-size:.98rem;
+  padding:.85rem 1.5rem;border-radius:8px;
+  text-decoration:none;border:1.5px solid transparent;
+  transition:transform .16s ease,background-color .16s ease,border-color .16s ease;
+}
+.btn--solid{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn--solid:hover{transform:translateY(-2px)}
+.btn--ghost{border-color:var(--line);color:var(--ink);background:transparent}
+.btn--ghost:hover{border-color:var(--ink);transform:translateY(-2px)}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:40;
+  background:color-mix(in srgb,var(--paper) 88%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
+.brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
+.brand__mark{width:26px;height:26px;flex:none}
+.brand__word{display:inline}
+.brand__va{color:var(--accent)}
+.nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
+/* When the links outrun the bar, scroll them instead of letting the row
+   squash, wrap and push the header taller. min-width:0 is what makes it
+   work: a flex item will not shrink below its content without it, so the
+   row would just overflow and never become scrollable. */
+.nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
+.nav__links::-webkit-scrollbar{display:none}
+.nav__links a{flex:none;white-space:nowrap}
+/* Only the links give way; the brand and the controls keep their size. */
+.brand{flex:none}
+.nav__tools{flex:none}
+.nav__links a{text-decoration:none;color:var(--ink-2)}
+.nav__links a:hover{color:var(--accent)}
+.nav__signin{color:var(--accent);font-weight:600}
+.nav__cta{margin-left:0}
+.nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
+.themetog,.navtog{
+  width:38px;height:38px;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);border-radius:8px;
+  background:transparent;color:var(--ink-2);cursor:pointer;
+  transition:border-color .16s ease,color .16s ease;
+}
+.themetog:hover,.navtog:hover{border-color:var(--accent);color:var(--accent)}
+.themetog svg,.navtog svg{display:block}
+.navtog .i-close{display:none}
+.navtog[aria-expanded="true"] .i-open{display:none}
+.navtog[aria-expanded="true"] .i-close{display:block}
+
+.mobnav{border-top:1px solid var(--line);background:var(--paper);padding:.25rem 0 1.15rem}
+.mobnav[hidden]{display:none}
+.mobnav__in{display:grid}
+.mobnav a{
+  padding:.9rem .1rem;text-decoration:none;color:var(--ink-2);
+  border-bottom:1px solid var(--line);font-weight:600;
+}
+.mobnav a:last-child{border-bottom:none}
+.mobnav a:hover{color:var(--accent)}
+
+@media(max-width:559px){
+  .nav__in{gap:.6rem}
+  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+}
+@media(min-width:900px){
+  .nav__links{display:flex}
+  .nav__tools{margin-left:0}
+  .navtog{display:none}
+  .mobnav{display:none}
+}
+
+
+/* ---------- policy ---------- */
+.doc{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem)}
+.doc__wrap{max-width:46rem}
+.doc h1{font-size:var(--step-3);margin:.5rem 0 .4rem}
+.doc__meta{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 2rem}
+.doc h2{font-size:1.15rem;margin:2.2rem 0 .7rem;padding-top:1.4rem;border-top:1px solid var(--line)}
+.doc h2:first-of-type{border-top:0;padding-top:0;margin-top:1.6rem}
+.doc h3{font-size:1rem;margin:1.4rem 0 .5rem}
+.doc p{margin:0 0 .9rem;color:var(--ink-2);line-height:1.7}
+.doc ul{margin:0 0 1rem;padding-left:1.1rem;color:var(--ink-2);line-height:1.7}
+.doc li{margin-bottom:.4rem}
+.doc a{color:var(--accent)}
+.doc b{color:var(--ink)}
+.doc__toc{background:var(--surface-2);border-radius:10px;padding:1.1rem 1.3rem;margin-bottom:2rem}
+.doc__toc ul{list-style:none;padding:0;margin:0;display:grid;gap:.4rem;font-size:.92rem}
+.doc__toc a{text-decoration:none}
+.doc__toc a:hover{text-decoration:underline}
+
+/* Something we have not settled should look unsettled, not like fine print
+   somebody has already agreed to. */
+.doc__open{background:#FFF6E5;border-left:3px solid var(--signal);border-radius:0 8px 8px 0;padding:1rem 1.15rem;margin:0 0 1rem;font-size:.92rem;color:var(--ink-2);line-height:1.6}
+:root[data-theme="dark"] .doc__open{background:#2A2110}
+.doc__open b{display:block;margin-bottom:.3rem}
+
+.cform{display:grid;gap:0}
+.cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
+.cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
+.cform label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
+.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
+.cform textarea{min-height:8rem;resize:vertical}
+.cform input:focus-visible,.cform select:focus-visible,.cform textarea:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
+.cform .err{color:#B3261E;font-size:.85rem;margin:.15rem 0 0;min-height:1.1em}
+:root[data-theme="dark"] .cform .err{color:#F2B8B5}
+@media(min-width:560px){.cform__two{display:grid;grid-template-columns:1fr 1fr;gap:0 .9rem}}
+.cform__ok{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.15rem 1.3rem}
+.contact__at{display:grid;gap:.8rem;margin:1.4rem 0 2.2rem}
+.contact__row{display:flex;flex-wrap:wrap;gap:.5rem 1rem;padding-bottom:.7rem;border-bottom:1px solid var(--line)}
+.contact__k{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);min-width:9rem}
+</style>
+
+<script>
+/* Restore the saved theme before paint so the page never flashes the wrong one. */
+(function () {
+  try {
+    var saved = localStorage.getItem("sjva-theme");
+    if (saved === "dark" || saved === "light") {
+      document.documentElement.setAttribute("data-theme", saved);
+    }
+  } catch (e) {}
+})();
+</script>
+
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+    <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0072EE" style="stop-color:var(--mark-from,#0072EE)"></stop>
+      <stop offset="1" stop-color="#002E6B" style="stop-color:var(--mark-to,#002E6B)"></stop>
+    </linearGradient>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="nav__in">
+      <a class="brand" href="/" aria-label="SecureJobVA home">
+<svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
+          <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
+          <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
+          <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
+          <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
+      </a>
+      <nav class="nav__links">
+        <a href="/">Hiring a VA?</a>
+        <a href="/careers">Careers</a>
+        <a href="/contact">Contact</a>
+        <a class="nav__signin" href="/status">Sign in</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="doc">
+    <div class="wrap doc__wrap">
+      <span class="eyebrow">Site policies</span>
+      <h1>Terms of Service</h1>
+      <p class="doc__meta">Last updated 26 August 2026</p>
+      <nav class="doc__toc" aria-label="On this page"><ul><li><a href="#t1">1. Acceptance</a></li><li><a href="#t2">2. The service</a></li><li><a href="#t3">3. Eligibility</a></li><li><a href="#t4">4. Your account</a></li><li><a href="#t5">5. Applicant conduct</a></li><li><a href="#t6">6. Social accounts</a></li><li><a href="#t7">7. No guarantee of work</a></li><li><a href="#t8">8. Status of placed assistants</a></li><li><a href="#t9">9. Fees</a></li><li><a href="#t10">10. Intellectual property</a></li><li><a href="#t11">11. Termination</a></li><li><a href="#t12">12. Liability</a></li><li><a href="#t13">13. Governing law</a></li><li><a href="#t14">14. Changes</a></li><li><a href="#t15">15. Contact</a></li></ul></nav>
+      <h2 id="t1">1. Acceptance</h2>
+      <p>By using securejobva.com you agree to these Terms. If you do not agree, do not use the Site.</p>
+      <h2 id="t2">2. The service</h2>
+      <p>SecureJobVA connects people seeking virtual assistant work (&ldquo;Applicants&rdquo;) with businesses seeking to hire them (&ldquo;Clients&rdquo;). We are an intermediary. We do not guarantee employment, income, or any particular outcome.</p>
+      <h2 id="t3">3. Eligibility</h2>
+      <p>You must be at least 18 to create an account or apply.</p>
+      <h2 id="t4">4. Your account</h2>
+      <ul>
+        <li>Keep your login details to yourself.</li>
+        <li>Give accurate, current information in your application and profile.</li>
+        <li>You are responsible for what happens under your account.</li>
+      </ul>
+      <h2 id="t5">5. Applicant conduct</h2>
+      <p>Do not submit false information, impersonate anyone, or use the Site for anything other than genuinely looking for work.</p>
+      <h2 id="t6">6. Social accounts and posting</h2>
+      <p>If you give us social media links or connect an account, you authorise us to view the associated profile and activity in order to assess your application.</p>
+      <p>Posting on your behalf is a separate permission and is never assumed. We ask for it explicitly, record the date and the exact wording you agreed to, and nothing is published to your accounts without it. You can withdraw it at any time &mdash; from <a href="/status">your application page</a>, or by writing to <a href="mailto:support@securejobva.com">support@securejobva.com</a>. Withdrawing does not erase the record of the permission that applied while it was in force.</p>
+      <h2 id="t7">7. No guarantee of work</h2>
+      <p>Being listed, reviewed or interviewed does not guarantee an offer or continuing work. We take reasonable steps to check that a Client is legitimate, but we do not guarantee their conduct, their payment practices, or the conditions of the work.</p>
+      <h2 id="t8">8. Status of placed assistants</h2>
+      <div class="doc__open">
+        <b>This section is being finalised and is not yet in force.</b>
+        Whether a placed assistant is an independent contractor of the Client, a contractor of Secure Job VA, or an employee changes the tax and liability position for everyone involved, and it is being settled with our accountant and attorney rather than drafted here. Until it is published, the arrangement that applies to you is the one written in the agreement you sign before starting work, and that agreement governs.
+      </div>
+      <p>If you are applying and want to know where you would stand before you spend time on the exams, ask us at <a href="mailto:support@securejobva.com">support@securejobva.com</a> and we will tell you plainly.</p>
+      <h2 id="t9">9. Fees</h2>
+      <p><b>Applicants are never charged.</b> There is no fee to apply, to be listed, to be assessed, or to be placed, and we do not take a percentage of what you are paid. If anyone asks you to pay us for any of those things, it did not come from us &mdash; tell us at <a href="mailto:support@securejobva.com">support@securejobva.com</a>.</p>
+      <p><b>Clients</b> pay a flat hourly rate for hours worked, quoted before the seat starts and billed weekly. There is no setup fee, no recruiting fee, and no markup added afterwards. The current rate and what it includes are on the <a href="/#pricing">pricing section</a> of the home page; the rate quoted to you on your first call is the rate you are billed.</p>
+      <p>The first week of a new seat is not charged. A card and a deposit are set up before it starts so the seat can begin on the day it is approved. Billing begins in the second week.</p>
+      <h2 id="t10">10. Intellectual property</h2>
+      <p>Everything on the Site except content submitted by users belongs to Secure Job VA and may not be copied or reproduced without permission.</p>
+      <h2 id="t11">11. Termination</h2>
+      <p>We may suspend or close an account for breaking these Terms, for fraud, or for misusing the Site.</p>
+      <h2 id="t12">12. Liability</h2>
+      <p>To the fullest extent the law allows, Secure Job VA is not liable for disputes, damages or losses arising out of the working relationship between an Applicant and a Client.</p>
+      <h2 id="t13">13. Governing law</h2>
+      <p>These Terms are governed by the laws of the State of Texas, United States, without regard to conflict of law principles. Secure Job VA is the legal business name operating this Site.</p>
+      <h2 id="t14">14. Changes</h2>
+      <p>We may update these Terms. Continuing to use the Site after a change means you accept the revised version.</p>
+      <h2 id="t15">15. Contact</h2>
+      <p>Questions about these Terms: <a href="mailto:support@securejobva.com">support@securejobva.com</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__bot" style="margin-top:0;border-top:0;padding-top:0">
+      <span>&copy; 2026 Secure Job VA &middot; Houston, Texas</span>
+      <span>
+        <a href="/">Home</a> &middot;
+        <a href="/careers">Careers</a> &middot;
+        <a href="/privacy">Privacy</a> &middot;
+        <a href="/terms">Terms</a> &middot;
+        <a href="/refunds">Refunds</a> &middot;
+        <a href="/contact">Contact</a>
+      </span>
+    </div>
+  </div>
+</footer>
+

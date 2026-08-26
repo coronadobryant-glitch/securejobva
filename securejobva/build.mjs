@@ -52,6 +52,38 @@ const PAGES = [
     description: "Internal.",
     ogTitle: "Applications",
     noindex: true
+  },
+  {
+    src: "privacy.html",
+    path: "/privacy",
+    title: "Privacy Policy — SecureJobVA",
+    description:
+      "How SecureJobVA collects, uses and protects information from visitors, applicants and clients.",
+    ogTitle: "Privacy Policy"
+  },
+  {
+    src: "terms.html",
+    path: "/terms",
+    title: "Terms of Service — SecureJobVA",
+    description:
+      "The terms you agree to by using securejobva.com, for both applicants and clients.",
+    ogTitle: "Terms of Service"
+  },
+  {
+    src: "refunds.html",
+    path: "/refunds",
+    title: "Refund Policy — SecureJobVA",
+    description:
+      "How refunds, the free first week and the replacement guarantee work. Applicants are never charged.",
+    ogTitle: "Refund Policy"
+  },
+  {
+    src: "contact.html",
+    path: "/contact",
+    title: "Contact — SecureJobVA",
+    description:
+      "Reach SecureJobVA about an application, hiring, billing or a privacy request.",
+    ogTitle: "Contact"
   }
 ];
 

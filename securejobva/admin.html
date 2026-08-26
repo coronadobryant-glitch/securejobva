@@ -147,6 +147,7 @@ img{max-width:100%}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
+.nav__signin{color:var(--accent);font-weight:600}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
 .themetog,.navtog{
@@ -183,22 +184,6 @@ img{max-width:100%}
   .mobnav{display:none}
 }
 
-/* ---------- sections ---------- */
-.sec{padding:clamp(3.75rem,7vw,6.5rem) 0}
-.sec--tint{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.sec__head{max-width:62ch;margin-bottom:clamp(2rem,4vw,3rem)}
-.sec__head h2{font-size:var(--step-3);margin:.7rem 0 .9rem}
-
-/* footer */
-.foot{padding:3rem 0 3.5rem;border-top:1px solid var(--line)}
-.foot__grid{display:grid;gap:2rem}
-@media(min-width:800px){.foot__grid{grid-template-columns:1.4fr repeat(3,1fr)}}
-.foot h5{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .85rem;font-weight:500}
-.foot ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.92rem}
-.foot a{text-decoration:none;color:var(--ink-2)}
-.foot a:hover{color:var(--accent)}
-.foot__brand{margin-bottom:.75rem}
-.foot__bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;font-size:.82rem;color:var(--muted)}
 
 /* ---------- portal ---------- */
 .pt{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem);min-height:60vh}
@@ -306,6 +291,21 @@ img{max-width:100%}
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+.scores{margin-top:.6rem;border-top:1px dashed var(--line);padding-top:.55rem}
+.scores summary{cursor:pointer;font-size:.8rem;color:var(--muted);list-style:none}
+.scores summary::-webkit-details-marker{display:none}
+.scores summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.scores[open] summary::before{content:"− "}
+.scr__avg{color:var(--accent-deep)}
+.scr__none{opacity:.8}
+.scr__by{font-size:.72rem}
+.scr__hint{margin:.5rem 0 .7rem;font-size:.78rem;color:var(--muted)}
+.scrgrid{display:grid;gap:.4rem}
+@media(min-width:700px){.scrgrid{grid-template-columns:repeat(2,1fr);gap:.4rem .9rem}}
+.scr{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:.5rem;font-size:.82rem}
+.scr__k{color:var(--ink-2)}
+.scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
+.scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -346,6 +346,7 @@ img{max-width:100%}
 .acctlist{display:grid;gap:.5rem;margin-top:1rem}
 .acct{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;padding:.6rem .8rem;background:var(--surface-2);border-radius:8px}
 .acct__e{font-size:.9rem}
+.acct__note{display:block;font-size:.78rem;color:var(--muted);margin-top:.2rem}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
@@ -374,7 +375,6 @@ img{max-width:100%}
 })();
 </script>
 
-<!-- Gradient for the brand mark. Defined once; all three marks point at it. -->
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <defs>
     <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
@@ -388,7 +388,7 @@ img{max-width:100%}
   <div class="wrap">
     <div class="nav__in">
       <a class="brand" href="/" aria-label="SecureJobVA home">
-        <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+<svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
           <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
@@ -760,6 +760,43 @@ function socialLink(s) {
 
 /* Only the skills they actually answered. A blank is not a beginner, and
    drawing it as one would put words in their mouth. */
+/* Self-rating and interviewer score side by side, because the gap between
+   them is the useful part. An unscored skill shows a dash, never a 0: nobody
+   has judged it yet, and 0 is a judgement. */
+function scoreLine(a) {
+  if (!can("applications.edit")) return "";
+  var rows = SKILLS.map(function (k) {
+    var col = k[0].replace("skill_", "score_");
+    var have = a[col];
+    var opts = ['<option value="">&mdash;</option>'];
+    for (var n = 1; n <= 10; n++) {
+      opts.push('<option value="' + n + '"' + (Number(have) === n ? " selected" : "") + ">" + n + "</option>");
+    }
+    return (
+      '<label class="scr">' +
+        '<span class="scr__k">' + esc(k[1]) + "</span>" +
+        '<span class="scr__claim">' +
+          (a[k[0]] ? esc(LEVEL_LABEL[a[k[0]]] || a[k[0]]) : "not stated") +
+        "</span>" +
+        '<select data-score="' + esc(col) + '">' + opts.join("") + "</select>" +
+      "</label>"
+    );
+  }).join("");
+
+  return (
+    '<details class="scores"' + (a.score_avg ? " open" : "") + ">" +
+      "<summary>Interview scores" +
+        (a.score_avg
+          ? ' <b class="scr__avg">' + esc(a.score_avg) + "/10 avg</b>"
+          : ' <span class="scr__none">not scored</span>') +
+        (a.scored_by ? ' <span class="scr__by">' + esc(a.scored_by) + "</span>" : "") +
+      "</summary>" +
+      '<p class="scr__hint">Their own rating on the left, your 1&ndash;10 on the right. Leave blank for anything you did not assess.</p>' +
+      '<div class="scrgrid">' + rows + "</div>" +
+    "</details>"
+  );
+}
+
 function skillLine(a) {
   var given = SKILLS.filter(function (k) { return a[k[0]]; });
   if (!given.length) return "";
@@ -854,6 +891,7 @@ function rowHtml(a) {
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
       contactLine(a) +
+      scoreLine(a) +
       social +
       ctl +
     "</div>"
@@ -873,16 +911,42 @@ function loadRoles() {
   box.innerHTML = '<span class="spin"></span>Loading accounts&hellip;';
   Promise.all([
     api("rpc/list_roles", { method: "POST", body: {} }),
-    api("rpc/list_role_grants", { method: "POST", body: {} })
+    api("rpc/list_role_grants", { method: "POST", body: {} }),
+    api("rpc/list_account_requests", { method: "POST", body: {} }).catch(function () { return []; })
   ]).then(function (r) {
     ROLES = r[0] || [];
-    drawRoles(box, r[1] || []);
+    drawRoles(box, r[1] || [], r[2] || []);
   }).catch(function (e) {
     box.innerHTML = '<p class="msg msg--bad">Could not load accounts. ' + esc(e.message) + "</p>";
   });
 }
 
-function drawRoles(box, grants) {
+function drawRequests(box, reqs) {
+  if (!reqs.length) return "";
+  return (
+    '<h2 class="edit__h" style="margin-top:1.4rem">Waiting for approval</h2>' +
+    '<p class="msg" style="margin-top:0">What somebody says they are is a claim until one of us agrees with it.</p>' +
+    '<div class="acctlist">' +
+      reqs.map(function (r) {
+        return (
+          '<div class="acct" data-req="' + esc(r.user_email) + '" data-role="' + esc(r.requested_role) + '">' +
+            "<span>" +
+              '<span class="acct__e">' + esc(r.user_email) + "</span> " +
+              '<span class="pill">' + esc(r.requested_role) + "</span>" +
+              (r.note ? '<span class="acct__note">' + esc(r.note) + "</span>" : "") +
+            "</span>" +
+            '<span class="acct__r">' +
+              '<button class="btn btn--ghost" data-decide="yes" style="padding:.35rem .7rem;font-size:.82rem">Approve</button> ' +
+              '<button class="btn btn--ghost" data-decide="no" style="padding:.35rem .7rem;font-size:.82rem">Decline</button>' +
+            "</span>" +
+          "</div>"
+        );
+      }).join("") +
+    "</div>"
+  );
+}
+
+function drawRoles(box, grants, reqs) {
   var opts = ROLES.map(function (r) {
     return '<option value="' + esc(r.key) + '">' + esc(r.label) + "</option>";
   }).join("");
@@ -904,7 +968,8 @@ function drawRoles(box, grants) {
     : '<p class="msg">Nobody has a role yet.</p>';
 
   box.innerHTML =
-    '<h2 class="edit__h">Who can do what</h2>' +
+    drawRequests(box, reqs || []) +
+    '<h2 class="edit__h"' + ((reqs || []).length ? ' style="margin-top:1.6rem"' : "") + ">Who can do what</h2>" +
     '<p class="msg" style="margin-top:0">A role is granted to an email address. It takes effect the next time that person signs in.</p>' +
     '<div class="acctlist">' + rows + "</div>" +
     '<div class="adm__bar" style="margin:1.1rem 0 0">' +
@@ -928,6 +993,23 @@ function drawRoles(box, grants) {
     var rk = document.getElementById("r-role").value;
     if (!em || em.indexOf("@") < 1) { msg.textContent = "Enter an email address."; return; }
     setRole(em, rk, true, msg);
+  });
+
+  box.querySelectorAll("[data-decide]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-req]");
+      api("rpc/decide_account_request", {
+        method: "POST",
+        body: {
+          target_email: row.getAttribute("data-req"),
+          role_key: row.getAttribute("data-role"),
+          approve: b.getAttribute("data-decide") === "yes"
+        }
+      }).then(loadRoles).catch(function (e) {
+        msg.className = "msg msg--bad";
+        msg.textContent = e.message || "That did not go through.";
+      });
+    });
   });
 
   box.querySelectorAll("[data-revoke]").forEach(function (b) {
@@ -1058,6 +1140,8 @@ function paint() {
     if (st === "__late") {
       var w = days(a.waiting_since);
       if (!(a.is_ghosted || (w !== null && w >= 7 && !a.response_received))) return false;
+    } else if (st === "__unscored") {
+      if (a.pipeline !== "interviewed" || a.score_avg) return false;
     } else if (st && a.pipeline !== st) {
       return false;
     }
@@ -1116,6 +1200,19 @@ function save(row) {
     var t = { application_id: id, updated_at: new Date().toISOString() };
     var changed = false;
     if (pipe !== null && (!rec || rec.pipeline !== pipe)) { t.pipeline = pipe; changed = true; }
+
+    /* scored_by and scored_at are deliberately not sent. The database stamps
+       them, and only when a score actually moves, so re-saving a note does
+       not rewrite who did the assessing. */
+    row.querySelectorAll("[data-score]").forEach(function (el) {
+      var col = el.getAttribute("data-score");
+      var val = el.value === "" ? null : Number(el.value);
+      var was = rec ? (rec[col] === undefined ? null : rec[col]) : undefined;
+      if (was === undefined || (was === null ? val !== null : Number(was) !== val)) {
+        t[col] = val;
+        changed = true;
+      }
+    });
     if (replied !== null && (!rec || !!rec.response_received !== replied)) {
       t.response_received = replied;
       changed = true;
@@ -1139,6 +1236,10 @@ function save(row) {
         if (t.last_contacted_at) rec.last_contacted_at = t.last_contacted_at;
         if (t.contacted_by) rec.contacted_by = t.contacted_by;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
+        SKILLS.forEach(function (k) {
+          var col = k[0].replace("skill_", "score_");
+          if (col in t) rec[col] = t[col];
+        });
       }));
     }
   }
@@ -1157,6 +1258,14 @@ function save(row) {
     }
     row.removeAttribute("data-mark-contacted");
     if (pipe !== null || replied !== null) {
+      /* Recompute the average locally rather than refetching: the row is about
+         to be redrawn and a stale header under a changed score reads as a bug. */
+      var got = SKILLS.map(function (k) { return rec[k[0].replace("skill_", "score_")]; })
+                      .filter(function (v) { return v !== null && v !== undefined && v !== ""; })
+                      .map(Number);
+      rec.score_avg = got.length
+        ? String(Math.round((got.reduce(function (x, y) { return x + y; }, 0) / got.length) * 10) / 10)
+        : null;
       var fresh = rowHtml(rec);
       var tmp = document.createElement("div");
       tmp.innerHTML = fresh;
@@ -1201,6 +1310,7 @@ function render(email, apps, notes, socials) {
       '<select id="filter" aria-label="Filter by pipeline">' +
         '<option value="">All pipeline</option>' + pipeOptions("") +
         '<option value="__late">Waiting 7+ days, no reply</option>' +
+        '<option value="__unscored">Interviewed, not yet scored</option>' +
       "</select>" +
       '<select id="fskill" aria-label="Filter by skill">' +
         '<option value="">Any skill</option>' +
