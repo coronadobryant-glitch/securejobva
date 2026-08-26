@@ -9,7 +9,12 @@
    Run: node build.mjs   Deploy: the dist/ folder. */
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
 
-const SITE = "https://securejobva.com";
+/* Must match the host Vercel serves as Production, not the one that redirects
+   to it. Vercel is www-primary: securejobva.com 308s to www.securejobva.com. A
+   canonical pointing at the apex would name a URL that immediately redirects,
+   which splits the ranking signal. Flip this back if the apex is ever made
+   primary in Vercel -> Domains. */
+const SITE = "https://www.securejobva.com";
 
 const PAGES = [
   {
