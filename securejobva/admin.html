@@ -754,11 +754,6 @@ function esc(s) {
 
 /* The four stages the careers page promises, in order. Declined is deliberately
    not in this list: it is an end, not a step along it. */
-/* The same sentence the application form shows. Kept identical on purpose: a
-   consent recorded from this page must be answerable to the same wording. */
-var CONSENT_TEXT = "If I am placed in a seat that involves posting, SecureJobVA may " +
-  "publish content to the accounts I listed on my behalf. I can withdraw this at any " +
-  "time by telling my manager.";
 
 var STAGES = [
   ["applied",    "Application received",  "We have it, and a person reads every one."],
@@ -980,10 +975,6 @@ function rowHtml(a) {
         (list.length
           ? list.map(socialLink).join(" &middot; ")
           : '<span class="soc__none">none given</span>') +
-        (a.posting_consent
-          ? '<span class="soc__ok" title="Consented ' + esc(when(a.posting_consent_at)) + '">' +
-            "&#10003; may post</span>"
-          : '<span class="soc__no">no consent to post</span>') +
       "</div>";
   }
 

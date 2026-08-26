@@ -27,9 +27,10 @@ run it. That is always safer than guessing.
 | `011-consent-select.sql` | Lets an applicant read back the consent they gave |
 | `012-seat-status.sql` | Where a seat request has got to, and the business portal that reads it |
 | `013-documents.sql` | CV uploads: a private bucket, and who may read what |
+| `014-no-posting.sql` | Removes the ability to record posting consent, and adds an administrator |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 013 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 014 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

@@ -464,11 +464,6 @@ function esc(s) {
 
 /* The four stages the careers page promises, in order. Declined is deliberately
    not in this list: it is an end, not a step along it. */
-/* The same sentence the application form shows. Kept identical on purpose: a
-   consent recorded from this page must be answerable to the same wording. */
-var CONSENT_TEXT = "If I am placed in a seat that involves posting, SecureJobVA may " +
-  "publish content to the accounts I listed on my behalf. I can withdraw this at any " +
-  "time by telling my manager.";
 
 var STAGES = [
   ["applied",    "Application received",  "We have it, and a person reads every one."],
@@ -786,9 +781,6 @@ function editForm(a) {
       skills +
       '<label class="chk" style="margin:.5rem 0 .9rem"><input type="checkbox" id="e-kit"' +
         (a.has_equipment ? " checked" : "") + "> I have my own computer and internet</label>" +
-      '<label class="chk" style="margin-bottom:1rem"><input type="checkbox" id="e-consent"' +
-        (a.posting_consent ? " checked" : "") +
-        "> You may post on my behalf if I am placed</label>" +
       '<button class="btn btn--solid" id="e-save" type="button">Save changes</button>' +
       '<span class="row__ok" id="e-ok" style="margin-left:.7rem">Saved</span>' +
     "</div>"
@@ -809,17 +801,6 @@ function wireEdit(a) {
     SKILLS.forEach(function (k) {
       body[k[0]] = document.getElementById("e-" + k[0]).value || null;
     });
-
-    /* Consent is sent only when it changes. The database keeps the history of a
-       withdrawal, so this must not blindly restamp it on every save. */
-    var consent = document.getElementById("e-consent").checked;
-    if (consent !== !!a.posting_consent) {
-      body.posting_consent = consent;
-      if (consent) {
-        body.posting_consent_at = new Date().toISOString();
-        body.posting_consent_text = CONSENT_TEXT;
-      }
-    }
 
     btn.disabled = true;
     api("applications?id=eq." + encodeURIComponent(a.id), {
@@ -1053,7 +1034,7 @@ function loadApplications() {
   var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
   Promise.all([
-    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,posting_consent,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
+    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
     api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
       .catch(function () { return []; })
   ])
@@ -1273,10 +1254,6 @@ function rowHtml(a) {
         (list.length
           ? list.map(socialLink).join(" &middot; ")
           : '<span class="soc__none">none given</span>') +
-        (a.posting_consent
-          ? '<span class="soc__ok" title="Consented ' + esc(when(a.posting_consent_at)) + '">' +
-            "&#10003; may post</span>"
-          : '<span class="soc__no">no consent to post</span>') +
       "</div>";
   }
 
