@@ -536,6 +536,18 @@ img{max-width:100%}
 .perk h4{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:1.04rem;letter-spacing:-.01em}
 .perk p{font-size:.9rem;color:var(--ink-2);margin-top:.4rem;line-height:1.5}
 
+/* "why the bar is high" band — deliberately not a .sec, so the tinted/untinted
+   stripe running down the page is not thrown off by inserting it. */
+.gaps{background:var(--surface-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:clamp(3rem,6vw,4.5rem) 0}
+.gaps__grid{display:grid;gap:1rem;margin-top:2rem}
+@media(min-width:640px){.gaps__grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1000px){.gaps__grid{grid-template-columns:repeat(3,1fr)}}
+.gap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.3rem;display:flex;flex-direction:column;gap:.6rem}
+.gap__n{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;color:var(--muted)}
+.gap h3{font-size:1.02rem;margin:0;letter-spacing:-.01em}
+.gap__p{margin:0;font-size:.9rem;color:var(--ink-2);line-height:1.55}
+.gap__ask{margin:.15rem 0 0;padding-top:.7rem;border-top:1px dashed var(--line);font-size:.86rem;color:var(--ink)}
+.gap__ask b{color:var(--accent)}
 .reqs{display:grid;gap:1.25rem}
 @media(min-width:860px){.reqs{grid-template-columns:1fr 1fr}}
 .req{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.5rem 1.5rem 1.6rem}
@@ -680,7 +692,7 @@ html{scroll-behavior:smooth}
     <div class="bar__meter" role="img" aria-label="23 of the 40 seats for this month are already taken">
       <i style="width:57.5%"></i>
     </div>
-    <p class="bar__sub">Training is paid once you pass the exams and are approved &middot; A strengths test places you where you will excel</p>
+    <p class="bar__sub">Training is paid <b>only after</b> you pass the exams and are approved &middot; A strengths test places you where you will excel</p>
   </div>
 </div>
 
@@ -741,14 +753,14 @@ html{scroll-behavior:smooth}
   <section class="hero">
     <div class="wrap hero__grid">
       <div>
-        <span class="eyebrow">Now hiring worldwide &middot; 40 hrs/week &middot; American time</span>
+        <span class="eyebrow">Online jobs &middot; Hiring worldwide &middot; 40 hrs/week &middot; American time</span>
         <h1><span class="hl">Paid training</span>, then a full-time seat.</h1>
-        <p class="lede">Pass the exams, get approved, and we train you on our payroll rather than yours. Then <b>forty hours a week</b> on fixed hours in American time &mdash; customer service, sales and marketing, or admin support. One business, one manager, no gig queue. Apply from any country.</p>
+        <p class="lede">Pass the exams and get approved &mdash; only then do we train you, on our payroll rather than yours. Then <b>forty hours a week</b> on fixed hours in American time &mdash; customer service, sales and marketing, or admin support. These are full-time online jobs &mdash; one business, one manager, no gig queue. Apply from any country.</p>
         <div class="ptrain">
           <span class="ptrain__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 9 12 4 2 9l10 5 10-5Z"></path><path d="M6 11.5V17c0 1.6 3 3 6 3s6-1.4 6-3v-5.5"></path></svg></span>
           <p class="ptrain__t">
             <span class="ptrain__k">Paid training</span>
-            Pass the exams and get approved, and your training is <b>paid</b> &mdash; you earn while you learn, starting within one week. A strengths test places you in the seat you will excel in, not the first one with a vacancy.
+            Training is paid <b>only if</b> you pass the exams and are approved. Clear both and you earn while you learn, starting within one week. A strengths test places you in the seat you will excel in, not the first one with a vacancy.
           </p>
         </div>
         <div class="hero__actions">
@@ -818,7 +830,7 @@ html{scroll-behavior:smooth}
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">What we staff</span>
-        <h2>Three tracks. Pick the one you are already good at.</h2>
+        <h2>Three tracks of online jobs. Pick the one you are already good at.</h2>
         <p class="lede">These are the seats our clients buy, so these are the seats we hire for. Tools can be taught in a week &mdash; judgment and clear English cannot, so lead with those. Not sure which one is yours? The strengths test in stage two places you where you will excel.</p>
       </div>
 
@@ -872,7 +884,7 @@ html{scroll-behavior:smooth}
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">What the seat gives you</span>
-        <h2>Forty hours. Fixed American hours. Paid training.</h2>
+        <h2>Online jobs with forty fixed hours, and paid training.</h2>
         <p class="lede">Freelance marketplaces make you re-sell yourself every month. A seat does not work that way.</p>
       </div>
 
@@ -894,8 +906,8 @@ html{scroll-behavior:smooth}
         </div>
         <div class="perk" id="paid-training">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V6a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"></path><path d="M9 8h7"></path></svg></div>
-          <h4>Paid training once you pass</h4>
-          <p>Clear the exams and qualification checks and your training is paid. You are onboarded on the client&rsquo;s tools and scripts before your first shift, not handed a login and wished luck.</p>
+          <h4>Paid training only if you pass</h4>
+          <p>Your training is paid <b>only after</b> you clear the exams and the qualification checks &mdash; not before. You are onboarded on the client&rsquo;s tools and scripts before your first shift, not handed a login and wished luck.</p>
         </div>
         <div class="perk">
           <div class="perk__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"></path><path d="M17 6.5c0-2-2.2-3-5-3s-5 1-5 3 2.2 2.8 5 3.5 5 1.5 5 3.5-2.2 3-5 3-5-1-5-3"></path></svg></div>
@@ -953,6 +965,55 @@ html{scroll-behavior:smooth}
     </div>
   </section>
 
+  <section class="gaps" id="gaps">
+    <div class="wrap">
+      <div class="sec__head">
+        <span class="eyebrow">Why the bar is where it is</span>
+        <h2>Six things businesses have been burned by.</h2>
+        <p class="lede">Every client who calls us has been let down by a virtual assistant before, and it is almost always one of these six. The exams, the strengths test, the fixed hours and the background check all exist to answer them &mdash; which is why clearing them is what makes the seat worth paying for.</p>
+      </div>
+
+      <div class="gaps__grid">
+        <div class="gap">
+          <span class="gap__n">01</span>
+          <h3>Communication gaps</h3>
+          <p class="gap__p">Time-zone mismatches, accents that are hard to follow, replies that take hours, and problems the assistant saw coming but never flagged.</p>
+          <p class="gap__ask"><b>What we ask of you:</b> Hold your shift in American time, write and speak clearly, and raise a problem the day you spot it &mdash; not the week it lands.</p>
+        </div>
+        <div class="gap">
+          <span class="gap__n">02</span>
+          <h3>Quality control and oversight</h3>
+          <p class="gap__p">No way to verify the work is actually happening, no clear record of output or time spent. What starts as a question becomes distrust.</p>
+          <p class="gap__ask"><b>What we ask of you:</b> Work on tracked time your client can audit, and end each day with what you handled and what still needs them.</p>
+        </div>
+        <div class="gap">
+          <span class="gap__n">03</span>
+          <h3>Vetting and skill mismatch</h3>
+          <p class="gap__p">A r&eacute;sum&eacute; and an interview say one thing; the first real task says another, and the client is left with someone who cannot do the job.</p>
+          <p class="gap__ask"><b>What we ask of you:</b> This is what the written task and the qualification exams are for. Pass them on your own ability and the mismatch never reaches a client.</p>
+        </div>
+        <div class="gap">
+          <span class="gap__n">04</span>
+          <h3>Training overhead</h3>
+          <p class="gap__p">Clients underestimate the weeks it takes to onboard someone, especially on niche tasks &mdash; time they were trying to buy back in the first place.</p>
+          <p class="gap__ask"><b>What we ask of you:</b> You are trained on our payroll, on the client&rsquo;s tools and scripts, before your first shift. You arrive ready, not learning.</p>
+        </div>
+        <div class="gap">
+          <span class="gap__n">05</span>
+          <h3>Turnover and reliability</h3>
+          <p class="gap__p">Assistants who ghost, quit without notice, or hop between clients &mdash; forcing the business to re-hire and re-train from zero.</p>
+          <p class="gap__ask"><b>What we ask of you:</b> One business, one manager, a fixed seat. If you need to leave, you give notice and hand over properly.</p>
+        </div>
+        <div class="gap">
+          <span class="gap__n">06</span>
+          <h3>Security and confidentiality</h3>
+          <p class="gap__p">Handing a remote worker access to financial accounts, customer records and passwords feels reckless without a contract and real safeguards.</p>
+          <p class="gap__ask"><b>What we ask of you:</b> You sign a contract and an NDA, clear an ID and background check, and follow the password and data rules from day one.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="sec sec--tint" id="process">
     <div class="wrap">
       <div class="sec__head">
@@ -978,7 +1039,7 @@ html{scroll-behavior:smooth}
         <div class="step">
           <span class="step__n">04</span>
           <h3>Approved &mdash; paid training starts</h3>
-          <p>Pass the exams, clear approval, and paid training begins within one week. Contract, tools, scripts and a handover, then your first shift on the American hours your manager sets with you.</p>
+          <p>Only once you pass the exams and clear approval does paid training begin, within one week. Contract, tools, scripts and a handover, then your first shift on the American hours your manager sets with you.</p>
         </div>
       </div>
     </div>
@@ -1030,7 +1091,7 @@ html{scroll-behavior:smooth}
   <section class="cta" id="apply-now">
     <div class="wrap">
       <h2>Bring the skills. We will bring the seat.</h2>
-      <p>Applications are open in all three tracks. Five minutes now, an answer from a person either way &mdash; and paid training the week you are approved.</p>
+      <p>Our online jobs are open in all three tracks. Five minutes now, an answer from a person either way &mdash; and paid training the week you are approved.</p>
       <div class="hero__actions" style="margin-top:0">
         <a class="btn btn--solid" data-apply href="mailto:support@securejobva.com">Start your application</a>
         <a class="btn btn--ghost" href="mailto:support@securejobva.com">Email us instead</a>

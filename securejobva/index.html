@@ -230,11 +230,12 @@ img{max-width:100%}
 
 /* stat strip */
 /* rating band + free-week offer */
-.rated{border-top:1px solid var(--line);background:var(--glow)}
-.rated__in{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.5rem .8rem;padding:.95rem clamp(.9rem,2vw,1.6rem)}
-.rated__stars{display:inline-flex;gap:.14rem;color:var(--signal);line-height:0}
-.rated__t{margin:0;font-size:.95rem;color:var(--ink-2);text-align:center}
-.rated__t b{color:var(--ink);font-weight:700}
+/* Sits above the sticky nav, so it scrolls away rather than eating header room. */
+.rated{background:var(--price-bg);color:var(--price-fg)}
+.rated__in{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.35rem .7rem;padding:.6rem clamp(.9rem,2vw,1.6rem)}
+.rated__stars{display:inline-flex;gap:.1rem;color:var(--signal);line-height:0}
+.rated__t{margin:0;font-size:.86rem;text-align:center;opacity:.92}
+.rated__t b{font-weight:700;opacity:1}
 
 .trial{background:var(--price-bg);color:var(--price-fg);padding:clamp(2.4rem,5vw,3.6rem) 0}
 .trial__in{display:grid;gap:1.6rem;align-items:center}
@@ -525,8 +526,8 @@ img{max-width:100%}
 .seg input{position:absolute;width:1px;height:1px;opacity:0;margin:0}
 .seg label:has(input:checked),.seg label.is-on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .seg input:focus-visible ~ span{outline:2.5px solid var(--accent);outline-offset:4px;border-radius:3px}
-.seg__custom{margin-top:.7rem;display:none}
-.seg__custom.is-on{display:grid}
+.field.seg__custom{margin-top:.7rem;display:none}
+.field.seg__custom.is-on{display:grid}
 .seg__custom input{max-width:11rem}
 
 .est{
@@ -626,6 +627,19 @@ img{max-width:100%}
   </defs>
 </svg>
 
+<section class="rated" aria-label="Customer rating">
+  <div class="wrap rated__in">
+    <span class="rated__stars" role="img" aria-label="Rated 5 out of 5 stars">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
+    </span>
+    <p class="rated__t"><b>Rated 5 stars</b> by the businesses we staff.</p>
+  </div>
+</section>
+
 <header class="nav">
   <div class="wrap nav__in">
     <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
@@ -724,19 +738,6 @@ img{max-width:100%}
 
         <p class="cov__foot">This is one shape, not the shape. Your team works <b>9&ndash;5</b>, so here the seat takes the evening and early-morning block and quotes, tickets and callbacks are handled <b>before you open</b>. Need it over your own day instead, or across the weekend? That is the schedule you set.</p>
       </div>
-    </div>
-  </section>
-
-  <section class="rated" aria-label="Customer rating">
-    <div class="wrap rated__in">
-      <span class="rated__stars" role="img" aria-label="Rated 5 out of 5 stars">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-      </span>
-      <p class="rated__t"><b>Rated 5 stars</b> by the businesses we staff.</p>
     </div>
   </section>
 
