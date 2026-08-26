@@ -178,6 +178,42 @@ for (const p of PAGES) {
   });
 }
 
+/* Every column on applications must be granted, not just the named ones.
+
+   The earlier check below compares the columns a page names in `select=`. That
+   missed the failure that reached production, because nothing named the column:
+   the admin page PATCHes a stage without `Prefer: return=minimal`, PostgREST
+   returns the updated row, and returning a row reads every column in it. One
+   ungranted column — user_id, added by 004 — refused the whole statement, and
+   the operator saw an error about SELECT on an update they had not made.
+
+   So the rule is the stronger one: if a column exists on applications, a
+   signed-in user may read it. Row-level security decides *which rows* they see,
+   which is the part that actually protects anyone. Withholding a column on a
+   row they can already read buys nothing and breaks `select=*`.
+
+   A column that genuinely must be hidden belongs in its own table — that is
+   exactly why 005 put the internal pipeline in application_tracking rather
+   than adding columns here. */
+await check("every applications column is granted", () => {
+  const declared = new Set(Object.keys(columns(sql, "applications")));
+  const granted = new Set();
+  for (const stmt of sql.split(";")) {
+    const m = stmt.match(/grant\s+select\s*\(([^)]*)\)\s*on\s+public\.applications\s+to\s+authenticated/i);
+    if (m) for (const c of m[1].split(",")) {
+      const t = c.trim().replace(/--.*/, "").trim();
+      if (t) granted.add(t);
+    }
+  }
+  const missing = [...declared].filter((c) => !granted.has(c));
+  if (missing.length) {
+    throw new Error(missing.join(", ") + " — declared on applications but never granted SELECT to " +
+      "authenticated. Any select=* against the table refuses the whole statement with 42501. " +
+      "Grant it, or move it to its own table if it truly must be hidden.");
+  }
+  return declared.size + " columns, all granted";
+});
+
 /* The mirror of the form check, for the pages that read rather than write.
 
    Grants on applications are column-level, and PostgREST refuses the whole
