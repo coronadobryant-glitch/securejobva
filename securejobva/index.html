@@ -257,15 +257,19 @@ img{max-width:100%}
 
 /* steps */
 .steps{display:grid;gap:0;border-top:1px solid var(--line)}
-.step{
+/* Scoped to .steps on purpose. The dialog also marks its form panes
+   .step; unscoped, they inherited this three-column grid and their flat
+   h3 / p / div / err children auto-placed into consecutive cells, so every
+   question after the first slid one column sideways. */
+.steps > .step{
   display:grid;gap:.35rem 1.5rem;padding:1.6rem 0;border-bottom:1px solid var(--line);
   grid-template-columns:auto 1fr;align-items:start;
 }
-.step h3{font-size:var(--step-1);grid-column:2/-1}
-.step p{color:var(--ink-2);grid-column:2/-1;font-size:.97rem}
+.steps > .step h3{font-size:var(--step-1);grid-column:2/-1}
+.steps > .step p{color:var(--ink-2);grid-column:2/-1;font-size:.97rem}
 @media(min-width:820px){
-  .step{grid-template-columns:5.5rem 15rem 1fr;align-items:baseline}
-  .step h3,.step p{grid-column:auto}
+  .steps > .step{grid-template-columns:5.5rem 15rem 1fr;align-items:baseline}
+  .steps > .step h3,.steps > .step p{grid-column:auto}
 }
 .step__n{
   font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--accent);
@@ -864,7 +868,7 @@ img{max-width:100%}
         <h5>Contact</h5>
         <ul>
           <li><a href="mailto:support@securejobva.com">support@securejobva.com</a></li>
-          <li><a href="#book">Book a call</a></li>
+          <li><a href="#book" data-book>Book a call</a></li>
         </ul>
       </div>
     </div>
