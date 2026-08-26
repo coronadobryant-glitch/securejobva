@@ -29,6 +29,29 @@ function cfg(file) {
 }
 
 const TARGETS = ["index.html", "careers.html"].map(cfg);
+
+/* Everything the public key must not be able to read. The first two above are
+   checked for insert as well, because they are supposed to accept one; these
+   are checked for read only, because they are supposed to accept nothing.
+
+   Keyed by what is behind the door, so a breach message says what leaked
+   rather than naming a table and leaving you to work it out. */
+const SEALED = [
+  ["application_tracking", "the internal pipeline, contact history and interview scores"],
+  ["application_notes",    "private staff notes about applicants"],
+  ["application_socials",  "applicants' social handles"],
+  ["application_queue",    "every applicant joined to their pipeline and scores"],
+  ["contact_messages",     "everything anyone has sent through the contact form"],
+  ["admins",               "the list of who administers this site"],
+  ["user_roles",           "who holds which role"],
+  ["role_requests",        "who has asked for what access"],
+  ["social_tokens",        "publishing tokens for other people's social accounts"]
+];
+
+/* The functions are SECURITY DEFINER, so a missing grant is the only thing
+   stopping the public key calling them. is_admin() answering at all would be
+   bad; my_permissions() answering would be worse. */
+const RPCS = ["is_admin", "my_permissions", "list_role_grants", "list_account_requests"];
 const headers = (k) => ({
   apikey: k,
   Authorization: "Bearer " + k,
@@ -38,6 +61,10 @@ const headers = (k) => ({
 
 const fails = [];
 console.log("");
+
+/* Both intake tables share one project, so either key reaches all of it. */
+const base = TARGETS[0].endpoint.replace(/\/[^/]+$/, "");
+const anonKey = TARGETS[0].key;
 
 for (const t of TARGETS) {
   /* The one that matters. A 200 here means the table is readable by the public
@@ -84,6 +111,46 @@ for (const t of TARGETS) {
 }
 
 console.log("");
+
+for (const [table, holds] of SEALED) {
+  try {
+    const r = await fetch(base + "/" + table + "?select=*&limit=1",
+      { headers: headers(anonKey) });
+    if (r.ok) {
+      const rows = await r.json().catch(() => []);
+      fails.push(table);
+      console.log("  BREACH  " + table + ": readable with the public key — " + holds);
+      console.log("          returned " + (Array.isArray(rows) ? rows.length : "?") + " row(s)");
+      console.log("          Revoke it now:  revoke all on public." + table + " from anon;");
+    } else {
+      console.log("  ok      " + table + ": denied (" + r.status + ")");
+    }
+  } catch (e) {
+    fails.push(table);
+    console.log("  ERROR   " + table + ": could not reach the API — " + e.message);
+  }
+}
+
+for (const fn of RPCS) {
+  try {
+    const r = await fetch(base + "/rpc/" + fn, {
+      method: "POST", headers: headers(anonKey), body: "{}"
+    });
+    /* A 404 is fine and expected: no EXECUTE grant means PostgREST does not
+       expose the function to this role at all. */
+    if (r.ok) {
+      fails.push("rpc/" + fn);
+      console.log("  BREACH  rpc/" + fn + ": callable with the public key");
+      console.log("          Revoke it:  revoke all on function public." + fn + " from anon;");
+    } else {
+      console.log("  ok      rpc/" + fn + ": denied (" + r.status + ")");
+    }
+  } catch (e) {
+    fails.push("rpc/" + fn);
+    console.log("  ERROR   rpc/" + fn + ": " + e.message);
+  }
+}
+
 if (fails.length) {
   console.log("FAILED: " + fails.join(", "));
   console.log("");
