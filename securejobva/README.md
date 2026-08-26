@@ -135,7 +135,7 @@ carrying a key with no column. Add a field to a form, add the column too.
 
 ## Guards
 
-Three, because every way this site loses data is silent. A rejected insert, a
+Four, because every way this site loses data is silent. A rejected insert, a
 readable table and a stale canonical all leave the pages rendering perfectly.
 
 **In the page — a submission survives a failed POST.** `send()` retries once,
@@ -156,9 +156,12 @@ canonical host. It also runs `tools/test-queue.mjs`, which pulls the queue code
 straight out of `index.html` and drives it against a mocked store — parking,
 draining, the cap, the expiry, and storage being blocked outright.
 
+**Is it all running? — `node tools/status.mjs`.** One command for the whole picture: whether both repos are in sync, whether the build and every check pass, whether the live site serves its routes with the right headers and is actually current, which migrations have landed in the database, and whether the two forms still accept work. Nothing it does writes a row — every probe fails on a constraint or names a column that does not exist. It prints what it cannot see too: anything behind sign-in is invisible to the public key by design, so it hands you the two URLs to open instead.
+
 **Against the database — `node tools/guard-rls.mjs`.** Asserts that the
-publishable key still cannot `SELECT` from either table, and that it can still
-insert. This is the one rule below, checked rather than believed: it is a
+publishable key still cannot `SELECT` from any of the eleven tables behind
+sign-in, that the SECURITY DEFINER functions refuse it, and that the two intake
+tables still accept an insert. This is the one rule below, checked rather than believed: it is a
 single dashboard toggle away from being untrue, and nothing in this repo would
 change when it happened. Nothing it does writes a row — the insert probe names
 a column that does not exist on purpose. Worth running on a schedule.
