@@ -157,19 +157,15 @@ want the wordmark card instead, then overwrite `og.png`.
 
 ## Still to do before launch
 
-- **`hello@` and `apply@` do not exist.** The domain has no MX records, so both
-  addresses on the pages bounce. Until this is fixed the forms are decorative:
-  every visitor who taps send is writing into a hole. Cheapest fix is a free
-  ImprovMX account (two DNS records at GoDaddy, forwards both to a Gmail); GoDaddy
-  also sells mailboxes. Check with `nslookup -type=MX securejobva.com` — no
-  answer means it is still broken.
+- **Confirm `support@` receives mail.** Both pages now use one address,
+  `support@securejobva.com`. The domain does have MX records pointing at GoDaddy
+  (`smtp.secureserver.net`, `mailstore1.secureserver.net`), plus SPF and DMARC — but
+  MX records only route mail, they do not create a mailbox. Send a test message from
+  another account and confirm it arrives rather than bounces.
 - **Pay bands on `careers.html`** — flagged placeholder, the first thing applicants look for.
 - **Confirm the hardware minimums** on `careers.html`; applicants buy kit against them.
 - **Client quotes on `index.html`** — optional. The first-90-days section stands on its own;
   three real quotes can replace it in the same grid once you have written permission.
-- **Wire the forms to Supabase.** Run `supabase.sql`, then paste the project URL and
-  anon key into `CFG` on both pages — see Forms above. Until then both dialogs just hand
-  the visitor a pre-written email, so you only hear from the ones who tap send.
 - **A booking link** (optional). `CFG.scheduler` on `index.html` takes a Cal.com or
   Calendly URL and adds a "Pick your time" step after submit.
 
