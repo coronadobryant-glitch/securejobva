@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 
 const PAGES = ["index.html", "careers.html", "status.html", "admin.html",
-               "privacy.html", "terms.html", "refunds.html", "contact.html"];
+               "privacy.html", "terms.html", "refunds.html", "contact.html", "seats.html"];
 
 const found = [];
 const note = (page, kind, detail) => found.push({ page, kind, detail });
@@ -85,7 +85,7 @@ const cols = new Set([...table.matchAll(/^\s{2}([a-z_]+)\s+/gm)].map((m) => m[1]
 sent.filter((k) => !cols.has(k)).forEach((k) => note("contact.html", "no column for form field", k));
 
 /* ── cross-page links that do not correspond to a built route ── */
-const routes = new Set(["/", "/careers", "/status", "/admin", "/privacy", "/terms", "/refunds", "/contact"]);
+const routes = new Set(["/", "/careers", "/status", "/admin", "/privacy", "/terms", "/refunds", "/contact", "/seats"]);
 for (const f of PAGES) {
   const h = readFileSync(f, "utf8");
   [...h.matchAll(/href="(\/[^"#?]*)/g)].map((m) => m[1])

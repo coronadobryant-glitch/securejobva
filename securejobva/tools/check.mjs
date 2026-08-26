@@ -89,7 +89,7 @@ console.log("\nstatic\n");
    status.html carry a sign-in flow and a stage editor; a stray brace there
    takes the portal down while the markup around it still renders fine. */
 const SHIPPED = [...PAGES.map((p) => p.file), "status.html", "admin.html",
-  "privacy.html", "terms.html", "refunds.html", "contact.html"]
+  "privacy.html", "terms.html", "refunds.html", "contact.html", "seats.html"]
   .filter((f) => existsSync(f));
 
 for (const p of SHIPPED.map((file) => ({ file }))) {

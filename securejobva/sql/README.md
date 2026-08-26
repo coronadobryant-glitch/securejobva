@@ -25,9 +25,10 @@ run it. That is always safer than guessing.
 | `009-account-types.sql` | Account types asked for at sign-up and granted by a person |
 | `010-contact.sql` | The contact form table — public writes, staff read |
 | `011-consent-select.sql` | Lets an applicant read back the consent they gave |
+| `012-seat-status.sql` | Where a seat request has got to, and the business portal that reads it |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 011 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 012 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

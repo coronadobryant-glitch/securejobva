@@ -356,6 +356,12 @@ img{max-width:100%}
 .soc__none{color:var(--muted)}
 .soc__ok{color:var(--accent-deep);font-weight:600}
 .soc__no{color:var(--muted)}
+.pill--received{background:var(--surface-2);color:var(--ink-2)}
+.pill--call_booked{background:var(--accent-soft);color:var(--accent-deep)}
+.pill--matching{background:var(--accent-soft);color:var(--accent-deep)}
+.pill--shortlist{background:var(--accent);color:var(--accent-ink)}
+.pill--running{background:var(--signal);color:var(--signal-ink)}
+.pill--closed{background:var(--surface-2);color:var(--muted)}
 .pill--applied{background:var(--surface-2);color:var(--ink-2)}
 .pill--assessment{background:var(--accent-soft);color:var(--accent-deep)}
 .pill--interview{background:var(--accent);color:var(--accent-ink)}
@@ -922,6 +928,11 @@ function render(user, apps) {
     return;
   }
 
+  if (!apps.length && BUSINESS) {
+    location.replace("/seats");
+    return;
+  }
+
   if (!apps.length) {
     lead.textContent = "Signed in as " + user.email + ".";
     view(who + staffBanner() +
@@ -1080,13 +1091,22 @@ function wireChooser() {
 var STAFF = false;
 
 function staffBanner() {
-  if (!STAFF) return "";
-  return (
-    '<div class="note" style="margin-bottom:1.2rem">' +
-      "<b>You have staff access.</b> Applications, stages and interview scores are on the " +
-      '<a href="/admin">admin page</a>.' +
-    "</div>"
-  );
+  var out = "";
+  if (STAFF) {
+    out +=
+      '<div class="note" style="margin-bottom:1.2rem">' +
+        "<b>You have staff access.</b> Applications, stages and interview scores are on the " +
+        '<a href="/admin">admin page</a>.' +
+      "</div>";
+  }
+  if (BUSINESS) {
+    out +=
+      '<div class="note" style="margin-bottom:1.2rem">' +
+        "<b>You are set up as a business.</b> The seats you have asked us for are on " +
+        'your <a href="/seats">seats page</a>.' +
+      "</div>";
+  }
+  return out;
 }
 
 function loadApplications() {

@@ -84,6 +84,14 @@ const PAGES = [
     description:
       "Reach SecureJobVA about an application, hiring, billing or a privacy request.",
     ogTitle: "Contact"
+  },
+  {
+    src: "seats.html",
+    path: "/seats",
+    title: "Your seats — SecureJobVA",
+    description: "Sign in to see the seats you have asked SecureJobVA for and where each one has got to.",
+    ogTitle: "Your seats",
+    noindex: true
   }
 ];
 
