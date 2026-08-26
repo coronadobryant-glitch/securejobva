@@ -1,6 +1,7 @@
 User-agent: *
 Disallow: /admin
 Disallow: /status
+Disallow: /seats
 Allow: /
 
 Sitemap: https://www.securejobva.com/sitemap.xml
