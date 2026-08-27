@@ -35,9 +35,10 @@ run it. That is always safer than guessing.
 | `019-notify-webhooks.sql` | Webhooks for seat requests and contact messages — needs the secret pasted in |
 | `020-restore-status-grants.sql` | Puts back the staff UPDATE grants that a re-run of 001 revoked |
 | `021-one-webhook-per-form.sql` | Removes the duplicate pokes; one per form, all on the real secret |
+| `022-note-log.sql` | The many-notes-per-applicant log the deployed /admin queries |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 021 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 022 in order, then `verify.sql` to confirm.
 
 ## Adding one
 
