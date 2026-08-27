@@ -174,6 +174,21 @@ img{max-width:100%}
 .nav__links a.nav__signin:hover,
 .mobnav__in a.nav__signin:hover{color:var(--signal-ink);filter:brightness(1.07)}
 .nav__links a.nav__signin:focus-visible{outline:2.5px solid var(--ink);outline-offset:2px}
+.nav__links a.nav__cross,
+.nav__tools a.nav__cross,
+.mobnav__in a.nav__cross{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:.5rem .9rem;border-radius:8px;
+  border:1.5px solid var(--line);color:var(--ink-2);
+  font-weight:600;line-height:1;
+  transition:border-color .16s ease,color .16s ease;
+}
+.nav__links a.nav__cross:hover,
+.nav__tools a.nav__cross:hover,
+.mobnav__in a.nav__cross:hover{border-color:var(--accent);color:var(--accent)}
+.nav__links a.nav__cross:focus-visible,
+.nav__tools a.nav__cross:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+.mobnav__in a.nav__cross{margin-top:.4rem}
 .mobnav__in a.nav__signin{margin-top:.5rem}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}

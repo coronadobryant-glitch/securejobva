@@ -174,6 +174,21 @@ img{max-width:100%}
 .nav__links a.nav__signin:hover,
 .mobnav__in a.nav__signin:hover{color:var(--signal-ink);filter:brightness(1.07)}
 .nav__links a.nav__signin:focus-visible{outline:2.5px solid var(--ink);outline-offset:2px}
+.nav__links a.nav__cross,
+.nav__tools a.nav__cross,
+.mobnav__in a.nav__cross{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:.5rem .9rem;border-radius:8px;
+  border:1.5px solid var(--line);color:var(--ink-2);
+  font-weight:600;line-height:1;
+  transition:border-color .16s ease,color .16s ease;
+}
+.nav__links a.nav__cross:hover,
+.nav__tools a.nav__cross:hover,
+.mobnav__in a.nav__cross:hover{border-color:var(--accent);color:var(--accent)}
+.nav__links a.nav__cross:focus-visible,
+.nav__tools a.nav__cross:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+.mobnav__in a.nav__cross{margin-top:.4rem}
 .mobnav__in a.nav__signin{margin-top:.5rem}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
@@ -554,12 +569,10 @@ img{max-width:100%}
 }
 
 /* ---------- careers ---------- */
-.nav__back{
-  display:none;font-size:.86rem;font-weight:600;text-decoration:none;color:var(--muted);
-  font-family:"IBM Plex Mono",monospace;letter-spacing:.02em;
-}
-.nav__back:hover{color:var(--accent)}
-@media(min-width:900px){.nav__back{display:inline}}
+/* Hidden on a narrow bar, which already carries the menu toggle. The mobile
+   menu has its own copy of this link, so nothing is lost. */
+.nav__tools a.nav__cross{display:none}
+@media(min-width:900px){.nav__tools a.nav__cross{display:inline-flex}}
 
 .tl{
   background:var(--surface);border:1px solid var(--line);border-radius:10px;
@@ -784,7 +797,7 @@ html{scroll-behavior:smooth}
         <a class="nav__signin" href="/status">Sign in</a>
       </nav>
       <div class="nav__tools">
-        <a class="nav__back" id="to-business" href="#top">Hiring a VA? &rarr;</a>
+        <a class="nav__cross" id="to-business" href="#top">Hiring a VA?</a>
         <button class="navtog" id="navtog" type="button" aria-expanded="false" aria-controls="mobnav" aria-label="Menu">
           <svg class="i-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16"></path>
@@ -811,7 +824,7 @@ html{scroll-behavior:smooth}
       <a href="#requirements">Requirements</a>
       <a href="#process">How to apply</a>
       <a href="#faq">FAQ</a>
-      <a id="to-business-mob" href="#top">Hiring a VA? &rarr;</a>
+      <a class="nav__cross" id="to-business-mob" href="#top">Hiring a VA?</a>
       <a class="nav__signin" href="/status">Sign in</a>
     </div>
   </div>
