@@ -2244,7 +2244,11 @@ function addNote(row) {
       rec.notes = rows || [];
       var tmp = document.createElement("div");
       tmp.innerHTML = rowHtml(rec);
-      row.replaceWith(tmp.firstChild);
+      var next = tmp.firstChild;
+      row.replaceWith(next);
+      /* Same as in save(): the row holding ok has just been replaced, so the
+         confirmation has to be aimed at the row that is now on the page. */
+      ok = next.querySelector("[data-ok]") || ok;
     }
     flash(ok, "Added");
   }).catch(function (e) {
@@ -2376,7 +2380,14 @@ function save(row) {
       var fresh = rowHtml(rec);
       var tmp = document.createElement("div");
       tmp.innerHTML = fresh;
-      row.replaceWith(tmp.firstChild);
+      var next = tmp.firstChild;
+      row.replaceWith(next);
+      /* ok was found inside the row we have just thrown away, so writing to it
+         now writes to a node the page no longer contains. That is why "Mark
+         contacted" looked like it did nothing: the write went through, the row
+         redrew, and the one word confirming it went into a detached element.
+         The redrawn row has its own, and that is the one a person can see. */
+      ok = next.querySelector("[data-ok]") || ok;
     }
     flash(ok, "Saved");
     if ("interview_at" in t) drawCalendar();
