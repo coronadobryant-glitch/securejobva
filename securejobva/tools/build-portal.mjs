@@ -286,20 +286,43 @@ const LIB = `
    never sent to a server, which is the property that makes this safe to do on
    a static page: Vercel never sees the token, only the browser does.
 
-   The token is kept in sessionStorage rather than localStorage. It is a key to
-   someone's personal data on a machine that may be shared, and closing the tab
-   should end the session rather than leave it lying there for the next person. */
+   The token was kept in sessionStorage, which dies with the tab. The intent was
+   right — it is a key to somebody's personal data on a machine that may be
+   shared — but the mechanism was wrong, and it made the portal unusable: click
+   the logo, come back in a new tab, close and reopen, restore a window, and you
+   were signed out with no explanation.
+
+   It bought less than it looked like, too. For as long as the tab stayed open
+   the token sat there just the same, and a tab can stay open for days.
+
+   So the session lives in localStorage now and the limit is time, which is the
+   thing that was actually meant: session() already refuses a token past its
+   expiry, and Supabase issues them for an hour. Signing out clears it. That is
+   an hour on a shared machine instead of "until somebody closes the tab",
+   which is both shorter and predictable. */
 var SB   = "https://hmgravlkatfmerzbozct.supabase.co";
 var ANON = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
 var KEY  = "sjva-session";
 
 function saveSession(s) {
-  try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
 }
 function loadSession() {
-  try { return JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { return null; }
+  var raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { return null; }
+  /* Anyone signed in when this shipped has their session in the old place.
+     Move it rather than logging them out to fix a bug about being logged out. */
+  if (!raw) {
+    try {
+      raw = sessionStorage.getItem(KEY);
+      if (raw) { localStorage.setItem(KEY, raw); sessionStorage.removeItem(KEY); }
+    } catch (e) { return null; }
+  }
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
 }
 function clearSession() {
+  try { localStorage.removeItem(KEY); } catch (e) {}
   try { sessionStorage.removeItem(KEY); } catch (e) {}
 }
 
@@ -371,10 +394,34 @@ function signUpPassword(email, password) {
   });
 }
 
+/* redirect_to is a QUERY parameter on GoTrue's REST endpoint. An options object
+   carrying redirectTo is the shape supabase-js takes, and this talks to the API
+   directly — so it was being ignored, Supabase fell back to the project's Site
+   URL, and the reset link dropped people on the home page instead of here. */
 function resetPassword(email) {
-  return authPost("recover", {
-    email: email,
-    options: { redirectTo: location.origin + location.pathname }
+  var back = location.origin + location.pathname;
+  return authPost("recover?redirect_to=" + encodeURIComponent(back), { email: email });
+}
+
+/* Setting the new one. The recovery link puts a real session in the fragment,
+   so this is an ordinary authenticated write against the user's own record —
+   there is no separate "reset token" to pass. */
+function setPassword(pw) {
+  var s = loadSession();
+  if (!s || !s.access_token) return Promise.reject(new Error("That link has expired. Ask for a new one."));
+  return fetch(SB + "/auth/v1/user", {
+    method: "PUT",
+    headers: {
+      apikey: ANON,
+      Authorization: "Bearer " + s.access_token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ password: pw })
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) throw new Error(j.error_description || j.msg || j.message || "That did not work.");
+      return j;
+    });
   });
 }
 
@@ -393,11 +440,21 @@ function signOut() {
 
 /* Supabase returns the tokens in the fragment. Take them, then scrub the URL so
    a copied link never carries someone's credentials. */
+/* Set when the fragment says this session arrived from a reset link, so start()
+   can ask for the new password instead of carrying on as if nothing happened.
+
+   A recovery link hands back an ordinary session, which is why this needed
+   saying out loud: without the check, clicking "reset my password" silently
+   signed you in and showed you the normal page. The mail worked, the link
+   worked, and nothing anywhere offered to change the password. */
+var CAME_FROM_RESET = false;
+
 function captureRedirect() {
   if (!location.hash || location.hash.indexOf("access_token") === -1) return false;
   var p = new URLSearchParams(location.hash.slice(1));
   var tok = p.get("access_token");
   if (!tok) return false;
+  if (p.get("type") === "recovery") CAME_FROM_RESET = true;
   saveSession({
     access_token: tok,
     refresh_token: p.get("refresh_token") || "",
@@ -405,6 +462,44 @@ function captureRedirect() {
   });
   history.replaceState(null, "", location.pathname);
   return true;
+}
+
+/* The form the reset link should have led to all along. Kept deliberately
+   plain: one field, one button, and no way to wander off into the rest of the
+   portal until the password is actually set. */
+function passwordForm(msg) {
+  view(
+    '<div class="card">' +
+      '<h2 class="edit__h">Choose a new password</h2>' +
+      (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
+      '<p class="msg" style="margin-top:0">At least eight characters. ' +
+      "You will be signed in once it is saved.</p>" +
+      '<div class="field" style="margin-top:1rem">' +
+        '<input id="pw1" type="password" autocomplete="new-password" ' +
+        'placeholder="New password" aria-label="New password">' +
+      "</div>" +
+      '<button class="btn btn--solid" id="pwgo" type="button" style="margin-top:1rem">Save password</button>' +
+      '<p class="msg" style="margin-top:1rem">' +
+        '<button class="lnk" id="pwskip" type="button">Cancel and sign out</button></p>' +
+    "</div>"
+  );
+
+  document.getElementById("pwgo").addEventListener("click", function () {
+    var el = document.getElementById("pw1");
+    var pw = el.value;
+    if (pw.length < 8) { passwordForm("That is too short — eight characters or more."); return; }
+    var btn = document.getElementById("pwgo");
+    btn.disabled = true;
+    btn.textContent = "Saving\\u2026";
+    setPassword(pw).then(function () {
+      CAME_FROM_RESET = false;
+      start();
+    })["catch"](function (e) {
+      passwordForm(e.message);
+    });
+  });
+
+  document.getElementById("pwskip").addEventListener("click", signOut);
 }
 
 function authError() {
@@ -963,6 +1058,7 @@ function render(user, apps) {
 
 function start() {
   captureRedirect();
+  if (CAME_FROM_RESET) { passwordForm(""); return; }
   var err = authError();
   if (!session()) { signedOut(err); return; }
 
@@ -1141,7 +1237,7 @@ writeFileSync("status.html", shell({
 
 console.log("status.html written");
 
-const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\nfunction signedOut(msg) {\n  view(\n    '<div class=\"card\">' +\n      (msg ? '<p class=\"msg msg--bad\">' + esc(msg) + \"</p>\" : \"\") +\n      '<button class=\"gbtn\" id=\"go\" type=\"button\">Continue with Google</button>' +\n      '<p class=\"msg\">Use the address you booked the call with &mdash; that is how we find your seats. ' +\n      'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.</p>' +\n    \"</div>\"\n  );\n  document.getElementById(\"go\").addEventListener(\"click\", signIn);\n}\n\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n    \"</div>\";\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  if (!rows.length) {\n    view(who +\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\");\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"&mdash;\") + \"</span></li>\" +\n          (r.weekly ? \"<li><b>Quoted</b><span>\" + esc(money(r.weekly)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"&mdash;\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"&mdash;\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  view(html);\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n}\n\nfunction start() {\n  captureRedirect();\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { render(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n}\n\nstart();";
+const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\nfunction signedOut(msg) {\n  view(\n    '<div class=\"card\">' +\n      (msg ? '<p class=\"msg msg--bad\">' + esc(msg) + \"</p>\" : \"\") +\n      '<button class=\"gbtn\" id=\"go\" type=\"button\">Continue with Google</button>' +\n      '<p class=\"msg\">Use the address you booked the call with &mdash; that is how we find your seats. ' +\n      'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.</p>' +\n    \"</div>\"\n  );\n  document.getElementById(\"go\").addEventListener(\"click\", signIn);\n}\n\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n    \"</div>\";\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  if (!rows.length) {\n    view(who +\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\");\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"&mdash;\") + \"</span></li>\" +\n          (r.weekly ? \"<li><b>Quoted</b><span>\" + esc(money(r.weekly)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"&mdash;\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"&mdash;\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  view(html);\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { render(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n}\n\nstart();";
 
 /* ────────────────────────── admin.html ────────────────────────── */
 
@@ -2292,6 +2388,7 @@ function render(email, apps, notes, socials, docs) {
 
 function start() {
   captureRedirect();
+  if (CAME_FROM_RESET) { passwordForm(""); return; }
   var err = authError();
   if (!session()) { signedOut(err); return; }
 
