@@ -283,6 +283,12 @@ const PAGE_CSS = `
 .fld select,.fld textarea{font-family:inherit;font-size:.98rem;padding:.65rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
 .fld textarea{resize:vertical}
 .edit__h{font-size:1.05rem;margin:0 0 .3rem}
+.edit__sec{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:1.4rem 0 .6rem;padding-bottom:.4rem;border-bottom:1px solid var(--line)}
+.edit__grid{display:grid;gap:0 1.1rem}
+@media(min-width:560px){.edit__grid{grid-template-columns:1fr 1fr}}
+.edit__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid var(--line)}
+.edit__foot .chk{flex:1 1 15rem;min-width:0}
+.edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
 
 /* Stat tiles. The hero numbers are the answer for three of these four; a chart
    of a single figure would be a chart of nothing. */
@@ -987,21 +993,48 @@ function editForm(a) {
            '<select id="e-' + k[0] + '"><option value="">Not answered</option>' + opts + "</select></div>";
   }).join("");
 
+  /* Eleven controls in one flat column, with the equipment tick and the button
+     sharing a line and overlapping each other on a narrow window — the tick's
+     label ran underneath "Save changes" and could not be read.
+
+     Grouped instead, in the order somebody thinks about their own application:
+     how we reach them, when they can work, then how they rate themselves. The
+     five ratings sit two to a row on anything wide enough, which takes the
+     page from eleven stacked fields to something a person can see the end of.
+
+     Every id is unchanged. wireEdit() reads them by id, and quietly renaming
+     one here would stop that field saving with nothing to show for it. */
+  var reach = EDIT_FIELDS.filter(function (f) { return f[0] === "phone" || f[0] === "cv"; });
+  var when = EDIT_FIELDS.filter(function (f) { return f[0] !== "phone" && f[0] !== "cv"; });
+  var field = function (f) {
+    return '<div class="fld"><label for="e-' + f[0] + '">' + esc(f[1]) + "</label>" +
+           '<input id="e-' + f[0] + '" type="' + f[2] + '" value="' + esc(a[f[0]] || "") + '"></div>';
+  };
+
   return (
     '<div class="card">' +
       '<h2 class="edit__h">Keep this up to date</h2>' +
       '<p class="msg" style="margin-top:0">A better phone number or a newer CV helps us reach you. Changes save straight away.</p>' +
-      EDIT_FIELDS.map(function (f) {
-        return '<div class="fld"><label for="e-' + f[0] + '">' + esc(f[1]) + "</label>" +
-               '<input id="e-' + f[0] + '" type="' + f[2] + '" value="' + esc(a[f[0]] || "") + '"></div>';
-      }).join("") +
+
+      '<p class="edit__sec">How we reach you</p>' +
+      '<div class="edit__grid">' + reach.map(field).join("") + "</div>" +
+
+      '<p class="edit__sec">Where and when you work</p>' +
+      '<div class="edit__grid">' + when.map(field).join("") + "</div>" +
       '<div class="fld"><label for="e-note">Anything we should know?</label>' +
         '<textarea id="e-note" rows="3">' + esc(a.note || "") + "</textarea></div>" +
-      skills +
-      '<label class="chk" style="margin:.5rem 0 .9rem"><input type="checkbox" id="e-kit"' +
-        (a.has_equipment ? " checked" : "") + "> I have my own computer and internet</label>" +
-      '<button class="btn btn--solid" id="e-save" type="button">Save changes</button>' +
-      '<span class="row__ok" id="e-ok" style="margin-left:.7rem">Saved</span>' +
+
+      '<p class="edit__sec">How you rate yourself</p>' +
+      '<div class="edit__grid">' + skills + "</div>" +
+
+      '<div class="edit__foot">' +
+        '<label class="chk"><input type="checkbox" id="e-kit"' +
+          (a.has_equipment ? " checked" : "") + "> I have my own computer and internet</label>" +
+        '<span class="edit__act">' +
+          '<span class="row__ok" id="e-ok">Saved</span>' +
+          '<button class="btn btn--solid" id="e-save" type="button">Save changes</button>' +
+        "</span>" +
+      "</div>" +
     "</div>"
   );
 }
