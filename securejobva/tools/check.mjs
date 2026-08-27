@@ -257,6 +257,52 @@ await check("portal reads only columns it is granted", () => {
 /* The queue is the last thing standing between a failed POST and a lost lead,
    so its behaviour is driven, not just parsed. tools/test-queue.mjs pulls the
    real block out of index.html and runs it against a mocked store. */
+/* 016 fixed a bug worth not having twice: user_id was added to applications in
+   004 and never granted, and nothing noticed until a PATCH returned the row —
+   because returning a row means reading every column in it, and one ungranted
+   column refuses the whole statement. The operator saw a SELECT error on an
+   UPDATE they had not made.
+
+   The general shape: asking for select=* against a table whose grant is a
+   column list is a bet that the list is complete. It is complete right up until
+   somebody adds a column and forgets, and then the failure lands somewhere else
+   entirely. So either grant the whole table, or never ask it for everything. */
+await check("select=* only where the whole table is granted", () => {
+  const pages = ["status.html", "admin.html", "seats.html", "index.html", "careers.html"]
+    .filter((f) => existsSync(f));
+
+  /* A grant with a column list looks like  grant select (a, b) on public.t
+     A table-wide one looks like  grant select, insert on public.t  */
+  const columnLimited = new Set();
+  const tableWide = new Set();
+  for (const m of sql.matchAll(/grant\s+select\s*\(([^)]*)\)\s*on\s+public\.([a-z_]+)/gi)) {
+    columnLimited.add(m[2].toLowerCase());
+  }
+  for (const m of sql.matchAll(/grant\s+([a-z,\s]*select[a-z,\s]*)\s+on\s+public\.([a-z_]+)\s+to/gi)) {
+    if (!/\(/.test(m[1])) tableWide.add(m[2].toLowerCase());
+  }
+
+  const offenders = [];
+  for (const f of pages) {
+    const html = read(f);
+    /* both the REST path form and a bare select=* query */
+    for (const m of html.matchAll(/["'`]([a-z_]+)\?select=\*/gi)) {
+      const t = m[1].toLowerCase();
+      if (tableWide.has(t)) continue;
+      if (columnLimited.has(t)) offenders.push(f + ": select=* on " + t);
+    }
+  }
+
+  if (offenders.length) {
+    throw new Error(offenders.join("; ") +
+      " — that table is granted column by column, so select=* fails the moment " +
+      "a column is added without being listed. Name the columns, or grant the table.");
+  }
+
+  const limited = [...columnLimited].filter((t) => !tableWide.has(t));
+  return limited.length + " column-limited tables, none queried with select=*";
+});
+
 /* The CSV is the one place applicant-typed text leaves this system and is
    opened in a program that executes formulas. Both failure modes are silent. */
 await check("CSV escaping holds", async () => {
