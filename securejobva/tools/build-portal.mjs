@@ -195,6 +195,22 @@ const PAGE_CSS = `
 }
 @media(max-width:620px){.cl{grid-template-columns:4rem 1fr;gap:.5rem}
   .cl__ord,.cl [data-cl-toggle],.cl [data-cl-del]{grid-column:2}}
+.cal__set{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--ink-2)}
+.cal__set input{font-family:inherit;font-size:.82rem;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.cal__issues{background:#FDECEA;border-left:3px solid #B3261E;border-radius:0 8px 8px 0;padding:1rem 1.15rem;margin-top:1rem}
+:root[data-theme="dark"] .cal__issues{background:#2B1512}
+.cal__ih{margin:0 0 .5rem;font-size:.95rem;color:#B3261E}
+:root[data-theme="dark"] .cal__ih{color:#F2B8B5}
+.cal__i{margin:0 0 .5rem;font-size:.88rem;color:var(--ink-2);line-height:1.55}
+.cal__i:last-child{margin-bottom:0}
+.cal__i b{color:var(--ink)}
+.cal__day{margin-top:1.3rem}
+.cal__dh{margin:0 0 .5rem;font-size:.92rem;display:flex;align-items:center;gap:.5rem}
+.cal__today{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:var(--signal);color:var(--signal-ink);padding:.16rem .4rem;border-radius:4px}
+.cal__row{display:grid;grid-template-columns:5rem 1fr;gap:.3rem .8rem;padding:.5rem .7rem;background:var(--surface-2);border-radius:7px;margin-bottom:.35rem}
+.cal__t{font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--ink-2)}
+.cal__n{font-weight:600;font-size:.92rem}
+.cal__w{grid-column:2;font-size:.78rem;color:var(--muted)}
 .tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
 .tab{
   font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
@@ -1446,6 +1462,10 @@ function rowHtml(a) {
         (can("applications.edit")
           ? '<select data-status aria-label="Stage the applicant sees">' + options(a.status) + "</select>" +
             '<select data-pipe aria-label="Internal pipeline">' + pipeOptions(a.pipeline) + "</select>" +
+            '<label class="cal__set">Interview' +
+              '<input type="datetime-local" data-interview value="' +
+                esc(localDateTime(a.interview_at)) + '" aria-label="Interview date and time">' +
+            "</label>" +
             '<label class="chk"><input type="checkbox" data-replied' +
               (a.response_received ? " checked" : "") + "> replied</label>" +
             '<button class="btn btn--ghost" data-contacted type="button" ' +
@@ -1827,6 +1847,7 @@ function wireClients(box, rows) {
     }).then(function () {
       msg.textContent = "";
       loadClients();
+  drawCalendar();
     }).catch(function (e) {
       btn.disabled = false;
       msg.className = "msg msg--bad";
@@ -1878,6 +1899,137 @@ function wireClients(box, rows) {
       });
     });
   });
+}
+
+/* A datetime-local input speaks local wall-clock with no zone. The database
+   stores an instant. These two convert between them explicitly rather than
+   letting toISOString() quietly shift a 9am booking by the offset. */
+function localDateTime(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  var p = function (n) { return String(n).padStart(2, "0"); };
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+    "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function fromLocalDateTime(v) {
+  if (!v) return null;
+  var d = new Date(v);
+  return isNaN(d) ? null : d.toISOString();
+}
+function whenTime(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString(undefined, {
+    weekday: "short", day: "numeric", month: "short",
+    hour: "numeric", minute: "2-digit"
+  });
+}
+
+/* ── Interviews ──
+   Not a month grid. A month grid is mostly empty squares and answers "what
+   does August look like", which nobody asks. What gets asked is: who is next,
+   and is anything wrong. So it is a list, grouped by day, with the problems
+   raised to the top rather than left to be noticed. */
+function drawCalendar() {
+  var box = document.getElementById("cal-card");
+  if (!box) return;
+
+  var booked = ALL.filter(function (a) { return a.interview_at; });
+  var now = Date.now();
+
+  var past = booked.filter(function (a) { return new Date(a.interview_at) < now; });
+  var upcoming = booked.filter(function (a) { return new Date(a.interview_at) >= now; })
+    .sort(function (x, y) { return new Date(x.interview_at) - new Date(y.interview_at); });
+
+  /* Three things that are worth interrupting for. */
+  var unresolved = past.filter(function (a) {
+    return a.interview_unresolved || (a.pipeline === "interviewed" && !a.score_avg);
+  });
+  var atInterviewNoDate = ALL.filter(function (a) {
+    return a.pipeline === "interviewed" && !a.interview_at;
+  });
+  /* Two bookings inside the same hour is nearly always a mistake, and the one
+     nobody catches until the second person is waiting. */
+  var clashes = [];
+  for (var i = 1; i < upcoming.length; i++) {
+    var gap = new Date(upcoming[i].interview_at) - new Date(upcoming[i - 1].interview_at);
+    if (gap < 3600000) clashes.push([upcoming[i - 1], upcoming[i]]);
+  }
+
+  var badge = document.getElementById("tab-cal");
+  var problems = unresolved.length + clashes.length + atInterviewNoDate.length;
+  if (badge) badge.textContent = problems ? String(problems) : "";
+
+  var issues = "";
+  if (problems) {
+    issues =
+      '<div class="cal__issues">' +
+        '<h3 class="cal__ih">Needs attention</h3>' +
+        (unresolved.length
+          ? '<p class="cal__i"><b>' + unresolved.length + " interviewed, not scored.</b> " +
+            "The interview has been and gone and nobody wrote down how it went: " +
+            unresolved.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
+            (unresolved.length > 6 ? " and " + (unresolved.length - 6) + " more" : "") + "</p>"
+          : "") +
+        (atInterviewNoDate.length
+          ? '<p class="cal__i"><b>' + atInterviewNoDate.length + " at interview with no date set.</b> " +
+            "Nothing will remind you about these: " +
+            atInterviewNoDate.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
+            (atInterviewNoDate.length > 6 ? " and " + (atInterviewNoDate.length - 6) + " more" : "") + "</p>"
+          : "") +
+        (clashes.length
+          ? '<p class="cal__i"><b>' + clashes.length + " booked within an hour of each other.</b> " +
+            clashes.slice(0, 4).map(function (p) {
+              return esc(p[0].name || p[0].email) + " and " + esc(p[1].name || p[1].email);
+            }).join("; ") + "</p>"
+          : "") +
+      "</div>";
+  }
+
+  if (!booked.length && !atInterviewNoDate.length) {
+    box.innerHTML = '<h2 class="edit__h">Interviews</h2>' +
+      '<p class="msg">Nothing booked. Set a date on any row in the Applications tab and it appears here.</p>';
+    return;
+  }
+
+  /* Grouped by day, because that is how somebody reads a schedule. */
+  var days = {};
+  upcoming.forEach(function (a) {
+    var d = new Date(a.interview_at);
+    var key = d.toDateString();
+    (days[key] = days[key] || []).push(a);
+  });
+
+  var list = Object.keys(days).map(function (key) {
+    var d = new Date(key);
+    var today = d.toDateString() === new Date().toDateString();
+    return (
+      '<div class="cal__day">' +
+        '<h4 class="cal__dh">' + esc(d.toLocaleDateString(undefined, {
+          weekday: "long", day: "numeric", month: "long"
+        })) + (today ? ' <span class="cal__today">today</span>' : "") + "</h4>" +
+        days[key].map(function (a) {
+          return '<div class="cal__row">' +
+            '<span class="cal__t">' + esc(new Date(a.interview_at).toLocaleTimeString(undefined, {
+              hour: "numeric", minute: "2-digit"
+            })) + "</span>" +
+            '<span class="cal__n">' + esc(a.name || a.email) + "</span>" +
+            '<span class="cal__w">' + esc((a.tracks || []).join(" + ")) +
+              (a.interviewer ? " &middot; " + esc(a.interviewer) : "") + "</span>" +
+          "</div>";
+        }).join("") +
+      "</div>"
+    );
+  }).join("");
+
+  box.innerHTML =
+    '<h2 class="edit__h">Interviews</h2>' +
+    issues +
+    (upcoming.length
+      ? '<p class="msg" style="margin-top:1rem">' + upcoming.length + " coming up.</p>" + list
+      : '<p class="msg" style="margin-top:1rem">Nothing upcoming.</p>');
 }
 
 function wireTabs() {
@@ -2224,6 +2376,19 @@ function save(row) {
     /* scored_by and scored_at are deliberately not sent. The database stamps
        them, and only when a score actually moves, so re-saving a note does
        not rewrite who did the assessing. */
+    var ivEl = row.querySelector("[data-interview]");
+    if (ivEl) {
+      var iv = fromLocalDateTime(ivEl.value);
+      var wasIv = rec ? (rec.interview_at || null) : undefined;
+      /* Compared as instants, not strings: the input gives local time and the
+         stored value is UTC, so the same moment is two different strings. */
+      var same = wasIv && iv && new Date(wasIv).getTime() === new Date(iv).getTime();
+      if (wasIv === undefined || (!same && (wasIv || iv))) {
+        t.interview_at = iv;
+        changed = true;
+      }
+    }
+
     row.querySelectorAll("[data-score]").forEach(function (el) {
       var col = el.getAttribute("data-score");
       var val = el.value === "" ? null : Number(el.value);
@@ -2256,6 +2421,7 @@ function save(row) {
         if (t.last_contacted_at) rec.last_contacted_at = t.last_contacted_at;
         if (t.contacted_by) rec.contacted_by = t.contacted_by;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
+        if ("interview_at" in t) rec.interview_at = t.interview_at;
         SKILLS.forEach(function (k) {
           var col = k[0].replace("skill_", "score_");
           if (col in t) rec[col] = t[col];
@@ -2293,6 +2459,7 @@ function save(row) {
       row.replaceWith(tmp.firstChild);
     }
     flash(ok, "Saved");
+    if ("interview_at" in t) drawCalendar();
   }).catch(function (e) {
     flash(ok, why(e), true);
   });
@@ -2375,6 +2542,7 @@ function render(email, apps, notes, socials, docs) {
       '<button class="tab" data-tab="seats" type="button">Seats</button>' +
       '<button class="tab" data-tab="inbox" type="button">Messages<span class="tab__n" id="tab-unread"></span></button>' +
       '<button class="tab" data-tab="clients" type="button">Clients</button>' +
+      '<button class="tab" data-tab="cal" type="button">Interviews<span class="tab__n" id="tab-cal"></span></button>' +
       (can("accounts.manage") ? '<button class="tab" data-tab="accts" type="button">Accounts</button>' : "") +
     "</div>" +
     '<div data-pane="apps">' +
@@ -2384,6 +2552,7 @@ function render(email, apps, notes, socials, docs) {
     '<div data-pane="seats" hidden><div class="card" id="seats-card"></div></div>' +
     '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div></div>' +
     '<div data-pane="clients" hidden><div class="card" id="clients-card"></div></div>' +
+    '<div data-pane="cal" hidden><div class="card" id="cal-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "")
@@ -2406,7 +2575,7 @@ function render(email, apps, notes, socials, docs) {
   document.getElementById("rows").addEventListener("change", function (e) {
     var row = e.target.closest(".row");
     if (!row) return;
-    if (e.target.matches("[data-status], [data-pipe], [data-replied], [data-score]")) {
+    if (e.target.matches("[data-status], [data-pipe], [data-replied], [data-score], [data-interview]")) {
       save(row);
     }
   });
