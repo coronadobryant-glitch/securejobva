@@ -537,6 +537,7 @@ img{max-width:100%}
   display:flex;align-items:center;gap:.7rem;
   padding:1.1rem 2rem;border-top:1px solid var(--line);background:var(--surface-2);
 }
+.intake__foot[hidden]{display:none}
 .intake__count{
   font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--muted);
   margin-right:auto;font-variant-numeric:tabular-nums;
@@ -1805,6 +1806,12 @@ html{scroll-behavior:smooth}
     foot.setAttribute("hidden", "");
     show(LAST);
     try { localStorage.removeItem(DRAFT); } catch (e) {}
+
+    /* A new application needs a new id. DRAFT_ID is minted once per page load
+       because the CV upload has to know the folder before the row exists, so
+       without this a second application in the same visit collides with the
+       first and comes back 409. */
+    DRAFT_ID = newId();
   }
 
   /* ── Lead guard ─────────────────────────────────────────────────────────
@@ -1916,6 +1923,11 @@ html{scroll-behavior:smooth}
       method: "POST", headers: hdrs(), body: JSON.stringify(d)
     }).then(function (r) {
       if (r.ok) return "ok";
+      /* 409 is a duplicate primary key, which means this exact row is already
+         in the table. The application arrived; the only thing that failed is
+         sending it a second time. Reporting that as a failure is how somebody
+         ends up seeing "one tap left" over an application we already have. */
+      if (r.status === 409) return "ok";
       if (r.status >= 400 && r.status < 500 && r.status !== 429) return "dead";
       return "retry";
     })["catch"](function () { return "retry"; }); /* offline, DNS, CORS */

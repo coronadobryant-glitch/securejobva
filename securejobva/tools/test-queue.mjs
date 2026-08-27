@@ -22,6 +22,7 @@ globalThis.fetch = async (url, opt) => {
   if (mode === "network") throw new Error("offline");
   if (mode === "fail") return { ok: false, status: 503 };
   if (mode === "dead") return { ok: false, status: 400 };
+  if (mode === "conflict") return { ok: false, status: 409 };
   sent.push(body);
   return { ok: true, status: 201 };
 };
@@ -60,6 +61,15 @@ api.drain(); await wait();
 is("drains when the endpoint recovers", qlen(), 0);
 is("and the lead actually went", sent.length, 1);
 is("with its details intact", sent[0].email, "ada@example.com");
+
+// A duplicate primary key means the row is already there. That is the
+// application arriving twice, not failing -- and calling it a failure is how
+// somebody saw "one tap left" over an application already in the table.
+mode = "conflict";
+store.clear();
+api.park({ name: "Dup", email: "dup@example.com" });
+api.drain(); await wait();
+is("a 409 counts as delivered", qlen(), 0);
 
 // a permanently rejected row is kept, not silently dropped
 mode = "dead";
