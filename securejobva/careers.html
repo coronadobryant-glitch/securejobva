@@ -485,6 +485,7 @@ img{max-width:100%}
 .disc__p input:checked + .disc__dot--l{border-color:var(--muted);background:var(--muted)}
 .disc__p input:focus-visible + .disc__dot{outline:2px solid var(--accent);outline-offset:2px}
 .disc__g.is-bad{border-color:#B3261E}
+.skill.is-bad .seg--sm{border-color:#B3261E}
 .disc__e:empty{display:none}
 .disc__e{margin:.5rem 0 0}
 @media (max-width:420px){
@@ -1504,6 +1505,7 @@ html{scroll-behavior:smooth}
             <label><input type="radio" name="skill_english" value="advanced"><span>Advanced</span></label>
             <label><input type="radio" name="skill_english" value="fluent"><span>Fluent</span></label>
           </div>
+          <p class="err" data-skill-err="skill_english" aria-live="polite"></p>
         </div>
         <div class="skill">
           <span class="skill__t">Customer service</span>
@@ -1513,6 +1515,7 @@ html{scroll-behavior:smooth}
             <label><input type="radio" name="skill_customer" value="intermediate"><span>Intermediate</span></label>
             <label><input type="radio" name="skill_customer" value="advanced"><span>Advanced</span></label>
           </div>
+          <p class="err" data-skill-err="skill_customer" aria-live="polite"></p>
         </div>
         <div class="skill">
           <span class="skill__t">Data entry</span>
@@ -1522,6 +1525,7 @@ html{scroll-behavior:smooth}
             <label><input type="radio" name="skill_data_entry" value="intermediate"><span>Intermediate</span></label>
             <label><input type="radio" name="skill_data_entry" value="advanced"><span>Advanced</span></label>
           </div>
+          <p class="err" data-skill-err="skill_data_entry" aria-live="polite"></p>
         </div>
         <div class="skill">
           <span class="skill__t">Social media</span>
@@ -1531,6 +1535,7 @@ html{scroll-behavior:smooth}
             <label><input type="radio" name="skill_social" value="intermediate"><span>Intermediate</span></label>
             <label><input type="radio" name="skill_social" value="advanced"><span>Advanced</span></label>
           </div>
+          <p class="err" data-skill-err="skill_social" aria-live="polite"></p>
         </div>
         <div class="skill">
           <span class="skill__t">Bookkeeping and admin</span>
@@ -1540,6 +1545,7 @@ html{scroll-behavior:smooth}
             <label><input type="radio" name="skill_bookkeeping" value="intermediate"><span>Intermediate</span></label>
             <label><input type="radio" name="skill_bookkeeping" value="advanced"><span>Advanced</span></label>
           </div>
+          <p class="err" data-skill-err="skill_bookkeeping" aria-live="polite"></p>
         </div>
 
         <h3 class="q q--again">Where can we see your work?</h3>
@@ -1565,6 +1571,7 @@ html{scroll-behavior:smooth}
         </div>
 
 
+              <p class="err" id="err-skills" aria-live="polite"></p>
       </section>
       <section class="step" data-step="4" hidden>
         <h3 class="q">How you work, in your own words</h3>
@@ -1884,6 +1891,55 @@ html{scroll-behavior:smooth}
     return out;
   }
 
+  /* The five ratings had no default, no check and nowhere to put a message, so
+     a person could walk past the whole step and be told nothing — the step
+     simply returned true. They land in the admin row and in the notification,
+     so an application arriving without them is one somebody has to chase.
+
+     Every missing one is marked, not just the first, and the summary names
+     them: being told "something on this page" on a page of five identical
+     rows is the same problem the questionnaire had.
+
+     None of them is a trick question — the step says nobody is rejected for
+     answering beginner, and the exams settle it either way. */
+  var SKILLS = [
+    ["skill_english", "English"],
+    ["skill_customer", "Customer service"],
+    ["skill_data_entry", "Data entry"],
+    ["skill_social", "Social media"],
+    ["skill_bookkeeping", "Bookkeeping"]
+  ];
+
+  function validSkills() {
+    clearErrors();
+    var missing = [];
+    var first = null;
+    for (var i = 0; i < SKILLS.length; i++) {
+      var name = SKILLS[i][0];
+      var slot = form.querySelector('[data-skill-err="' + name + '"]');
+      var block = slot ? slot.closest(".skill") : null;
+      var answered = !!form.querySelector("[name=" + name + "]:checked");
+      if (block) block.classList.toggle("is-bad", !answered);
+      if (slot) slot.textContent = answered ? "" : "Pick one.";
+      if (!answered) {
+        missing.push(SKILLS[i][1]);
+        if (!first) first = block;
+      }
+    }
+    if (!missing.length) return true;
+    var err = document.getElementById("err-skills");
+    if (err) {
+      err.textContent = missing.length === 1
+        ? "One rating is missing: " + missing[0] + "."
+        : missing.length + " ratings are missing: " +
+          (missing.length > 2
+            ? missing.slice(0, -1).join(", ") + " and " + missing[missing.length - 1]
+            : missing.join(" and ")) + ".";
+    }
+    if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
+    return false;
+  }
+
   function validDisc() {
     clearErrors();
     var first = null;
@@ -2001,6 +2057,7 @@ html{scroll-behavior:smooth}
       return false;
     }
     if (step === 4) return validDisc();
+    if (step === 3) return validSkills();
     if (step === 2) {
       var name = document.getElementById("ap-name");
       var country = document.getElementById("ap-country");

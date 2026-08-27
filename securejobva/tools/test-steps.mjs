@@ -103,6 +103,95 @@ for (const file of ["index.html", "careers.html"]) {
   is("still not blank", h.steps.some((s) => !s.hidden), true);
 }
 
+/* ── the five ratings ──────────────────────────────────────────────────────
+   Step 3 had no default on any of the five radio groups, no check, and no
+   element to put a message in — valid(3) returned true. Somebody could walk
+   past the whole page and be told nothing, and the application arrived without
+   the ratings the admin row and the notification both show.
+
+   The listener is a named function, so this drives the real one rather than
+   reading it: a check that cannot fail is worse than none. */
+{
+  const html = readFileSync("careers.html", "utf8");
+  const at = html.indexOf("  function validSkills() {");
+  if (at < 0) throw new Error("careers.html: validSkills() not found");
+  const src = html.slice(at, html.indexOf("\n  }", at) + 4);
+
+  const listAt = html.indexOf("  var SKILLS = [");
+  const listSrc = html.slice(listAt, html.indexOf("];", listAt) + 2);
+
+  /* A fake page holding five rating blocks, answered or not. */
+  function page(answered) {
+    const slots = {}, blocks = {};
+    const names = ["skill_english", "skill_customer", "skill_data_entry",
+                   "skill_social", "skill_bookkeeping"];
+    names.forEach((n) => {
+      blocks[n] = {
+        bad: false,
+        classList: { toggle(c, on) { if (c === "is-bad") blocks[n].bad = on; } },
+        scrollIntoView() {}
+      };
+      slots[n] = { textContent: "", closest: () => blocks[n] };
+    });
+    return {
+      slots, blocks, names,
+      querySelector(sel) {
+        let m = sel.match(/^\[data-skill-err="([a-z_]+)"\]$/);
+        if (m) return slots[m[1]];
+        m = sel.match(/^\[name=([a-z_]+)\]:checked$/);
+        if (m) return answered.includes(m[1]) ? { value: "advanced" } : null;
+        return null;
+      },
+      querySelectorAll: () => []
+    };
+  }
+
+  function run(answered) {
+    const form = page(answered);
+    const errBox = { textContent: "" };
+    const document = { getElementById: (id) => (id === "err-skills" ? errBox : null) };
+    const fn = new Function("form", "document", "clearErrors",
+      listSrc + "\n" + src + "\nreturn validSkills();");
+    const ok = fn(form, document, () => {});
+    return { ok, errBox, form };
+  }
+
+  console.log("\nratings\n");
+
+  const all = run(["skill_english", "skill_customer", "skill_data_entry",
+                   "skill_social", "skill_bookkeeping"]);
+  is("a fully rated step goes through", all.ok, true);
+  is("and marks nothing", Object.values(all.form.blocks).filter((b) => b.bad).length, 0);
+
+  const none = run([]);
+  is("an unrated step is refused", none.ok, false);
+  is("and every missing one is marked, not just the first",
+    Object.values(none.form.blocks).filter((b) => b.bad).length, 5);
+  is("and each says what to do", none.form.slots.skill_social.textContent, "Pick one.");
+  is("and the summary counts them", /5 ratings are missing/.test(none.errBox.textContent), true);
+
+  const some = run(["skill_english", "skill_data_entry", "skill_social"]);
+  is("a partly rated step is refused", some.ok, false);
+  is("only the missing ones are marked",
+    Object.entries(some.form.blocks).filter(([, b]) => b.bad).map(([n]) => n),
+    ["skill_customer", "skill_bookkeeping"]);
+  is("the summary names them rather than counting",
+    /Customer service and Bookkeeping/.test(some.errBox.textContent), true);
+  is("and does not name the answered ones",
+    /English|Data entry|Social media/.test(some.errBox.textContent), false);
+
+  /* Everything above drives validSkills() directly, which proves the function
+     and not that anything calls it. Removing the line that routes step 3 to it
+     left all of them green — so this asserts the wiring, which is the one
+     thing reading the source does prove. */
+  is("step 3 is actually routed to it",
+    html.includes("if (step === 3) return validSkills();"), true);
+
+  const one = run(["skill_english", "skill_customer", "skill_data_entry", "skill_social"]);
+  is("one missing reads as one, not as a count",
+    one.errBox.textContent, "One rating is missing: Bookkeeping.");
+}
+
 console.log("");
 console.log(bad ? bad + " FAILED" : "all passed");
 console.log("");
