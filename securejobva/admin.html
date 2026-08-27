@@ -463,6 +463,22 @@ img{max-width:100%}
 .msg__body{margin:.6rem 0 0;font-size:.9rem;color:var(--ink-2);line-height:1.6;white-space:pre-wrap}
 /* An answered message stays readable but stops competing for attention. */
 .row.is-done{opacity:.62}
+.notes{margin-top:.7rem;padding-top:.6rem;border-top:1px dashed var(--line)}
+.note__e{padding:.45rem .6rem;background:var(--surface-2);border-radius:7px;margin-bottom:.3rem}
+.note__m{display:block;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted);letter-spacing:.03em}
+.note__t{display:block;font-size:.88rem;color:var(--ink-2);line-height:1.5;white-space:pre-wrap;margin-top:.15rem}
+.note__none{margin:0 0 .4rem;font-size:.84rem;color:var(--muted)}
+.note__more{margin-bottom:.3rem}
+.note__more summary{cursor:pointer;font-size:.8rem;color:var(--accent);list-style:none;padding:.3rem 0}
+.note__more summary::-webkit-details-marker{display:none}
+.note__more summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.note__more[open] summary::before{content:"− "}
+.note__add{display:flex;gap:.5rem;align-items:flex-start;margin-top:.45rem}
+.note__add textarea{
+  flex:1;min-width:10rem;font-family:inherit;font-size:.88rem;padding:.45rem .6rem;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
+  resize:vertical;min-height:2.2rem;
+}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -1176,6 +1192,52 @@ function pipeOptions(cur) {
   }).join("");
 }
 
+/* The log, newest first. Three, because the answer to "what is going on with
+   this person" is almost always in the last few lines, and a row that unrolls
+   eleven notes buries the next applicant. The rest are one click away and the
+   button says how many, so nobody has to guess whether there is more. */
+function noteEntry(n) {
+  return '<div class="note__e">' +
+    '<span class="note__m">' + esc(n.author || "unknown") +
+      " &middot; " + esc(whenStamp(n.created_at)) + "</span>" +
+    '<span class="note__t">' + esc(n.note) + "</span>" +
+  "</div>";
+}
+
+function noteBox(a) {
+  var all = a.notes || [];
+  var first = all.slice(0, 3);
+  var rest = all.slice(3);
+
+  return (
+    '<div class="notes">' +
+      (all.length
+        ? first.map(noteEntry).join("") +
+          (rest.length
+            ? '<details class="note__more"><summary>' + rest.length +
+              " earlier note" + (rest.length === 1 ? "" : "s") + "</summary>" +
+              rest.map(noteEntry).join("") + "</details>"
+            : "")
+        : '<p class="note__none">No notes yet.</p>') +
+      '<div class="note__add">' +
+        '<textarea data-note rows="1" aria-label="Add a note about ' +
+          esc(a.name || "this applicant") + '" placeholder="Add a note…"></textarea>' +
+        '<button class="btn btn--ghost" data-note-add type="button" ' +
+          'style="padding:.4rem .75rem;font-size:.84rem">Add</button>' +
+      "</div>" +
+    "</div>"
+  );
+}
+
+function whenStamp(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString(undefined, {
+    day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
+  });
+}
+
 function rowHtml(a) {
   var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "&mdash;";
 
@@ -1211,9 +1273,7 @@ function rowHtml(a) {
               'style="padding:.45rem .8rem;font-size:.85rem">Mark contacted</button>'
           : "") +
         (can("applications.note")
-          ? '<textarea data-note rows="1" aria-label="Private note about ' +
-            esc(a.name || "this applicant") + '" placeholder="Private note (staff only)">' +
-            esc(a.note_text || "") + "</textarea>"
+          ? noteBox(a)
           : "") +
         '<span class="row__ok" data-ok></span>' +
       "</div>";
@@ -2070,6 +2130,43 @@ function shownRows() {
   return shown;
 }
 
+/* Nothing here sends an author. 020 stamps it from the verified token and
+   overwrites whatever arrived, for the same reason scored_by is not sent: on a
+   log, who wrote it is the part that has to be true. */
+function addNote(row) {
+  var box = row.querySelector("[data-note]");
+  var ok = row.querySelector("[data-ok]");
+  var id = row.getAttribute("data-id");
+  var text = (box.value || "").trim();
+  if (!text) return;
+
+  box.disabled = true;
+  flash(ok, "Saving…");
+  api("application_note_log", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: { application_id: id, note: text }
+  }).then(function () {
+    box.value = "";
+    /* Refetched rather than guessed at locally: the row needs the author and
+       the timestamp the database chose, not the ones this page would invent. */
+    return api("application_note_log?select=id,application_id,note,author,created_at&application_id=eq." +
+      encodeURIComponent(id) + "&order=created_at.desc");
+  }).then(function (rows) {
+    var rec = ALL.filter(function (x) { return x.id === id; })[0];
+    if (rec) {
+      rec.notes = rows || [];
+      var tmp = document.createElement("div");
+      tmp.innerHTML = rowHtml(rec);
+      row.replaceWith(tmp.firstChild);
+    }
+    flash(ok, "Added");
+  }).catch(function (e) {
+    box.disabled = false;
+    flash(ok, why(e), true);
+  });
+}
+
 function paint() {
   var shown = shownRows();
   document.getElementById("count").textContent =
@@ -2081,11 +2178,11 @@ function paint() {
 function save(row) {
   var id  = row.getAttribute("data-id");
   var stEl = row.querySelector("[data-status]");
-  var ntEl = row.querySelector("[data-note]");
+
   var ppEl = row.querySelector("[data-pipe]");
   var rpEl = row.querySelector("[data-replied]");
   var st   = stEl ? stEl.value : null;
-  var note = ntEl ? ntEl.value : null;
+
   var pipe = ppEl ? ppEl.value : null;
   var replied = rpEl ? rpEl.checked : null;
   var ok  = row.querySelector("[data-ok]");
@@ -2099,14 +2196,7 @@ function save(row) {
       body: { status: st, status_changed_at: new Date().toISOString() }
     }));
   }
-  if (note !== null && (!rec || (rec.note_text || "") !== note)) {
-    /* upsert: one row per application, keyed by its id */
-    jobs.push(api("application_notes", {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: { application_id: id, note: note, updated_at: new Date().toISOString() }
-    }));
-  }
+
   /* Not gated on the pipeline control existing. It used to be, and the scores
      and the interview date were written inside that gate — so they saved only
      because the pipeline select happens to be drawn beside them. Rename or
@@ -2180,7 +2270,7 @@ function save(row) {
   Promise.all(jobs).then(function () {
     if (rec) {
       if (st !== null) rec.status = st;
-      if (note !== null) rec.note_text = note;
+
     }
     if (st !== null) {
       var pill = row.querySelector("[data-pill]");
@@ -2233,7 +2323,11 @@ function why(e) {
 
 function render(email, apps, notes, socials, docs) {
   var byId = {};
-  (notes || []).forEach(function (n) { byId[n.application_id] = n.note; });
+  /* Newest first, which is the order they arrive in and the order they are
+     read: the last thing said about somebody is the thing you want. */
+  (notes || []).forEach(function (n) {
+    (byId[n.application_id] = byId[n.application_id] || []).push(n);
+  });
   var socById = {};
   (socials || []).forEach(function (s) {
     (socById[s.application_id] = socById[s.application_id] || []).push(s);
@@ -2243,7 +2337,7 @@ function render(email, apps, notes, socials, docs) {
     (docById[d.application_id] = docById[d.application_id] || []).push(d);
   });
   ALL = apps.map(function (a) {
-    a.note_text = byId[a.id] || "";
+    a.notes = byId[a.id] || [];
     a.socials = socById[a.id] || [];
     a.docs = docById[a.id] || [];
     a.pipeline = a.pipeline || "new";
@@ -2324,23 +2418,10 @@ function render(email, apps, notes, socials, docs) {
     }
   });
 
-  /* Typing is different: saving every keystroke would be a write per letter.
-     Wait for a pause, and also save on blur so leaving the field commits. */
-  document.getElementById("rows").addEventListener("input", function (e) {
-    if (!e.target.matches("[data-note]")) return;
-    var row = e.target.closest(".row");
-    clearTimeout(row._noteTimer);
-    row._noteTimer = setTimeout(function () { save(row); }, 900);
-  });
-
-  document.getElementById("rows").addEventListener("blur", function (e) {
-    if (!e.target.matches("[data-note]")) return;
-    var row = e.target.closest(".row");
-    clearTimeout(row._noteTimer);
-    save(row);
-  }, true);
 
   document.getElementById("rows").addEventListener("click", function (e) {
+    var add = e.target.closest("[data-note-add]");
+    if (add) { addNote(add.closest(".row")); return; }
     var doc = e.target.closest("[data-doc]");
     if (doc) { openDoc(doc); return; }
     var c = e.target.closest("[data-contacted]");
@@ -2384,7 +2465,7 @@ function start() {
            a security-barrier view, so it shows an applicant nothing. */
         api("application_queue?select=*&order=waiting_since.asc"),
         can("applications.note")
-          ? api("application_notes?select=application_id,note")
+          ? api("application_note_log?select=id,application_id,note,author,created_at&order=created_at.desc")
           : Promise.resolve([]),
         can("social.view")
           ? api("application_socials?select=application_id,platform,handle,url")

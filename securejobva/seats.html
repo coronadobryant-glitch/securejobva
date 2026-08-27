@@ -463,6 +463,22 @@ img{max-width:100%}
 .msg__body{margin:.6rem 0 0;font-size:.9rem;color:var(--ink-2);line-height:1.6;white-space:pre-wrap}
 /* An answered message stays readable but stops competing for attention. */
 .row.is-done{opacity:.62}
+.notes{margin-top:.7rem;padding-top:.6rem;border-top:1px dashed var(--line)}
+.note__e{padding:.45rem .6rem;background:var(--surface-2);border-radius:7px;margin-bottom:.3rem}
+.note__m{display:block;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted);letter-spacing:.03em}
+.note__t{display:block;font-size:.88rem;color:var(--ink-2);line-height:1.5;white-space:pre-wrap;margin-top:.15rem}
+.note__none{margin:0 0 .4rem;font-size:.84rem;color:var(--muted)}
+.note__more{margin-bottom:.3rem}
+.note__more summary{cursor:pointer;font-size:.8rem;color:var(--accent);list-style:none;padding:.3rem 0}
+.note__more summary::-webkit-details-marker{display:none}
+.note__more summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.note__more[open] summary::before{content:"− "}
+.note__add{display:flex;gap:.5rem;align-items:flex-start;margin-top:.45rem}
+.note__add textarea{
+  flex:1;min-width:10rem;font-family:inherit;font-size:.88rem;padding:.45rem .6rem;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
+  resize:vertical;min-height:2.2rem;
+}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
