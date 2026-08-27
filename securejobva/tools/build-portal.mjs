@@ -34,6 +34,18 @@ const OPT_CSS = (function () {
 
 const PAGE_CSS = `
 /* ---------- portal ---------- */
+/* The legal row is the one place in the footer where the links have to look
+   like links. The column links above sit under headings that already say what
+   they are; these are a run of words separated by dots at .82rem, and with no
+   underline they read as a line of grey text somebody has stopped scrolling
+   past. Underlined, they are findable, which is the entire job of a policy
+   link.
+
+   Scoped .foot .foot__bot a, not .foot__bot a. Both that and .foot a are one
+   class plus one element, so a bare version only wins by sitting later in the
+   file — and every rule in this stylesheet has moved at least once today. */
+.foot .foot__bot a{text-decoration:underline;text-underline-offset:.22em;text-decoration-thickness:from-font;color:var(--ink-2)}
+.foot .foot__bot a:hover{color:var(--accent)}
 .pt{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem);min-height:60vh}
 .pt__head{margin-bottom:2rem}
 .pt__head h1{font-size:var(--step-3);margin:.5rem 0 .6rem}
@@ -133,6 +145,9 @@ const PAGE_CSS = `
   resize:vertical;min-height:2.4rem;
 }
 .row__ok{font-size:.8rem;color:var(--accent);opacity:0;transition:opacity .18s ease}
+/* An error is not decoration: it wraps, it stays, and it is readable. */
+.row__ok.is-bad{color:#B3261E;font-weight:600;opacity:1;flex-basis:100%;line-height:1.45}
+:root[data-theme="dark"] .row__ok.is-bad{color:#F2B8B5}
 .row__ok.is-on{opacity:1}
 .pill{
   display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
@@ -180,6 +195,22 @@ const PAGE_CSS = `
 }
 @media(max-width:620px){.cl{grid-template-columns:4rem 1fr;gap:.5rem}
   .cl__ord,.cl [data-cl-toggle],.cl [data-cl-del]{grid-column:2}}
+.cal__set{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--ink-2)}
+.cal__set input{font-family:inherit;font-size:.82rem;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.cal__issues{background:#FDECEA;border-left:3px solid #B3261E;border-radius:0 8px 8px 0;padding:1rem 1.15rem;margin-top:1rem}
+:root[data-theme="dark"] .cal__issues{background:#2B1512}
+.cal__ih{margin:0 0 .5rem;font-size:.95rem;color:#B3261E}
+:root[data-theme="dark"] .cal__ih{color:#F2B8B5}
+.cal__i{margin:0 0 .5rem;font-size:.88rem;color:var(--ink-2);line-height:1.55}
+.cal__i:last-child{margin-bottom:0}
+.cal__i b{color:var(--ink)}
+.cal__day{margin-top:1.3rem}
+.cal__dh{margin:0 0 .5rem;font-size:.92rem;display:flex;align-items:center;gap:.5rem}
+.cal__today{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:var(--signal);color:var(--signal-ink);padding:.16rem .4rem;border-radius:4px}
+.cal__row{display:grid;grid-template-columns:5rem 1fr;gap:.3rem .8rem;padding:.5rem .7rem;background:var(--surface-2);border-radius:7px;margin-bottom:.35rem}
+.cal__t{font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--ink-2)}
+.cal__n{font-weight:600;font-size:.92rem}
+.cal__w{grid-column:2;font-size:.78rem;color:var(--muted)}
 .tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
 .tab{
   font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
@@ -198,6 +229,41 @@ const PAGE_CSS = `
 .msg__body{margin:.6rem 0 0;font-size:.9rem;color:var(--ink-2);line-height:1.6;white-space:pre-wrap}
 /* An answered message stays readable but stops competing for attention. */
 .row.is-done{opacity:.62}
+.notes{margin-top:.7rem;padding-top:.6rem;border-top:1px dashed var(--line)}
+.note__e{padding:.45rem .6rem;background:var(--surface-2);border-radius:7px;margin-bottom:.3rem}
+.note__m{display:block;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted);letter-spacing:.03em}
+.note__t{display:block;font-size:.88rem;color:var(--ink-2);line-height:1.5;white-space:pre-wrap;margin-top:.15rem}
+.note__none{margin:0 0 .4rem;font-size:.84rem;color:var(--muted)}
+.note__more{margin-bottom:.3rem}
+.note__more summary{cursor:pointer;font-size:.8rem;color:var(--accent);list-style:none;padding:.3rem 0}
+.note__more summary::-webkit-details-marker{display:none}
+.note__more summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.note__more[open] summary::before{content:"− "}
+.note__add{display:flex;gap:.5rem;align-items:flex-start;margin-top:.45rem}
+.note__add textarea{
+  flex:1;min-width:10rem;font-family:inherit;font-size:.88rem;padding:.45rem .6rem;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
+  resize:vertical;min-height:2.2rem;
+}
+.disc__r{margin-top:.7rem;padding:.6rem .75rem;background:var(--surface-2);border-radius:8px}
+.disc__r--none{font-size:.82rem;color:var(--muted)}
+.disc__rk{
+  display:block;font-family:"IBM Plex Mono",monospace;font-size:.62rem;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+}
+.disc__rn{display:block;font-weight:600;font-size:.95rem;margin-top:.12rem}
+.disc__r2{font-weight:400;font-size:.84rem;color:var(--muted)}
+.disc__rf{display:block;font-size:.82rem;color:var(--ink-2);margin-top:.1rem}
+.disc__bs{display:grid;gap:.18rem;margin-top:.5rem}
+.disc__b{display:grid;grid-template-columns:1.1rem 1fr 2.2rem;align-items:center;gap:.45rem}
+.disc__bk{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted)}
+.disc__bt{position:relative;display:block;height:.5rem;background:var(--surface);border-radius:3px;overflow:hidden}
+.disc__bt::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+.disc__bt i{position:absolute;top:0;bottom:0;background:var(--accent);border-radius:2px}
+.disc__bv{
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-2);
+  text-align:right;font-variant-numeric:tabular-nums;
+}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -1406,6 +1472,113 @@ function pipeOptions(cur) {
   }).join("");
 }
 
+/* The log, newest first. Three, because the answer to "what is going on with
+   this person" is almost always in the last few lines, and a row that unrolls
+   eleven notes buries the next applicant. The rest are one click away and the
+   button says how many, so nobody has to guess whether there is more. */
+function noteEntry(n) {
+  return '<div class="note__e">' +
+    '<span class="note__m">' + esc(n.author || "unknown") +
+      " &middot; " + esc(whenStamp(n.created_at)) + "</span>" +
+    '<span class="note__t">' + esc(n.note) + "</span>" +
+  "</div>";
+}
+
+function noteBox(a) {
+  var all = a.notes || [];
+  var first = all.slice(0, 3);
+  var rest = all.slice(3);
+
+  return (
+    '<div class="notes">' +
+      (all.length
+        ? first.map(noteEntry).join("") +
+          (rest.length
+            ? '<details class="note__more"><summary>' + rest.length +
+              " earlier note" + (rest.length === 1 ? "" : "s") + "</summary>" +
+              rest.map(noteEntry).join("") + "</details>"
+            : "")
+        : '<p class="note__none">No notes yet.</p>') +
+      '<div class="note__add">' +
+        '<textarea data-note rows="1" aria-label="Add a note about ' +
+          esc(a.name || "this applicant") + '" placeholder="Add a note\u2026"></textarea>' +
+        '<button class="btn btn--ghost" data-note-add type="button" ' +
+          'style="padding:.4rem .75rem;font-size:.84rem">Add</button>' +
+      "</div>" +
+    "</div>"
+  );
+}
+
+function whenStamp(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString(undefined, {
+    day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
+  });
+}
+
+var DISC_STYLE = {
+  "D": {
+    "name": "Driver",
+    "fits": "Escalations, outbound sales, anything with a target on it"
+  },
+  "I": {
+    "name": "Persuader",
+    "fits": "Front-line customer service, lead follow-up, appointment setting"
+  },
+  "S": {
+    "name": "Steady",
+    "fits": "Inbox and calendar, long-running client accounts, support"
+  },
+  "C": {
+    "name": "Checker",
+    "fits": "Bookkeeping, data entry, invoicing, documents"
+  }
+};
+
+/* What the questionnaire came back as.
+ *
+ * The letter alone tells nobody anything, so it is shown as a name and the
+ * kind of seat it suits. The four bars are there because the shape matters
+ * more than the winner: somebody at D 4 I 3 is a different person from
+ * somebody at D 9 I -6, and both read as "Driver" if you only print the top
+ * letter.
+ *
+ * Scores run -12 to 12, so the bar is offset from a centre line — a negative
+ * is a real result (this is markedly not you), not a missing one.
+ */
+function discLine(a) {
+  var d = a.disc;
+  if (!d) {
+    return '<div class="disc__r disc__r--none">Working style &mdash; not taken. ' +
+      "Applications sent before the questionnaire existed will say this.</div>";
+  }
+  var style = DISC_STYLE[d.primary_style] || { name: d.primary_style, fits: "" };
+  var second = DISC_STYLE[d.secondary_style];
+
+  var bars = ["d", "i", "s", "c"].map(function (k) {
+    var v = Number(d[k]) || 0;
+    var pct = Math.min(50, Math.abs(v) / 12 * 50);
+    return '<div class="disc__b">' +
+      '<span class="disc__bk">' + k.toUpperCase() + "</span>" +
+      '<span class="disc__bt"><i style="' +
+        (v >= 0 ? "left:50%;width:" : "right:50%;width:") + pct.toFixed(1) + '%"></i></span>' +
+      '<span class="disc__bv">' + (v > 0 ? "+" : "") + v + "</span>" +
+    "</div>";
+  }).join("");
+
+  return (
+    '<div class="disc__r">' +
+      '<span class="disc__rk">Working style</span>' +
+      '<span class="disc__rn">' + esc(style.name) +
+        (second ? ' <span class="disc__r2">then ' + esc(second.name) + "</span>" : "") + "</span>" +
+      (style.fits ? '<span class="disc__rf">' + esc(style.fits) + "</span>" : "") +
+      '<div class="disc__bs">' + bars + "</div>" +
+    "</div>"
+  );
+}
+
 function rowHtml(a) {
   var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "&mdash;";
 
@@ -1431,18 +1604,19 @@ function rowHtml(a) {
         (can("applications.edit")
           ? '<select data-status aria-label="Stage the applicant sees">' + options(a.status) + "</select>" +
             '<select data-pipe aria-label="Internal pipeline">' + pipeOptions(a.pipeline) + "</select>" +
+            '<label class="cal__set">Interview' +
+              '<input type="datetime-local" data-interview value="' +
+                esc(localDateTime(a.interview_at)) + '" aria-label="Interview date and time">' +
+            "</label>" +
             '<label class="chk"><input type="checkbox" data-replied' +
               (a.response_received ? " checked" : "") + "> replied</label>" +
             '<button class="btn btn--ghost" data-contacted type="button" ' +
               'style="padding:.45rem .8rem;font-size:.85rem">Mark contacted</button>'
           : "") +
         (can("applications.note")
-          ? '<textarea data-note rows="1" aria-label="Private note about ' +
-            esc(a.name || "this applicant") + '" placeholder="Private note (staff only)">' +
-            esc(a.note_text || "") + "</textarea>"
+          ? noteBox(a)
           : "") +
-        '<button class="btn btn--ghost" data-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
-        '<span class="row__ok" data-ok>Saved</span>' +
+        '<span class="row__ok" data-ok></span>' +
       "</div>";
   }
 
@@ -1459,6 +1633,7 @@ function rowHtml(a) {
         (a.region ? " &middot; " + esc(a.region) : "") +
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
+      discLine(a) +
       docList(a.docs) +
       contactLine(a) +
       scoreLine(a) +
@@ -1813,6 +1988,7 @@ function wireClients(box, rows) {
     }).then(function () {
       msg.textContent = "";
       loadClients();
+  drawCalendar();
     }).catch(function (e) {
       btn.disabled = false;
       msg.className = "msg msg--bad";
@@ -1864,6 +2040,137 @@ function wireClients(box, rows) {
       });
     });
   });
+}
+
+/* A datetime-local input speaks local wall-clock with no zone. The database
+   stores an instant. These two convert between them explicitly rather than
+   letting toISOString() quietly shift a 9am booking by the offset. */
+function localDateTime(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  var p = function (n) { return String(n).padStart(2, "0"); };
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+    "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function fromLocalDateTime(v) {
+  if (!v) return null;
+  var d = new Date(v);
+  return isNaN(d) ? null : d.toISOString();
+}
+function whenTime(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString(undefined, {
+    weekday: "short", day: "numeric", month: "short",
+    hour: "numeric", minute: "2-digit"
+  });
+}
+
+/* ── Interviews ──
+   Not a month grid. A month grid is mostly empty squares and answers "what
+   does August look like", which nobody asks. What gets asked is: who is next,
+   and is anything wrong. So it is a list, grouped by day, with the problems
+   raised to the top rather than left to be noticed. */
+function drawCalendar() {
+  var box = document.getElementById("cal-card");
+  if (!box) return;
+
+  var booked = ALL.filter(function (a) { return a.interview_at; });
+  var now = Date.now();
+
+  var past = booked.filter(function (a) { return new Date(a.interview_at) < now; });
+  var upcoming = booked.filter(function (a) { return new Date(a.interview_at) >= now; })
+    .sort(function (x, y) { return new Date(x.interview_at) - new Date(y.interview_at); });
+
+  /* Three things that are worth interrupting for. */
+  var unresolved = past.filter(function (a) {
+    return a.interview_unresolved || (a.pipeline === "interviewed" && !a.score_avg);
+  });
+  var atInterviewNoDate = ALL.filter(function (a) {
+    return a.pipeline === "interviewed" && !a.interview_at;
+  });
+  /* Two bookings inside the same hour is nearly always a mistake, and the one
+     nobody catches until the second person is waiting. */
+  var clashes = [];
+  for (var i = 1; i < upcoming.length; i++) {
+    var gap = new Date(upcoming[i].interview_at) - new Date(upcoming[i - 1].interview_at);
+    if (gap < 3600000) clashes.push([upcoming[i - 1], upcoming[i]]);
+  }
+
+  var badge = document.getElementById("tab-cal");
+  var problems = unresolved.length + clashes.length + atInterviewNoDate.length;
+  if (badge) badge.textContent = problems ? String(problems) : "";
+
+  var issues = "";
+  if (problems) {
+    issues =
+      '<div class="cal__issues">' +
+        '<h3 class="cal__ih">Needs attention</h3>' +
+        (unresolved.length
+          ? '<p class="cal__i"><b>' + unresolved.length + " interviewed, not scored.</b> " +
+            "The interview has been and gone and nobody wrote down how it went: " +
+            unresolved.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
+            (unresolved.length > 6 ? " and " + (unresolved.length - 6) + " more" : "") + "</p>"
+          : "") +
+        (atInterviewNoDate.length
+          ? '<p class="cal__i"><b>' + atInterviewNoDate.length + " at interview with no date set.</b> " +
+            "Nothing will remind you about these: " +
+            atInterviewNoDate.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
+            (atInterviewNoDate.length > 6 ? " and " + (atInterviewNoDate.length - 6) + " more" : "") + "</p>"
+          : "") +
+        (clashes.length
+          ? '<p class="cal__i"><b>' + clashes.length + " booked within an hour of each other.</b> " +
+            clashes.slice(0, 4).map(function (p) {
+              return esc(p[0].name || p[0].email) + " and " + esc(p[1].name || p[1].email);
+            }).join("; ") + "</p>"
+          : "") +
+      "</div>";
+  }
+
+  if (!booked.length && !atInterviewNoDate.length) {
+    box.innerHTML = '<h2 class="edit__h">Interviews</h2>' +
+      '<p class="msg">Nothing booked. Set a date on any row in the Applications tab and it appears here.</p>';
+    return;
+  }
+
+  /* Grouped by day, because that is how somebody reads a schedule. */
+  var days = {};
+  upcoming.forEach(function (a) {
+    var d = new Date(a.interview_at);
+    var key = d.toDateString();
+    (days[key] = days[key] || []).push(a);
+  });
+
+  var list = Object.keys(days).map(function (key) {
+    var d = new Date(key);
+    var today = d.toDateString() === new Date().toDateString();
+    return (
+      '<div class="cal__day">' +
+        '<h4 class="cal__dh">' + esc(d.toLocaleDateString(undefined, {
+          weekday: "long", day: "numeric", month: "long"
+        })) + (today ? ' <span class="cal__today">today</span>' : "") + "</h4>" +
+        days[key].map(function (a) {
+          return '<div class="cal__row">' +
+            '<span class="cal__t">' + esc(new Date(a.interview_at).toLocaleTimeString(undefined, {
+              hour: "numeric", minute: "2-digit"
+            })) + "</span>" +
+            '<span class="cal__n">' + esc(a.name || a.email) + "</span>" +
+            '<span class="cal__w">' + esc((a.tracks || []).join(" + ")) +
+              (a.interviewer ? " &middot; " + esc(a.interviewer) : "") + "</span>" +
+          "</div>";
+        }).join("") +
+      "</div>"
+    );
+  }).join("");
+
+  box.innerHTML =
+    '<h2 class="edit__h">Interviews</h2>' +
+    issues +
+    (upcoming.length
+      ? '<p class="msg" style="margin-top:1rem">' + upcoming.length + " coming up.</p>" + list
+      : '<p class="msg" style="margin-top:1rem">Nothing upcoming.</p>');
 }
 
 function wireTabs() {
@@ -1938,8 +2245,7 @@ function drawSeats(box, rows) {
             (can("applications.edit")
               ? '<div class="row__ctl">' +
                   '<select data-seat-status aria-label="Stage of this seat request">' + opts + "</select>" +
-                  '<button class="btn btn--ghost" data-seat-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
-                  '<span class="row__ok" data-seat-ok>Saved</span>' +
+                  '<span class="row__ok" data-seat-ok></span>' +
                 "</div>"
               : "") +
           "</div>"
@@ -1947,12 +2253,16 @@ function drawSeats(box, rows) {
       }).join("") +
     "</div>";
 
-  box.querySelectorAll("[data-seat-save]").forEach(function (b) {
-    b.addEventListener("click", function () {
-      var row = b.closest("[data-seat]");
+  /* Writes on change, like the applications table. A dropdown has no
+     half-chosen state, so there is nothing a Save button was waiting for —
+     it only created a way to make a change and lose it by navigating away. */
+  box.querySelectorAll("[data-seat-status]").forEach(function (sel) {
+    sel.addEventListener("change", function () {
+      var row = sel.closest("[data-seat]");
       var id = row.getAttribute("data-seat");
-      var st = row.querySelector("[data-seat-status]").value;
+      var st = sel.value;
       var ok = row.querySelector("[data-seat-ok]");
+      flash(ok, "Saving…");
       api("seat_requests?id=eq." + encodeURIComponent(id), {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
@@ -1963,7 +2273,7 @@ function drawSeats(box, rows) {
         pill.textContent = SEAT_LABEL[st] || st;
         flash(ok, "Saved");
       }).catch(function (e) {
-        flash(ok, String(e.message) === "signed out" ? "Signed out" : "Failed");
+        flash(ok, why(e), true);
       });
     });
   });
@@ -2044,8 +2354,7 @@ function drawInbox(box, rows) {
           : { handled_at: null, handled_by: null }
       }).then(loadInbox)
         .catch(function (e) {
-          flash(row.querySelector("[data-msg-ok]"),
-                String(e.message) === "signed out" ? "Signed out" : "Failed");
+          flash(row.querySelector("[data-msg-ok]"), why(e), true);
         });
     });
   });
@@ -2163,6 +2472,43 @@ function shownRows() {
   return shown;
 }
 
+/* Nothing here sends an author. 020 stamps it from the verified token and
+   overwrites whatever arrived, for the same reason scored_by is not sent: on a
+   log, who wrote it is the part that has to be true. */
+function addNote(row) {
+  var box = row.querySelector("[data-note]");
+  var ok = row.querySelector("[data-ok]");
+  var id = row.getAttribute("data-id");
+  var text = (box.value || "").trim();
+  if (!text) return;
+
+  box.disabled = true;
+  flash(ok, "Saving\u2026");
+  api("application_note_log", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: { application_id: id, note: text }
+  }).then(function () {
+    box.value = "";
+    /* Refetched rather than guessed at locally: the row needs the author and
+       the timestamp the database chose, not the ones this page would invent. */
+    return api("application_note_log?select=id,application_id,note,author,created_at&application_id=eq." +
+      encodeURIComponent(id) + "&order=created_at.desc");
+  }).then(function (rows) {
+    var rec = ALL.filter(function (x) { return x.id === id; })[0];
+    if (rec) {
+      rec.notes = rows || [];
+      var tmp = document.createElement("div");
+      tmp.innerHTML = rowHtml(rec);
+      row.replaceWith(tmp.firstChild);
+    }
+    flash(ok, "Added");
+  }).catch(function (e) {
+    box.disabled = false;
+    flash(ok, why(e), true);
+  });
+}
+
 function paint() {
   var shown = shownRows();
   document.getElementById("count").textContent =
@@ -2174,11 +2520,11 @@ function paint() {
 function save(row) {
   var id  = row.getAttribute("data-id");
   var stEl = row.querySelector("[data-status]");
-  var ntEl = row.querySelector("[data-note]");
+
   var ppEl = row.querySelector("[data-pipe]");
   var rpEl = row.querySelector("[data-replied]");
   var st   = stEl ? stEl.value : null;
-  var note = ntEl ? ntEl.value : null;
+
   var pipe = ppEl ? ppEl.value : null;
   var replied = rpEl ? rpEl.checked : null;
   var ok  = row.querySelector("[data-ok]");
@@ -2192,15 +2538,13 @@ function save(row) {
       body: { status: st, status_changed_at: new Date().toISOString() }
     }));
   }
-  if (note !== null && (!rec || (rec.note_text || "") !== note)) {
-    /* upsert: one row per application, keyed by its id */
-    jobs.push(api("application_notes", {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: { application_id: id, note: note, updated_at: new Date().toISOString() }
-    }));
-  }
-  if (pipe !== null || replied !== null) {
+
+  /* Not gated on the pipeline control existing. It used to be, and the scores
+     and the interview date were written inside that gate — so they saved only
+     because the pipeline select happens to be drawn beside them. Rename or
+     remove that one control and two others stop saving with no error anywhere.
+     Whether anything is sent is decided by the changed flag alone. */
+  {
     var t = { application_id: id, updated_at: new Date().toISOString() };
     var changed = false;
     if (pipe !== null && (!rec || rec.pipeline !== pipe)) { t.pipeline = pipe; changed = true; }
@@ -2208,6 +2552,19 @@ function save(row) {
     /* scored_by and scored_at are deliberately not sent. The database stamps
        them, and only when a score actually moves, so re-saving a note does
        not rewrite who did the assessing. */
+    var ivEl = row.querySelector("[data-interview]");
+    if (ivEl) {
+      var iv = fromLocalDateTime(ivEl.value);
+      var wasIv = rec ? (rec.interview_at || null) : undefined;
+      /* Compared as instants, not strings: the input gives local time and the
+         stored value is UTC, so the same moment is two different strings. */
+      var same = wasIv && iv && new Date(wasIv).getTime() === new Date(iv).getTime();
+      if (wasIv === undefined || (!same && (wasIv || iv))) {
+        t.interview_at = iv;
+        changed = true;
+      }
+    }
+
     row.querySelectorAll("[data-score]").forEach(function (el) {
       var col = el.getAttribute("data-score");
       var val = el.value === "" ? null : Number(el.value);
@@ -2240,6 +2597,7 @@ function save(row) {
         if (t.last_contacted_at) rec.last_contacted_at = t.last_contacted_at;
         if (t.contacted_by) rec.contacted_by = t.contacted_by;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
+        if ("interview_at" in t) rec.interview_at = t.interview_at;
         SKILLS.forEach(function (k) {
           var col = k[0].replace("skill_", "score_");
           if (col in t) rec[col] = t[col];
@@ -2248,12 +2606,13 @@ function save(row) {
     }
   }
 
-  if (!jobs.length) { flash(ok, "No change"); return; }
+  if (!jobs.length) return;
+  flash(ok, "Saving\u2026");
 
   Promise.all(jobs).then(function () {
     if (rec) {
       if (st !== null) rec.status = st;
-      if (note !== null) rec.note_text = note;
+
     }
     if (st !== null) {
       var pill = row.querySelector("[data-pill]");
@@ -2261,7 +2620,7 @@ function save(row) {
       pill.textContent = LABEL[st] || st;
     }
     row.removeAttribute("data-mark-contacted");
-    if (pipe !== null || replied !== null) {
+    if (rec) {
       /* Recompute the average locally rather than refetching: the row is about
          to be redrawn and a stale header under a changed score reads as a bug. */
       var got = SKILLS.map(function (k) { return rec[k[0].replace("skill_", "score_")]; })
@@ -2276,20 +2635,41 @@ function save(row) {
       row.replaceWith(tmp.firstChild);
     }
     flash(ok, "Saved");
+    if ("interview_at" in t) drawCalendar();
   }).catch(function (e) {
-    flash(ok, String(e.message) === "signed out" ? "Signed out" : "Failed");
+    flash(ok, why(e), true);
   });
 }
 
-function flash(el, text) {
+function flash(el, text, bad) {
   el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
   el.classList.add("is-on");
-  setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+  /* An error stays until the next attempt. A success fades, because nobody
+     needs to be told twice that a dropdown worked. */
+  clearTimeout(el._t);
+  if (!bad) el._t = setTimeout(function () { el.classList.remove("is-on"); }, 1600);
 }
 
-function render(email, apps, notes, socials, docs) {
+/* PostgREST answers with JSON carrying message, details and hint. The hint is
+   usually the actionable half — "GRANT SELECT ON ..." — so it is kept. */
+function why(e) {
+  var t = String((e && e.message) || e || "");
+  if (t === "signed out") return "Signed out — reload and sign in again";
+  try {
+    var j = JSON.parse(t);
+    return [j.message, j.hint].filter(Boolean).join(" — ").slice(0, 180) || t.slice(0, 180);
+  } catch (x) {}
+  return t.slice(0, 180) || "That did not save";
+}
+
+function render(email, apps, notes, socials, docs, disc) {
   var byId = {};
-  (notes || []).forEach(function (n) { byId[n.application_id] = n.note; });
+  /* Newest first, which is the order they arrive in and the order they are
+     read: the last thing said about somebody is the thing you want. */
+  (notes || []).forEach(function (n) {
+    (byId[n.application_id] = byId[n.application_id] || []).push(n);
+  });
   var socById = {};
   (socials || []).forEach(function (s) {
     (socById[s.application_id] = socById[s.application_id] || []).push(s);
@@ -2298,10 +2678,13 @@ function render(email, apps, notes, socials, docs) {
   (docs || []).forEach(function (d) {
     (docById[d.application_id] = docById[d.application_id] || []).push(d);
   });
+  var discById = {};
+  (disc || []).forEach(function (d) { discById[d.application_id] = d; });
   ALL = apps.map(function (a) {
-    a.note_text = byId[a.id] || "";
+    a.notes = byId[a.id] || [];
     a.socials = socById[a.id] || [];
     a.docs = docById[a.id] || [];
+    a.disc = discById[a.id] || null;
     a.pipeline = a.pipeline || "new";
     return a;
   });
@@ -2342,6 +2725,7 @@ function render(email, apps, notes, socials, docs) {
       '<button class="tab" data-tab="seats" type="button">Seats</button>' +
       '<button class="tab" data-tab="inbox" type="button">Messages<span class="tab__n" id="tab-unread"></span></button>' +
       '<button class="tab" data-tab="clients" type="button">Clients</button>' +
+      '<button class="tab" data-tab="cal" type="button">Interviews<span class="tab__n" id="tab-cal"></span></button>' +
       (can("accounts.manage") ? '<button class="tab" data-tab="accts" type="button">Accounts</button>' : "") +
     "</div>" +
     '<div data-pane="apps">' +
@@ -2351,6 +2735,7 @@ function render(email, apps, notes, socials, docs) {
     '<div data-pane="seats" hidden><div class="card" id="seats-card"></div></div>' +
     '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div></div>' +
     '<div data-pane="clients" hidden><div class="card" id="clients-card"></div></div>' +
+    '<div data-pane="cal" hidden><div class="card" id="cal-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "")
@@ -2368,7 +2753,20 @@ function render(email, apps, notes, socials, docs) {
   document.getElementById("fskill").addEventListener("change", paint);
   document.getElementById("csv").addEventListener("click", exportCsv);
   document.getElementById("flevel").addEventListener("change", paint);
+  /* Selects and checkboxes commit immediately. There is no half-chosen state
+     in a dropdown, so there is nothing to wait for. */
+  document.getElementById("rows").addEventListener("change", function (e) {
+    var row = e.target.closest(".row");
+    if (!row) return;
+    if (e.target.matches("[data-status], [data-pipe], [data-replied], [data-score], [data-interview]")) {
+      save(row);
+    }
+  });
+
+
   document.getElementById("rows").addEventListener("click", function (e) {
+    var add = e.target.closest("[data-note-add]");
+    if (add) { addNote(add.closest(".row")); return; }
     var doc = e.target.closest("[data-doc]");
     if (doc) { openDoc(doc); return; }
     var c = e.target.closest("[data-contacted]");
@@ -2380,8 +2778,6 @@ function render(email, apps, notes, socials, docs) {
       save(r);
       return;
     }
-    var b = e.target.closest("[data-save]");
-    if (b) save(b.closest(".row"));
   });
   paint();
 }
@@ -2414,16 +2810,21 @@ function start() {
            a security-barrier view, so it shows an applicant nothing. */
         api("application_queue?select=*&order=waiting_since.asc"),
         can("applications.note")
-          ? api("application_notes?select=application_id,note")
+          ? api("application_note_log?select=id,application_id,note,author,created_at&order=created_at.desc")
           : Promise.resolve([]),
         can("social.view")
           ? api("application_socials?select=application_id,platform,handle,url")
           : Promise.resolve([]),
         api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
+          .catch(function () { return []; }),
+        /* Caught rather than awaited-or-fail: until 021 is run this table does
+           not exist, and an admin page that will not load because a
+           questionnaire is missing is worse than one without the questionnaire. */
+        api("application_disc_read?select=application_id,d,i,s,c,primary_style,secondary_style,primary_name")
           .catch(function () { return []; })
       ];
       return Promise.all(jobs).then(function (r) {
-        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || []);
+        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || [], r[4] || []);
       });
     })
     .catch(function (e) {

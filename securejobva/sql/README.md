@@ -35,10 +35,13 @@ run it. That is always safer than guessing.
 | `019-notify-webhooks.sql` | Webhooks for seat requests and contact messages — needs the secret pasted in |
 | `020-restore-status-grants.sql` | Puts back the staff UPDATE grants that a re-run of 001 revoked |
 | `021-one-webhook-per-form.sql` | Removes the duplicate pokes; one per form, all on the real secret |
-| `022-note-log.sql` | The many-notes-per-applicant log the deployed /admin queries |
+| `022-note-log.sql` | Made the note log in a hurry when /admin went down. Superseded by 024 |
+| `023-interview-times.sql` | When the interview is, and the Interviews tab that reads it |
+| `024-note-log.sql` | Notes stop overwriting each other — a row per note, with who and when |
+| `025-disc.sql` | The DISC questionnaire and its scorer. GENERATED — edit `tools/disc-items.mjs` |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 022 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 025 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

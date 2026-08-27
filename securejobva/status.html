@@ -194,6 +194,19 @@ img{max-width:100%}
 .nav__links a.nav__cross:focus-visible,
 .nav__tools a.nav__cross:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
 .mobnav__in a.nav__cross{margin-top:.4rem}
+/* Staff shortcut. Injected by script, so it does not exist for the people
+   who make up nearly all of this page's traffic. */
+.nav__links a.nav__admin,
+.mobnav__in a.nav__admin{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  padding:.5rem .9rem;border-radius:8px;
+  border:1.5px solid var(--accent);color:var(--accent);
+  font-weight:600;line-height:1;
+  transition:background-color .16s ease,color .16s ease;
+}
+.nav__links a.nav__admin:hover,
+.mobnav__in a.nav__admin:hover{background:var(--accent);color:var(--accent-ink)}
+.mobnav__in a.nav__admin{margin-top:.4rem}
 .mobnav__in a.nav__signin{margin-top:.5rem}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
@@ -255,6 +268,18 @@ img{max-width:100%}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 /* ---------- portal ---------- */
+/* The legal row is the one place in the footer where the links have to look
+   like links. The column links above sit under headings that already say what
+   they are; these are a run of words separated by dots at .82rem, and with no
+   underline they read as a line of grey text somebody has stopped scrolling
+   past. Underlined, they are findable, which is the entire job of a policy
+   link.
+
+   Scoped .foot .foot__bot a, not .foot__bot a. Both that and .foot a are one
+   class plus one element, so a bare version only wins by sitting later in the
+   file — and every rule in this stylesheet has moved at least once today. */
+.foot .foot__bot a{text-decoration:underline;text-underline-offset:.22em;text-decoration-thickness:from-font;color:var(--ink-2)}
+.foot .foot__bot a:hover{color:var(--accent)}
 .pt{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem);min-height:60vh}
 .pt__head{margin-bottom:2rem}
 .pt__head h1{font-size:var(--step-3);margin:.5rem 0 .6rem}
@@ -354,6 +379,9 @@ img{max-width:100%}
   resize:vertical;min-height:2.4rem;
 }
 .row__ok{font-size:.8rem;color:var(--accent);opacity:0;transition:opacity .18s ease}
+/* An error is not decoration: it wraps, it stays, and it is readable. */
+.row__ok.is-bad{color:#B3261E;font-weight:600;opacity:1;flex-basis:100%;line-height:1.45}
+:root[data-theme="dark"] .row__ok.is-bad{color:#F2B8B5}
 .row__ok.is-on{opacity:1}
 .pill{
   display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
@@ -401,6 +429,22 @@ img{max-width:100%}
 }
 @media(max-width:620px){.cl{grid-template-columns:4rem 1fr;gap:.5rem}
   .cl__ord,.cl [data-cl-toggle],.cl [data-cl-del]{grid-column:2}}
+.cal__set{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--ink-2)}
+.cal__set input{font-family:inherit;font-size:.82rem;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.cal__issues{background:#FDECEA;border-left:3px solid #B3261E;border-radius:0 8px 8px 0;padding:1rem 1.15rem;margin-top:1rem}
+:root[data-theme="dark"] .cal__issues{background:#2B1512}
+.cal__ih{margin:0 0 .5rem;font-size:.95rem;color:#B3261E}
+:root[data-theme="dark"] .cal__ih{color:#F2B8B5}
+.cal__i{margin:0 0 .5rem;font-size:.88rem;color:var(--ink-2);line-height:1.55}
+.cal__i:last-child{margin-bottom:0}
+.cal__i b{color:var(--ink)}
+.cal__day{margin-top:1.3rem}
+.cal__dh{margin:0 0 .5rem;font-size:.92rem;display:flex;align-items:center;gap:.5rem}
+.cal__today{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:var(--signal);color:var(--signal-ink);padding:.16rem .4rem;border-radius:4px}
+.cal__row{display:grid;grid-template-columns:5rem 1fr;gap:.3rem .8rem;padding:.5rem .7rem;background:var(--surface-2);border-radius:7px;margin-bottom:.35rem}
+.cal__t{font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--ink-2)}
+.cal__n{font-weight:600;font-size:.92rem}
+.cal__w{grid-column:2;font-size:.78rem;color:var(--muted)}
 .tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
 .tab{
   font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
@@ -419,6 +463,41 @@ img{max-width:100%}
 .msg__body{margin:.6rem 0 0;font-size:.9rem;color:var(--ink-2);line-height:1.6;white-space:pre-wrap}
 /* An answered message stays readable but stops competing for attention. */
 .row.is-done{opacity:.62}
+.notes{margin-top:.7rem;padding-top:.6rem;border-top:1px dashed var(--line)}
+.note__e{padding:.45rem .6rem;background:var(--surface-2);border-radius:7px;margin-bottom:.3rem}
+.note__m{display:block;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted);letter-spacing:.03em}
+.note__t{display:block;font-size:.88rem;color:var(--ink-2);line-height:1.5;white-space:pre-wrap;margin-top:.15rem}
+.note__none{margin:0 0 .4rem;font-size:.84rem;color:var(--muted)}
+.note__more{margin-bottom:.3rem}
+.note__more summary{cursor:pointer;font-size:.8rem;color:var(--accent);list-style:none;padding:.3rem 0}
+.note__more summary::-webkit-details-marker{display:none}
+.note__more summary::before{content:"+ ";font-family:"IBM Plex Mono",monospace}
+.note__more[open] summary::before{content:"− "}
+.note__add{display:flex;gap:.5rem;align-items:flex-start;margin-top:.45rem}
+.note__add textarea{
+  flex:1;min-width:10rem;font-family:inherit;font-size:.88rem;padding:.45rem .6rem;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
+  resize:vertical;min-height:2.2rem;
+}
+.disc__r{margin-top:.7rem;padding:.6rem .75rem;background:var(--surface-2);border-radius:8px}
+.disc__r--none{font-size:.82rem;color:var(--muted)}
+.disc__rk{
+  display:block;font-family:"IBM Plex Mono",monospace;font-size:.62rem;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+}
+.disc__rn{display:block;font-weight:600;font-size:.95rem;margin-top:.12rem}
+.disc__r2{font-weight:400;font-size:.84rem;color:var(--muted)}
+.disc__rf{display:block;font-size:.82rem;color:var(--ink-2);margin-top:.1rem}
+.disc__bs{display:grid;gap:.18rem;margin-top:.5rem}
+.disc__b{display:grid;grid-template-columns:1.1rem 1fr 2.2rem;align-items:center;gap:.45rem}
+.disc__bk{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted)}
+.disc__bt{position:relative;display:block;height:.5rem;background:var(--surface);border-radius:3px;overflow:hidden}
+.disc__bt::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+.disc__bt i{position:absolute;top:0;bottom:0;background:var(--accent);border-radius:2px}
+.disc__bv{
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-2);
+  text-align:right;font-variant-numeric:tabular-nums;
+}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}

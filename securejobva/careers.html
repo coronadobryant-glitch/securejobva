@@ -194,6 +194,19 @@ img{max-width:100%}
 .nav__links a.nav__cross:focus-visible,
 .nav__tools a.nav__cross:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
 .mobnav__in a.nav__cross{margin-top:.4rem}
+/* Staff shortcut. Injected by script, so it does not exist for the people
+   who make up nearly all of this page's traffic. */
+.nav__links a.nav__admin,
+.mobnav__in a.nav__admin{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  padding:.5rem .9rem;border-radius:8px;
+  border:1.5px solid var(--accent);color:var(--accent);
+  font-weight:600;line-height:1;
+  transition:background-color .16s ease,color .16s ease;
+}
+.nav__links a.nav__admin:hover,
+.mobnav__in a.nav__admin:hover{background:var(--accent);color:var(--accent-ink)}
+.mobnav__in a.nav__admin{margin-top:.4rem}
 .mobnav__in a.nav__signin{margin-top:.5rem}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
@@ -402,6 +415,18 @@ img{max-width:100%}
 .foot ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.92rem}
 .foot a{text-decoration:none;color:var(--ink-2)}
 .foot a:hover{color:var(--accent)}
+/* The legal row is the one place in the footer where the links have to look
+   like links. The column links above sit under headings that already say what
+   they are; these are a run of words separated by dots at .82rem, and with no
+   underline they read as a line of grey text somebody has stopped scrolling
+   past. Underlined, they are findable, which is the entire job of a policy
+   link.
+
+   Scoped .foot .foot__bot a, not .foot__bot a. Both that and .foot a are one
+   class plus one element, so a bare version only wins by sitting later in the
+   file — and every rule in this stylesheet has moved at least once today. */
+.foot .foot__bot a{text-decoration:underline;text-underline-offset:.22em;text-decoration-thickness:from-font;color:var(--ink-2)}
+.foot .foot__bot a:hover{color:var(--accent)}
 .foot__brand{margin-bottom:.75rem}
 .foot__bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;font-size:.82rem;color:var(--muted)}
 
@@ -434,6 +459,38 @@ img{max-width:100%}
 
 /* three real steps, so the rail is a sequence and not decoration */
 .rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;padding:0 2rem 1.3rem}
+.disc{display:grid;gap:.9rem;margin-top:1.1rem}
+.disc__g{border:1px solid var(--line);border-radius:11px;padding:.85rem .95rem;margin:0}
+.disc__n{
+  font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);padding:0 .4rem;
+}
+.disc__hd,.disc__w{display:grid;grid-template-columns:1fr 3.1rem 3.1rem;align-items:center;gap:.4rem}
+.disc__hd{padding:0 0 .4rem}
+.disc__hd span{
+  font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);text-align:center;
+}
+.disc__ws{display:grid;gap:.1rem}
+.disc__w{padding:.34rem 0;border-top:1px solid var(--line)}
+.disc__w:first-child{border-top:0}
+.disc__t{font-size:.94rem;color:var(--ink-2);line-height:1.35}
+.disc__p{display:flex;justify-content:center;cursor:pointer;padding:.3rem 0}
+.disc__p input{position:absolute;opacity:0;width:0;height:0}
+.disc__dot{
+  width:1.3rem;height:1.3rem;border-radius:50%;border:2px solid var(--line);
+  display:block;transition:border-color .12s,background .12s,box-shadow .12s;
+}
+.disc__p input:checked + .disc__dot{border-color:var(--accent);background:var(--accent);box-shadow:inset 0 0 0 3px var(--surface)}
+.disc__p input:checked + .disc__dot--l{border-color:var(--muted);background:var(--muted)}
+.disc__p input:focus-visible + .disc__dot{outline:2px solid var(--accent);outline-offset:2px}
+.disc__g.is-bad{border-color:#B3261E}
+.disc__e:empty{display:none}
+.disc__e{margin:.5rem 0 0}
+@media (max-width:420px){
+  .disc__hd,.disc__w{grid-template-columns:1fr 2.5rem 2.5rem}
+  .disc__t{font-size:.88rem}
+}
 .rail__i{display:grid;gap:.45rem}
 .rail__bar{height:3px;border-radius:2px;background:var(--line);transition:background-color .2s ease}
 .rail__i[data-on] .rail__bar{background:var(--accent)}
@@ -1276,6 +1333,7 @@ html{scroll-behavior:smooth}
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">2 &middot; Setup</div></div>
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">3 &middot; You</div></div>
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">4 &middot; Social</div></div>
+      <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">5 &middot; Style</div></div>
     </div>
 
     <form class="intake__body" id="apply-form" novalidate>
@@ -1509,6 +1567,149 @@ html{scroll-behavior:smooth}
 
       </section>
       <section class="step" data-step="4" hidden>
+        <h3 class="q">How you work, in your own words</h3>
+        <p class="q__sub">Twelve short groups. In each one, tick the word that is <b>most</b> like you and the word that is <b>least</b> like you. There is no right answer and nothing here can fail you &mdash; it tells us which online job you would actually enjoy, so we stop putting quiet people on outbound calls.</p>
+
+        <div class="disc">
+          <!-- disc:start -->
+        <fieldset class="disc__g" data-disc-g="0">
+          <legend class="disc__n">1 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Patient</span><label class="disc__p"><input type="radio" name="disc_m0" value="0" aria-label="Patient — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l0" value="0" aria-label="Patient — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Direct</span><label class="disc__p"><input type="radio" name="disc_m0" value="1" aria-label="Direct — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l0" value="1" aria-label="Direct — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Careful</span><label class="disc__p"><input type="radio" name="disc_m0" value="2" aria-label="Careful — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l0" value="2" aria-label="Careful — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Cheerful</span><label class="disc__p"><input type="radio" name="disc_m0" value="3" aria-label="Cheerful — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l0" value="3" aria-label="Cheerful — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="0" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="1">
+          <legend class="disc__n">2 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Talkative</span><label class="disc__p"><input type="radio" name="disc_m1" value="0" aria-label="Talkative — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l1" value="0" aria-label="Talkative — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Accurate</span><label class="disc__p"><input type="radio" name="disc_m1" value="1" aria-label="Accurate — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l1" value="1" aria-label="Accurate — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Decisive</span><label class="disc__p"><input type="radio" name="disc_m1" value="2" aria-label="Decisive — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l1" value="2" aria-label="Decisive — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Steady</span><label class="disc__p"><input type="radio" name="disc_m1" value="3" aria-label="Steady — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l1" value="3" aria-label="Steady — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="1" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="2">
+          <legend class="disc__n">3 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Precise</span><label class="disc__p"><input type="radio" name="disc_m2" value="0" aria-label="Precise — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l2" value="0" aria-label="Precise — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Calm</span><label class="disc__p"><input type="radio" name="disc_m2" value="1" aria-label="Calm — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l2" value="1" aria-label="Calm — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Friendly</span><label class="disc__p"><input type="radio" name="disc_m2" value="2" aria-label="Friendly — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l2" value="2" aria-label="Friendly — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Competitive</span><label class="disc__p"><input type="radio" name="disc_m2" value="3" aria-label="Competitive — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l2" value="3" aria-label="Competitive — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="2" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="3">
+          <legend class="disc__n">4 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Bold</span><label class="disc__p"><input type="radio" name="disc_m3" value="0" aria-label="Bold — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l3" value="0" aria-label="Bold — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Loyal</span><label class="disc__p"><input type="radio" name="disc_m3" value="1" aria-label="Loyal — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l3" value="1" aria-label="Loyal — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Persuasive</span><label class="disc__p"><input type="radio" name="disc_m3" value="2" aria-label="Persuasive — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l3" value="2" aria-label="Persuasive — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Cautious</span><label class="disc__p"><input type="radio" name="disc_m3" value="3" aria-label="Cautious — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l3" value="3" aria-label="Cautious — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="3" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="4">
+          <legend class="disc__n">5 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Easy-going</span><label class="disc__p"><input type="radio" name="disc_m4" value="0" aria-label="Easy-going — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l4" value="0" aria-label="Easy-going — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Thorough</span><label class="disc__p"><input type="radio" name="disc_m4" value="1" aria-label="Thorough — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l4" value="1" aria-label="Thorough — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Firm</span><label class="disc__p"><input type="radio" name="disc_m4" value="2" aria-label="Firm — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l4" value="2" aria-label="Firm — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Optimistic</span><label class="disc__p"><input type="radio" name="disc_m4" value="3" aria-label="Optimistic — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l4" value="3" aria-label="Optimistic — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="4" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="5">
+          <legend class="disc__n">6 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Outgoing</span><label class="disc__p"><input type="radio" name="disc_m5" value="0" aria-label="Outgoing — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l5" value="0" aria-label="Outgoing — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Follows the rules</span><label class="disc__p"><input type="radio" name="disc_m5" value="1" aria-label="Follows the rules — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l5" value="1" aria-label="Follows the rules — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Good listener</span><label class="disc__p"><input type="radio" name="disc_m5" value="2" aria-label="Good listener — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l5" value="2" aria-label="Good listener — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Takes charge</span><label class="disc__p"><input type="radio" name="disc_m5" value="3" aria-label="Takes charge — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l5" value="3" aria-label="Takes charge — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="5" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="6">
+          <legend class="disc__n">7 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Methodical</span><label class="disc__p"><input type="radio" name="disc_m6" value="0" aria-label="Methodical — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l6" value="0" aria-label="Methodical — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Blunt</span><label class="disc__p"><input type="radio" name="disc_m6" value="1" aria-label="Blunt — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l6" value="1" aria-label="Blunt — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Dependable</span><label class="disc__p"><input type="radio" name="disc_m6" value="2" aria-label="Dependable — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l6" value="2" aria-label="Dependable — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Playful</span><label class="disc__p"><input type="radio" name="disc_m6" value="3" aria-label="Playful — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l6" value="3" aria-label="Playful — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="6" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="7">
+          <legend class="disc__n">8 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Warm</span><label class="disc__p"><input type="radio" name="disc_m7" value="0" aria-label="Warm — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l7" value="0" aria-label="Warm — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Gentle</span><label class="disc__p"><input type="radio" name="disc_m7" value="1" aria-label="Gentle — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l7" value="1" aria-label="Gentle — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Questioning</span><label class="disc__p"><input type="radio" name="disc_m7" value="2" aria-label="Questioning — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l7" value="2" aria-label="Questioning — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Driven</span><label class="disc__p"><input type="radio" name="disc_m7" value="3" aria-label="Driven — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l7" value="3" aria-label="Driven — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="7" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="8">
+          <legend class="disc__n">9 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Consistent</span><label class="disc__p"><input type="radio" name="disc_m8" value="0" aria-label="Consistent — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l8" value="0" aria-label="Consistent — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Quick to act</span><label class="disc__p"><input type="radio" name="disc_m8" value="1" aria-label="Quick to act — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l8" value="1" aria-label="Quick to act — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Exact</span><label class="disc__p"><input type="radio" name="disc_m8" value="2" aria-label="Exact — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l8" value="2" aria-label="Exact — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Enthusiastic</span><label class="disc__p"><input type="radio" name="disc_m8" value="3" aria-label="Enthusiastic — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l8" value="3" aria-label="Enthusiastic — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="8" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="9">
+          <legend class="disc__n">10 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Expressive</span><label class="disc__p"><input type="radio" name="disc_m9" value="0" aria-label="Expressive — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l9" value="0" aria-label="Expressive — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Reserved</span><label class="disc__p"><input type="radio" name="disc_m9" value="1" aria-label="Reserved — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l9" value="1" aria-label="Reserved — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Strong-willed</span><label class="disc__p"><input type="radio" name="disc_m9" value="2" aria-label="Strong-willed — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l9" value="2" aria-label="Strong-willed — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Supportive</span><label class="disc__p"><input type="radio" name="disc_m9" value="3" aria-label="Supportive — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l9" value="3" aria-label="Supportive — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="9" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="10">
+          <legend class="disc__n">11 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Checks the detail</span><label class="disc__p"><input type="radio" name="disc_m10" value="0" aria-label="Checks the detail — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l10" value="0" aria-label="Checks the detail — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Even-tempered</span><label class="disc__p"><input type="radio" name="disc_m10" value="1" aria-label="Even-tempered — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l10" value="1" aria-label="Even-tempered — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Sociable</span><label class="disc__p"><input type="radio" name="disc_m10" value="2" aria-label="Sociable — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l10" value="2" aria-label="Sociable — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Takes risks</span><label class="disc__p"><input type="radio" name="disc_m10" value="3" aria-label="Takes risks — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l10" value="3" aria-label="Takes risks — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="10" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="disc__g" data-disc-g="11">
+          <legend class="disc__n">12 of 12</legend>
+          <div class="disc__hd"><span></span><span>Most</span><span>Least</span></div>
+          <div class="disc__ws">
+            <div class="disc__w"><span class="disc__t">Agreeable</span><label class="disc__p"><input type="radio" name="disc_m11" value="0" aria-label="Agreeable — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l11" value="0" aria-label="Agreeable — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Demanding</span><label class="disc__p"><input type="radio" name="disc_m11" value="1" aria-label="Demanding — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l11" value="1" aria-label="Demanding — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Systematic</span><label class="disc__p"><input type="radio" name="disc_m11" value="2" aria-label="Systematic — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l11" value="2" aria-label="Systematic — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+            <div class="disc__w"><span class="disc__t">Charming</span><label class="disc__p"><input type="radio" name="disc_m11" value="3" aria-label="Charming — most like me"><span class="disc__dot"></span></label><label class="disc__p"><input type="radio" name="disc_l11" value="3" aria-label="Charming — least like me"><span class="disc__dot disc__dot--l"></span></label></div>
+          </div>
+          <p class="err disc__e" data-disc-err="11" aria-live="polite"></p>
+        </fieldset>
+<!-- disc:end -->
+        </div>
+        <p class="err" id="err-disc" aria-live="polite"></p>
+      </section>
+
+      <section class="step" data-step="5" hidden>
         <div class="done">
           <div class="done__mark">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1658,6 +1859,109 @@ html{scroll-behavior:smooth}
     Array.prototype.forEach.call(form.querySelectorAll(".is-bad"), function (e) { e.classList.remove("is-bad"); });
   }
 
+  /* ── DISC ────────────────────────────────────────────────────────────────
+     The page is told which words are in which group and nothing else. Which
+     letter each word belongs to lives in the database, so the answers cannot
+     be reverse-engineered from view-source and gamed, and a score cannot be
+     sent from here at all — sql/021 grants anon two columns, and the score is
+     not one of them. */
+  var DISC_N = form.querySelectorAll("[data-disc-g]").length;
+  var DISC_DRAFT = "sjva-apply-disc";
+
+  function discPick(kind, g) {
+    var el = form.querySelector("[name=disc_" + kind + g + "]:checked");
+    return el ? Number(el.value) : null;
+  }
+
+  function discAnswers() {
+    var out = [];
+    for (var g = 0; g < DISC_N; g++) {
+      var m = discPick("m", g);
+      var l = discPick("l", g);
+      if (m === null || l === null || m === l) return null;
+      out.push({ g: g, m: m, l: l });
+    }
+    return out;
+  }
+
+  function validDisc() {
+    clearErrors();
+    var first = null;
+    var missing = 0;
+    for (var g = 0; g < DISC_N; g++) {
+      var box = form.querySelector('[data-disc-g="' + g + '"]');
+      var m = discPick("m", g);
+      var l = discPick("l", g);
+      var msg = "";
+      if (m === null && l === null) msg = "Tick one word as most like you and one as least.";
+      else if (m === null) msg = "Still needs a most.";
+      else if (l === null) msg = "Still needs a least.";
+      else if (m === l) msg = "The same word cannot be both.";
+      box.classList.toggle("is-bad", !!msg);
+      box.querySelector("[data-disc-err]").textContent = msg;
+      if (msg) { missing++; if (!first) first = box; }
+    }
+    if (!missing) return true;
+    document.getElementById("err-disc").textContent =
+      missing === 1 ? "One group is not finished yet." : missing + " groups are not finished yet.";
+    if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
+    return false;
+  }
+
+  /* A word cannot be most and least at once. Rather than refuse the second
+     tick — which reads as a dead control — the first one gives way, because
+     the tick somebody just made is the one they meant. */
+  form.addEventListener("change", function (e) {
+    var t = e.target;
+    if (!t.name || t.name.indexOf("disc_") !== 0) return;
+    var kind = t.name.charAt(5);
+    var g = t.name.slice(6);
+    var other = form.querySelector("[name=disc_" + (kind === "m" ? "l" : "m") + g + "]:checked");
+    if (other && other.value === t.value) other.checked = false;
+    var box = t.closest("[data-disc-g]");
+    if (box) {
+      box.classList.remove("is-bad");
+      box.querySelector("[data-disc-err]").textContent = "";
+    }
+    document.getElementById("err-disc").textContent = "";
+  });
+
+  function saveDisc() {
+    var out = [];
+    for (var g = 0; g < DISC_N; g++) out.push([discPick("m", g), discPick("l", g)]);
+    try { localStorage.setItem(DISC_DRAFT, JSON.stringify(out)); } catch (e) {}
+  }
+
+  function restoreDisc() {
+    var raw;
+    try { raw = localStorage.getItem(DISC_DRAFT); } catch (e) { return; }
+    if (!raw) return;
+    var d;
+    try { d = JSON.parse(raw); } catch (e) { return; }
+    if (!d || !d.length) return;
+    for (var g = 0; g < DISC_N && g < d.length; g++) {
+      ["m", "l"].forEach(function (kind, k) {
+        var v = d[g][k];
+        if (v === null || v === undefined) return;
+        var el = form.querySelector("[name=disc_" + kind + g + '][value="' + v + '"]');
+        if (el) el.checked = true;
+      });
+    }
+  }
+
+  /* Sent after the application lands, like the handles are, and for the same
+     reason: a questionnaire that fails to store is a gap in the admin view,
+     never a failure screen for somebody who has finished applying. */
+  function postDisc() {
+    var answers = discAnswers();
+    if (!answers) return;
+    fetch(CFG.endpoint.replace("/applications", "/application_disc"), {
+      method: "POST",
+      headers: hdrs(),
+      body: JSON.stringify({ application_id: DRAFT_ID, answers: answers })
+    })["catch"](function () {});
+  }
+
   function valid(step) {
     clearErrors();
     if (step === 0) {
@@ -1671,6 +1975,7 @@ html{scroll-behavior:smooth}
         "Pick at least one shift you can hold — it decides which seats we can match you to.";
       return false;
     }
+    if (step === 4) return validDisc();
     if (step === 2) {
       var name = document.getElementById("ap-name");
       var country = document.getElementById("ap-country");
@@ -1784,7 +2089,8 @@ html{scroll-behavior:smooth}
       row("Careers", esc((d.tracks || []).join(", "))) +
       row("Shifts", esc((d.shifts || []).join(", "))) +
       row("Based in", esc(d.country)) +
-      row("Experience", esc(d.experience));
+      row("Experience", esc(d.experience)) +
+      (discAnswers() ? row("Working style", "answered — we score it, not you") : "");
 
     var actions = document.getElementById("apply-actions");
     if (mode === "sent") {
@@ -1805,7 +2111,7 @@ html{scroll-behavior:smooth}
 
     foot.setAttribute("hidden", "");
     show(LAST);
-    try { localStorage.removeItem(DRAFT); } catch (e) {}
+    try { localStorage.removeItem(DRAFT); localStorage.removeItem(DISC_DRAFT); } catch (e) {}
 
     /* A new application needs a new id. DRAFT_ID is minted once per page load
        because the CV upload has to know the folder before the row exists, so
@@ -1992,6 +2298,7 @@ html{scroll-behavior:smooth}
            a gap in the admin view, never a failure screen for someone who has
            just finished applying. */
         postSocials();
+        postDisc();
         uploadFile();
         finish("sent", d);
         return;
@@ -2079,6 +2386,7 @@ html{scroll-behavior:smooth}
     foot.removeAttribute("hidden");
     clearErrors();
     restore();
+    restoreDisc();
     paint();
     dlg.showModal();
     show(0);
@@ -2098,6 +2406,7 @@ html{scroll-behavior:smooth}
   form.addEventListener("change", function () {
     paint();
     save();
+    saveDisc();
   });
 
   form.addEventListener("change", function (e) {
@@ -2197,4 +2506,63 @@ html{scroll-behavior:smooth}
       );
     });
   })();
+</script>
+
+<script>
+/* An admin shortcut in the header, for the people who have one.
+
+   The check is in two steps on purpose. A stored session is read locally and
+   costs nothing; only if one exists does this ask the database what the
+   account may do. Nearly everyone who loads this page is not signed in, and
+   they should not pay a network round trip for a button they will never see.
+
+   The token is read but never trusted: what it decides is whether to ask.
+   The answer comes from rpc/my_permissions, and /admin refuses anyone
+   without the permission regardless of what the header shows. */
+(function () {
+  var SB = "https://hmgravlkatfmerzbozct.supabase.co";
+  var ANON = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
+
+  var sess;
+  try { sess = JSON.parse(localStorage.getItem("sjva-session") || "null"); } catch (e) { return; }
+  if (!sess || !sess.access_token) return;
+  /* Expired is the same as absent here — session() on the portal pages
+     refuses it too, so showing the button would promise something the next
+     page immediately takes back. */
+  if (sess.expires_at && Date.now() > sess.expires_at - 30000) return;
+
+  fetch(SB + "/rest/v1/rpc/my_permissions", {
+    method: "POST",
+    headers: {
+      apikey: ANON,
+      Authorization: "Bearer " + sess.access_token,
+      "Content-Type": "application/json"
+    },
+    body: "{}"
+  })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    ["catch"](function () { return []; })
+    .then(function (perms) {
+      if (!perms || perms.indexOf("applications.view_all") < 0) return;
+
+      var mark = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="2.2" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M12 3 4 6.5v5c0 4.5 3.2 7.5 8 9 4.8-1.5 8-4.5 8-9v-5L12 3Z"></path></svg>';
+
+      /* Both navs, so it is there whichever one is on screen. */
+      [".nav__links", ".mobnav__in"].forEach(function (sel) {
+        var nav = document.querySelector(sel);
+        if (!nav || nav.querySelector(".nav__admin")) return;
+        var a = document.createElement("a");
+        a.className = "nav__admin";
+        a.href = "/admin";
+        a.innerHTML = mark + "Admin";
+        /* Ahead of the sign-in, which is the thing it makes redundant. */
+        var signin = nav.querySelector(".nav__signin");
+        if (signin) nav.insertBefore(a, signin);
+        else nav.appendChild(a);
+      });
+    });
+})();
 </script>
