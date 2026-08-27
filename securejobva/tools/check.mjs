@@ -575,6 +575,68 @@ await check("anon can still only INSERT", () => {
   return stmts.length + " grants — anon insert-only, " + authed + " to signed-in users";
 });
 
+/* A signed-in applicant may write their own row. Which COLUMNS they may write
+   is decided by the column list on the grant and by nothing else — the policy
+   in 006 checks that the row is theirs and stops there. So `grant update` with
+   no column list on a table holding applicants is the difference between an
+   applicant fixing their phone number and an applicant writing
+   status = 'approved' on themselves.
+
+   This is not hypothetical. Postgres answers a refused write with
+
+     permission denied for table applications
+     Grant the required privileges with: GRANT UPDATE ON public.applications TO authenticated;
+
+   which is correct advice about permissions and terrible advice about this
+   table, arrives at the exact moment somebody is stuck, and is one paste away
+   from being run. The real cause of that error has always been a missing column
+   grant — 020 is what it looks like fixed properly.
+
+   INSERT is not included: an insert makes a new row rather than rewriting an
+   existing one, and 001 grants it to anon by design. */
+await check("no whole-table UPDATE where the subject writes their own row", () => {
+  /* Only these two. Everywhere else a signed-in person may write — the notes,
+     the tracking, the contact inbox — the policy behind it is staff-only, so a
+     table-level grant hands nothing to the person the row is about. It is these
+     two, where the policy's whole test is "is this row yours", that need the
+     column list to be doing the other half of the work.
+
+     Flagging the staff tables as well was the first version of this check. It
+     failed on grants that were deliberate and correct, and a guard that cries
+     wolf gets switched off. */
+  const SUBJECT_WRITES_OWN_ROW = new Set(["applications", "seat_requests"]);
+
+  /* Comments here run to hundreds of lines and say the word `grant` often, and
+     several of them quote the dangerous statement in order to warn against it.
+     Match against the SQL with the prose taken out. */
+  const bare_sql = sql.replace(/--[^\n]*/g, " ");
+
+  const offenders = [];
+  for (const s of bare_sql.match(/grant\b[\s\S]*?;/gi) || []) {
+    const table = ((s.match(/\son\s+public\.(\w+)/i) || [])[1] || "").toLowerCase();
+    if (!SUBJECT_WRITES_OWN_ROW.has(table)) continue;
+
+    /* The privileges as written, with any column list left in place: it is the
+       presence of the parentheses that makes the grant safe. */
+    const privs = ((s.match(/grant\s+([\s\S]*?)\s+on\s/i) || [])[1] || "").toLowerCase();
+
+    /* `update (a, b)` is a column grant. `update` alone, or `all`, is the table. */
+    const bare = /\ball\b(?!\s*\()/.test(privs) || /\bupdate\b(?!\s*\()/.test(privs);
+    if (!bare) continue;
+
+    const to = ((s.match(/\sto\s+([a-z_, ]+);/i) || [])[1] || "").trim();
+    offenders.push(privs.replace(/\s+/g, " ").trim() + " on " + table + " -> " + to);
+  }
+
+  if (offenders.length) {
+    throw new Error(offenders.join("; ") + " — name the columns: `grant update (status, " +
+      "status_changed_at) on public.applications to authenticated`. Without a column list " +
+      "the only thing deciding what an applicant may write is a policy that never looks at " +
+      "columns, so they can set their own status");
+  }
+  return SUBJECT_WRITES_OWN_ROW.size + " tables — every UPDATE grant names its columns";
+});
+
 /* ── built output ────────────────────────────────────────────────────────── */
 
 console.log("\ndist\n");

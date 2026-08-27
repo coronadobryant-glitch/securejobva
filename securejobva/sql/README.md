@@ -32,9 +32,11 @@ run it. That is always safer than guessing.
 | `016-grant-user-id.sql` | Superseded by 018; harmless to run |
 | `017-staff-requests.sql` | Lets somebody ask to be staff; approval is unchanged |
 | `018-select-applications.sql` | Table-level SELECT on applications — ends the column-by-column chase |
+| `019-notify-webhooks.sql` | Webhooks for seat requests and contact messages — needs the secret pasted in |
+| `020-restore-status-grants.sql` | Puts back the staff UPDATE grants that a re-run of 001 revoked |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 018 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 020 in order, then `verify.sql` to confirm.
 
 ## Adding one
 
