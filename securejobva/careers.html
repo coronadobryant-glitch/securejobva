@@ -1917,11 +1917,24 @@ html{scroll-behavior:smooth}
     var kind = t.name.charAt(5);
     var g = t.name.slice(6);
     var other = form.querySelector("[name=disc_" + (kind === "m" ? "l" : "m") + g + "]:checked");
-    if (other && other.value === t.value) other.checked = false;
+    /* Giving way is right. Doing it in silence is not: the tick that gives way
+       is one the person already made, and watching an answer vanish with no
+       word said is indistinguishable from the control being broken. It reads
+       as "I ticked every box and it still says I have not", which is exactly
+       how it was reported. So say which word moved and what is now missing. */
+    var freed = null;
+    if (other && other.value === t.value) {
+      other.checked = false;
+      freed = kind === "m" ? "least" : "most";
+    }
     var box = t.closest("[data-disc-g]");
     if (box) {
       box.classList.remove("is-bad");
-      box.querySelector("[data-disc-err]").textContent = "";
+      var row = t.closest(".disc__w");
+      var word = row && row.querySelector(".disc__t") ? row.querySelector(".disc__t").textContent : "That word";
+      box.querySelector("[data-disc-err]").textContent = freed
+        ? "“" + word + "” cannot be both. Pick a different word as " + freed + "."
+        : "";
     }
     document.getElementById("err-disc").textContent = "";
   });

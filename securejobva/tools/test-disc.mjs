@@ -238,6 +238,57 @@ check("the same word cannot be most and least", () => {
   assert(/cannot be both/i.test(f.errs[2].textContent), "the reason was not given: " + f.errs[2].textContent);
 });
 
+check("a tick that gives way says so", () => {
+  /* Source-level, not behavioural: the rule lives in an anonymous change
+     listener that the harness above cannot reach, so this asserts the code
+     rather than the click. It is still worth having. Clearing the other tick
+     in silence was reported as "I ticked every box and it still says I have
+     not" — the answer disappeared and nothing explained it, which is what a
+     broken control looks like. */
+  const at = js.indexOf('form.addEventListener("change"');
+  assert(at > -1, "the disc change handler is gone");
+  const src = js.slice(at, js.indexOf("\n  });", at));
+  /* src stops before the closing "});", so everything after the opening brace
+     is the body — trimming a trailing "}" here would cut at an inner one. */
+  const bodyAt = src.indexOf("{", src.indexOf("function (e)"));
+  const listener = src.slice(bodyAt + 1);
+
+  /* Run the listener, rather than reading it. An earlier version of this test
+     only grepped the source for the message, and still passed when the branch
+     that shows it had been made unreachable — a check that cannot fail is
+     worse than no check, because it is counted. */
+  const f = sheet(complete);                       /* most = word 0 everywhere */
+  const words = GROUPS[0].map((w) => w[0]);
+  f.boxes.forEach((b) => {
+    b.closest = (sel) => sel === "[data-disc-g]"
+      ? f.groups[b.g]
+      : { querySelector: () => ({ textContent: words[b.wi] }) };
+  });
+
+  const errBox = { textContent: "" };
+  const run = new Function("form", "document", "e",
+    listener.replace(/\bvar t = e\.target;/, "var t = e.target;"));
+  const doc = { getElementById: (id) => (id === "err-disc" ? errBox : null) };
+
+  /* Tick LEAST on the word already ticked MOST — the case that was reported. */
+  const least0 = f.boxes.find((b) => b.kind === "l" && b.g === 0 && b.wi === 0);
+  const most0  = f.boxes.find((b) => b.kind === "m" && b.g === 0 && b.wi === 0);
+  least0.checked = true;
+  run(f, doc, { target: least0 });
+
+  assert(most0.checked === false, "the most tick was left in place, so the word is both");
+  assert(/cannot be both/i.test(f.errs[0].textContent),
+    "the most tick was cleared in silence — nothing said which word moved: " +
+    JSON.stringify(f.errs[0].textContent));
+  /* They ticked LEAST, so it is the MOST that gave way and the most column
+     that is now empty. The message has to name that one, not the one they
+     just ticked. */
+  assert(/as most/i.test(f.errs[0].textContent),
+    "the message does not say which column is now empty: " + f.errs[0].textContent);
+  assert(f.errs[0].textContent.includes(words[0]),
+    "the message does not name the word: " + f.errs[0].textContent);
+});
+
 check("the page sends answers and never a score", () => {
   /* sql/021 grants anon application_id and answers. Anything else in the body
      makes the whole insert 42501 — so this is the check that keeps the
