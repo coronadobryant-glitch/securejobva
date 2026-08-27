@@ -12,6 +12,26 @@ const { fonts: FONTS, css: TOKENS_TO_NAV, themeScript: THEME_SCRIPT,
 const SECTIONS = "";
 const FOOTER_CSS = "";
 
+/* The portal writes .opt markup — the account-type chooser on /status, and the
+   forms elsewhere — but the chooser shipped with none of the CSS for it, so
+   both options collapsed into one wrapped line of text: the title, then the
+   description, then the next title, with no break between them. It read as a
+   sentence rather than a choice.
+
+   Lifted from careers.html by anchor rather than retyped, so the two stay the
+   same control. Anchored on the first and last rule of the block; if either
+   moves, the build stops instead of shipping an unstyled chooser again. */
+const OPT_CSS = (function () {
+  const src = readFileSync("careers.html", "utf8").split(/\r?\n/);
+  const from = src.findIndex((l) => /^\.opts\{/.test(l));
+  const to = src.findIndex((l, i) => i > from && /^\.opt:has\(input:checked\) \.opt__box svg/.test(l));
+  if (from < 0 || to < 0) {
+    throw new Error("build-portal: could not find the .opt block in careers.html — " +
+      "the chooser on /status needs it, and shipped once without it");
+  }
+  return src.slice(from, to + 1).join(nl);
+})();
+
 const PAGE_CSS = `
 /* ---------- portal ---------- */
 .pt{padding:clamp(2.5rem,5vw,4rem) 0 clamp(3rem,6vw,4.5rem);min-height:60vh}
@@ -564,6 +584,7 @@ function shell(o) {
     TOKENS_TO_NAV,
     SECTIONS,
     FOOTER_CSS,
+    OPT_CSS,
     PAGE_CSS,
     "</style>",
     "",

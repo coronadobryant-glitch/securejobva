@@ -142,6 +142,29 @@ const sqlFiles = readdirSync(SQL_DIR)
   .filter((f) => /^\d+.*\.sql$/.test(f))
   .sort();
 if (!sqlFiles.length) throw new Error("no numbered .sql files in " + SQL_DIR + "/");
+
+/* Two people writing migrations against the same folder collided on 008, 014
+   and 017 in a single day — each time discovered by a merge rather than by
+   either author, and each time needing a rename after the file had already
+   been pasted into the database under its old number.
+
+   The number is the running order, so two files sharing one have no defined
+   order between them. Caught here it costs a rename; caught later it is a
+   migration somebody ran twice or not at all. */
+await check("no two migrations share a number", () => {
+  const byNumber = new Map();
+  for (const f of sqlFiles) {
+    const n = (f.match(/^(\d+)/) || [])[1];
+    if (!byNumber.has(n)) byNumber.set(n, []);
+    byNumber.get(n).push(f);
+  }
+  const clashes = [...byNumber.entries()].filter(([, files]) => files.length > 1);
+  if (clashes.length) {
+    throw new Error(clashes.map(([n, files]) => n + ": " + files.join(" and ")).join("; ") +
+      " — renumber the later one. Claim the number in sql/README.md before writing the file.");
+  }
+  return sqlFiles.length + " migrations, 001–" + [...byNumber.keys()].sort().pop();
+});
 const sql = sqlFiles.map((f) => read(SQL_DIR + "/" + f)).join("\n");
 
 for (const p of PAGES) {
