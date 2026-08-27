@@ -137,9 +137,14 @@ for (const p of SHIPPED.map((file) => ({ file }))) {
    editor one at a time. For checking purposes they are one document — a column
    added in 002 is just as real as one declared in 001. verify.sql is excluded:
    it is read-only diagnostics, not schema. */
+/* A file ending .local.sql is a filled-in copy of the migration beside it, with
+   a real secret pasted where the placeholder is. It is git-ignored, it exists
+   only so the copy you are meant to paste sits next to the copy you are not,
+   and it is a duplicate of a numbered file by design — so it is not schema and
+   must not be read as any. */
 const SQL_DIR = "sql";
 const sqlFiles = readdirSync(SQL_DIR)
-  .filter((f) => /^\d+.*\.sql$/.test(f))
+  .filter((f) => /^\d+.*\.sql$/.test(f) && !f.endsWith(".local.sql"))
   .sort();
 if (!sqlFiles.length) throw new Error("no numbered .sql files in " + SQL_DIR + "/");
 

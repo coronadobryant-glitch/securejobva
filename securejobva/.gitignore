@@ -3,3 +3,8 @@ node_modules/
 
 .vercel
 .env*
+
+# Filled-in copies of migrations, carrying the real WEBHOOK_SECRET.
+# They exist so the version with the secret in it is the one sitting next to
+# the version without, instead of in a temp folder nobody looks in.
+*.local.sql

@@ -34,9 +34,10 @@ run it. That is always safer than guessing.
 | `018-select-applications.sql` | Table-level SELECT on applications — ends the column-by-column chase |
 | `019-notify-webhooks.sql` | Webhooks for seat requests and contact messages — needs the secret pasted in |
 | `020-restore-status-grants.sql` | Puts back the staff UPDATE grants that a re-run of 001 revoked |
+| `021-one-webhook-per-form.sql` | Removes the duplicate pokes; one per form, all on the real secret |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 020 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 021 in order, then `verify.sql` to confirm.
 
 ## Adding one
 
