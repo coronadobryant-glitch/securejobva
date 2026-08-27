@@ -39,9 +39,10 @@ run it. That is always safer than guessing.
 | `023-interview-times.sql` | When the interview is, and the Interviews tab that reads it |
 | `024-note-log.sql` | Notes stop overwriting each other — a row per note, with who and when |
 | `025-disc.sql` | The DISC questionnaire and its scorer. GENERATED — edit `tools/disc-items.mjs` |
+| `026-hired-and-the-hub.sql` | The hired stage, the payout preference, leave requests and the notice board |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 025 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 026 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

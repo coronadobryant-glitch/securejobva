@@ -278,13 +278,31 @@ await check("every applications column is granted", () => {
       if (t) granted.add(t);
     }
   }
+  /* 018 granted SELECT on the whole table for exactly this reason, and Postgres
+     extends a table-level grant to columns added afterwards — so once that
+     statement is in the folder, select=* cannot fail on a new column and the
+     column-by-column list is not the thing keeping anyone safe.
+
+     This check predates it and only ever looked for column lists, so the first
+     column added after 018 failed it: payout_method in 026, which select=*
+     could read perfectly well. Still worth keeping for the day somebody revokes
+     the table grant — then the columns have to carry it again. */
+  /* Statement by statement. Matched against the whole file, `[a-z,\s]*` walks
+     across semicolons and pairs a `grant` in one statement with `on
+     public.applications` in another — which it did, and the check went green
+     with 018's grant deleted. */
+  const wholeTable = sql.replace(/--[^\n]*/g, " ").split(";").some((stmt) =>
+    /grant\s+[a-z,\s]*\bselect\b[a-z,\s]*\s+on\s+public\.applications\s+to\s+[a-z_,\s]*authenticated/i.test(stmt) &&
+    !/grant\s+select\s*\(/i.test(stmt));
+  if (wholeTable) return declared.size + " columns, SELECT granted on the table";
+
   const missing = [...declared].filter((c) => !granted.has(c));
   if (missing.length) {
     throw new Error(missing.join(", ") + " — declared on applications but never granted SELECT to " +
       "authenticated. Any select=* against the table refuses the whole statement with 42501. " +
       "Grant it, or move it to its own table if it truly must be hidden.");
   }
-  return declared.size + " columns, all granted";
+  return declared.size + " columns, all granted individually";
 });
 
 /* The mirror of the form check, for the pages that read rather than write.
