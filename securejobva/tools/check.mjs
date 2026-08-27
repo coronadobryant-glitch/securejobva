@@ -133,6 +133,51 @@ for (const p of SHIPPED.map((file) => ({ file }))) {
   });
 }
 
+/* esc() turns & into &amp;, which is the whole point of it — it is what stops a
+   name containing markup from becoming markup. So an HTML entity handed to it
+   comes out as its own source text: `esc(a.track || "&mdash;")` renders the
+   five characters &mdash; on the page, sitting where a dash should be.
+
+   It reached production and stayed there, because it breaks nothing. The page
+   renders, the JS parses, the tags balance, and every check passed while the
+   admin queue showed `&mdash; · ? · applied Aug 25` beside real applicants.
+   Only a person looking at it can tell, which is what this is for.
+
+   The fallback is the character itself — "—" — which esc() passes through
+   untouched. Entities in raw markup are fine and not matched here: it is the
+   trip through esc() that ruins them. */
+for (const p of SHIPPED.map((file) => ({ file }))) {
+  await check(p.file + ": no HTML entity gets escaped", () => {
+    const html = read(p.file);
+    /* One level of nesting is enough for the real calls — esc(x || "y") and
+       esc((a.list || []).join(", ") || "y"). */
+    const calls = html.match(/esc\((?:[^()]|\([^()]*\))*\)/g) || [];
+    const bad = calls.filter((c) => /&[a-z]+;|&#\d+;/i.test(c));
+
+    /* The first version of this check looked only inside esc(), and missed the
+       bug that prompted it:
+
+         var tracks = (… ) || "&mdash;";      // here
+         … esc(tracks) …                       // escaped over there
+
+       The entity and the escaping are in different statements, so no esc() call
+       contains one. What both forms share is the entity being a FALLBACK — the
+       value a field takes when it is empty — and a fallback is by definition
+       something a person reads. Entities elsewhere are raw markup and correct,
+       which is why the match is on `|| "&…;"` and not on the entity alone. */
+    for (const [, ent] of html.matchAll(/\|\|\s*\\?"(&[a-z]+;|&#\d+;)\\?"/gi)) {
+      bad.push('a fallback of "' + ent + '"');
+    }
+
+    if (bad.length) {
+      throw new Error(bad.length + " place(s) escape an entity, e.g. " +
+        bad[0].slice(0, 80) + " — it prints as its own source text. " +
+        "Use the character itself, or keep the entity outside esc()");
+    }
+    return calls.length + " esc() calls";
+  });
+}
+
 /* The schema lives in sql/ as numbered files that get pasted into the Supabase
    editor one at a time. For checking purposes they are one document — a column
    added in 002 is just as real as one declared in 001. verify.sql is excluded:

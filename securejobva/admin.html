@@ -926,7 +926,12 @@ function api(path, opts) {
   }).then(function (r) {
     if (r.status === 401) { clearSession(); throw new Error("signed out"); }
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
-    return r.status === 204 ? null : r.json();
+    /* Prefer: return=minimal answers a POST with 201 and an empty body, not
+       204, so checking the status was not enough — adding a note reported
+       "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+       in red under the box, after the note had already been saved. Read the
+       body and decide on what is actually there. */
+    return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
   });
 }
 
@@ -1319,7 +1324,7 @@ function discLine(a) {
 }
 
 function rowHtml(a) {
-  var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "&mdash;";
+  var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "—";
 
   var social = "";
   if (can("social.view")) {

@@ -926,7 +926,12 @@ function api(path, opts) {
   }).then(function (r) {
     if (r.status === 401) { clearSession(); throw new Error("signed out"); }
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
-    return r.status === 204 ? null : r.json();
+    /* Prefer: return=minimal answers a POST with 201 and an empty body, not
+       204, so checking the status was not enough — adding a note reported
+       "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+       in red under the box, after the note had already been saved. Read the
+       body and decide on what is actually there. */
+    return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
   });
 }
 
@@ -1324,9 +1329,9 @@ function render(user, apps) {
             "You are welcome to apply again — tell us what has changed since.</div>"
           : stages(a)) +
         '<ul class="meta">' +
-          "<li><b>Shifts you offered</b><span>" + esc((a.shifts || []).join(", ") || "&mdash;") + "</span></li>" +
-          "<li><b>Experience</b><span>" + esc(a.experience || "&mdash;") + "</span></li>" +
-          "<li><b>Based in</b><span>" + esc(a.country || "&mdash;") + "</span></li>" +
+          "<li><b>Shifts you offered</b><span>" + esc((a.shifts || []).join(", ") || "—") + "</span></li>" +
+          "<li><b>Experience</b><span>" + esc(a.experience || "—") + "</span></li>" +
+          "<li><b>Based in</b><span>" + esc(a.country || "—") + "</span></li>" +
           "<li><b>Last updated</b><span>" + esc(when(a.status_changed_at) || when(a.created_at)) + "</span></li>" +
         "</ul>" +
         docList(a.docs) +

@@ -926,7 +926,12 @@ function api(path, opts) {
   }).then(function (r) {
     if (r.status === 401) { clearSession(); throw new Error("signed out"); }
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
-    return r.status === 204 ? null : r.json();
+    /* Prefer: return=minimal answers a POST with 201 and an empty body, not
+       204, so checking the status was not enough — adding a note reported
+       "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+       in red under the box, after the note had already been saved. Read the
+       body and decide on what is actually there. */
+    return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
   });
 }
 
@@ -1169,10 +1174,10 @@ function render(email, rows) {
         "</div>" +
         stages(r) +
         '<ul class="meta">' +
-          "<li><b>Hours a week</b><span>" + esc(r.hours || "&mdash;") + "</span></li>" +
+          "<li><b>Hours a week</b><span>" + esc(r.hours || "—") + "</span></li>" +
           (r.weekly ? "<li><b>Quoted</b><span>" + esc(money(r.weekly)) + " a week</span></li>" : "") +
-          "<li><b>Cover</b><span>" + esc((r.blocks || []).join(", ") || "&mdash;") + "</span></li>" +
-          "<li><b>Your time zone</b><span>" + esc(r.timezone || "&mdash;") + "</span></li>" +
+          "<li><b>Cover</b><span>" + esc((r.blocks || []).join(", ") || "—") + "</span></li>" +
+          "<li><b>Your time zone</b><span>" + esc(r.timezone || "—") + "</span></li>" +
           "<li><b>Last updated</b><span>" +
             esc(when(r.status_changed_at) || when(r.created_at)) + "</span></li>" +
         "</ul>" +
