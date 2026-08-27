@@ -73,14 +73,20 @@ check("any complete sheet scores to zero across the four letters", () => {
 
 /* ── the generated files still match the bank ───────────────────────────── */
 
-check("sql/021 and careers.html are current with the item bank", () => {
+check("sql/025 and careers.html are current with the item bank", () => {
   /* Compared, not regenerated. Rewriting the files to find out whether they
      needed rewriting means the check repairs what it is meant to report, and
      passes the second time you run it. */
+  /* Newlines normalised on both sides. Git checks these files out with CRLF on
+     Windows and LF on Linux, so comparing raw bytes asks whether the file was
+     generated on the same operating system as the machine running the test —
+     which is not the question, and which is how this check went green here and
+     red on Vercel for two hours. */
+  const lf = (s) => s.replace(/\r\n/g, "\n");
   const onDisk = readFileSync("sql/025-disc.sql", "utf8");
-  assert(onDisk === sqlText(), "sql/025-disc.sql is stale — run node tools/build-disc.mjs");
+  assert(lf(onDisk) === lf(sqlText()), "sql/025-disc.sql is stale — run node tools/build-disc.mjs");
   const page = readFileSync("careers.html", "utf8");
-  assert(page === pageText(page), "careers.html is stale — run node tools/build-disc.mjs");
+  assert(lf(page) === lf(pageText(page)), "careers.html is stale — run node tools/build-disc.mjs");
 });
 
 check("the scoring map in the SQL is the item bank", () => {

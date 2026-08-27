@@ -306,7 +306,16 @@ ${D}t${D};
 /* Both outputs as strings, so a test can ask whether the files on disk still
    match the item bank without rewriting them to find out. A staleness check
    that fixes the staleness passes on its second run and tells you nothing. */
-export const sqlText = () => sql.replace(/\r?\n/g, "\r\n");
+/* LF, not CRLF, and the difference took production down for two hours.
+   Hardcoding \r\n here made the staleness check pass on Windows, where git
+   hands you a CRLF working copy, and fail on every Linux checkout — including
+   the one Vercel builds in. `node build.mjs && node tools/check.mjs` exited 1,
+   the deploy errored in 4s, and nothing after it shipped.
+
+   Git stores this file with LF whatever machine wrote it, so LF is what the
+   generator has to produce. The comparison in test-disc.mjs normalises both
+   sides as well, so a CRLF working copy on Windows is still current. */
+export const sqlText = () => sql.replace(/\r?\n/g, "\n");
 
 export function pageText(page) {
   const START = "<!-- disc:start -->";
