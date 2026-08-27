@@ -2107,7 +2107,12 @@ function save(row) {
       body: { application_id: id, note: note, updated_at: new Date().toISOString() }
     }));
   }
-  if (pipe !== null || replied !== null) {
+  /* Not gated on the pipeline control existing. It used to be, and the scores
+     and the interview date were written inside that gate — so they saved only
+     because the pipeline select happens to be drawn beside them. Rename or
+     remove that one control and two others stop saving with no error anywhere.
+     Whether anything is sent is decided by the changed flag alone. */
+  {
     var t = { application_id: id, updated_at: new Date().toISOString() };
     var changed = false;
     if (pipe !== null && (!rec || rec.pipeline !== pipe)) { t.pipeline = pipe; changed = true; }
@@ -2183,7 +2188,7 @@ function save(row) {
       pill.textContent = LABEL[st] || st;
     }
     row.removeAttribute("data-mark-contacted");
-    if (pipe !== null || replied !== null) {
+    if (rec) {
       /* Recompute the average locally rather than refetching: the row is about
          to be redrawn and a stale header under a changed score reads as a bug. */
       var got = SKILLS.map(function (k) { return rec[k[0].replace("skill_", "score_")]; })

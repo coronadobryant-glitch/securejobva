@@ -326,6 +326,18 @@ await check("select=* only where the whole table is granted", () => {
   return limited.length + " column-limited tables, none queried with select=*";
 });
 
+/* save() on /admin decides what changed and builds the writes. A wrong
+   comparison there is invisible: the row looks saved and nothing was sent. */
+await check("admin saves what changed and nothing else", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-admin-save.mjs"], { stdio: "pipe" });
+    return "6 checks";
+  } catch (e) {
+    throw new Error("tools/test-admin-save.mjs failed — run it directly");
+  }
+});
+
 /* The CSV is the one place applicant-typed text leaves this system and is
    opened in a program that executes formulas. Both failure modes are silent. */
 await check("CSV escaping holds", async () => {
