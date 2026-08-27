@@ -227,6 +227,25 @@ check("an empty sheet is refused without claiming one group is fine", () => {
   assert(clean === 0, clean + " unanswered groups were reported as complete");
 });
 
+check("the summary says which groups are unfinished", () => {
+  /* A count on its own — "3 groups are not finished yet" — says how much is
+     wrong and not where any of it is, on a page of twelve. Reported as being
+     unable to submit with no idea what was missing. */
+  const f = sheet((b) => {
+    complete(b);
+    [2, 6, 9].forEach((g) => {
+      b.find((x) => x.kind === "l" && x.g === g && x.checked).checked = false;
+    });
+  });
+  const api = load(f);
+  assert(api.validDisc() === false, "an unfinished sheet went through");
+  const said = api.errBox.textContent;
+  [3, 7, 10].forEach((n) => {
+    assert(new RegExp("\\b" + n + "\\b").test(said), "group " + n + " is not named: " + said);
+  });
+  assert(!/\b1\b/.test(said.replace(/\b10\b/g, "")), "a finished group was named: " + said);
+});
+
 check("the same word cannot be most and least", () => {
   const f = sheet((b) => {
     complete(b);

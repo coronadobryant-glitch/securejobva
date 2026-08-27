@@ -1887,7 +1887,7 @@ html{scroll-behavior:smooth}
   function validDisc() {
     clearErrors();
     var first = null;
-    var missing = 0;
+    var unfinished = [];
     for (var g = 0; g < DISC_N; g++) {
       var box = form.querySelector('[data-disc-g="' + g + '"]');
       var m = discPick("m", g);
@@ -1899,11 +1899,23 @@ html{scroll-behavior:smooth}
       else if (m === l) msg = "The same word cannot be both.";
       box.classList.toggle("is-bad", !!msg);
       box.querySelector("[data-disc-err]").textContent = msg;
-      if (msg) { missing++; if (!first) first = box; }
+      if (msg) { unfinished.push(g + 1); if (!first) first = box; }
     }
-    if (!missing) return true;
+    if (!unfinished.length) return true;
+
+    /* Twelve groups on one long page, and a count on its own — "12 groups are
+       not finished yet" — tells somebody how much is wrong without telling
+       them where any of it is. Scrolling to the first one helps only until
+       they fix it and scroll back. So name them: the numbers here are the
+       numbers on each group's own legend, so a person can go straight to it. */
     document.getElementById("err-disc").textContent =
-      missing === 1 ? "One group is not finished yet." : missing + " groups are not finished yet.";
+      unfinished.length === 1
+        ? "Group " + unfinished[0] + " is not finished — it is marked below."
+        : unfinished.length + " groups are not finished: " +
+          (unfinished.length > 2
+            ? unfinished.slice(0, -1).join(", ") + " and " + unfinished[unfinished.length - 1]
+            : unfinished.join(" and ")) +
+          ". Each one is marked below.";
     if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
     return false;
   }
