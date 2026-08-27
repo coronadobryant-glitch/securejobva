@@ -678,10 +678,34 @@ function signUpPassword(email, password) {
   });
 }
 
+/* redirect_to is a QUERY parameter on GoTrue's REST endpoint. An options object
+   carrying redirectTo is the shape supabase-js takes, and this talks to the API
+   directly — so it was being ignored, Supabase fell back to the project's Site
+   URL, and the reset link dropped people on the home page instead of here. */
 function resetPassword(email) {
-  return authPost("recover", {
-    email: email,
-    options: { redirectTo: location.origin + location.pathname }
+  var back = location.origin + location.pathname;
+  return authPost("recover?redirect_to=" + encodeURIComponent(back), { email: email });
+}
+
+/* Setting the new one. The recovery link puts a real session in the fragment,
+   so this is an ordinary authenticated write against the user's own record —
+   there is no separate "reset token" to pass. */
+function setPassword(pw) {
+  var s = loadSession();
+  if (!s || !s.access_token) return Promise.reject(new Error("That link has expired. Ask for a new one."));
+  return fetch(SB + "/auth/v1/user", {
+    method: "PUT",
+    headers: {
+      apikey: ANON,
+      Authorization: "Bearer " + s.access_token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ password: pw })
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) throw new Error(j.error_description || j.msg || j.message || "That did not work.");
+      return j;
+    });
   });
 }
 
@@ -700,11 +724,21 @@ function signOut() {
 
 /* Supabase returns the tokens in the fragment. Take them, then scrub the URL so
    a copied link never carries someone's credentials. */
+/* Set when the fragment says this session arrived from a reset link, so start()
+   can ask for the new password instead of carrying on as if nothing happened.
+
+   A recovery link hands back an ordinary session, which is why this needed
+   saying out loud: without the check, clicking "reset my password" silently
+   signed you in and showed you the normal page. The mail worked, the link
+   worked, and nothing anywhere offered to change the password. */
+var CAME_FROM_RESET = false;
+
 function captureRedirect() {
   if (!location.hash || location.hash.indexOf("access_token") === -1) return false;
   var p = new URLSearchParams(location.hash.slice(1));
   var tok = p.get("access_token");
   if (!tok) return false;
+  if (p.get("type") === "recovery") CAME_FROM_RESET = true;
   saveSession({
     access_token: tok,
     refresh_token: p.get("refresh_token") || "",
@@ -712,6 +746,44 @@ function captureRedirect() {
   });
   history.replaceState(null, "", location.pathname);
   return true;
+}
+
+/* The form the reset link should have led to all along. Kept deliberately
+   plain: one field, one button, and no way to wander off into the rest of the
+   portal until the password is actually set. */
+function passwordForm(msg) {
+  view(
+    '<div class="card">' +
+      '<h2 class="edit__h">Choose a new password</h2>' +
+      (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
+      '<p class="msg" style="margin-top:0">At least eight characters. ' +
+      "You will be signed in once it is saved.</p>" +
+      '<div class="field" style="margin-top:1rem">' +
+        '<input id="pw1" type="password" autocomplete="new-password" ' +
+        'placeholder="New password" aria-label="New password">' +
+      "</div>" +
+      '<button class="btn btn--solid" id="pwgo" type="button" style="margin-top:1rem">Save password</button>' +
+      '<p class="msg" style="margin-top:1rem">' +
+        '<button class="lnk" id="pwskip" type="button">Cancel and sign out</button></p>' +
+    "</div>"
+  );
+
+  document.getElementById("pwgo").addEventListener("click", function () {
+    var el = document.getElementById("pw1");
+    var pw = el.value;
+    if (pw.length < 8) { passwordForm("That is too short — eight characters or more."); return; }
+    var btn = document.getElementById("pwgo");
+    btn.disabled = true;
+    btn.textContent = "Saving\u2026";
+    setPassword(pw).then(function () {
+      CAME_FROM_RESET = false;
+      start();
+    })["catch"](function (e) {
+      passwordForm(e.message);
+    });
+  });
+
+  document.getElementById("pwskip").addEventListener("click", signOut);
 }
 
 function authError() {
@@ -1008,6 +1080,7 @@ function render(email, rows) {
 
 function start() {
   captureRedirect();
+  if (CAME_FROM_RESET) { passwordForm(""); return; }
   var err = authError();
   if (!session()) { signedOut(err); return; }
 
