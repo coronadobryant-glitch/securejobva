@@ -549,6 +549,7 @@ img{max-width:100%}
   display:flex;align-items:center;gap:.7rem;
   padding:1.1rem 2rem;border-top:1px solid var(--line);background:var(--surface-2);
 }
+.intake__foot[hidden]{display:none}
 .intake__count{
   font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--muted);
   margin-right:auto;font-variant-numeric:tabular-nums;
@@ -1792,8 +1793,8 @@ html{scroll-behavior:smooth}
 
   function finish(mode, d) {
     document.getElementById("apply-recap").innerHTML =
-      row("Careers", esc(d.tracks.join(", "))) +
-      row("Shifts", esc(d.shifts.join(", "))) +
+      row("Careers", esc((d.tracks || []).join(", "))) +
+      row("Shifts", esc((d.shifts || []).join(", "))) +
       row("Based in", esc(d.country)) +
       row("Experience", esc(d.experience));
 
@@ -1817,6 +1818,12 @@ html{scroll-behavior:smooth}
     foot.setAttribute("hidden", "");
     show(LAST);
     try { localStorage.removeItem(DRAFT); } catch (e) {}
+
+    /* A new application needs a new id. DRAFT_ID is minted once per page load
+       because the CV upload has to know the folder before the row exists, so
+       without this a second application in the same visit collides with the
+       first and comes back 409. */
+    DRAFT_ID = newId();
   }
 
   /* ── Lead guard ─────────────────────────────────────────────────────────
@@ -1928,6 +1935,11 @@ html{scroll-behavior:smooth}
       method: "POST", headers: hdrs(), body: JSON.stringify(d)
     }).then(function (r) {
       if (r.ok) return "ok";
+      /* 409 is a duplicate primary key, which means this exact row is already
+         in the table. The application arrived; the only thing that failed is
+         sending it a second time. Reporting that as a failure is how somebody
+         ends up seeing "one tap left" over an application we already have. */
+      if (r.status === 409) return "ok";
       if (r.status >= 400 && r.status < 500 && r.status !== 429) return "dead";
       return "retry";
     })["catch"](function () { return "retry"; }); /* offline, DNS, CORS */
@@ -2009,7 +2021,16 @@ html{scroll-behavior:smooth}
     });
   }
 
+  /* An index past the end hides every step and then throws on the next line,
+     which is how the apply dialog went blank: no step matched, so all of them
+     were hidden, the counter was skipped and froze on its old value, every rail
+     segment lit up, and the applicant was left staring at an empty box with
+     their answers still in it and no way forward.
+
+     A step that does not exist is not a step to show. Refusing here costs
+     nothing and turns a dead end into a no-op. */
   function show(n) {
+    if (typeof n !== "number" || n < 0 || n > LAST) return;
     at = n;
     steps.forEach(function (s, k) {
       if (k === n) { s.removeAttribute("hidden"); } else { s.setAttribute("hidden", ""); }

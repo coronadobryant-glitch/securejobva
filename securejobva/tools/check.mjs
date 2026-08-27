@@ -364,6 +364,37 @@ await check("admin charts compute", async () => {
   }
 });
 
+/* The notification endpoint is reachable from the internet and describes real
+   applicants, so its refusals are as much the point as its sending. Driven
+   rather than parsed: a wrong secret, a missing secret, an unlisted table, an
+   escaped field, and a Resend outage that must ask for a retry rather than
+   swallow the row. */
+await check("notify refuses and sends correctly", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-notify.mjs"], { stdio: "pipe" });
+    return "27 behaviours";
+  } catch (e) {
+    throw new Error("tools/test-notify.mjs failed — run it directly for the detail");
+  }
+});
+
+/* The apply dialog went blank because show() accepted an index past the end:
+   every step hidden, the counter frozen, every rail segment lit, and then a
+   throw. An applicant saw an empty box with their answers still in it and no
+   way forward, and nothing anywhere said so.
+
+   Driven against the real show() pulled out of both pages. */
+await check("a step index past the end is refused", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-steps.mjs"], { stdio: "pipe" });
+    return "32 behaviours, both dialogs";
+  } catch (e) {
+    throw new Error("tools/test-steps.mjs failed — run it directly for the detail");
+  }
+});
+
 await check("lead queue behaves", async () => {
   const { execFileSync } = await import("node:child_process");
   try {

@@ -166,6 +166,42 @@ single dashboard toggle away from being untrue, and nothing in this repo would
 change when it happened. Nothing it does writes a row — the insert probe names
 a column that does not exist on purpose. Worth running on a schedule.
 
+## Notifications
+
+An application, a seat request or a contact message sends one email to whoever
+is listed in `NOTIFY_TO`. It hangs off the row landing rather than the form
+submitting, so a lead the queue parked on somebody's device and drained three
+days later still tells you when it finally arrives.
+
+`api/notify.js` receives a Supabase Database Webhook and sends through Resend.
+It deliberately does NOT use the service role key: a webhook carries the whole
+row in its payload, so there is nothing to go back and read, and the most
+dangerous credential in the project stays out of a function reachable from the
+internet.
+
+### Setting it up
+
+Four environment variables on the Vercel project, Production:
+
+```
+RESEND_API_KEY      from resend.com -> API Keys
+RESEND_FROM         support@securejobva.com
+NOTIFY_TO           comma separated
+WEBHOOK_SECRET      any long random string
+```
+
+Without `WEBHOOK_SECRET` the endpoint refuses everything rather than defaulting
+to open.
+
+Then one webhook per table in Supabase -> Database -> Webhooks, on INSERT for
+`applications`, `seat_requests` and `contact_messages`, pointed at
+`https://www.securejobva.com/api/notify` with an HTTP header
+`x-webhook-secret` carrying the same string.
+
+`node tools/test-notify.mjs` drives all of it without Supabase, Resend or a
+deploy -- the refusals as much as the sending, since the endpoint is public and
+describes real applicants.
+
 ## Brand
 
 Four colours, read pixel by pixel out of the supplied logo file. They are the
