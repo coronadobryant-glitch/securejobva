@@ -24,9 +24,16 @@ function mockRes() {
 }
 
 let sent = null;
+let all = [];
 let resendStatus = 200;
+/* Two emails go out for an application now — yours and the applicant's — so
+   keeping only the last one would quietly retarget every assertion below at the
+   confirmation and still pass. all[] holds them in order; sent stays the one
+   addressed to you. */
 globalThis.fetch = async (url, opt) => {
-  sent = { url, headers: opt.headers, body: JSON.parse(opt.body) };
+  const call = { url, headers: opt.headers, body: JSON.parse(opt.body) };
+  all.push(call);
+  sent = all[0];
   return {
     ok: resendStatus < 300,
     status: resendStatus,
@@ -58,6 +65,7 @@ Object.assign(process.env, env);
 
 const call = async (body, headers, method) => {
   sent = null;
+  all = [];
   const res = mockRes();
   await handler({ method: method || "POST", headers: headers || { "x-webhook-secret": "shh" }, body }, res);
   return res;
@@ -132,6 +140,66 @@ is("and is still readable", sent.body.html.includes("&lt;script&gt;"), true);
 resendStatus = 500;
 is("a Resend failure asks Supabase to retry", (await call(APPLICATION)).code, 502);
 resendStatus = 200;
+
+
+/* ── the confirmation the done screen promises ─────────────────────────────
+   careers.html tells every applicant a confirmation is on its way to them by
+   name. These are the assertions that keep that true, and keep it from
+   becoming something it was never meant to be. */
+
+const two = await call(APPLICATION);
+is("an application still answers 200", two.code, 200);
+is("two emails go out, not one", all.length, 2);
+is("the first is yours", all[0].body.to, ["david@example.com", "bryant@example.com"]);
+is("the second is theirs", all[1].body.to, ["maria@example.com"]);
+is("and it says so", two.body.confirmed, true);
+is("from the same verified domain", all[1].body.from, "SecureJobVA <support@securejobva.com>");
+is("the subject is about receipt, not a decision",
+  all[1].body.subject, "We have your application — SecureJobVA");
+is("it greets them by first name", all[1].body.text.startsWith("Hi Maria,"), true);
+is("it repeats the promise the screen made",
+  all[1].body.text.includes("three working days"), true);
+is("it points at their own page", all[1].body.text.includes("/status"), true);
+
+/* An applicant may forward this to anybody. It must not read as an outcome. */
+is("it carries no verdict", /approved|accepted|rejected|shortlist|congratulat/i
+  .test(all[1].body.text + all[1].body.html), false);
+/* Nor may it carry the queue. */
+is("it names no other applicant", /david@example\.com|bryant@example\.com/
+  .test(all[1].body.text + all[1].body.html), false);
+is("it does not link the admin queue", /\/admin/.test(all[1].body.text + all[1].body.html), false);
+
+/* The other two forms promise nothing, so they must not start emailing people
+   who were never told to expect it. */
+await call({ type: "INSERT", table: "seat_requests",
+  record: { name: "Ana", company: "Rosehill", email: "ana@example.com", hours: 30 } });
+is("a seat request sends one email, to you", all.length, 1);
+await call({ type: "INSERT", table: "contact_messages",
+  record: { name: "Sam", email: "sam@example.com", reason: "Billing", message: "A question" } });
+is("a contact message sends one email, to you", all.length, 1);
+
+/* No address, no confirmation — and no crash reaching for one. */
+const noEmail = await call({ type: "INSERT", table: "applications",
+  record: { name: "Jo", email: "", tracks: ["Admin Tasks"] } });
+is("an application with no address still notifies you", noEmail.code, 200);
+is("and sends only the one email", all.length, 1);
+is("and says the confirmation did not go", noEmail.body.confirmed, false);
+
+/* The failure that matters is the one to you. A refused confirmation must not
+   turn a delivered notification into a retried one, or a mistyped address
+   mails you the same application forever. */
+let n = 0;
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, opt) => {
+  n++;
+  const r = await realFetch(url, opt);
+  return n === 1 ? r : { ok: false, status: 422, text: async () => "invalid recipient" };
+};
+const half = await call(APPLICATION);
+globalThis.fetch = realFetch;
+is("a refused confirmation still answers 200", half.code, 200);
+is("and reports it honestly", half.body.confirmed, false);
+is("and still counts your two", half.body.sent, 2);
 
 console.log("");
 console.log(bad ? bad + " FAILED" : "all passed");

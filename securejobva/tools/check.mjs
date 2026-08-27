@@ -448,8 +448,11 @@ await check("admin charts compute", async () => {
 await check("notify refuses and sends correctly", async () => {
   const { execFileSync } = await import("node:child_process");
   try {
-    execFileSync(process.execPath, ["tools/test-notify.mjs"], { stdio: "pipe" });
-    return "27 behaviours";
+    /* Counted from the run, not written down here. The label said 27 while the
+       file asserted 48, because a number in a string does not move when the
+       thing it describes does. */
+    const out = execFileSync(process.execPath, ["tools/test-notify.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours";
   } catch (e) {
     throw new Error("tools/test-notify.mjs failed — run it directly for the detail");
   }

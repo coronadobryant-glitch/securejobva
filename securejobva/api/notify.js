@@ -72,6 +72,63 @@ function list(v) {
   return Array.isArray(v) ? v.filter(Boolean).join(", ") : (v || "");
 }
 
+/* ── the one the applicant gets ───────────────────────────────────────────
+   careers.html closes with, in as many words:
+
+     "We have it, and a confirmation is on its way to <their address>. A person
+      reads every application and answers either way, usually within three
+      working days."
+
+   Until now nothing sent it. Applying for a job is exactly when somebody
+   watches their inbox, and a promise made on the screen and not kept is worse
+   than not making it.
+
+   So this says precisely what that screen said and stops. It carries no
+   decision, no stage, and no wording that could read as an offer — an
+   applicant forwarding it to somebody should not be able to give the wrong
+   impression of where they stand. Only applications get one: the seats and
+   contact forms promise nothing, and inventing a message nobody was told to
+   expect is a different decision from keeping this one. */
+const CONFIRM = {
+  applications: (r, site) => {
+    const first = String(r.name || "").trim().split(/\s+/)[0] || "there";
+    const what = list(r.tracks) || r.track || "";
+
+    const body = [
+      "Hi " + first + ",",
+      "",
+      "We have your application" + (what ? " for " + what : "") + ".",
+      "",
+      "A person reads every one and answers either way, usually within three " +
+        "working days. There is nothing else for you to do in the meantime.",
+      "",
+      "You can see where it has got to at " + site + "/status — sign in with " +
+        "this address, and it will show you your own application and nothing else.",
+      "",
+      "If something in it needs correcting, reply to this email and tell us.",
+      "",
+      "SecureJobVA"
+    ].join("\n");
+
+    const html =
+      '<div style="font:15px/1.65 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#26374F;max-width:34rem">' +
+        "<p>Hi " + esc(first) + ",</p>" +
+        "<p>We have your application" + (what ? " for <b>" + esc(what) + "</b>" : "") + ".</p>" +
+        "<p>A person reads every one and answers either way, usually within three " +
+          "working days. There is nothing else for you to do in the meantime.</p>" +
+        '<p><a href="' + esc(site) + '/status" ' +
+          'style="background:#0072EE;color:#fff;text-decoration:none;padding:10px 18px;' +
+          'border-radius:6px;display:inline-block">See where it has got to</a></p>' +
+        "<p>Sign in with this address and it will show you your own application " +
+          "and nothing else.</p>" +
+        "<p>If something in it needs correcting, reply to this email and tell us.</p>" +
+        "<p>SecureJobVA</p>" +
+      "</div>";
+
+    return { subject: "We have your application — SecureJobVA", text: body, html };
+  }
+};
+
 function esc(s) {
   return String(s === null || s === undefined ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -161,5 +218,35 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: "resend refused", detail: detail.slice(0, 300) });
   }
 
-  return res.status(200).json({ sent: to.length, table: body.table });
+  /* ── then the applicant's own copy ───────────────────────────────────────
+     Second, and deliberately not allowed to change the answer. A retry is
+     driven by the status code, so if this send decided it, one applicant
+     mistyping their address would put the whole webhook in a retry loop —
+     mailing you about the same application over and over while never reaching
+     them. Costly in the wrong direction.
+
+     So the failure that matters is the one to you: that is the one that must
+     be retried until it lands, because it is the one holding somebody's reply.
+     This one is attempted once, its outcome is reported, and it never turns a
+     delivered notification into a repeated one. */
+  const theirs = CONFIRM[body.table];
+  const applicant = String(body.record.email || "").trim();
+  if (!theirs || !applicant.includes("@")) {
+    return res.status(200).json({ sent: to.length, table: body.table, confirmed: false });
+  }
+
+  const c = theirs(body.record, site);
+  const sentToThem = await fetch(RESEND, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "SecureJobVA <" + from + ">",
+      to: [applicant],
+      subject: c.subject,
+      text: c.text,
+      html: c.html
+    })
+  }).then((x) => x.ok).catch(() => false);
+
+  return res.status(200).json({ sent: to.length, table: body.table, confirmed: sentToThem });
 }
