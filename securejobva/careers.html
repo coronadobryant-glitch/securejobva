@@ -194,6 +194,19 @@ img{max-width:100%}
 .nav__links a.nav__cross:focus-visible,
 .nav__tools a.nav__cross:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
 .mobnav__in a.nav__cross{margin-top:.4rem}
+/* Staff shortcut. Injected by script, so it does not exist for the people
+   who make up nearly all of this page's traffic. */
+.nav__links a.nav__admin,
+.mobnav__in a.nav__admin{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  padding:.5rem .9rem;border-radius:8px;
+  border:1.5px solid var(--accent);color:var(--accent);
+  font-weight:600;line-height:1;
+  transition:background-color .16s ease,color .16s ease;
+}
+.nav__links a.nav__admin:hover,
+.mobnav__in a.nav__admin:hover{background:var(--accent);color:var(--accent-ink)}
+.mobnav__in a.nav__admin{margin-top:.4rem}
 .mobnav__in a.nav__signin{margin-top:.5rem}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
@@ -2209,4 +2222,63 @@ html{scroll-behavior:smooth}
       );
     });
   })();
+</script>
+
+<script>
+/* An admin shortcut in the header, for the people who have one.
+
+   The check is in two steps on purpose. A stored session is read locally and
+   costs nothing; only if one exists does this ask the database what the
+   account may do. Nearly everyone who loads this page is not signed in, and
+   they should not pay a network round trip for a button they will never see.
+
+   The token is read but never trusted: what it decides is whether to ask.
+   The answer comes from rpc/my_permissions, and /admin refuses anyone
+   without the permission regardless of what the header shows. */
+(function () {
+  var SB = "https://hmgravlkatfmerzbozct.supabase.co";
+  var ANON = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
+
+  var sess;
+  try { sess = JSON.parse(localStorage.getItem("sjva-session") || "null"); } catch (e) { return; }
+  if (!sess || !sess.access_token) return;
+  /* Expired is the same as absent here — session() on the portal pages
+     refuses it too, so showing the button would promise something the next
+     page immediately takes back. */
+  if (sess.expires_at && Date.now() > sess.expires_at - 30000) return;
+
+  fetch(SB + "/rest/v1/rpc/my_permissions", {
+    method: "POST",
+    headers: {
+      apikey: ANON,
+      Authorization: "Bearer " + sess.access_token,
+      "Content-Type": "application/json"
+    },
+    body: "{}"
+  })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    ["catch"](function () { return []; })
+    .then(function (perms) {
+      if (!perms || perms.indexOf("applications.view_all") < 0) return;
+
+      var mark = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="2.2" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M12 3 4 6.5v5c0 4.5 3.2 7.5 8 9 4.8-1.5 8-4.5 8-9v-5L12 3Z"></path></svg>';
+
+      /* Both navs, so it is there whichever one is on screen. */
+      [".nav__links", ".mobnav__in"].forEach(function (sel) {
+        var nav = document.querySelector(sel);
+        if (!nav || nav.querySelector(".nav__admin")) return;
+        var a = document.createElement("a");
+        a.className = "nav__admin";
+        a.href = "/admin";
+        a.innerHTML = mark + "Admin";
+        /* Ahead of the sign-in, which is the thing it makes redundant. */
+        var signin = nav.querySelector(".nav__signin");
+        if (signin) nav.insertBefore(a, signin);
+        else nav.appendChild(a);
+      });
+    });
+})();
 </script>

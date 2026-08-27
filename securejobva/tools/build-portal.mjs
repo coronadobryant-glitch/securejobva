@@ -145,6 +145,9 @@ const PAGE_CSS = `
   resize:vertical;min-height:2.4rem;
 }
 .row__ok{font-size:.8rem;color:var(--accent);opacity:0;transition:opacity .18s ease}
+/* An error is not decoration: it wraps, it stays, and it is readable. */
+.row__ok.is-bad{color:#B3261E;font-weight:600;opacity:1;flex-basis:100%;line-height:1.45}
+:root[data-theme="dark"] .row__ok.is-bad{color:#F2B8B5}
 .row__ok.is-on{opacity:1}
 .pill{
   display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
@@ -1453,8 +1456,7 @@ function rowHtml(a) {
             esc(a.name || "this applicant") + '" placeholder="Private note (staff only)">' +
             esc(a.note_text || "") + "</textarea>"
           : "") +
-        '<button class="btn btn--ghost" data-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
-        '<span class="row__ok" data-ok>Saved</span>' +
+        '<span class="row__ok" data-ok></span>' +
       "</div>";
   }
 
@@ -1950,8 +1952,7 @@ function drawSeats(box, rows) {
             (can("applications.edit")
               ? '<div class="row__ctl">' +
                   '<select data-seat-status aria-label="Stage of this seat request">' + opts + "</select>" +
-                  '<button class="btn btn--ghost" data-seat-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
-                  '<span class="row__ok" data-seat-ok>Saved</span>' +
+                  '<span class="row__ok" data-seat-ok></span>' +
                 "</div>"
               : "") +
           "</div>"
@@ -1959,12 +1960,16 @@ function drawSeats(box, rows) {
       }).join("") +
     "</div>";
 
-  box.querySelectorAll("[data-seat-save]").forEach(function (b) {
-    b.addEventListener("click", function () {
-      var row = b.closest("[data-seat]");
+  /* Writes on change, like the applications table. A dropdown has no
+     half-chosen state, so there is nothing a Save button was waiting for —
+     it only created a way to make a change and lose it by navigating away. */
+  box.querySelectorAll("[data-seat-status]").forEach(function (sel) {
+    sel.addEventListener("change", function () {
+      var row = sel.closest("[data-seat]");
       var id = row.getAttribute("data-seat");
-      var st = row.querySelector("[data-seat-status]").value;
+      var st = sel.value;
       var ok = row.querySelector("[data-seat-ok]");
+      flash(ok, "Saving…");
       api("seat_requests?id=eq." + encodeURIComponent(id), {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
@@ -1975,7 +1980,7 @@ function drawSeats(box, rows) {
         pill.textContent = SEAT_LABEL[st] || st;
         flash(ok, "Saved");
       }).catch(function (e) {
-        flash(ok, String(e.message) === "signed out" ? "Signed out" : "Failed");
+        flash(ok, why(e), true);
       });
     });
   });
@@ -2056,8 +2061,7 @@ function drawInbox(box, rows) {
           : { handled_at: null, handled_by: null }
       }).then(loadInbox)
         .catch(function (e) {
-          flash(row.querySelector("[data-msg-ok]"),
-                String(e.message) === "signed out" ? "Signed out" : "Failed");
+          flash(row.querySelector("[data-msg-ok]"), why(e), true);
         });
     });
   });
@@ -2260,7 +2264,8 @@ function save(row) {
     }
   }
 
-  if (!jobs.length) { flash(ok, "No change"); return; }
+  if (!jobs.length) return;
+  flash(ok, "Saving\u2026");
 
   Promise.all(jobs).then(function () {
     if (rec) {
@@ -2289,14 +2294,30 @@ function save(row) {
     }
     flash(ok, "Saved");
   }).catch(function (e) {
-    flash(ok, String(e.message) === "signed out" ? "Signed out" : "Failed");
+    flash(ok, why(e), true);
   });
 }
 
-function flash(el, text) {
+function flash(el, text, bad) {
   el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
   el.classList.add("is-on");
-  setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+  /* An error stays until the next attempt. A success fades, because nobody
+     needs to be told twice that a dropdown worked. */
+  clearTimeout(el._t);
+  if (!bad) el._t = setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+}
+
+/* PostgREST answers with JSON carrying message, details and hint. The hint is
+   usually the actionable half — "GRANT SELECT ON ..." — so it is kept. */
+function why(e) {
+  var t = String((e && e.message) || e || "");
+  if (t === "signed out") return "Signed out — reload and sign in again";
+  try {
+    var j = JSON.parse(t);
+    return [j.message, j.hint].filter(Boolean).join(" — ").slice(0, 180) || t.slice(0, 180);
+  } catch (x) {}
+  return t.slice(0, 180) || "That did not save";
 }
 
 function render(email, apps, notes, socials, docs) {
@@ -2380,6 +2401,32 @@ function render(email, apps, notes, socials, docs) {
   document.getElementById("fskill").addEventListener("change", paint);
   document.getElementById("csv").addEventListener("click", exportCsv);
   document.getElementById("flevel").addEventListener("change", paint);
+  /* Selects and checkboxes commit immediately. There is no half-chosen state
+     in a dropdown, so there is nothing to wait for. */
+  document.getElementById("rows").addEventListener("change", function (e) {
+    var row = e.target.closest(".row");
+    if (!row) return;
+    if (e.target.matches("[data-status], [data-pipe], [data-replied], [data-score]")) {
+      save(row);
+    }
+  });
+
+  /* Typing is different: saving every keystroke would be a write per letter.
+     Wait for a pause, and also save on blur so leaving the field commits. */
+  document.getElementById("rows").addEventListener("input", function (e) {
+    if (!e.target.matches("[data-note]")) return;
+    var row = e.target.closest(".row");
+    clearTimeout(row._noteTimer);
+    row._noteTimer = setTimeout(function () { save(row); }, 900);
+  });
+
+  document.getElementById("rows").addEventListener("blur", function (e) {
+    if (!e.target.matches("[data-note]")) return;
+    var row = e.target.closest(".row");
+    clearTimeout(row._noteTimer);
+    save(row);
+  }, true);
+
   document.getElementById("rows").addEventListener("click", function (e) {
     var doc = e.target.closest("[data-doc]");
     if (doc) { openDoc(doc); return; }
@@ -2392,8 +2439,6 @@ function render(email, apps, notes, socials, docs) {
       save(r);
       return;
     }
-    var b = e.target.closest("[data-save]");
-    if (b) save(b.closest(".row"));
   });
   paint();
 }
