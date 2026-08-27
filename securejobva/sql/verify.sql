@@ -48,3 +48,23 @@ select grantee, string_agg(privilege_type, ',' order by privilege_type) as privi
 from information_schema.role_table_grants
 where table_name = 'applications' and grantee in ('anon', 'authenticated')
 group by grantee;
+
+
+-- --------------------------------------------------------------------------
+-- The notify webhooks
+-- --------------------------------------------------------------------------
+--
+-- Three rows, one per form. secret_filled must be true on all three: a trigger
+-- still carrying the __WEBHOOK_SECRET__ placeholder fires, collects a 401 from
+-- api/notify.js, and sends nothing — which from the outside is indistinguishable
+-- from having no webhook at all. The secret itself is never printed.
+
+select c.relname as table_name,
+       t.tgname as webhook,
+       pg_get_triggerdef(t.oid) not like '%\_\_WEBHOOK\_SECRET\_\_%' as secret_filled,
+       pg_get_triggerdef(t.oid) like '%api/notify%' as points_at_notify
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+where not t.tgisinternal
+  and c.relname in ('applications', 'seat_requests', 'contact_messages')
+order by c.relname;
