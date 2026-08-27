@@ -1780,8 +1780,8 @@ html{scroll-behavior:smooth}
 
   function finish(mode, d) {
     document.getElementById("apply-recap").innerHTML =
-      row("Careers", esc(d.tracks.join(", "))) +
-      row("Shifts", esc(d.shifts.join(", "))) +
+      row("Careers", esc((d.tracks || []).join(", "))) +
+      row("Shifts", esc((d.shifts || []).join(", "))) +
       row("Based in", esc(d.country)) +
       row("Experience", esc(d.experience));
 
@@ -1997,7 +1997,16 @@ html{scroll-behavior:smooth}
     });
   }
 
+  /* An index past the end hides every step and then throws on the next line,
+     which is how the apply dialog went blank: no step matched, so all of them
+     were hidden, the counter was skipped and froze on its old value, every rail
+     segment lit up, and the applicant was left staring at an empty box with
+     their answers still in it and no way forward.
+
+     A step that does not exist is not a step to show. Refusing here costs
+     nothing and turns a dead end into a no-op. */
   function show(n) {
+    if (typeof n !== "number" || n < 0 || n > LAST) return;
     at = n;
     steps.forEach(function (s, k) {
       if (k === n) { s.removeAttribute("hidden"); } else { s.setAttribute("hidden", ""); }
