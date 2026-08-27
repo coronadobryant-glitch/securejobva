@@ -33,9 +33,11 @@ run it. That is always safer than guessing.
 | `017-staff-requests.sql` | Lets somebody ask to be staff; approval is unchanged |
 | `018-select-applications.sql` | Table-level SELECT on applications — ends the column-by-column chase |
 | `019-interview-times.sql` | When the interview is, and the Interviews tab that reads it |
+| `020-note-log.sql` | Notes stop overwriting each other — a row per note, with who and when |
+| `021-disc.sql` | The DISC questionnaire and its scorer. GENERATED — edit `tools/disc-items.mjs` |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 019 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 021 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

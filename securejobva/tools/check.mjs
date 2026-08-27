@@ -338,6 +338,20 @@ await check("admin saves what changed and nothing else", async () => {
   }
 });
 
+/* The questionnaire is asked by careers.html and scored by sql/021, and both
+   are generated from tools/disc-items.mjs. If they ever drift, nothing errors
+   — every applicant simply gets a wrong profile. tools/test-disc.mjs
+   regenerates and diffs, and drives the page's own rules. */
+await check("the DISC questionnaire holds together", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-disc.mjs"], { stdio: "pipe" });
+    return "13 checks";
+  } catch (e) {
+    throw new Error("tools/test-disc.mjs failed — run it directly");
+  }
+});
+
 /* The CSV is the one place applicant-typed text leaves this system and is
    opened in a program that executes formulas. Both failure modes are silent. */
 await check("CSV escaping holds", async () => {
@@ -511,8 +525,16 @@ await check("views run as the caller, not the owner", () => {
 await check("anon can still only INSERT", () => {
   /* A grant can span lines and carry a column list —
         grant select ( id, created_at, … ) on public.applications to authenticated;
-     so match to the statement terminator, not to end of line. */
-  const stmts = sql.match(/grant\b[\s\S]*?;/gi) || [];
+     so match to the statement terminator, not to end of line.
+
+     Comments come out first. Matching to the next semicolon across a `--` line
+     means the word "grant" in a sentence about grants starts a statement that
+     runs on into the real one below it, and the privileges this then reads are
+     whatever prose sat in between. It fired as a false alarm on 021, but the
+     same hole hides a real grant just as easily: a `grant select … to anon`
+     with a comment above it gets swallowed into that phantom statement and is
+     never checked on its own. */
+  const stmts = sql.replace(/--[^\n]*/g, "").match(/grant\b[\s\S]*?;/gi) || [];
   if (!stmts.length) throw new Error("no grants found — has the file been rewritten?");
 
   /* Insert-only is the rule, and 015 is the first honest exception: client
@@ -533,6 +555,7 @@ await check("anon can still only INSERT", () => {
      to be readable by anon, that is a conversation, not a comment. */
   const NEVER_PUBLIC = new Set([
     "applications", "seat_requests", "contact_messages", "application_notes",
+    "application_note_log", "application_disc", "application_disc_read",
     "application_tracking", "application_socials", "application_documents",
     "application_queue", "social_tokens", "admins", "user_roles",
     "role_requests", "roles", "permissions", "role_permissions"

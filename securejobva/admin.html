@@ -479,6 +479,25 @@ img{max-width:100%}
   border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
   resize:vertical;min-height:2.2rem;
 }
+.disc__r{margin-top:.7rem;padding:.6rem .75rem;background:var(--surface-2);border-radius:8px}
+.disc__r--none{font-size:.82rem;color:var(--muted)}
+.disc__rk{
+  display:block;font-family:"IBM Plex Mono",monospace;font-size:.62rem;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+}
+.disc__rn{display:block;font-weight:600;font-size:.95rem;margin-top:.12rem}
+.disc__r2{font-weight:400;font-size:.84rem;color:var(--muted)}
+.disc__rf{display:block;font-size:.82rem;color:var(--ink-2);margin-top:.1rem}
+.disc__bs{display:grid;gap:.18rem;margin-top:.5rem}
+.disc__b{display:grid;grid-template-columns:1.1rem 1fr 2.2rem;align-items:center;gap:.45rem}
+.disc__bk{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted)}
+.disc__bt{position:relative;display:block;height:.5rem;background:var(--surface);border-radius:3px;overflow:hidden}
+.disc__bt::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+.disc__bt i{position:absolute;top:0;bottom:0;background:var(--accent);border-radius:2px}
+.disc__bv{
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-2);
+  text-align:right;font-variant-numeric:tabular-nums;
+}
 .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .sk{font-size:.72rem;padding:.16rem .42rem;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 .sk--advanced,.sk--fluent{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
@@ -1238,6 +1257,67 @@ function whenStamp(iso) {
   });
 }
 
+var DISC_STYLE = {
+  "D": {
+    "name": "Driver",
+    "fits": "Escalations, outbound sales, anything with a target on it"
+  },
+  "I": {
+    "name": "Persuader",
+    "fits": "Front-line customer service, lead follow-up, appointment setting"
+  },
+  "S": {
+    "name": "Steady",
+    "fits": "Inbox and calendar, long-running client accounts, support"
+  },
+  "C": {
+    "name": "Checker",
+    "fits": "Bookkeeping, data entry, invoicing, documents"
+  }
+};
+
+/* What the questionnaire came back as.
+ *
+ * The letter alone tells nobody anything, so it is shown as a name and the
+ * kind of seat it suits. The four bars are there because the shape matters
+ * more than the winner: somebody at D 4 I 3 is a different person from
+ * somebody at D 9 I -6, and both read as "Driver" if you only print the top
+ * letter.
+ *
+ * Scores run -12 to 12, so the bar is offset from a centre line — a negative
+ * is a real result (this is markedly not you), not a missing one.
+ */
+function discLine(a) {
+  var d = a.disc;
+  if (!d) {
+    return '<div class="disc__r disc__r--none">Working style &mdash; not taken. ' +
+      "Applications sent before the questionnaire existed will say this.</div>";
+  }
+  var style = DISC_STYLE[d.primary_style] || { name: d.primary_style, fits: "" };
+  var second = DISC_STYLE[d.secondary_style];
+
+  var bars = ["d", "i", "s", "c"].map(function (k) {
+    var v = Number(d[k]) || 0;
+    var pct = Math.min(50, Math.abs(v) / 12 * 50);
+    return '<div class="disc__b">' +
+      '<span class="disc__bk">' + k.toUpperCase() + "</span>" +
+      '<span class="disc__bt"><i style="' +
+        (v >= 0 ? "left:50%;width:" : "right:50%;width:") + pct.toFixed(1) + '%"></i></span>' +
+      '<span class="disc__bv">' + (v > 0 ? "+" : "") + v + "</span>" +
+    "</div>";
+  }).join("");
+
+  return (
+    '<div class="disc__r">' +
+      '<span class="disc__rk">Working style</span>' +
+      '<span class="disc__rn">' + esc(style.name) +
+        (second ? ' <span class="disc__r2">then ' + esc(second.name) + "</span>" : "") + "</span>" +
+      (style.fits ? '<span class="disc__rf">' + esc(style.fits) + "</span>" : "") +
+      '<div class="disc__bs">' + bars + "</div>" +
+    "</div>"
+  );
+}
+
 function rowHtml(a) {
   var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "&mdash;";
 
@@ -1292,6 +1372,7 @@ function rowHtml(a) {
         (a.region ? " &middot; " + esc(a.region) : "") +
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
+      discLine(a) +
       docList(a.docs) +
       contactLine(a) +
       scoreLine(a) +
@@ -2321,7 +2402,7 @@ function why(e) {
   return t.slice(0, 180) || "That did not save";
 }
 
-function render(email, apps, notes, socials, docs) {
+function render(email, apps, notes, socials, docs, disc) {
   var byId = {};
   /* Newest first, which is the order they arrive in and the order they are
      read: the last thing said about somebody is the thing you want. */
@@ -2336,10 +2417,13 @@ function render(email, apps, notes, socials, docs) {
   (docs || []).forEach(function (d) {
     (docById[d.application_id] = docById[d.application_id] || []).push(d);
   });
+  var discById = {};
+  (disc || []).forEach(function (d) { discById[d.application_id] = d; });
   ALL = apps.map(function (a) {
     a.notes = byId[a.id] || [];
     a.socials = socById[a.id] || [];
     a.docs = docById[a.id] || [];
+    a.disc = discById[a.id] || null;
     a.pipeline = a.pipeline || "new";
     return a;
   });
@@ -2471,10 +2555,15 @@ function start() {
           ? api("application_socials?select=application_id,platform,handle,url")
           : Promise.resolve([]),
         api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
+          .catch(function () { return []; }),
+        /* Caught rather than awaited-or-fail: until 021 is run this table does
+           not exist, and an admin page that will not load because a
+           questionnaire is missing is worse than one without the questionnaire. */
+        api("application_disc_read?select=application_id,d,i,s,c,primary_style,secondary_style,primary_name")
           .catch(function () { return []; })
       ];
       return Promise.all(jobs).then(function (r) {
-        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || []);
+        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || [], r[4] || []);
       });
     })
     .catch(function (e) {
