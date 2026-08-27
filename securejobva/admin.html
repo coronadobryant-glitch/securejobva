@@ -593,20 +593,43 @@ img{max-width:100%}
    never sent to a server, which is the property that makes this safe to do on
    a static page: Vercel never sees the token, only the browser does.
 
-   The token is kept in sessionStorage rather than localStorage. It is a key to
-   someone's personal data on a machine that may be shared, and closing the tab
-   should end the session rather than leave it lying there for the next person. */
+   The token was kept in sessionStorage, which dies with the tab. The intent was
+   right — it is a key to somebody's personal data on a machine that may be
+   shared — but the mechanism was wrong, and it made the portal unusable: click
+   the logo, come back in a new tab, close and reopen, restore a window, and you
+   were signed out with no explanation.
+
+   It bought less than it looked like, too. For as long as the tab stayed open
+   the token sat there just the same, and a tab can stay open for days.
+
+   So the session lives in localStorage now and the limit is time, which is the
+   thing that was actually meant: session() already refuses a token past its
+   expiry, and Supabase issues them for an hour. Signing out clears it. That is
+   an hour on a shared machine instead of "until somebody closes the tab",
+   which is both shorter and predictable. */
 var SB   = "https://hmgravlkatfmerzbozct.supabase.co";
 var ANON = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
 var KEY  = "sjva-session";
 
 function saveSession(s) {
-  try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
 }
 function loadSession() {
-  try { return JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { return null; }
+  var raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { return null; }
+  /* Anyone signed in when this shipped has their session in the old place.
+     Move it rather than logging them out to fix a bug about being logged out. */
+  if (!raw) {
+    try {
+      raw = sessionStorage.getItem(KEY);
+      if (raw) { localStorage.setItem(KEY, raw); sessionStorage.removeItem(KEY); }
+    } catch (e) { return null; }
+  }
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
 }
 function clearSession() {
+  try { localStorage.removeItem(KEY); } catch (e) {}
   try { sessionStorage.removeItem(KEY); } catch (e) {}
 }
 
