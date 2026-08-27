@@ -505,6 +505,18 @@ img{max-width:100%}
 .foot ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.92rem}
 .foot a{text-decoration:none;color:var(--ink-2)}
 .foot a:hover{color:var(--accent)}
+/* The legal row is the one place in the footer where the links have to look
+   like links. The column links above sit under headings that already say what
+   they are; these are a run of words separated by dots at .82rem, and with no
+   underline they read as a line of grey text somebody has stopped scrolling
+   past. Underlined, they are findable, which is the entire job of a policy
+   link.
+
+   Scoped .foot .foot__bot a, not .foot__bot a. Both that and .foot a are one
+   class plus one element, so a bare version only wins by sitting later in the
+   file — and every rule in this stylesheet has moved at least once today. */
+.foot .foot__bot a{text-decoration:underline;text-underline-offset:.22em;text-decoration-thickness:from-font;color:var(--ink-2)}
+.foot .foot__bot a:hover{color:var(--accent)}
 .foot__brand{margin-bottom:.75rem}
 .foot__bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;font-size:.82rem;color:var(--muted)}
 
