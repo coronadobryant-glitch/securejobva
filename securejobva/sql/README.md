@@ -29,11 +29,12 @@ run it. That is always safer than guessing.
 | `013-documents.sql` | CV uploads: a private bucket, and who may read what |
 | `014-admin.sql` | Adds an administrator |
 | `015-client-logos.sql` | The sliding client strip: a public logo bucket, staff-only uploads |
-| `016-grant-user-id.sql` | Grants `user_id`, the column `select=*` tripped over |
+| `016-grant-user-id.sql` | Superseded by 018; harmless to run |
 | `017-staff-requests.sql` | Lets somebody ask to be staff; approval is unchanged |
+| `018-select-applications.sql` | Table-level SELECT on applications — ends the column-by-column chase |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 017 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 018 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

@@ -1,6 +1,6 @@
--- 017 — grant SELECT on applications at table level, and stop chasing columns
+-- 018 — grant SELECT on applications at table level, and stop chasing columns
 --
--- Run after: 016
+-- Run after: 017
 -- Safe to re-run: yes
 -- Also needed: nothing in the dashboard.
 --
