@@ -329,6 +329,10 @@ body:has(.adm__wrap) main{padding:0}
 .adm__topn b{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}
 .adm__topn span{font-size:.72rem;color:#7C93B4}
 .adm__canvas{padding:1.1rem 1.2rem 2.5rem}
+.adm__page{padding:0;margin:0}
+.adm__bar{margin:0;padding:.65rem 1.2rem;background:var(--paper);border-bottom:1px solid var(--line)}
+.adm__bar input,.adm__bar select{font-size:.85rem}
+.rail__title{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:.78rem;color:#7C93B4;padding:0 .9rem .55rem}
 .kpis{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));margin-bottom:1rem}
 .kpis:empty{display:none}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:.7rem .85rem}
@@ -1427,20 +1431,15 @@ const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead
 
 /* ────────────────────────── admin.html ────────────────────────── */
 
+/* No section padding, no page head, no centred column. The heading and the
+   "signed in as" line moved into the shell — the band says which section you
+   are in and the sidebar says who you are, so a third copy above both was the
+   thing making it look like a page with an application pasted into it. */
 const ADMIN_BODY = [
-  '  <section class="pt">',
-  '    <div class="wrap" style="max-width:96rem">',
-  '      <div class="pt__head">',
-  '        <span class="eyebrow">Internal</span>',
-  /* It was "Applications.", which is one of six things this page does and the
-     same word an applicant sees at the top of their own page. Somebody landing
-     on the wrong one could not tell them apart. */
-  "        <h1>Admin portal.</h1>",
-  '        <p id="pt-lead">Applications, seats, messages, interviews and the team.</p>',
-  "      </div>",
-  '      <div id="pt-root"></div>',
-  "    </div>",
-  "  </section>"
+  '  <div class="adm__page">',
+  '    <p id="pt-lead" hidden></p>',
+  '    <div id="pt-root"></div>',
+  "  </div>"
 ].join(nl);
 
 const ADMIN_SCRIPT = `
@@ -3100,29 +3099,6 @@ function render(email, apps, notes, socials, docs, disc) {
 
   lead.textContent = "Signed in as " + email + ".";
   view(
-    '<div class="adm__bar">' +
-      '<input id="q" type="search" aria-label="Search applications" ' +
-        'placeholder="Search name, email, country, region, track">' +
-      '<select id="filter" aria-label="Filter by pipeline">' +
-        '<option value="">All pipeline</option>' + pipeOptions("") +
-        '<option value="__late">Waiting 7+ days, no reply</option>' +
-        '<option value="__unscored">Interviewed, not yet scored</option>' +
-      "</select>" +
-      '<select id="fskill" aria-label="Filter by skill">' +
-        '<option value="">Any skill</option>' +
-        SKILLS.map(function (k) {
-          return '<option value="' + k[0] + '">' + k[1] + "</option>";
-        }).join("") +
-      "</select>" +
-      '<select id="flevel" aria-label="Minimum level">' +
-        '<option value="">Any level</option>' +
-        LEVELS.map(function (l) {
-          return '<option value="' + l + '">' + LEVEL_LABEL[l] + " or better</option>";
-        }).join("") +
-      "</select>" +
-      '<span class="adm__count" id="count"></span>' +
-      '<button class="btn btn--ghost" id="csv" type="button" style="padding:.5rem .8rem;font-size:.85rem">Export CSV</button>' +
-    "</div>" +
     /* The tab bar became a rail. Same buttons, same data-tab values, same
        container id — wireTabs() finds them exactly as before and nothing about
        switching panes changed. What is new is that each one can carry a count,
@@ -3135,6 +3111,7 @@ function render(email, apps, notes, socials, docs, disc) {
          application keeps who you are in the corner of the furniture, not in a
          band across the top of the work. */
       '<a class="rail__brand" href="/">SecureJob<b>VA</b></a>' +
+      '<span class="rail__title">Admin portal</span>' +
       '<span class="rail__me"><span class="who__av">' + esc(email.charAt(0).toUpperCase()) + "</span>" +
         "<span><b>Administrator</b>" + esc(email) + "</span></span>" +
       '<span class="rail__k">The queue</span>' +
@@ -3184,6 +3161,29 @@ function render(email, apps, notes, socials, docs, disc) {
     '<div class="adm__top">' +
       '<span><span class="k">The queue</span><h2>Applications</h2></span>' +
       '<span class="adm__topn"><b id="top-n">&mdash;</b><span>waiting on you</span></span>' +
+    "</div>" +
+    '<div class="adm__bar">' +
+      '<input id="q" type="search" aria-label="Search applications" ' +
+        'placeholder="Search name, email, country, region, track">' +
+      '<select id="filter" aria-label="Filter by pipeline">' +
+        '<option value="">All pipeline</option>' + pipeOptions("") +
+        '<option value="__late">Waiting 7+ days, no reply</option>' +
+        '<option value="__unscored">Interviewed, not yet scored</option>' +
+      "</select>" +
+      '<select id="fskill" aria-label="Filter by skill">' +
+        '<option value="">Any skill</option>' +
+        SKILLS.map(function (k) {
+          return '<option value="' + k[0] + '">' + k[1] + "</option>";
+        }).join("") +
+      "</select>" +
+      '<select id="flevel" aria-label="Minimum level">' +
+        '<option value="">Any level</option>' +
+        LEVELS.map(function (l) {
+          return '<option value="' + l + '">' + LEVEL_LABEL[l] + " or better</option>";
+        }).join("") +
+      "</select>" +
+      '<span class="adm__count" id="count"></span>' +
+      '<button class="btn btn--ghost" id="csv" type="button" style="padding:.5rem .8rem;font-size:.85rem">Export CSV</button>' +
     "</div>" +
     '<div class="adm__canvas">' +
     '<div data-pane="apps">' +
