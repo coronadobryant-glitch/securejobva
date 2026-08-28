@@ -324,6 +324,10 @@ const PAGE_CSS = `
 .tl__art{background:var(--surface-2);display:grid;place-items:center;padding:1.2rem .8rem;border-bottom:1px solid var(--line)}
 .tl__art svg{width:32px;height:32px;stroke:var(--accent);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .tl__l{background:var(--ink);color:var(--paper);padding:.55rem .6rem;text-align:center;font-size:.82rem;font-weight:600}
+.tl__l small{display:block;font-weight:400;font-size:.7rem;opacity:.72;margin-top:.1rem}
+.tl--soon{opacity:.62;cursor:default}
+.tl--soon .tl__art svg{stroke:var(--muted)}
+.tl--soon:hover{border-color:var(--line)}
 .lvs{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1.2rem}
 .lv{background:var(--surface);padding:.7rem .9rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .lv__w{display:block;font-size:.85rem;color:var(--muted)}
@@ -3349,6 +3353,14 @@ function render(a, leaves, notices) {
       tile("/status", "Your profile", '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>') +
       tile("#leave", "Ask for leave", '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>') +
       tile("#pay", "Getting paid", '<rect x="3" y="6" width="18" height="12.5" rx="2"></rect><path d="M3 10.5h18M6.5 15h4"></path>') +
+      /* Named rather than hidden. Somebody hired this week wonders where their
+         hours go, and a tile saying we are building it answers that; an absence
+         does not. It is not a link, because there is nothing behind it yet and
+         a tile that goes nowhere is worse than one that says so. */
+      '<span class="tl tl--soon"><span class="tl__art">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle>' +
+        '<path d="M12 7v5.2l3.3 2"></path></svg></span>' +
+        '<span class="tl__l">Hours and timesheet<small>Still working on it</small></span></span>' +
       tile("#notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
     "</div>" +
 
