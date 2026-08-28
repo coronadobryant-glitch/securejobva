@@ -68,3 +68,32 @@ join pg_class c on c.oid = t.tgrelid
 where not t.tgisinternal
   and c.relname in ('applications', 'seat_requests', 'contact_messages')
 order by c.relname;
+
+
+-- --------------------------------------------------------------------------
+-- The hub tables
+-- --------------------------------------------------------------------------
+--
+-- 026 grants INSERT and UPDATE on these by COLUMN, so role_table_grants shows
+-- only SELECT and looks alarmingly bare. That view lists table-level privileges
+-- and nothing else; the column ones are here. Expect:
+--
+--   leave_requests  INSERT  application_id, ends_on, reason, starts_on
+--   leave_requests  UPDATE  decided_at, decided_by, status
+--   notices         INSERT  body, created_by, pinned, published_at, title
+--   notices         UPDATE  body, pinned, published_at, title
+--
+-- anon must not appear at all.
+
+select table_name, grantee, privilege_type,
+       string_agg(column_name, ', ' order by column_name) as columns
+from information_schema.column_privileges
+where table_name in ('leave_requests', 'notices')
+  and grantee in ('anon', 'authenticated')
+group by table_name, grantee, privilege_type
+order by table_name, privilege_type;
+
+-- And the fifth rung, which is what opens /hub at all.
+select pg_get_constraintdef(oid) as status_constraint
+from pg_constraint
+where conname = 'applications_status_check';
