@@ -309,6 +309,67 @@ is("a missing address still answers 200", noAddr.code, 200);
 is("and sends nothing", all.length, 0);
 is("and says so honestly", noAddr.body.told, false);
 
+/* ── the answer an applicant was promised ──────────────────────────────────
+   028 tells them we have it. Nothing told them what we decided: being hired or
+   turned down existed only as a rung on /status that changed quietly. */
+
+const STAGE = (status, over) => ({
+  type: "STATUS", event: "decided", table: "applications",
+  person: { name: "Maria Santos", email: "maria@example.com" },
+  record: { id: "a1", name: "Maria Santos", status, ...over }
+});
+
+await call(STAGE("assessment"));
+is("moving to the exams tells them", sent.body.to, ["maria@example.com"]);
+is("and says which exams", sent.body.text.includes("strengths test"), true);
+is("and greets them by first name", sent.body.text.startsWith("Hi Maria,"), true);
+
+await call(STAGE("interview"));
+is("the interviews email says there are two",
+  sent.body.text.includes("one on how you work"), true);
+
+await call(STAGE("approved"));
+is("approved repeats the training promise",
+  sent.body.subject, "You are through — paid training starts within a week");
+is("and matches what /status says", sent.body.text.includes("within a week"), true);
+
+await call(STAGE("hired"));
+is("hired says the portal is open", sent.body.subject, "You are on the team — your portal is open");
+is("and points at /hub", sent.body.text.includes("/hub"), true);
+
+/* The one that needed the most care. */
+const no = await call(STAGE("declined", { again: "2026-11-28" }));
+is("a decline is sent at all", no.body.told, true);
+is("the subject does not pre-announce the answer", sent.body.subject, "About your application");
+is("it gives a plain answer",
+  sent.body.text.includes("not taking your application forward"), true);
+is("it names the date they may apply again",
+  sent.body.text.includes("28 November 2026"), true);
+/* Sending someone to the careers page in the same breath as turning them down
+   is not a kindness, so this one carries no button at all. */
+is("a decline offers no button", /<a href/.test(sent.body.html), false);
+is("and does not apologise or explain itself away",
+  /sorry|unfortunately|regret/i.test(sent.body.text), false);
+
+/* The date has to agree with what the form will actually enforce. If it is
+   missing the email must still be sendable rather than saying "from ". */
+await call(STAGE("declined", { again: null }));
+is("no date still reads as a sentence",
+  sent.body.text.includes("apply again in three months"), true);
+is("and never leaves a dangling date", /from \./.test(sent.body.text), false);
+
+/* Nothing about an application email may carry the queue or anybody else. */
+is("no applicant email links the admin queue",
+  /\/admin/.test(sent.body.text + sent.body.html), false);
+is("and none names another address", /david@example\.com|bryant@example\.com/
+  .test(sent.body.text + sent.body.html), false);
+
+/* 'applied' is where they start — 028 already sent the receipt, and a second
+   email saying they have applied is one nobody needs. */
+const dup = await call(STAGE("applied"));
+is("no second email for merely having applied", dup.code, 200);
+is("and nothing is sent", all.length, 0);
+
 /* ── the retry rule, which is the whole point of splitting them ── */
 resendStatus = 500;
 is("a failed email to you is retried", (await call(WEEK)).code, 502);

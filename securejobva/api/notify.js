@@ -180,19 +180,111 @@ function firstName(s) {
   return String(s || "").trim().split(/\s+/)[0] || "there";
 }
 
-/* A button and a closing line, since every one of these ends the same way. */
+function fullDate(iso) {
+  const p = String(iso || "").split("-");
+  if (p.length !== 3) return "";
+  return Number(p[2]) + " " + MONTH[Number(p[1]) - 1] + " " + p[0];
+}
+
+/* A button and a closing line, since most of these end the same way. `where`
+   may be null: a decline gets no button, because the only page to send someone
+   to at that moment is the one advertising the job they did not get. */
 function wrap(paras, site, where, label) {
   return '<div style="font:15px/1.65 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;' +
       'color:#26374F;max-width:34rem">' +
     paras.join("") +
-    '<p><a href="' + esc(site) + esc(where) + '" ' +
-      'style="background:#0072EE;color:#fff;text-decoration:none;padding:10px 18px;' +
-      'border-radius:6px;display:inline-block">' + esc(label) + "</a></p>" +
+    (where
+      ? '<p><a href="' + esc(site) + esc(where) + '" ' +
+        'style="background:#0072EE;color:#fff;text-decoration:none;padding:10px 18px;' +
+        'border-radius:6px;display:inline-block">' + esc(label) + "</a></p>"
+      : "") +
     "<p>SecureJobVA</p>" +
   "</div>";
 }
 
+/* Every rung after the first, in the site's own words — the same sentences
+   /status shows, so an email and the page never describe the same moment
+   differently.
+
+   028 sends the receipt and stops. These are the answer it promised. */
+const STAGE_MAIL = {
+  assessment: {
+    subject: "Your application — the exams are next",
+    lead: "has moved on to the exams and strengths test",
+    body: "That is a written task in your track, the qualification exams, and " +
+      "the strengths test. We will be in touch with the detail.",
+    where: "/status", label: "See where you are"
+  },
+  interview: {
+    subject: "Your application — two interviews next",
+    lead: "has moved on to the interviews",
+    body: "There are two: one on how you work, and one on your setup and " +
+      "connection. We will be in touch to arrange them.",
+    where: "/status", label: "See where you are"
+  },
+  approved: {
+    subject: "You are through — paid training starts within a week",
+    lead: "has been approved",
+    body: "You are through. Paid training starts within a week, and we will be " +
+      "in touch with the dates.",
+    where: "/status", label: "See where you are"
+  },
+  hired: {
+    subject: "You are on the team — your portal is open",
+    lead: "is complete",
+    body: "You are on the team. Your portal is open now: it is where your hours " +
+      "go, where you ask for leave, and where you tell us how you would rather " +
+      "be paid.",
+    where: "/hub", label: "Open your portal"
+  }
+};
+
 const DECIDE = {
+  applications: {
+    decided: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name || r.name) + ",";
+
+      /* The one that had to be written carefully. Somebody has waited weeks for
+         it, and the two things it owes them are a plain answer and a date they
+         can act on — not an apology, and not a door left ambiguously ajar. */
+      if (r.status === "declined") {
+        const again = fullDate(r.again);
+        const when = again
+          ? "You are welcome to apply again from " + again + "."
+          : "You are welcome to apply again in three months.";
+        return {
+          subject: "About your application",
+          text: [hi, "",
+            "We are not taking your application forward this time. A person read " +
+              "it, and we said we would answer either way.",
+            "", when, "", "SecureJobVA"].join("\n"),
+          html: wrap([
+            "<p>" + esc(hi) + "</p>",
+            "<p>We are not taking your application forward this time. A person " +
+              "read it, and we said we would answer either way.</p>",
+            "<p>" + esc(when) + "</p>"
+          ], site, null, null)
+        };
+      }
+
+      const s = STAGE_MAIL[r.status];
+      if (!s) return null;
+      return {
+        subject: s.subject,
+        text: [hi, "",
+          "Your application " + s.lead + ".",
+          "", s.body,
+          "", "You can see where you are at " + site + s.where + ".",
+          "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>Your application <b>" + esc(s.lead) + "</b>.</p>",
+          "<p>" + esc(s.body) + "</p>"
+        ], site, s.where, s.label)
+      };
+    }
+  },
+
   timesheets: {
     /* To you and Bryant. The days are printed because a wrong number is the
        whole reason the queue exists, and it is only visible if the days are. */
@@ -376,6 +468,13 @@ async function decision(body, res, env) {
   }
 
   const m = shape(record, person, env.site);
+  /* A status with no message written for it. The trigger already filters, but
+     the two lists are in different files and only one of them can be right
+     when they disagree — so this refuses rather than throwing on m.subject. */
+  if (!m) {
+    return res.status(200).json({ skipped: String(body.table) + "/" + String(record.status) });
+  }
+
   const told = await send(env, { to: [who], subject: m.subject, text: m.text, html: m.html });
   return res.status(200).json({
     sent: told ? 1 : 0, table: body.table, event: "decided", told

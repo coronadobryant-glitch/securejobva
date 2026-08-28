@@ -11,6 +11,13 @@
 -- double entry", and they are told nothing at all — they find out only if they
 -- happen to open /hub. Leave has been the same since 026.
 --
+-- The worst of it is the applicant. careers.html promises that "a person reads
+-- every one and answers either way, usually within three working days", and
+-- 028 keeps the first half of that: they are told we have it. Nothing has ever
+-- told them the answer. Being hired, or being turned down, has existed only as
+-- a rung on /status that changed while nobody said so — which means the people
+-- who found out are the ones who thought to keep checking.
+--
 -- That is the failure this codebase keeps meeting from the other side: the
 -- thing worked, and the reporting of it did not.
 --
@@ -73,16 +80,31 @@ declare
   daysx   text    := '';
   payload jsonb;
 begin
-  select a.name, a.email into who
-  from public.applications a
-  where a.id = new.application_id;
+  -- An application IS the person; the other two only point at one. 028 already
+  -- mails the applicant when the row lands, and then said nothing ever again —
+  -- not when they were moved to the exams, not when they were hired, not when
+  -- they were turned down. careers.html promises "a person reads every one and
+  -- answers either way", and until this ran, the answer existed only as a rung
+  -- on /status that nobody told them had moved.
+  if tg_table_name = 'applications' then
+    who := new;
+  else
+    select a.name, a.email into who
+    from public.applications a
+    where a.id = new.application_id;
+  end if;
 
-  -- No address, nothing to send, and nothing worth failing an approval over.
+  -- No address, nothing to send, and nothing worth failing a decision over.
   if who is null or coalesce(btrim(who.email), '') = '' then
     return new;
   end if;
 
-  if tg_table_name = 'timesheets' then
+  if tg_table_name = 'applications' then
+    -- Every rung is either something they must now do or the answer itself,
+    -- so every one of them is worth an email. Nothing here is noise.
+    ev := case when new.status in ('assessment', 'interview', 'approved', 'hired', 'declined')
+               then 'decided' else null end;
+  elsif tg_table_name = 'timesheets' then
     ev := case when new.status = 'submitted' then 'arrived'
                when new.status in ('approved', 'returned') then 'decided'
                else null end;
@@ -116,6 +138,17 @@ begin
     'table', tg_table_name,
     'person', jsonb_build_object('name', who.name, 'email', who.email),
     'record', case tg_table_name
+      when 'applications' then jsonb_build_object(
+        'id',     new.id,
+        'status', new.status,
+        'name',   new.name,
+        -- The date they may apply again. Worked out here rather than in the
+        -- endpoint, and written with exactly the expression 027 uses —
+        -- coalesce(status_changed_at, created_at) — because a date in this
+        -- email that disagrees with the one the form enforces is worse than no
+        -- date at all: they come back when we told them to and are refused.
+        'again',  (coalesce(new.status_changed_at, new.created_at)
+                    + interval '3 months')::date)
       when 'timesheets' then jsonb_build_object(
         'id',             new.id,
         'status',         new.status,
@@ -167,6 +200,17 @@ revoke all on function public.notify_decision() from public, anon, authenticated
 --
 -- `of status` and the WHEN together mean a note being corrected, or a day's
 -- hours being edited, is not an email. Only the state changing is.
+
+-- 028 mails the applicant once, when the row lands. This is every rung after
+-- that. Separate from "notify-applications" rather than folded into it: that
+-- one is an INSERT webhook posting the whole row, this is an UPDATE posting a
+-- decision, and the two have different payloads and different retry rules.
+drop trigger if exists "notify-application-status" on public.applications;
+create trigger "notify-application-status"
+  after update of status on public.applications
+  for each row
+  when (old.status is distinct from new.status)
+  execute function public.notify_decision();
 
 drop trigger if exists "notify-timesheet-status" on public.timesheets;
 create trigger "notify-timesheet-status"
