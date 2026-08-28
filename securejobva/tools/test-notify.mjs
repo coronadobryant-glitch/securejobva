@@ -201,6 +201,122 @@ is("a refused confirmation still answers 200", half.code, 200);
 is("and reports it honestly", half.body.confirmed, false);
 is("and still counts your two", half.body.sent, 2);
 
+/* ── decisions, both directions ────────────────────────────────────────────
+   031 posts these rather than Supabase, because a timesheet carries no address
+   and the person is looked up in the database instead. The shape is different
+   from a webhook and so are the rules: one direction must be retried, the
+   other must never be. */
+
+const WEEK = {
+  type: "STATUS", event: "arrived", table: "timesheets",
+  person: { name: "Maricel Ordoñez", email: "maricel@example.com" },
+  record: { id: "t1", status: "submitted", week_starts_on: "2026-08-24",
+            note: null, hours: 38, days: "Mon 8 · Tue 8 · Wed 8 · Thu 7 · Fri 7" }
+};
+
+const decided = (over) => ({
+  ...WEEK, event: "decided",
+  record: { ...WEEK.record, ...over }
+});
+
+/* ── a week arriving ── */
+const arr = await call(WEEK);
+is("a sent week answers 200", arr.code, 200);
+is("it goes to you and Bryant", sent.body.to, ["david@example.com", "bryant@example.com"]);
+is("the subject names who and which week",
+  sent.body.subject, "Timesheet sent — Maricel Ordoñez, week of 24 August");
+is("reply reaches the assistant", sent.body.reply_to, "maricel@example.com");
+is("the total is in the body", sent.body.text.includes("Total: 38 hours"), true);
+is("the days are in the body", sent.body.text.includes("Mon 8 · Tue 8"), true);
+is("it links the queue", sent.body.text.includes("/admin"), true);
+is("only one email goes out", all.length, 1);
+
+/* ── approved ── */
+const app = await call(decided({ status: "approved" }));
+is("an approval answers 200", app.code, 200);
+is("and reports it was told", app.body.told, true);
+is("it goes to the assistant alone", sent.body.to, ["maricel@example.com"]);
+is("the subject says approved", sent.body.subject, "Your hours for 24 to 30 August are approved");
+is("it greets them by first name", sent.body.text.startsWith("Hi Maricel,"), true);
+is("it repeats the total", sent.body.text.includes("38 hours"), true);
+is("it points at their own page", sent.body.text.includes("/hub"), true);
+
+/* An assistant may forward this. It must carry neither the queue nor anybody
+   else's address — the same rule the applicant confirmation follows. */
+is("it does not link the admin queue", /\/admin/.test(sent.body.text + sent.body.html), false);
+is("it names nobody else", /david@example\.com|bryant@example\.com/
+  .test(sent.body.text + sent.body.html), false);
+
+/* ── sent back: the reason is the message ── */
+const back = await call(decided({ status: "returned", note: "Thursday looks like a double entry — can you check?" }));
+is("a send-back answers 200", back.code, 200);
+is("the subject asks for a change", sent.body.subject, "Your hours for 24 to 30 August need a change");
+is("the reason is in the plain text",
+  sent.body.text.includes("Thursday looks like a double entry"), true);
+is("the reason is in the HTML",
+  sent.body.html.includes("Thursday looks like a double entry"), true);
+is("it says the week is still open",
+  sent.body.text.includes("send it again"), true);
+/* Asserted on this one as well as the approval. Checking only the happy path
+   left the send-back free to point at /admin, and nothing went red when it
+   did — the two emails are written separately and have to be checked
+   separately. */
+is("the send-back points at their page, not the queue",
+  /\/hub/.test(sent.body.text + sent.body.html) &&
+  !/\/admin/.test(sent.body.text + sent.body.html), true);
+is("and names nobody else", /david@example\.com|bryant@example\.com/
+  .test(sent.body.text + sent.body.html), false);
+
+await call(decided({ status: "returned", note: null }));
+is("no note means no dangling colon", /with a note:/.test(sent.body.text), false);
+
+/* ── a week that crosses a month ── */
+await call(decided({ status: "approved", week_starts_on: "2026-08-31" }));
+is("a week spanning two months names both",
+  sent.body.subject, "Your hours for 31 August to 6 September are approved");
+
+/* ── leave, both ways ── */
+const LEAVE = {
+  type: "STATUS", table: "leave_requests",
+  person: { name: "Jomar Villanueva", email: "jomar@example.com" },
+  record: { id: "l1", status: "pending", starts_on: "2026-09-14", ends_on: "2026-09-18",
+            reason: "Family wedding in Cebu" }
+};
+await call({ ...LEAVE, event: "arrived" });
+is("leave asked for names the dates",
+  sent.body.subject, "Leave requested — Jomar Villanueva, 14 September to 18 September");
+is("the reason reaches you", sent.body.text.includes("Family wedding in Cebu"), true);
+
+await call({ ...LEAVE, event: "decided", record: { ...LEAVE.record, status: "approved" } });
+is("approved leave says so",
+  sent.body.subject, "Your leave for 14 September to 18 September is approved");
+await call({ ...LEAVE, event: "decided", record: { ...LEAVE.record, status: "declined" } });
+is("declined leave does not pretend",
+  sent.body.subject, "Your leave for 14 September to 18 September was not approved");
+is("and offers a way forward", sent.body.text.includes("ask again"), true);
+
+/* ── ignored quietly ── */
+is("an unknown event is skipped", (await call({ ...WEEK, event: "poked" })).code, 200);
+is("and sends nothing", sent, null);
+is("an unlisted table is skipped", (await call({ ...WEEK, table: "notices" })).code, 200);
+is("and sends nothing", sent, null);
+is("a status nobody hears about is skipped",
+  (await call({ ...WEEK, event: "decided", table: "timesheets", record: { ...WEEK.record, status: "draft" } })).code, 200);
+
+/* ── no address ── */
+const noAddr = await call({ ...decided({ status: "approved" }), person: { name: "Nobody", email: "" } });
+is("a missing address still answers 200", noAddr.code, 200);
+is("and sends nothing", all.length, 0);
+is("and says so honestly", noAddr.body.told, false);
+
+/* ── the retry rule, which is the whole point of splitting them ── */
+resendStatus = 500;
+is("a failed email to you is retried", (await call(WEEK)).code, 502);
+const lost = await call(decided({ status: "approved" }));
+is("a failed email to them is not", lost.code, 200);
+is("and is reported rather than hidden", lost.body.told, false);
+resendStatus = 200;
+
 console.log("");
 console.log(bad ? bad + " FAILED" : "all passed");
 console.log("");

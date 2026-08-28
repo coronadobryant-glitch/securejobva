@@ -2605,7 +2605,7 @@ function drawTimesheets(box, rows) {
             "</span>" +
             '<span class="pill pill--ts_' + esc(r.status) + '">' +
               esc(TS_LABEL[r.status] || r.status) + "</span>" +
-            '<span class="row__tot">' + esc(tsNum(tsTotal(r))) + " h</span></div>" +
+            '<span class="row__tot">' + esc(tsNum(tsTotal(r))) + " / 40 h</span></div>" +
             tsBreak(r) +
             (r.status === "submitted"
               ? '<div class="row__ctl">' +
@@ -3600,6 +3600,13 @@ function mondayOf(d) {
 }
 
 var DAY_NAME = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/* What a full week is. An employer sets the hours and 40 is the floor rather
+   than the ceiling, so this is shown as something to measure against and never
+   enforced — a week is not refused for being over it or under it. Printing the
+   total on its own left "18.5" meaning nothing without knowing what was
+   expected of it. */
+var WEEK_TARGET = 40;
 var TS_LABEL = { draft: "not sent yet", submitted: "waiting on us",
                  approved: "approved", returned: "sent back" };
 
@@ -3719,7 +3726,8 @@ function hoursCard() {
     "</div>" +
     '<div class="sheet">' + rows +
       '<div class="sum"><span class="sum__l">Total this week</span>' +
-      '<span class="sum__v">' + esc(showHours(total)) + " <small>hours</small></span></div>" +
+      '<span class="sum__v">' + esc(showHours(total)) +
+        " <small>of " + WEEK_TARGET + " hours</small></span></div>" +
     "</div>" +
     '<div class="edit__foot" style="margin-top:1rem">' + foot + "</div>" +
     pastWeeks();

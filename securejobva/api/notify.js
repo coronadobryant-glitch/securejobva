@@ -134,6 +134,165 @@ function esc(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/* ── decisions, in both directions ────────────────────────────────────────
+   Everything above hangs off a row landing from the public. This is the other
+   direction: a week of hours sent, leave asked for, and the answers to both.
+   Until this existed a week could be sent back with "Thursday looks like a
+   double entry" and the only way to find out was to open /hub and notice.
+
+   These arrive from the trigger in 031 rather than from a Supabase webhook,
+   because a timesheet carries an application_id and no address — the person it
+   is about is looked up in the database, where that is ordinary, and arrives
+   here already attached. This endpoint still holds no database credential and
+   still looks nothing up. */
+
+const MONTH = ["January", "February", "March", "April", "May", "June",
+               "July", "August", "September", "October", "November", "December"];
+
+/* Written out rather than handed to toLocaleDateString, which answers
+   differently depending on the locale of whatever machine happens to run this
+   and would make the wording of an email a property of the server. */
+function dayText(iso) {
+  const p = String(iso || "").split("-");
+  const d = Number(p[2]), m = Number(p[1]);
+  if (!d || !m) return String(iso || "");
+  return d + " " + MONTH[m - 1];
+}
+
+function weekText(iso) {
+  const p = String(iso || "").split("-").map(Number);
+  if (p.length !== 3 || !p[2]) return String(iso || "");
+  const end = new Date(Date.UTC(p[0], p[1] - 1, p[2] + 6));
+  const a = p[2], am = p[1];
+  const b = end.getUTCDate(), bm = end.getUTCMonth() + 1;
+  /* A week that stays in one month says the month once. */
+  return am === bm
+    ? a + " to " + b + " " + MONTH[bm - 1]
+    : a + " " + MONTH[am - 1] + " to " + b + " " + MONTH[bm - 1];
+}
+
+function hoursText(n) {
+  const v = Number(n || 0);
+  return (Math.round(v * 100) / 100).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function firstName(s) {
+  return String(s || "").trim().split(/\s+/)[0] || "there";
+}
+
+/* A button and a closing line, since every one of these ends the same way. */
+function wrap(paras, site, where, label) {
+  return '<div style="font:15px/1.65 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;' +
+      'color:#26374F;max-width:34rem">' +
+    paras.join("") +
+    '<p><a href="' + esc(site) + esc(where) + '" ' +
+      'style="background:#0072EE;color:#fff;text-decoration:none;padding:10px 18px;' +
+      'border-radius:6px;display:inline-block">' + esc(label) + "</a></p>" +
+    "<p>SecureJobVA</p>" +
+  "</div>";
+}
+
+const DECIDE = {
+  timesheets: {
+    /* To you and Bryant. The days are printed because a wrong number is the
+       whole reason the queue exists, and it is only visible if the days are. */
+    arrived: (r, p) => ({
+      subject: "Timesheet sent — " + (p.name || "an assistant") +
+        ", week of " + dayText(r.week_starts_on),
+      lines: [
+        ["Assistant", p.name],
+        ["Week", weekText(r.week_starts_on)],
+        ["Total", hoursText(r.hours) + " hours"],
+        ["Days", r.days]
+      ],
+      where: "/admin"
+    }),
+
+    decided: (r, p, site) => {
+      const week = weekText(r.week_starts_on);
+      const hi = "Hi " + firstName(p.name) + ",";
+
+      if (r.status === "approved") {
+        return {
+          subject: "Your hours for " + week + " are approved",
+          text: [hi, "",
+            "Your timesheet for " + week + " has been approved — " +
+              hoursText(r.hours) + " hours. Nothing else is needed from you for that week.",
+            "", "You can see it at " + site + "/hub.", "", "SecureJobVA"].join("\n"),
+          html: wrap([
+            "<p>" + esc(hi) + "</p>",
+            "<p>Your timesheet for <b>" + esc(week) + "</b> has been approved — <b>" +
+              esc(hoursText(r.hours)) + " hours</b>. Nothing else is needed from you " +
+              "for that week.</p>"
+          ], site, "/hub", "See your hours")
+        };
+      }
+
+      /* The one that actually had to exist. The reason is the message — an
+         email saying a week came back without saying why is the same silence
+         in a longer form. */
+      const why = String(r.note || "").trim();
+      return {
+        subject: "Your hours for " + week + " need a change",
+        text: [hi, "",
+          "Your timesheet for " + week + " has come back to you" +
+            (why ? " with a note:" : "."), "",
+          why ? "  " + why : "",
+          why ? "" : "",
+          "Change what needs changing and send it again. It stays open for " +
+            "editing until you do.",
+          "", "Open it at " + site + "/hub.", "", "SecureJobVA"]
+          .filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>Your timesheet for <b>" + esc(week) + "</b> has come back to you" +
+            (why ? " with a note:" : ".") + "</p>",
+          why ? '<p style="border-left:3px solid #FFC233;background:#FFF6E0;margin:0 0 16px;' +
+                'padding:10px 14px;color:#001232">' + esc(why) + "</p>" : "",
+          "<p>Change what needs changing and send it again. It stays open for " +
+            "editing until you do.</p>"
+        ], site, "/hub", "Open your timesheet")
+      };
+    }
+  },
+
+  leave_requests: {
+    arrived: (r, p) => ({
+      subject: "Leave requested — " + (p.name || "an assistant") + ", " +
+        dayText(r.starts_on) + " to " + dayText(r.ends_on),
+      lines: [
+        ["Assistant", p.name],
+        ["From", dayText(r.starts_on)],
+        ["To", dayText(r.ends_on)],
+        ["Reason", r.reason]
+      ],
+      where: "/admin"
+    }),
+
+    decided: (r, p, site) => {
+      const span = dayText(r.starts_on) + " to " + dayText(r.ends_on);
+      const hi = "Hi " + firstName(p.name) + ",";
+      const yes = r.status === "approved";
+      return {
+        subject: yes ? "Your leave for " + span + " is approved"
+                     : "Your leave for " + span + " was not approved",
+        text: [hi, "",
+          yes ? "Your leave for " + span + " has been approved."
+              : "Your leave for " + span + " has not been approved this time. " +
+                "If the dates could work differently, ask again or reply to this email.",
+          "", "You can see it at " + site + "/hub.", "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>Your leave for <b>" + esc(span) + "</b> " +
+            (yes ? "has been <b>approved</b>."
+                 : "has <b>not been approved</b> this time. If the dates could work " +
+                   "differently, ask again or reply to this email.") + "</p>"
+        ], site, "/hub", "See your leave")
+      };
+    }
+  }
+};
+
 /* Plain text alongside the HTML. A notification that arrives unreadable on a
    phone with images off is a notification that gets ignored. */
 function render(kind, row, site) {
@@ -159,6 +318,68 @@ function render(kind, row, site) {
     "</div>";
 
   return { text, html };
+}
+
+/* One place that talks to Resend, so the from address and the auth header are
+   written once rather than three times. Returns whether it landed; the caller
+   decides what that means. */
+async function send(env, msg) {
+  const r = await fetch(RESEND, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + env.key, "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ from: "SecureJobVA <" + env.from + ">" }, msg))
+  }).catch(() => null);
+  return !!(r && r.ok);
+}
+
+/* A decision, and which way it is going is the whole difference.
+
+   `arrived` goes to you and Bryant, and its failure must be retried — it is
+   the one holding somebody's answer, so its status code decides the response
+   exactly as an application's does.
+
+   `decided` goes to the assistant and is attempted once. Same rule the
+   applicant confirmation already follows: a dead address costs one missing
+   email, and never a webhook that mails the same decision forever. */
+async function decision(body, res, env) {
+  const shapes = DECIDE[body.table];
+  const shape = shapes && shapes[body.event];
+  const person = body.person || {};
+  const record = body.record || {};
+
+  /* A status nobody asked to hear about is ignored quietly, and 200 stops it
+     being retried for the rest of its life. */
+  if (!shape) {
+    return res.status(200).json({ skipped: String(body.table) + "/" + String(body.event) });
+  }
+
+  if (body.event === "arrived") {
+    const m = shape(record, person, env.site);
+    /* Rendered through the same function the other three notifications use, so
+       there is one table style and not a second one drifting away from it. */
+    const { text, html } = render({ lines: () => m.lines, where: m.where }, record, env.site);
+    const landed = await send(env, {
+      to: env.to,
+      reply_to: person.email || undefined,
+      subject: m.subject,
+      text, html
+    });
+    if (!landed) {
+      return res.status(502).json({ error: "resend refused", table: body.table });
+    }
+    return res.status(200).json({ sent: env.to.length, table: body.table, event: "arrived" });
+  }
+
+  const who = String(person.email || "").trim();
+  if (!who.includes("@")) {
+    return res.status(200).json({ sent: 0, table: body.table, event: "decided", told: false });
+  }
+
+  const m = shape(record, person, env.site);
+  const told = await send(env, { to: [who], subject: m.subject, text: m.text, html: m.html });
+  return res.status(200).json({
+    sent: told ? 1 : 0, table: body.table, event: "decided", told
+  });
 }
 
 export default async function handler(req, res) {
@@ -187,6 +408,13 @@ export default async function handler(req, res) {
   }
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+
+  /* A decision from 031 rather than a row landing. Handled first because it is
+     the one shape that is not a Supabase webhook and does not look like one. */
+  if (body.type === "STATUS") {
+    return decision(body, res, { key, to, from, site });
+  }
+
   const kind = KINDS[body.table];
 
   /* Not an error. A webhook on a table nobody asked to hear about should be

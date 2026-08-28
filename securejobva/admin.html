@@ -2277,7 +2277,7 @@ function drawTimesheets(box, rows) {
             "</span>" +
             '<span class="pill pill--ts_' + esc(r.status) + '">' +
               esc(TS_LABEL[r.status] || r.status) + "</span>" +
-            '<span class="row__tot">' + esc(tsNum(tsTotal(r))) + " h</span></div>" +
+            '<span class="row__tot">' + esc(tsNum(tsTotal(r))) + " / 40 h</span></div>" +
             tsBreak(r) +
             (r.status === "submitted"
               ? '<div class="row__ctl">' +
