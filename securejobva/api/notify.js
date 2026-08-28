@@ -227,6 +227,10 @@ const STAGE_MAIL = {
     lead: "has been approved",
     body: "You are through. Paid training starts within a week, and we will be " +
       "in touch with the dates.",
+    /* Its own paragraph, not a clause on the end of the good news. This is the
+       email somebody reads before rearranging a week around training, and a
+       condition on being paid is not a detail to bury. */
+    note: "Training is paid only if you are hired at the end of it.",
     where: "/status", label: "See where you are"
   },
   hired: {
@@ -274,12 +278,17 @@ const DECIDE = {
         text: [hi, "",
           "Your application " + s.lead + ".",
           "", s.body,
+          ...(s.note ? ["", s.note] : []),
           "", "You can see where you are at " + site + s.where + ".",
           "", "SecureJobVA"].join("\n"),
         html: wrap([
           "<p>" + esc(hi) + "</p>",
           "<p>Your application <b>" + esc(s.lead) + "</b>.</p>",
-          "<p>" + esc(s.body) + "</p>"
+          "<p>" + esc(s.body) + "</p>",
+          s.note
+            ? '<p style="border-left:3px solid #FFC233;background:#FFF6E0;margin:0 0 16px;' +
+              'padding:10px 14px;color:#001232">' + esc(s.note) + "</p>"
+            : ""
         ], site, s.where, s.label)
       };
     }

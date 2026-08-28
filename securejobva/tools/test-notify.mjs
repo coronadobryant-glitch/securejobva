@@ -332,6 +332,14 @@ await call(STAGE("approved"));
 is("approved repeats the training promise",
   sent.body.subject, "You are through — paid training starts within a week");
 is("and matches what /status says", sent.body.text.includes("within a week"), true);
+/* Somebody reads this before rearranging a week around training. The condition
+   on being paid rides in both parts or it is not really stated. */
+is("it says training is paid only if they are hired",
+  sent.body.text.includes("paid only if you are hired"), true);
+is("and says it in the HTML too",
+  sent.body.html.includes("paid only if you are hired"), true);
+is("the condition is its own paragraph, not a clause on the good news",
+  /<p[^>]*>Training is paid only if/.test(sent.body.html), true);
 
 await call(STAGE("hired"));
 is("hired says the portal is open", sent.body.subject, "You are on the team — your portal is open");
