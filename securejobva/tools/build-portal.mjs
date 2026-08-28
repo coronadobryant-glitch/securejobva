@@ -289,14 +289,14 @@ const PAGE_CSS = `
 .edit__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid var(--line)}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
-.adm__wrap{display:grid;grid-template-columns:1fr;gap:1rem;align-items:start}
-@media(min-width:900px){.adm__wrap{grid-template-columns:13rem 1fr;gap:1.4rem}}
+.adm__wrap{display:grid;grid-template-columns:1fr;gap:0;align-items:stretch;min-height:100vh}
+@media(min-width:900px){.adm__wrap{grid-template-columns:16rem 1fr}}
 .adm__main{min-width:0}
-.rail{display:flex;flex-direction:column;gap:.12rem;background:var(--ink);border-radius:8px;padding:.7rem .55rem;position:sticky;top:1rem}
-@media(max-width:899px){.rail{position:static;flex-direction:row;flex-wrap:wrap;gap:.3rem}}
+.rail{display:flex;flex-direction:column;gap:.12rem;background:var(--ink);border-radius:0;padding:0 0 1rem;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
+@media(max-width:899px){.rail{position:static;flex-direction:column;max-height:none;gap:.12rem}}
 .rail__k{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:#5C769A;padding:.75rem .5rem .25rem}
 @media(max-width:899px){.rail__k{display:none}}
-.rnav{display:flex;align-items:center;gap:.5rem;width:100%;padding:.42rem .55rem;border:0;border-radius:5px;background:none;color:#B9C8DE;font:inherit;font-size:.87rem;text-align:left;cursor:pointer}
+.rnav{display:flex;align-items:center;gap:.5rem;width:100%;padding:.42rem .9rem;border:0;border-left:2px solid transparent;border-radius:0;background:none;color:#B9C8DE;font:inherit;font-size:.87rem;text-align:left;cursor:pointer}
 @media(max-width:899px){.rnav{width:auto;font-size:.82rem}}
 .rnav:hover{background:rgba(255,255,255,.06);color:#fff}
 .rnav.is-on{background:var(--accent);color:var(--accent-ink);font-weight:600}
@@ -305,6 +305,30 @@ const PAGE_CSS = `
 .rnav__n:empty{display:none}
 .rnav.is-on .rnav__n{background:rgba(0,0,0,.22)}
 .rnav__n.is-warn{background:var(--signal);color:var(--signal-ink)}
+body:has(.adm__wrap) main{padding:0}
+.rail__brand{display:flex;align-items:center;gap:.1rem;padding:1rem .9rem .2rem;color:#fff;font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;font-size:1.05rem;text-decoration:none}
+.rail__brand b{color:var(--accent)}
+.rail__me{display:flex;align-items:center;gap:.5rem;padding:.35rem .9rem 1rem;color:#8FA5C4;font-size:.74rem;line-height:1.35;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:.3rem}
+.rail__me b{display:block;color:#DCE6F5;font-size:.82rem}
+.rail__me .who__av{width:26px;height:26px;flex:0 0 auto}
+.rnav.is-on{border-left-color:var(--accent);background:rgba(255,255,255,.07);color:#fff}
+.rail__k{padding-left:.9rem}
+.rail__foot{margin-top:auto;padding:1rem .9rem 0;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:.15rem}
+.rlink{color:#B9C8DE;font-size:.82rem;text-decoration:none;padding:.15rem 0}
+.rlink:hover{color:#fff}
+.rail__tiny{font-size:.68rem;color:#6F87A8;line-height:1.5;margin-top:.35rem}
+.rail__tiny a{color:#6F87A8}
+.rail__acts{display:flex;gap:.4rem;margin-top:.6rem}
+.rbtn{font:inherit;font-size:.76rem;color:#B9C8DE;background:none;border:1px solid rgba(255,255,255,.18);border-radius:5px;padding:.25rem .6rem;cursor:pointer}
+.rbtn:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+.adm__main{display:flex;flex-direction:column;background:var(--surface-2,var(--paper))}
+.adm__top{background:var(--ink);color:#fff;padding:.9rem 1.2rem;display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+.adm__top h2{margin:0;font-size:1.3rem;color:#fff;font-family:"IBM Plex Sans Condensed",sans-serif}
+.adm__top .k{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:#7C93B4;display:block}
+.adm__topn{margin-left:auto;text-align:right}
+.adm__topn b{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.adm__topn span{font-size:.72rem;color:#7C93B4}
+.adm__canvas{padding:1.1rem 1.2rem 2.5rem}
 .kpis{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));margin-bottom:1rem}
 .kpis:empty{display:none}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:.7rem .85rem}
@@ -822,7 +846,7 @@ function shell(o) {
     "",
     SVG_DEFS,
     "",
-    '<header class="nav">',
+    ...(o.app ? [] : ['<header class="nav">',
     '  <div class="wrap">',
     '    <div class="nav__in">',
     '      <a class="brand" href="/" aria-label="SecureJobVA home">',
@@ -839,13 +863,13 @@ function shell(o) {
     "      </div>",
     "    </div>",
     "  </div>",
-    "</header>",
+"</header>"]),
     "",
     "<main>",
     o.body,
     "</main>",
     "",
-    '<footer class="foot">',
+    ...(o.app ? [] : ['<footer class="foot">',
     '  <div class="wrap">',
     '    <div class="foot__bot" style="margin-top:0;border-top:0;padding-top:0">',
     '      <span>&copy; 2026 Secure Job VA &middot; Houston, Texas</span>',
@@ -859,7 +883,7 @@ function shell(o) {
     "      </span>",
     "    </div>",
     "  </div>",
-    "</footer>",
+"</footer>"]),
     "",
     "<script>",
     "/* Theme toggle, same behaviour as the rest of the site. */",
@@ -2357,6 +2381,8 @@ function drawKpis() {
     tile(UNREAD, "unanswered messages", "warn");
 
   badge("tab-apps", ALL.length);
+  var n = document.getElementById("top-n");
+  if (n) n.textContent = String(live.length);
 }
 
 var UNREAD = 0;
@@ -2371,6 +2397,14 @@ function wireTabs() {
     bar.querySelectorAll("[data-tab]").forEach(function (x) {
       x.classList.toggle("is-on", x === b);
     });
+    var top = document.querySelector(".adm__top h2");
+    var k = document.querySelector(".adm__top .k");
+    if (top) top.textContent = b.textContent.replace(/d+$/, "").trim();
+    if (k) {
+      var grp = b.previousElementSibling;
+      while (grp && !grp.classList.contains("rail__k")) grp = grp.previousElementSibling;
+      k.textContent = grp ? grp.textContent : "";
+    }
     root.querySelectorAll("[data-pane]").forEach(function (p) {
       if (p.getAttribute("data-pane") === want) p.removeAttribute("hidden");
       else p.setAttribute("hidden", "");
@@ -3066,12 +3100,6 @@ function render(email, apps, notes, socials, docs, disc) {
 
   lead.textContent = "Signed in as " + email + ".";
   view(
-    '<div class="who">' +
-      '<div class="who__id"><span class="who__av">' + esc(email.charAt(0).toUpperCase()) + "</span>" +
-      '<span class="who__t"><span class="who__n">Administrator</span>' +
-      '<span class="who__e">' + esc(email) + "</span></span></div>" +
-      '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
-    "</div>" +
     '<div class="adm__bar">' +
       '<input id="q" type="search" aria-label="Search applications" ' +
         'placeholder="Search name, email, country, region, track">' +
@@ -3102,6 +3130,13 @@ function render(email, apps, notes, socials, docs, disc) {
        hidden is six things that cannot ask for attention. */
     '<div class="adm__wrap">' +
     '<nav class="rail" id="tabs" aria-label="Sections">' +
+      /* The brand and the person, which the site header and the who-row used to
+         carry between them. Both moved here rather than being dropped: an
+         application keeps who you are in the corner of the furniture, not in a
+         band across the top of the work. */
+      '<a class="rail__brand" href="/">SecureJob<b>VA</b></a>' +
+      '<span class="rail__me"><span class="who__av">' + esc(email.charAt(0).toUpperCase()) + "</span>" +
+        "<span><b>Administrator</b>" + esc(email) + "</span></span>" +
       '<span class="rail__k">The queue</span>' +
       '<button class="rnav is-on" data-tab="apps" type="button">' + ICON.apps +
         'Applications<span class="rnav__n" id="tab-apps"></span></button>' +
@@ -3119,8 +3154,38 @@ function render(email, apps, notes, socials, docs, disc) {
       (can("accounts.manage")
         ? '<button class="rnav" data-tab="accts" type="button">' + ICON.accts + "Accounts</button>"
         : "") +
+
+      /* Everything the header and the footer used to offer, put back. Nothing
+         became unreachable: Careers, Home, Privacy, Terms, Refunds, Contact and
+         the applicant's own page are all still one click away, and the theme
+         toggle keeps the id the theme script looks for. They are down here
+         because they are somebody else's links — a visitor's — and a desk
+         should not open with them across the top. */
+      '<span class="rail__foot">' +
+        '<span class="rail__k">Elsewhere</span>' +
+        '<a class="rlink" href="/status">Your application</a>' +
+        '<a class="rlink" href="/hub">Assistant portal</a>' +
+        '<a class="rlink" href="/careers">Careers</a>' +
+        '<a class="rlink" href="/">Home</a>' +
+        '<span class="rail__tiny">' +
+          '<a href="/privacy">Privacy</a> &middot; <a href="/terms">Terms</a> &middot; ' +
+          '<a href="/refunds">Refunds</a> &middot; <a href="/contact">Contact</a>' +
+        "</span>" +
+        '<span class="rail__acts">' +
+          '<button class="rbtn" id="themetog" type="button" aria-label="Switch theme">Theme</button>' +
+          '<button class="rbtn" id="out" type="button">Sign out</button>' +
+        "</span>" +
+        '<span class="rail__tiny">&copy; 2026 Secure Job VA &middot; Houston, Texas</span>' +
+      "</span>" +
     "</nav>" +
     '<div class="adm__main">' +
+    /* The band an application has and a page does not: where you are, and the
+       one number that decides whether you can close the tab. */
+    '<div class="adm__top">' +
+      '<span><span class="k">The queue</span><h2>Applications</h2></span>' +
+      '<span class="adm__topn"><b id="top-n">&mdash;</b><span>waiting on you</span></span>' +
+    "</div>" +
+    '<div class="adm__canvas">' +
     '<div data-pane="apps">' +
     '<div class="kpis" id="kpis"></div>' +
     (can("analytics.view") ? '<div id="stats-card"></div>' : "") +
@@ -3135,7 +3200,7 @@ function render(email, apps, notes, socials, docs, disc) {
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "") +
-    "</div></div>"
+    "</div></div></div>"
   );
 
   document.getElementById("out").addEventListener("click", signOut);
@@ -3239,6 +3304,7 @@ start();
 `.trim();
 
 writeFileSync("admin.html", shell({
+  app: true,
   title: "Admin portal — SecureJobVA",
   links: [
     '        <a href="/status">Your application</a>',

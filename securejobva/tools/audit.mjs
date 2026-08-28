@@ -85,7 +85,14 @@ const cols = new Set([...table.matchAll(/^\s{2}([a-z_]+)\s+/gm)].map((m) => m[1]
 sent.filter((k) => !cols.has(k)).forEach((k) => note("contact.html", "no column for form field", k));
 
 /* ── cross-page links that do not correspond to a built route ── */
-const routes = new Set(["/", "/careers", "/status", "/admin", "/privacy", "/terms", "/refunds", "/contact", "/seats"]);
+/* Read from build.mjs rather than written down here. This list was a copy of
+   the one in build.mjs and went stale the day /hub was added: the audit then
+   reported a link to a page that exists and is deployed. A second copy of a
+   list is a list that will disagree with the first. */
+const routes = new Set(
+  [...readFileSync("build.mjs", "utf8").matchAll(/^\s*path:\s*"([^"]+)"/gm)].map((m) => m[1])
+);
+if (routes.size < 5) throw new Error("could not read the routes out of build.mjs");
 for (const f of PAGES) {
   const h = readFileSync(f, "utf8");
   [...h.matchAll(/href="(\/[^"#?]*)/g)].map((m) => m[1])
