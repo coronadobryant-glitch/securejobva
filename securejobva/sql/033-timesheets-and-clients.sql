@@ -29,11 +29,14 @@ alter table public.timesheets
 create index if not exists timesheets_placement_idx
   on public.timesheets (placement_id, week_starts_on desc);
 
--- Deliberately not granted to anybody. The page never sends it and could not
--- if it tried: a trigger writes columns the caller has no privilege on, which
--- is the same reason 030 stamps submitted_at and decided_by rather than
--- trusting a request body. Who a week is billed to is not a claim a browser
--- gets to make.
+-- Readable, and writable by nobody. 030 grants SELECT on this table rather
+-- than column by column, so this column is readable by anyone who can already
+-- see the row — deliberately, because both sides need to know which placement
+-- a week belongs to. It appears in neither write list, so the page never sends
+-- it and could not if it tried: a trigger writes columns the caller has no
+-- privilege on, the same reason 030 stamps submitted_at and decided_by rather
+-- than trusting a request body. Who a week is billed to is not a claim a
+-- browser gets to make.
 --
 -- 'matched' is excluded because nobody has started: a week of hours against a
 -- placement that has not begun is a week worked for somebody they have only

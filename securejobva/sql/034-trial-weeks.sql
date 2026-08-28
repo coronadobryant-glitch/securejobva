@@ -33,8 +33,19 @@
 alter table public.timesheets
   add column if not exists trial_week boolean not null default false;
 
--- Not granted to anybody, for the same reason placement_id is not: whether a
--- week is chargeable is not a claim a browser gets to make.
+-- Readable, and writable by nobody.
+--
+-- 030 grants SELECT on this table rather than column by column, so a column
+-- added here is readable by anyone who can already see the row — which is what
+-- the client's page needs, since it has to know a week is on us to show it as
+-- such. What it is not in is either write list: INSERT names
+-- (application_id, week_starts_on) and UPDATE names (status, note). So whether
+-- a week is chargeable is not a claim a browser gets to make, which is the
+-- half that matters.
+--
+-- placement_id in 033 is the same: readable, never writable. Said plainly here
+-- because "not granted" would be wrong, and a comment that misstates who can
+-- read something is worse than no comment at all.
 
 -- ==========================================================================
 -- THE TRIGGER, REPLACED
