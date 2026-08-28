@@ -2179,8 +2179,20 @@ html{scroll-behavior:smooth}
       document.getElementById("apply-done-h").textContent = "Application in.";
       document.getElementById("apply-done-p").textContent =
         "We have it, and a confirmation is on its way to " + d.email +
-        ". A person reads every application and answers either way, usually within three working days.";
-      actions.innerHTML = "<a class=\"btn btn--ghost\" href=\"#requirements\" id=\"apply-close2\">Back to the page</a>";
+        ". A person reads every application and answers either way, usually within three working days. " +
+        "You can watch where it has got to on your own page.";
+      /* The only way out of this screen used to be back to the marketing page,
+         which is the one place somebody who has just applied has no more use
+         for. Their own page is the thing they now have — it shows the stage
+         their application is at, and it is where the email we just sent them
+         points as well.
+
+         Both buttons, not one: closing the dialog and staying is still a
+         perfectly reasonable thing to want, and it is what the close control
+         above already does. This only changes which of the two is the offer. */
+      actions.innerHTML =
+        "<a class=\"btn btn--solid\" href=\"/status\">See your application</a>" +
+        "<a class=\"btn btn--ghost\" href=\"#requirements\" id=\"apply-close2\">Back to the page</a>";
     } else {
       document.getElementById("apply-done-h").textContent = "One tap left.";
       document.getElementById("apply-done-p").textContent =
