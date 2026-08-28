@@ -566,6 +566,89 @@ await check("the portal survives 030 not being pasted yet", () => {
   return "caught, flagged, and a signed-out session still rethrows";
 });
 
+/* ── 032, the two rates ──────────────────────────────────────────────────
+   Your cut is the gap between two numbers, and it stays confidential only
+   because neither side can reach the other's. That property lives entirely in
+   two policy bodies naming two different functions. Nothing about the page
+   protects it, and nothing about it fails loudly when it goes. */
+
+await check("neither side of a placement can read the other's rate", () => {
+  const billing = policyBody("a client reads what they are charged");
+  const pay = policyBody("an assistant reads what they are paid");
+
+  if (!/is_placement_client\s*\(/i.test(billing)) {
+    throw new Error("the billing rate is not fenced to the client of that placement");
+  }
+  if (/is_placement_assistant\s*\(/i.test(billing)) {
+    throw new Error("an assistant can read what the client is charged — that is the cut, " +
+      "visible to the person on the other side of it");
+  }
+  if (!/is_placement_assistant\s*\(/i.test(pay)) {
+    throw new Error("the pay rate is not fenced to the assistant on that placement");
+  }
+  if (/is_placement_client\s*\(/i.test(pay)) {
+    throw new Error("a client can read what the assistant is paid — that is the cut, " +
+      "visible to the person paying it");
+  }
+  return "billing to the client, pay to the assistant, staff to both";
+});
+
+/* Two rates on one row cannot be fenced: a column grant separates roles, and a
+   client and an assistant are both `authenticated`. The moment either rate is
+   moved onto placements, the policy protecting it protects nothing. */
+await check("the two rates are not on the same table", () => {
+  const cols = Object.keys(columns(sql, "placements"));
+  const money = cols.filter((c) => /rate|salary|pay|charge|cost|price/i.test(c));
+  if (money.length) {
+    throw new Error(money.join(", ") + " on placements — both sides can read that row, so a " +
+      "rate living on it is readable by whichever of them was not meant to see it. " +
+      "Rates belong in placement_billing and placement_pay.");
+  }
+  for (const t of ["placement_billing", "placement_pay"]) {
+    const c = Object.keys(columns(sql, t));
+    if (!c.includes("rate")) throw new Error(t + " has no rate column");
+    if (c.length > 2) {
+      throw new Error(t + " carries more than a placement and a rate (" + c.join(", ") +
+        ") — anything else added here inherits that table's audience");
+    }
+  }
+  return "placements holds no money; one rate per table";
+});
+
+/* The assistant must not learn from a page that a client asked to replace
+   them. Only two things may read that table: the client who asked, and staff. */
+await check("an assistant cannot read a swap request about them", () => {
+  const p = policyBody("a client reads their own swap requests");
+  if (/is_placement_assistant\s*\(|owns_application\s*\(/i.test(p)) {
+    throw new Error("the assistant can read swap requests — somebody would find out from a " +
+      "portal that a client asked for them to be replaced");
+  }
+  if (!/is_placement_client\s*\(/i.test(p)) {
+    throw new Error("swap requests are not fenced to the client who raised them");
+  }
+  return "the client who asked, and staff";
+});
+
+await check("only one placement per assistant can be live", () => {
+  if (!/create\s+unique\s+index[\s\S]{0,200}?on\s+public\.placements\s*\(application_id\)[\s\S]{0,120}?where\s+status\s+in\s*\(\s*'matched'\s*,\s*'trial'\s*,\s*'ongoing'\s*\)/i.test(sql)) {
+    throw new Error("nothing stops a second live placement, so an assistant can be billed to " +
+      "two clients for the same hours");
+  }
+  return "partial unique index on the live states";
+});
+
+await check("anon holds nothing on the placement tables", () => {
+  for (const t of ["clients", "placements", "placement_billing", "placement_pay", "swap_requests"]) {
+    if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
+      throw new Error("nothing revokes anon on " + t);
+    }
+    if (!new RegExp("alter\\s+table\\s+public\\." + t + "\\s+enable\\s+row\\s+level\\s+security", "i").test(sql)) {
+      throw new Error("row-level security is never enabled on " + t);
+    }
+  }
+  return "five tables, all revoked and all RLS on";
+});
+
 await check("anon holds nothing on the timesheet tables", () => {
   for (const t of ["timesheets", "timesheet_days"]) {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
