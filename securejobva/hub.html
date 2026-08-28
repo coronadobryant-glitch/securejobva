@@ -539,8 +539,7 @@ img{max-width:100%}
 .rnav__n:empty{display:none}
 .rnav.is-on .rnav__n{background:rgba(0,0,0,.22)}
 .rnav__n.is-warn{background:var(--signal);color:var(--signal-ink)}
-.kpis{display:grid;gap:.7rem;grid-template-columns:repeat(2,1fr);margin-bottom:1rem}
-@media(min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpis{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));margin-bottom:1rem}
 .kpis:empty{display:none}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:.7rem .85rem}
 .kpi b{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:1.55rem;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}

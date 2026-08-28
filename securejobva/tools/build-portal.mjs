@@ -305,8 +305,7 @@ const PAGE_CSS = `
 .rnav__n:empty{display:none}
 .rnav.is-on .rnav__n{background:rgba(0,0,0,.22)}
 .rnav__n.is-warn{background:var(--signal);color:var(--signal-ink)}
-.kpis{display:grid;gap:.7rem;grid-template-columns:repeat(2,1fr);margin-bottom:1rem}
-@media(min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpis{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));margin-bottom:1rem}
 .kpis:empty{display:none}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:.7rem .85rem}
 .kpi b{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:1.55rem;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
@@ -1406,7 +1405,7 @@ const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead
 
 const ADMIN_BODY = [
   '  <section class="pt">',
-  '    <div class="wrap" style="max-width:60rem">',
+  '    <div class="wrap" style="max-width:96rem">',
   '      <div class="pt__head">',
   '        <span class="eyebrow">Internal</span>',
   /* It was "Applications.", which is one of six things this page does and the
@@ -1978,7 +1977,8 @@ function drawStats() {
      going quiet, because a blank is ambiguous. */
   var lateCls = late > 0 ? " tile--warn" : "";
 
-  var tiles =
+  var tiles = "";
+  var unusedTiles =
     '<div class="tiles">' +
       '<div class="tile"><span class="tile__n">' + total + '</span><span class="tile__l">Applications</span></div>' +
       '<div class="tile' + lateCls + '"><span class="tile__n">' + late + "</span>" +
@@ -1990,7 +1990,7 @@ function drawStats() {
   box.className = "card";
   box.style.marginBottom = "1.6rem";
   box.innerHTML =
-    '<h2 class="edit__h">At a glance</h2>' +
+    '<h2 class="edit__h">Breakdown</h2>' +
     tiles +
     '<div class="barsgrid">' +
       bars("Pipeline", countBy(ALL, "pipeline"), PIPE, PIPE_LABEL) +
@@ -2342,9 +2342,17 @@ function drawKpis() {
     return '<div class="kpi' + (kind && n ? " kpi--" + kind : "") + '">' +
       "<b>" + n + "</b><span>" + label + "</span></div>";
   };
+  /* "Applied this week" came off the At a glance card, which used to print its
+     own four numbers directly under these. Two rows of tiles saying 2 and 0 at
+     each other is worse than either alone, so that card keeps the three
+     breakdowns nobody else shows and gives up the counting. */
+  var weekCut = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  var week = ALL.filter(function (a) { return new Date(a.created_at).getTime() >= weekCut; });
+
   box.innerHTML =
     tile(late.length, "waiting over 3 days", "warn") +
     tile(live.length, "in the queue") +
+    tile(week.length, "applied this week") +
     tile(hired.length, "hired", "good") +
     tile(UNREAD, "unanswered messages", "warn");
 
