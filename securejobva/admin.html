@@ -523,6 +523,31 @@ img{max-width:100%}
 .edit__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid var(--line)}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
+.adm__wrap{display:grid;grid-template-columns:1fr;gap:1rem;align-items:start}
+@media(min-width:900px){.adm__wrap{grid-template-columns:13rem 1fr;gap:1.4rem}}
+.adm__main{min-width:0}
+.rail{display:flex;flex-direction:column;gap:.12rem;background:var(--ink);border-radius:8px;padding:.7rem .55rem;position:sticky;top:1rem}
+@media(max-width:899px){.rail{position:static;flex-direction:row;flex-wrap:wrap;gap:.3rem}}
+.rail__k{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:#5C769A;padding:.75rem .5rem .25rem}
+@media(max-width:899px){.rail__k{display:none}}
+.rnav{display:flex;align-items:center;gap:.5rem;width:100%;padding:.42rem .55rem;border:0;border-radius:5px;background:none;color:#B9C8DE;font:inherit;font-size:.87rem;text-align:left;cursor:pointer}
+@media(max-width:899px){.rnav{width:auto;font-size:.82rem}}
+.rnav:hover{background:rgba(255,255,255,.06);color:#fff}
+.rnav.is-on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.rnav svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.rnav__n{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.68rem;background:rgba(255,255,255,.14);color:#fff;border-radius:9px;padding:0 .34rem;min-width:1.1rem;text-align:center}
+.rnav__n:empty{display:none}
+.rnav.is-on .rnav__n{background:rgba(0,0,0,.22)}
+.rnav__n.is-warn{background:var(--signal);color:var(--signal-ink)}
+.kpis{display:grid;gap:.7rem;grid-template-columns:repeat(2,1fr);margin-bottom:1rem}
+@media(min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpis:empty{display:none}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:.7rem .85rem}
+.kpi b{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:1.55rem;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
+.kpi span{display:block;font-size:.76rem;color:var(--muted);margin-top:.1rem}
+.kpi--warn{border-color:var(--signal)}
+.kpi--warn b{color:var(--signal-ink)}
+.kpi--good b{color:#0B7A63}
 .hub__hi{text-align:center;margin:1.6rem 0 1.4rem}
 .hub__hi h2{font-size:1.6rem;margin:0 0 .2rem}
 .hub__hi p{margin:0;color:var(--muted);font-size:.95rem}
@@ -1976,6 +2001,63 @@ function drawCalendar() {
       : '<p class="msg" style="margin-top:1rem">Nothing upcoming.</p>');
 }
 
+/* One <svg> each, written once. Inline rather than a sprite because the page is
+   a single file by design and a sprite would be a second request for eight
+   shapes. */
+var ICON = (function () {
+  var s = function (d) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + "</svg>";
+  };
+  return {
+    apps:    s('<path d="M4 6h16M4 12h16M4 18h10"></path>'),
+    cal:     s('<rect x="3.5" y="5" width="17" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>'),
+    inbox:   s('<path d="M4 5.5h16v13H8l-4 3z"></path>'),
+    seats:   s('<path d="M4 20V9l8-5 8 5v11"></path><path d="M9.5 20v-6h5v6"></path>'),
+    clients: s('<circle cx="12" cy="12" r="8.5"></circle><path d="M3.5 12h17M12 3.5c4 4.5 4 12.5 0 17M12 3.5c-4 4.5-4 12.5 0 17"></path>'),
+    team:    s('<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5"></path><path d="M17 6.5a3.5 3.5 0 010 7"></path>'),
+    accts:   s('<path d="M12 3.5l7 3.2v5.6c0 4.2-2.8 7.2-7 8.2-4.2-1-7-4-7-8.2V6.7z"></path>')
+  };
+})();
+
+/* A count on a rail item, or nothing at all when there is nothing to say. A
+   badge showing 0 is noise pretending to be information. */
+function badge(id, n) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = n ? String(n) : "";
+  el.classList.toggle("is-warn", id === "tab-unread" || id === "tab-leave" ? !!n : false);
+}
+
+/* The summary. It answers "what needs me" before anything is read, which the
+   page could not do at all: it opened on every application ever received with
+   nothing marking the one that has been waiting a week.
+
+   Three days is not an arbitrary threshold — careers.html promises an answer
+   either way "usually within three working days", so a row past it is a
+   promise going stale. */
+function drawKpis() {
+  var box = document.getElementById("kpis");
+  if (!box) return;
+  var live = ALL.filter(function (a) { return a.status !== "declined" && a.status !== "hired"; });
+  var cut = Date.now() - 3 * 24 * 60 * 60 * 1000;
+  var late = live.filter(function (a) { return new Date(a.created_at).getTime() < cut; });
+  var hired = ALL.filter(function (a) { return a.status === "hired"; });
+
+  var tile = function (n, label, kind) {
+    return '<div class="kpi' + (kind && n ? " kpi--" + kind : "") + '">' +
+      "<b>" + n + "</b><span>" + label + "</span></div>";
+  };
+  box.innerHTML =
+    tile(late.length, "waiting over 3 days", "warn") +
+    tile(live.length, "in the queue") +
+    tile(hired.length, "hired", "good") +
+    tile(UNREAD, "unanswered messages", "warn");
+
+  badge("tab-apps", ALL.length);
+}
+
+var UNREAD = 0;
+
 function wireTabs() {
   var bar = document.getElementById("tabs");
   if (!bar) return;
@@ -2182,6 +2264,7 @@ function loadSeats() {
 }
 
 function drawSeats(box, rows) {
+  badge("tab-seats", rows.filter(function (r) { return r.status !== "closed"; }).length);
   if (!rows.length) {
     box.innerHTML = '<h2 class="edit__h">Seat requests</h2><p class="msg">Nobody has asked for a seat yet.</p>';
     return;
@@ -2269,6 +2352,12 @@ function drawInbox(box, rows) {
   var open = rows.filter(function (r) { return !r.handled_at; });
   var badge = document.getElementById("tab-unread");
   if (badge) badge.textContent = open.length ? String(open.length) : "";
+  if (badge) badge.classList.toggle("is-warn", !!open.length);
+  /* The summary tile needs this number and the inbox is the only thing that
+     knows it. It loads on its own schedule, so the tiles are redrawn when it
+     arrives rather than being left showing a stale zero. */
+  UNREAD = open.length;
+  drawKpis();
 
   if (!rows.length) {
     box.innerHTML = '<h2 class="edit__h">Messages</h2><p class="msg">Nothing yet.</p>';
@@ -2485,6 +2574,7 @@ function addNote(row) {
 }
 
 function paint() {
+  drawKpis();
   var shown = shownRows();
   document.getElementById("count").textContent =
     shown.length + " of " + ALL.length;
@@ -2702,16 +2792,34 @@ function render(email, apps, notes, socials, docs, disc) {
       '<span class="adm__count" id="count"></span>' +
       '<button class="btn btn--ghost" id="csv" type="button" style="padding:.5rem .8rem;font-size:.85rem">Export CSV</button>' +
     "</div>" +
-    '<div class="tabs" id="tabs">' +
-      '<button class="tab is-on" data-tab="apps" type="button">Applications</button>' +
-      '<button class="tab" data-tab="seats" type="button">Seats</button>' +
-      '<button class="tab" data-tab="inbox" type="button">Messages<span class="tab__n" id="tab-unread"></span></button>' +
-      '<button class="tab" data-tab="clients" type="button">Clients</button>' +
-      '<button class="tab" data-tab="cal" type="button">Interviews<span class="tab__n" id="tab-cal"></span></button>' +
-      '<button class="tab" data-tab="team" type="button">Team<span class="tab__n" id="tab-leave"></span></button>' +
-      (can("accounts.manage") ? '<button class="tab" data-tab="accts" type="button">Accounts</button>' : "") +
-    "</div>" +
+    /* The tab bar became a rail. Same buttons, same data-tab values, same
+       container id — wireTabs() finds them exactly as before and nothing about
+       switching panes changed. What is new is that each one can carry a count,
+       so what is waiting says so without being opened: seven tabs where six are
+       hidden is six things that cannot ask for attention. */
+    '<div class="adm__wrap">' +
+    '<nav class="rail" id="tabs" aria-label="Sections">' +
+      '<span class="rail__k">The queue</span>' +
+      '<button class="rnav is-on" data-tab="apps" type="button">' + ICON.apps +
+        'Applications<span class="rnav__n" id="tab-apps"></span></button>' +
+      '<button class="rnav" data-tab="cal" type="button">' + ICON.cal +
+        'Interviews<span class="rnav__n" id="tab-cal"></span></button>' +
+      '<button class="rnav" data-tab="inbox" type="button">' + ICON.inbox +
+        'Messages<span class="rnav__n" id="tab-unread"></span></button>' +
+      '<span class="rail__k">The business</span>' +
+      '<button class="rnav" data-tab="seats" type="button">' + ICON.seats +
+        'Seats<span class="rnav__n" id="tab-seats"></span></button>' +
+      '<button class="rnav" data-tab="clients" type="button">' + ICON.clients + "Clients</button>" +
+      '<span class="rail__k">The team</span>' +
+      '<button class="rnav" data-tab="team" type="button">' + ICON.team +
+        'Team<span class="rnav__n" id="tab-leave"></span></button>' +
+      (can("accounts.manage")
+        ? '<button class="rnav" data-tab="accts" type="button">' + ICON.accts + "Accounts</button>"
+        : "") +
+    "</nav>" +
+    '<div class="adm__main">' +
     '<div data-pane="apps">' +
+    '<div class="kpis" id="kpis"></div>' +
     (can("analytics.view") ? '<div id="stats-card"></div>' : "") +
     '<div class="rows" id="rows"></div>' +
     "</div>" +
@@ -2723,7 +2831,8 @@ function render(email, apps, notes, socials, docs, disc) {
       '<div class="card" id="notice-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
-      : "")
+      : "") +
+    "</div></div>"
   );
 
   document.getElementById("out").addEventListener("click", signOut);
