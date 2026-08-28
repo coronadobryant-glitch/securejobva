@@ -1182,7 +1182,6 @@ function render(user, apps) {
     lead.textContent = "Signed in as " + user.email + ".";
     view(who + typeChooser());
     document.getElementById("out").addEventListener("click", signOut);
-    wireChooser();
     return;
   }
 
@@ -1323,55 +1322,46 @@ function typeChooser() {
   return (
     '<div class="card">' +
       '<h2 class="edit__h">What brings you here?</h2>' +
-      '<p class="msg" style="margin-top:0">Pick one and we will set your account up. ' +
-      "You can say more in the box if it helps." +
-      (declined ? " Your last request was not approved &mdash; you are welcome to ask again." : "") +
+      '<p class="msg" style="margin-top:0">There is nothing under this address yet. ' +
+      "Whichever of these you are, the next step is a form &mdash; it is the form that " +
+      "creates your place here." +
+      (declined ? " Your last request was not approved &mdash; you are welcome to apply again." : "") +
       "</p>" +
-      /* One per line, full width. Side by side they were read as a row of
-         chips and the descriptions were the first thing to get skipped, which
-         is how somebody picks the wrong account and needs it changed by hand. */
+
+      /* This used to file a request for an account and stop there: "Waiting on
+         us", and no way forward. Nothing was waiting on us. Both pages find
+         your row by the address you are signed in with — the policies match on
+         email, not on a role — so an account was never the thing standing
+         between somebody and their own page. The form was.
+
+         So each choice goes to the form it means. Applying is what creates an
+         application; asking for a seat is what creates a seat. The account
+         follows from the row, which is how it already worked. */
       '<div class="opts opts--stack" style="margin-top:1rem">' +
-        TYPES.map(function (t, i) {
-          return '<label class="opt">' +
-            '<input type="radio" name="acct" value="' + t[0] + '"' + (i === 0 ? " checked" : "") + ">" +
-            tick +
-            "<span>" +
-              '<span class="opt__t">' + t[1] + "</span>" +
-              '<span class="opt__d">' + t[2] + "</span>" +
-            "</span>" +
-          "</label>";
-        }).join("") +
+        '<a class="opt" href="/careers#apply-now">' + tick +
+          "<span>" +
+            '<span class="opt__t">I am looking for work</span>' +
+            '<span class="opt__d">Fill in the application &mdash; five short steps. ' +
+            "It appears on this page the moment you send it.</span>" +
+          "</span></a>" +
+        '<a class="opt" href="/#book">' + tick +
+          "<span>" +
+            '<span class="opt__t">I am hiring</span>' +
+            '<span class="opt__d">Tell us the seat you need. ' +
+            "It appears on your seats page as soon as it reaches us.</span>" +
+          "</span></a>" +
       "</div>" +
-      '<div class="fld" style="margin-top:1rem">' +
-        '<label for="acct-note">Anything to add <em>&mdash; optional</em></label>' +
-        '<input id="acct-note" type="text" placeholder="Company name, or which role you applied for">' +
-      "</div>" +
-      '<button class="btn btn--solid" id="acct-go" type="button">Set up my account</button>' +
-      '<p class="msg">Nothing is granted by picking. Every account type is approved by a person first.</p>' +
-      '<p class="msg" id="acct-msg"></p>' +
+
+      '<p class="msg">Signed in with the wrong address? Sign out above and use the one ' +
+      "you applied or booked with &mdash; that is how we find you.</p>" +
     "</div>"
   );
 }
 
-function wireChooser() {
-  var b = document.getElementById("acct-go");
-  if (!b) return;
-  b.addEventListener("click", function () {
-    var picked = document.querySelector("[name=acct]:checked");
-    var msg = document.getElementById("acct-msg");
-    if (!picked) { msg.textContent = "Pick one."; return; }
-    b.disabled = true;
-    api("rpc/request_account_type", {
-      method: "POST",
-      body: { role_key: picked.value, note: document.getElementById("acct-note").value.trim() || null }
-    }).then(function () { start(); })
-      .catch(function (e) {
-        b.disabled = false;
-        msg.className = "msg msg--bad";
-        msg.textContent = e.message || "That did not go through.";
-      });
-  });
-}
+/* wireChooser() lived here. It read the radio, called request_account_type and
+   printed "Waiting on us". Both choices are links to the forms now, so there is
+   nothing to wire — and the audit said so plainly: the JS wanted acct-go,
+   acct-msg and acct-note, none of which the page renders any more. */
 
 var STAFF = false;
 
