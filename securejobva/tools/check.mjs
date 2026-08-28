@@ -822,6 +822,20 @@ await check("the timesheet's weeks and totals hold up", async () => {
   }
 });
 
+/* Everything else here checks a piece. This walks one person from applying to
+   being billed for, through the cards the pages actually render and the real
+   notify handler, and asserts what each party can see at every step —
+   including that no screen ever holds both rates. */
+await check("the whole walk holds together", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/simulate.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {4}ok/gm) || []).length + " behaviours, applied to billed";
+  } catch (e) {
+    throw new Error("tools/simulate.mjs failed — run it directly to see which step");
+  }
+});
+
 await check("lead queue behaves", async () => {
   const { execFileSync } = await import("node:child_process");
   try {
