@@ -155,7 +155,11 @@ const checks = [
   ["032 billing rate",    () => table("placement_billing"),    ["locked"]],
   ["032 pay rate",        () => table("placement_pay"),        ["locked"]],
   ["032 swap requests",   () => table("swap_requests"),        ["locked"]],
-  ["033 week to client",  () => column("timesheets", "placement_id", "x"), ["present", "no access"]]
+  /* Not a column probe. placement_id is granted to nobody by design, and
+     PostgREST hides columns the asking role holds no privilege on — so probing
+     it reports "not run yet" forever, however well the migration ran. The
+     function 033 adds is the honest signal: present and refusing anon. */
+  ["033 week to client",  () => fn("timesheet_is_clients", { ts: "00000000-0000-0000-0000-000000000000" }), ["locked"]]
 ];
 
 for (const [what, run, good] of checks) {
