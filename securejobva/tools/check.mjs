@@ -637,6 +637,52 @@ await check("only one placement per assistant can be live", () => {
   return "partial unique index on the live states";
 });
 
+/* ── 033, who a week belongs to and who may agree to it ─────────────────── */
+
+await check("a page cannot choose who a week is billed to", () => {
+  for (const stmt of sql.replace(/--[^\n]*/g, " ").split(";")) {
+    if (!/on\s+public\.timesheets\s+to\s+/i.test(stmt)) continue;
+    const cols = stmt.match(/grant\s+(?:insert|update)\s*\(([^)]*)\)/i);
+    if (cols && cols[1].split(",").some((c) => c.trim() === "placement_id")) {
+      throw new Error("placement_id is granted, so a request body can name the client a week " +
+        "is billed to. The trigger works it out; nothing else may.");
+    }
+    if (!cols && /grant\s+[a-z,\s]*\b(?:insert|update|all)\b[a-z,\s]*\s+on\s+public\.timesheets/i.test(stmt)) {
+      throw new Error("a table-level INSERT/UPDATE grant on timesheets covers placement_id");
+    }
+  }
+  const fn = functionBody("timesheet_placement");
+  if (/'matched'/.test(fn)) {
+    throw new Error("a matched placement counts, so hours can be billed against a client the " +
+      "assistant has only been introduced to");
+  }
+  if (!/new\.placement_id/.test(fn)) throw new Error("the trigger never sets placement_id");
+  return "trigger only, and never a placement that has not started";
+});
+
+await check("a client can only decide a week that is waiting on them", () => {
+  const p = policyBody("a client decides a week");
+  const lower = p.toLowerCase();
+  const using = p.slice(lower.indexOf("using"), lower.lastIndexOf("with check"));
+  const leaves = p.slice(lower.lastIndexOf("with check"));
+
+  if (!/status\s*=\s*'submitted'/i.test(using)) {
+    throw new Error("a client can reach a week that is not submitted — a draft they should not " +
+      "see the inside of, or an approved one whose number an invoice was already built from");
+  }
+  if (!/is_placement_client\s*\(/i.test(using)) {
+    throw new Error("the policy does not check the client is the client of that placement");
+  }
+  if (/'draft'|'submitted'/i.test(leaves)) {
+    throw new Error("WITH CHECK lets a client leave a week un-decided, which is a way to reopen " +
+      "somebody else's week rather than answer it");
+  }
+  if (!/'approved'[\s\S]{0,30}'returned'|'returned'[\s\S]{0,30}'approved'/i.test(leaves)) {
+    throw new Error("a client cannot both approve and send back");
+  }
+  return "submitted only, left approved or returned";
+});
+
 await check("anon holds nothing on the placement tables", () => {
   for (const t of ["clients", "placements", "placement_billing", "placement_pay", "swap_requests"]) {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {

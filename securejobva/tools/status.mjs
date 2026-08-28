@@ -154,7 +154,8 @@ const checks = [
   ["032 placements",      () => table("placements"),           ["locked"]],
   ["032 billing rate",    () => table("placement_billing"),    ["locked"]],
   ["032 pay rate",        () => table("placement_pay"),        ["locked"]],
-  ["032 swap requests",   () => table("swap_requests"),        ["locked"]]
+  ["032 swap requests",   () => table("swap_requests"),        ["locked"]],
+  ["033 week to client",  () => column("timesheets", "placement_id", "x"), ["present", "no access"]]
 ];
 
 for (const [what, run, good] of checks) {
