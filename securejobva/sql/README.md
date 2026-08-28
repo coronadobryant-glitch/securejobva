@@ -42,9 +42,10 @@ run it. That is always safer than guessing.
 | `026-hired-and-the-hub.sql` | The hired stage, the payout preference, leave requests and the notice board |
 | `027-one-application.sql` | One application per person, and three months after a decline |
 | `028-notify-applications.sql` | The third webhook, moved out of the dashboard — needs the secret pasted in |
+| `029-no-staff-requests.sql` | Staff can no longer be asked for — it is granted under Accounts |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 028 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through 029 in order, then `verify.sql` to confirm.
 
 ## Adding one
 

@@ -1296,13 +1296,19 @@ function typeChooser() {
 
   var declined = REQUESTS.filter(function (r) { return r.state === "declined"; })[0];
 
+  /* Two, not three. "I work at SecureJobVA" used to sit here and it should not
+     have: staff is not a thing anybody asks for, it is a thing an administrator
+     grants under Accounts. Offering it invited every applicant who saw the page
+     to tick it, and every one of those is a request somebody then has to read
+     and refuse.
+
+     Nothing is lost by taking it away. It never granted anything — it only ever
+     created a request — and the granting path in /admin is untouched. */
   var TYPES = [
     ["applicant", "I am looking for work",
      "An employee seat. See your application and how far along it is."],
     ["business", "I am hiring",
-     "An employer account. See the seats you have asked us for."],
-    ["staff", "I work at SecureJobVA",
-     "A staff account. Somebody here approves this one before it does anything."]
+     "An employer account. See the seats you have asked us for."]
   ];
 
   var tick = '<span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" ' +
