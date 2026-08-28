@@ -23,7 +23,7 @@ function grab(name) {
   throw new Error("unbalanced " + name);
 }
 
-const NAMES = ["isoDay", "fromIso", "addDays", "mondayOf", "showHours", "dayIn", "totalOf"];
+const NAMES = ["isoDay", "fromIso", "addDays", "mondayOf", "showHours", "dayIn", "totalOf", "when"];
 const F = new Function(
   NAMES.map(grab).join("\n") + "\nreturn {" + NAMES.join(",") + "};"
 )();
@@ -89,6 +89,33 @@ ok("a week spanning a year is named by its Monday", monday(2027, 1, 1) === "2026
   const mon = F.fromIso("2026-08-24");
   F.addDays(mon, 6);
   ok("addDays leaves its argument alone", F.isoDay(mon) === "2026-08-24");
+}
+
+/* ── a date is a day, not an instant ─────────────────────────────────────── */
+
+/* when() is shared by every page, and it was reading plain dates through
+   new Date(), which is midnight UTC. In any timezone behind UTC that renders
+   as the day before — leave beginning on the 7th shown as the 6th, and a
+   timesheet week labelled with the Sunday before its Monday. Found by looking
+   at a placement that said "from Sep 6" for a start date of the 7th.
+
+   Compared against a locally-built date rather than a fixed string, so this
+   asserts the same thing wherever it runs. */
+{
+  const fmt = { year: "numeric", month: "short", day: "numeric" };
+  ok("a plain date renders as that very day",
+    F.when("2026-09-07") === new Date(2026, 8, 7).toLocaleDateString(undefined, fmt),
+    "not the day before, whatever the reader's timezone");
+  ok("a month boundary does not slip",
+    F.when("2026-09-01") === new Date(2026, 8, 1).toLocaleDateString(undefined, fmt));
+  ok("a year boundary does not slip",
+    F.when("2027-01-01") === new Date(2027, 0, 1).toLocaleDateString(undefined, fmt));
+  ok("a timestamp still shows in the reader's own time",
+    F.when("2026-09-07T15:30:00Z") ===
+      new Date("2026-09-07T15:30:00Z").toLocaleDateString(undefined, fmt),
+    "that one really is an instant");
+  ok("nothing in, nothing out", F.when(null) === "" && F.when("") === "");
+  ok("rubbish in, nothing out", F.when("not a date") === "");
 }
 
 /* ── the numbers ─────────────────────────────────────────────────────────── */

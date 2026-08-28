@@ -383,6 +383,10 @@ body:has(.adm__wrap) main{padding:0}
 .pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
 .pill--ts_approved{background:#0B7A63;color:#fff}
 .pill--ts_returned{background:#B3261E;color:#fff}
+.pill--pl_matched{background:var(--surface-2);color:var(--ink-2)}
+.pill--pl_trial{background:var(--signal);color:var(--signal-ink)}
+.pill--pl_ongoing{background:#0B7A63;color:#fff}
+.pill--pl_ended{background:var(--surface-2);color:var(--muted)}
 .ts__hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem}
 .ts__wk{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--muted)}
 .sheet{margin-top:1.1rem;border:1px solid var(--line);border-radius:7px;overflow:hidden}
@@ -871,7 +875,21 @@ function stageIndex(s) {
 }
 function when(iso) {
   if (!iso) return "";
-  var d = new Date(iso);
+  /* A plain date is a day, not an instant. new Date("2026-09-07") is midnight
+     UTC, and every timezone behind UTC renders that as the 6th — so leave
+     starting on the 7th has been shown as starting on the 6th since 026, and a
+     timesheet week has been labelled with the Sunday before its Monday.
+     Parsed from its parts, a date means the same day everywhere.
+
+     A timestamptz still goes through Date, because that one really is an
+     instant and should be shown in the reader's own time. */
+  var d;
+  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(String(iso))) {
+    var p = String(iso).split("-");
+    d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  } else {
+    d = new Date(iso);
+  }
   if (isNaN(d)) return "";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
@@ -2388,7 +2406,8 @@ var ICON = (function () {
     clients: s('<circle cx="12" cy="12" r="8.5"></circle><path d="M3.5 12h17M12 3.5c4 4.5 4 12.5 0 17M12 3.5c-4 4.5-4 12.5 0 17"></path>'),
     team:    s('<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5"></path><path d="M17 6.5a3.5 3.5 0 010 7"></path>'),
     accts:   s('<path d="M12 3.5l7 3.2v5.6c0 4.2-2.8 7.2-7 8.2-4.2-1-7-4-7-8.2V6.7z"></path>'),
-    hours:   s('<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>')
+    hours:   s('<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>'),
+    place:   s('<path d="M12 21s7-5.2 7-11a7 7 0 10-14 0c0 5.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.6"></circle>')
   };
 })();
 
@@ -2399,7 +2418,8 @@ function badge(id, n) {
   if (!el) return;
   el.textContent = n ? String(n) : "";
   el.classList.toggle("is-warn",
-    id === "tab-unread" || id === "tab-leave" || id === "tab-hours" ? !!n : false);
+    id === "tab-unread" || id === "tab-leave" || id === "tab-hours" || id === "tab-place"
+      ? !!n : false);
 }
 
 /* The summary. It answers "what needs me" before anything is read, which the
@@ -2654,6 +2674,344 @@ function drawTimesheets(box, rows) {
         headers: { Prefer: "return=minimal" },
         body: yes ? { status: "approved" } : { status: "returned", note: why_ }
       }).then(loadTimesheets)
+        .catch(function (e) { flash(ok, why(e), true); });
+    });
+  });
+}
+
+/* ── clients and placements ──
+   Who works for whom. Everything else in /admin is about people on their way
+   in; this is the only page about people already working.
+
+   Both rates are set here because this is the one screen where they may sit
+   beside each other: 032 puts them in separate tables so a client can reach
+   one and an assistant the other, and staff are the only ones who read both.
+   That is the cut, and it exists nowhere else on any screen. */
+var CLIENTS = [];
+var PLACEMENTS = [];
+var RATES = {};
+
+var PLACE_LABEL = { matched: "Matched", trial: "On trial", ongoing: "Kept on", ended: "Ended" };
+
+function loadPlacements() {
+  var box = document.getElementById("place-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading placements&hellip;';
+  Promise.all([
+    api("clients?select=id,name,contact_name,contact_email,billing_cycle&order=name.asc"),
+    api("placements?select=id,application_id,client_id,status,started_on,ended_on," +
+        "hours_per_week,trial_weeks,clients(name,contact_email,billing_cycle)" +
+        "&order=started_on.desc.nullslast"),
+    api("placement_billing?select=placement_id,rate"),
+    api("placement_pay?select=placement_id,rate"),
+    api("swap_requests?select=id,placement_id,reason,status,created_at,resolved_at,resolved_by" +
+        "&order=created_at.desc")
+  ]).then(function (r) {
+    CLIENTS = r[0] || [];
+    PLACEMENTS = r[1] || [];
+    RATES = {};
+    (r[2] || []).forEach(function (b) {
+      RATES[b.placement_id] = RATES[b.placement_id] || {};
+      RATES[b.placement_id].bill = b.rate;
+    });
+    (r[3] || []).forEach(function (p) {
+      RATES[p.placement_id] = RATES[p.placement_id] || {};
+      RATES[p.placement_id].pay = p.rate;
+    });
+    drawPlacements(box, r[4] || []);
+  }).catch(function (e) {
+    box.innerHTML = '<p class="msg msg--bad">Could not load placements: ' + esc(why(e)) + "</p>";
+  });
+}
+
+function money(n) {
+  if (n === null || n === undefined || n === "") return "";
+  return "$" + Number(n).toFixed(2);
+}
+
+function drawPlacements(box, swaps) {
+  var byApp = {};
+  ALL.forEach(function (a) { byApp[a.id] = a; });
+
+  /* Only the hired can be placed. Somebody still in the queue appearing in
+     this list is an invitation to place a person who has not been taken on. */
+  var hired = ALL.filter(function (a) { return a.status === "hired"; });
+  var placedNow = {};
+  PLACEMENTS.forEach(function (p) {
+    if (p.status !== "ended") placedNow[p.application_id] = true;
+  });
+  var free = hired.filter(function (a) { return !placedNow[a.id]; });
+
+  var open = swaps.filter(function (s) { return s.status === "open"; });
+  badge("tab-place", open.length);
+
+  var clientOpts = CLIENTS.map(function (c) {
+    return '<option value="' + esc(c.id) + '">' + esc(c.name) + "</option>";
+  }).join("");
+
+  box.innerHTML =
+    "<h2>Clients and placements</h2>" +
+    '<p class="msg" style="margin-top:0">One client at a time. Matching somebody is what tells them &mdash; ' +
+      "and what makes their hours billable to the right business.</p>" +
+
+    (open.length
+      ? '<div class="note note--warn"><b>' + open.length +
+        (open.length === 1 ? " client has" : " clients have") + " asked for somebody different.</b> " +
+        "Nothing has changed for the assistant, and they have not been told. See below.</div>"
+      : "") +
+
+    /* ── the match form ── */
+    (free.length
+      ? '<div class="edit__sec">Match somebody to a client</div>' +
+        '<div class="edit__grid">' +
+          '<div class="fld"><label for="pl-who">Assistant</label><select id="pl-who">' +
+            free.map(function (a) {
+              return '<option value="' + esc(a.id) + '">' + esc(a.name || a.email) + "</option>";
+            }).join("") + "</select></div>" +
+          '<div class="fld"><label for="pl-client">Client</label><select id="pl-client">' +
+            clientOpts + '<option value="__new">+ A client not listed</option></select></div>' +
+        "</div>" +
+
+        '<div id="pl-new" hidden>' +
+          '<div class="edit__grid">' +
+            '<div class="fld"><label for="pl-cname">Business name</label><input id="pl-cname" type="text" placeholder="Rosehill Plumbing"></div>' +
+            '<div class="fld"><label for="pl-cwho">Their contact</label><input id="pl-cwho" type="text" placeholder="Name"></div>' +
+          "</div>" +
+          '<div class="edit__grid">' +
+            '<div class="fld"><label for="pl-cmail">Contact email</label><input id="pl-cmail" type="email" placeholder="name@rosehill.com">' +
+              '<p class="fileinfo">This is how they sign in to see their statement. It has to be right.</p></div>' +
+            '<div class="fld"><label for="pl-cycle">How they pay us</label><select id="pl-cycle">' +
+              '<option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>' +
+          "</div>" +
+        "</div>" +
+
+        '<div class="edit__grid">' +
+          '<div class="fld"><label for="pl-start">Starts on</label><input id="pl-start" type="date"></div>' +
+          '<div class="fld"><label for="pl-hours">Hours a week</label><input id="pl-hours" type="number" min="1" max="168" value="40"></div>' +
+        "</div>" +
+        '<div class="edit__grid">' +
+          '<div class="fld"><label for="pl-trial">Trial, in weeks</label><input id="pl-trial" type="number" min="1" max="52" value="2"></div>' +
+          '<div class="fld"></div>' +
+        "</div>" +
+
+        '<div class="edit__sec">The two rates &mdash; only you see both</div>' +
+        '<div class="edit__grid">' +
+          '<div class="fld"><label for="pl-bill">The client pays, an hour</label><input id="pl-bill" type="number" min="0" step="0.01" placeholder="7.75"></div>' +
+          '<div class="fld"><label for="pl-pay">The assistant gets, an hour</label><input id="pl-pay" type="number" min="0" step="0.01" placeholder="4.50"></div>' +
+        "</div>" +
+        '<p class="msg">Neither of them can see the other\\'s number. The assistant\\'s portal shows hours and no money at all; the client\\'s shows what they are charged and nothing about what we pay.</p>' +
+        '<p class="err" id="pl-err" aria-live="polite"></p>' +
+        '<div class="edit__foot"><span></span><span class="edit__act">' +
+          '<span class="row__ok" id="pl-ok"></span>' +
+          '<button class="btn btn--solid" id="pl-go" type="button">Match them</button>' +
+        "</span></div>"
+      : '<div class="note"><b>Nobody to place right now.</b> ' +
+        (hired.length
+          ? "Everybody hired already has a client."
+          : "Mark somebody Hired first and they will appear here.") + "</div>") +
+
+    /* ── the placements themselves ── */
+    '<div class="edit__sec">Placements</div>' +
+    (PLACEMENTS.length
+      ? '<div class="rows">' + PLACEMENTS.map(function (p) {
+          var a = byApp[p.application_id];
+          var r = RATES[p.id] || {};
+          var mine = swaps.filter(function (s) {
+            return s.placement_id === p.id && s.status === "open";
+          });
+          return '<div class="row" data-place="' + esc(p.id) + '">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(a ? a.name : "Unknown assistant") + "</span>" +
+              '<span class="row__meta"> &middot; ' + esc(p.clients ? p.clients.name : "a client") +
+                (p.started_on ? " &middot; from " + esc(when(p.started_on)) : "") + "</span>" +
+            "</span>" +
+            '<span class="pill pill--pl_' + esc(p.status) + '">' +
+              esc(PLACE_LABEL[p.status] || p.status) + "</span></div>" +
+
+            '<div class="row__tags">' + esc(p.hours_per_week) + " h a week" +
+              (p.trial_weeks ? " &middot; " + esc(p.trial_weeks) + "-week trial" : "") +
+              (p.clients && p.clients.billing_cycle ? " &middot; billed " + esc(p.clients.billing_cycle) : "") +
+            "</div>" +
+
+            (mine.length
+              ? '<div class="note note--warn" style="margin-top:.6rem"><b>They have asked for somebody different.</b> ' +
+                esc(mine[0].reason) + '<br><button class="btn btn--ghost" data-swap="' + esc(mine[0].id) +
+                '" type="button" style="padding:.4rem .75rem;font-size:.84rem;margin-top:.5rem">Mark it handled</button></div>'
+              : "") +
+
+            '<div class="row__ctl">' +
+              '<select data-pl-status aria-label="Placement stage">' +
+                ["matched", "trial", "ongoing", "ended"].map(function (s) {
+                  return '<option value="' + s + '"' + (p.status === s ? " selected" : "") + ">" +
+                    PLACE_LABEL[s] + "</option>";
+                }).join("") +
+              "</select>" +
+              '<input data-pl-bill type="number" min="0" step="0.01" placeholder="client $/h" ' +
+                'aria-label="What the client pays an hour" value="' + esc(r.bill === undefined ? "" : r.bill) + '" ' +
+                'style="width:8rem">' +
+              '<input data-pl-pay type="number" min="0" step="0.01" placeholder="assistant $/h" ' +
+                'aria-label="What the assistant is paid an hour" value="' + esc(r.pay === undefined ? "" : r.pay) + '" ' +
+                'style="width:8rem">' +
+              '<button class="btn btn--ghost" data-pl-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
+              '<span class="row__ok" data-pl-ok></span>' +
+            "</div>" +
+          "</div>";
+        }).join("") + "</div>"
+      : '<p class="msg">Nobody is placed yet.</p>');
+
+  wirePlacementForm();
+  wirePlacementRows(box);
+}
+
+function wirePlacementForm() {
+  var pick = document.getElementById("pl-client");
+  if (!pick) return;
+  var fresh = document.getElementById("pl-new");
+  var show = function () {
+    if (pick.value === "__new") fresh.removeAttribute("hidden");
+    else fresh.setAttribute("hidden", "");
+  };
+  pick.addEventListener("change", show);
+  if (!CLIENTS.length) { pick.value = "__new"; }
+  show();
+
+  document.getElementById("pl-go").addEventListener("click", function () {
+    var err = document.getElementById("pl-err");
+    var ok = document.getElementById("pl-ok");
+    var go = document.getElementById("pl-go");
+    var start = document.getElementById("pl-start");
+    var bill = document.getElementById("pl-bill");
+    var pay = document.getElementById("pl-pay");
+    err.textContent = "";
+
+    if (!start.value) { err.textContent = "Which day do they start?"; start.focus(); return; }
+    if (!bill.value) { err.textContent = "What does the client pay an hour? Without it their statement cannot be worked out."; bill.focus(); return; }
+    if (!pay.value) { err.textContent = "And what does the assistant get an hour?"; pay.focus(); return; }
+    if (Number(pay.value) > Number(bill.value)) {
+      err.textContent = "The assistant is set to be paid more than the client is charged. Check both numbers.";
+      pay.focus(); return;
+    }
+
+    go.disabled = true;
+    flash(ok, "Saving\\u2026");
+
+    /* A new client first, because the placement cannot point at one that does
+       not exist yet. return=representation so the id comes back rather than
+       being fetched again and hoped to be the right row. */
+    var wantNew = pick.value === "__new";
+    var clientStep = wantNew
+      ? api("clients", {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body: {
+            name: document.getElementById("pl-cname").value.trim(),
+            contact_name: document.getElementById("pl-cwho").value.trim() || null,
+            contact_email: document.getElementById("pl-cmail").value.trim() || null,
+            billing_cycle: document.getElementById("pl-cycle").value
+          }
+        }).then(function (rows) {
+          var c = (rows || [])[0];
+          if (!c) throw new Error("the client did not come back");
+          return c.id;
+        })
+      : Promise.resolve(pick.value);
+
+    if (wantNew && !document.getElementById("pl-cname").value.trim()) {
+      go.disabled = false;
+      err.textContent = "Give the business a name.";
+      return;
+    }
+
+    clientStep.then(function (clientId) {
+      return api("placements", {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: {
+          application_id: document.getElementById("pl-who").value,
+          client_id: clientId,
+          status: "matched",
+          started_on: start.value,
+          hours_per_week: Number(document.getElementById("pl-hours").value || 40),
+          trial_weeks: Number(document.getElementById("pl-trial").value || 0) || null
+        }
+      });
+    }).then(function (rows) {
+      var p = (rows || [])[0];
+      if (!p) throw new Error("the placement did not come back");
+      /* The rates are two more rows. If either fails the placement still
+         exists, so the message says so rather than implying nothing happened —
+         and both are editable on the row below. */
+      return Promise.all([
+        api("placement_billing", { method: "POST", headers: { Prefer: "return=minimal" },
+          body: { placement_id: p.id, rate: Number(bill.value) } }),
+        api("placement_pay", { method: "POST", headers: { Prefer: "return=minimal" },
+          body: { placement_id: p.id, rate: Number(pay.value) } })
+      ]).catch(function () {
+        throw new Error("Matched, but the rates did not save. Set them on the row below.");
+      });
+    }).then(function () {
+      loadPlacements();
+    }).catch(function (e) {
+      go.disabled = false;
+      flash(ok, why(e), true);
+      err.textContent = String(e && e.message ? e.message : e).slice(0, 300);
+    });
+  });
+}
+
+function wirePlacementRows(box) {
+  box.querySelectorAll("[data-pl-save]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-place]");
+      var id = row.getAttribute("data-place");
+      var ok = row.querySelector("[data-pl-ok]");
+      var status = row.querySelector("[data-pl-status]").value;
+      var bill = row.querySelector("[data-pl-bill]").value;
+      var pay = row.querySelector("[data-pl-pay]").value;
+
+      if (bill !== "" && pay !== "" && Number(pay) > Number(bill)) {
+        flash(ok, "The assistant cannot be paid more than the client is charged", true);
+        return;
+      }
+
+      flash(ok, "Saving\\u2026");
+      var jobs = [api("placements?id=eq." + encodeURIComponent(id), {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: { status: status, ended_on: status === "ended" ? new Date().toISOString().slice(0, 10) : null }
+      })];
+
+      /* Upserted one at a time rather than with merge-duplicates: the update
+         grant covers rate and nothing else, and an upsert would try to write
+         placement_id too. */
+      var rate = function (table, value, had) {
+        if (value === "") return null;
+        return had === undefined
+          ? api(table, { method: "POST", headers: { Prefer: "return=minimal" },
+              body: { placement_id: id, rate: Number(value) } })
+          : api(table + "?placement_id=eq." + encodeURIComponent(id), {
+              method: "PATCH", headers: { Prefer: "return=minimal" },
+              body: { rate: Number(value) } });
+      };
+      var have = RATES[id] || {};
+      var a = rate("placement_billing", bill, have.bill);
+      var c = rate("placement_pay", pay, have.pay);
+      if (a) jobs.push(a);
+      if (c) jobs.push(c);
+
+      Promise.all(jobs).then(loadPlacements)
+        .catch(function (e) { flash(ok, why(e), true); });
+    });
+  });
+
+  box.querySelectorAll("[data-swap]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-place]");
+      var ok = row.querySelector("[data-pl-ok]");
+      flash(ok, "Saving\\u2026");
+      api("swap_requests?id=eq." + encodeURIComponent(b.getAttribute("data-swap")), {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: { status: "resolved", resolved_at: new Date().toISOString(), resolved_by: ME }
+      }).then(loadPlacements)
         .catch(function (e) { flash(ok, why(e), true); });
     });
   });
@@ -3300,6 +3658,8 @@ function render(email, apps, notes, socials, docs, disc) {
       '<button class="rnav" data-tab="seats" type="button">' + ICON.seats +
         'Seats<span class="rnav__n" id="tab-seats"></span></button>' +
       '<button class="rnav" data-tab="clients" type="button">' + ICON.clients + "Clients</button>" +
+      '<button class="rnav" data-tab="place" type="button">' + ICON.place +
+        'Placements<span class="rnav__n" id="tab-place"></span></button>' +
       '<span class="rail__k">The team</span>' +
       '<button class="rnav" data-tab="team" type="button">' + ICON.team +
         'Team<span class="rnav__n" id="tab-leave"></span></button>' +
@@ -3375,6 +3735,7 @@ function render(email, apps, notes, socials, docs, disc) {
     '<div data-pane="team" hidden><div class="card" id="leave-card"></div>' +
       '<div class="card" id="notice-card"></div></div>' +
     '<div data-pane="hours" hidden><div class="card" id="ts-card"></div></div>' +
+    '<div data-pane="place" hidden><div class="card" id="place-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "") +
@@ -3388,6 +3749,7 @@ function render(email, apps, notes, socials, docs, disc) {
   loadSeats();
   loadLeave();
   loadTimesheets();
+  loadPlacements();
   loadNotices();
   loadInbox();
   loadClients();

@@ -617,6 +617,10 @@ body:has(.adm__wrap) main{padding:0}
 .pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
 .pill--ts_approved{background:#0B7A63;color:#fff}
 .pill--ts_returned{background:#B3261E;color:#fff}
+.pill--pl_matched{background:var(--surface-2);color:var(--ink-2)}
+.pill--pl_trial{background:var(--signal);color:var(--signal-ink)}
+.pill--pl_ongoing{background:#0B7A63;color:#fff}
+.pill--pl_ended{background:var(--surface-2);color:var(--muted)}
 .ts__hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem}
 .ts__wk{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--muted)}
 .sheet{margin-top:1.1rem;border:1px solid var(--line);border-radius:7px;overflow:hidden}
@@ -1196,7 +1200,21 @@ function stageIndex(s) {
 }
 function when(iso) {
   if (!iso) return "";
-  var d = new Date(iso);
+  /* A plain date is a day, not an instant. new Date("2026-09-07") is midnight
+     UTC, and every timezone behind UTC renders that as the 6th — so leave
+     starting on the 7th has been shown as starting on the 6th since 026, and a
+     timesheet week has been labelled with the Sunday before its Monday.
+     Parsed from its parts, a date means the same day everywhere.
+
+     A timestamptz still goes through Date, because that one really is an
+     instant and should be shown in the reader's own time. */
+  var d;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) {
+    var p = String(iso).split("-");
+    d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  } else {
+    d = new Date(iso);
+  }
   if (isNaN(d)) return "";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
