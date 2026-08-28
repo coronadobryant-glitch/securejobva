@@ -192,6 +192,72 @@ for (const file of ["index.html", "careers.html"]) {
     one.errBox.textContent, "One rating is missing: Bookkeeping.");
 }
 
+
+/* ── the email a signed-in person already proved ───────────────────────────
+   /status sends somebody straight to the form when we have nothing under their
+   address. Typing that address again is where a typo becomes a second
+   application nobody can match to them — and 027 then refuses the correction,
+   because from the database's side those are two different people.
+
+   These drive the real signedInEmail() and prefill() out of careers.html. The
+   cases that matter are the ones where it must NOT fill: a draft already typed,
+   a session that has expired, and anything unreadable in storage. */
+{
+  const careers = readFileSync("careers.html", "utf8");
+  const grab = (n) => {
+    const at = careers.indexOf("function " + n + "(");
+    if (at < 0) throw new Error("careers.html: " + n + "() not found");
+    let d = 0, i = careers.indexOf("{", at);
+    for (; i < careers.length; i++) {
+      if (careers[i] === "{") d++;
+      else if (careers[i] === "}") { d--; if (!d) return careers.slice(at, i + 1); }
+    }
+    throw new Error("unbalanced " + n);
+  };
+
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64")
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const token = (claims) => "header." + b64(claims) + ".signature";
+
+  const run = (stored, alreadyTyped) => {
+    const el = { value: alreadyTyped };
+    const ctx = {
+      localStorage: { getItem: () => stored },
+      document: { getElementById: (id) => (id === "ap-email" ? el : null) },
+      atob: (s) => Buffer.from(s, "base64").toString("binary"),
+      escape: global.escape,
+      decodeURIComponent, JSON, Date
+    };
+    new Function(...Object.keys(ctx),
+      grab("signedInEmail") + "\n" + grab("prefill") + "\nprefill();"
+    )(...Object.values(ctx));
+    return el.value;
+  };
+
+  const live = { access_token: token({ email: "maria@example.com", exp: Math.floor(Date.now() / 1000) + 3600 }) };
+  const dead = { access_token: token({ email: "maria@example.com", exp: Math.floor(Date.now() / 1000) - 10 }) };
+
+  console.log("\nprefill\n");
+
+  is("a signed-in address fills an empty field",
+    run(JSON.stringify(live), ""), "maria@example.com");
+  is("a draft already typed is never overwritten",
+    run(JSON.stringify(live), "typed@example.com"), "typed@example.com");
+  is("an expired session fills nothing",
+    run(JSON.stringify(dead), ""), "");
+  is("nobody signed in fills nothing",
+    run(null, ""), "");
+  is("unreadable storage fills nothing and does not throw",
+    run("{ not json at all", ""), "");
+  is("a session with no email fills nothing",
+    run(JSON.stringify({ access_token: token({ exp: Math.floor(Date.now() / 1000) + 3600 }) }), ""), "");
+
+  /* The field stays editable. Applying with a different address than the one
+     signed in is allowed — it is only the default that changed. */
+  is("the field is not made read-only",
+    /id="ap-email"[^>]*\b(readonly|disabled)\b/.test(careers), false);
+}
+
 console.log("");
 console.log(bad ? bad + " FAILED" : "all passed");
 console.log("");

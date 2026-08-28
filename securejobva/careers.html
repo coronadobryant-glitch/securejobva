@@ -2492,12 +2492,48 @@ html{scroll-behavior:smooth}
     });
   }
 
+  /* Somebody who signed in has already proved which address is theirs, and
+     /status sends them straight here when we have nothing under it. Making them
+     type it again is where a typo turns into a second application under an
+     address nobody can match to them — and 027 then refuses the correction,
+     because from the database's side those are two different people.
+
+     Read from the portal's own session, which is on this origin under the same
+     key, and only used to fill a field the person can still change: applying
+     with a different address is allowed, it is just no longer the default.
+
+     A draft always wins. Somebody who started the form and came back typed that
+     address on purpose. */
+  function signedInEmail() {
+    var raw;
+    try { raw = localStorage.getItem("sjva-session"); } catch (e) { return ""; }
+    if (!raw) return "";
+    try {
+      var tok = JSON.parse(raw).access_token;
+      var p = tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      while (p.length % 4) p += "=";
+      var claims = JSON.parse(decodeURIComponent(escape(atob(p))));
+      /* An expired token still names the person, but a session that will not
+         open their own page should not be quietly filling in forms either. */
+      if (claims.exp && claims.exp * 1000 < Date.now()) return "";
+      return typeof claims.email === "string" ? claims.email : "";
+    } catch (e) { return ""; }
+  }
+
+  function prefill() {
+    var el = document.getElementById("ap-email");
+    if (!el || el.value.trim()) return;
+    var mail = signedInEmail();
+    if (mail) el.value = mail;
+  }
+
   function open() {
     opener = document.activeElement;
     foot.removeAttribute("hidden");
     clearErrors();
     restore();
     restoreDisc();
+    prefill();
     paint();
     dlg.showModal();
     show(0);
