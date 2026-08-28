@@ -566,6 +566,11 @@ body:has(.adm__wrap) main{padding:0}
 .adm__page{padding:0;margin:0}
 .adm__bar{margin:0;padding:.65rem 1.2rem;background:var(--paper);border-bottom:1px solid var(--line)}
 .adm__bar input,.adm__bar select{font-size:.85rem}
+.adm__gate{min-height:100vh;display:grid;place-items:center;padding:2rem 1.2rem;background:var(--surface-2)}
+.adm__gatebox{width:100%;max-width:31rem;display:flex;flex-direction:column;gap:1rem}
+.adm__gatebrand{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;font-size:1.3rem;color:var(--ink);display:flex;align-items:baseline;gap:.6rem}
+.adm__gatebrand b{color:var(--accent)}
+.adm__gatebrand small{font-family:"IBM Plex Sans",sans-serif;font-weight:400;font-size:.8rem;color:var(--muted)}
 .rail__title{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:.78rem;color:#7C93B4;padding:0 .9rem .55rem}
 .kpis{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));margin-bottom:1rem}
 .kpis:empty{display:none}
@@ -1132,9 +1137,23 @@ function can(p) { return PERMS.indexOf(p) > -1; }
 
 function view(html) { root.innerHTML = html; }
 
+/* The shell took the page furniture away, and the two views that are not the
+   desk went with it: signed out and refused were left as bare text in the top
+   corner of a white screen, with no mark, no card and nothing centred. An
+   application still has to look like something before you are through the door.
+
+   So both are wrapped in a gate: the brand, then a card, centred in the window.
+   It is only a frame — the words and the buttons inside are unchanged. */
+function gate(inner) {
+  return '<div class="adm__gate"><div class="adm__gatebox">' +
+    '<span class="adm__gatebrand">SecureJob<b>VA</b><small>Admin portal</small></span>' +
+    '<div class="card">' + inner + "</div>" +
+  "</div></div>";
+}
+
 function signedOut(msg) {
   view(
-    '<div class="card">' +
+    gate(
       (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
       /* Signing in and having access are two different things, and the page
          used to offer the button with nothing said. Anybody with a Google
@@ -1145,8 +1164,8 @@ function signedOut(msg) {
       '<p class="msg" style="margin-top:0"><b>This is the staff desk.</b> Signing in proves who you are; ' +
         'it does not give you access. An administrator grants that separately. ' +
         'If you applied for a job, your own page is <a href="/status">Your application</a>.</p>' +
-      '<button class="gbtn" id="go" type="button">Sign in with Google</button>' +
-    "</div>"
+      '<button class="gbtn" id="go" type="button">Sign in with Google</button>'
+    )
   );
   document.getElementById("go").addEventListener("click", signIn);
 }
@@ -1170,15 +1189,15 @@ function notAdmin(email) {
   }
 
   view(
-    '<div class="card">' +
+    gate(
       '<div class="note note--warn"><b>No access. You have been signed out.</b> ' +
       esc(email) + " is not on the staff list, so this desk stays shut. Nothing here was " +
       "shown to you &mdash; the database refuses every row to an account without a role, " +
       "which is why the page is empty rather than locked. Access is granted by an " +
       "administrator, not by signing in.</div>" +
       '<p class="msg">Applied for a job? Your own page is <a href="/status">Your application</a> ' +
-      "&mdash; you will be asked to sign in again there.</p>" +
-    "</div>"
+      "&mdash; you will be asked to sign in again there.</p>"
+    )
   );
 }
 
