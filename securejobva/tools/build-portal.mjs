@@ -1485,7 +1485,251 @@ writeFileSync("status.html", shell({
 
 console.log("status.html written");
 
-const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\nfunction signedOut(msg) {\n  view(\n    '<div class=\"card\">' +\n      (msg ? '<p class=\"msg msg--bad\">' + esc(msg) + \"</p>\" : \"\") +\n      '<button class=\"gbtn\" id=\"go\" type=\"button\">Continue with Google</button>' +\n      '<p class=\"msg\">Use the address you booked the call with &mdash; that is how we find your seats. ' +\n      'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.</p>' +\n    \"</div>\"\n  );\n  document.getElementById(\"go\").addEventListener(\"click\", signIn);\n}\n\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n    \"</div>\";\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  if (!rows.length) {\n    view(who +\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\");\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly ? \"<li><b>Quoted</b><span>\" + esc(money(r.weekly)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  view(html);\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { render(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n}\n\nstart();";
+const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\nfunction signedOut(msg) {\n  view(\n    '<div class=\"card\">' +\n      (msg ? '<p class=\"msg msg--bad\">' + esc(msg) + \"</p>\" : \"\") +\n      '<button class=\"gbtn\" id=\"go\" type=\"button\">Continue with Google</button>' +\n      '<p class=\"msg\">Use the address you booked the call with &mdash; that is how we find your seats. ' +\n      'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.</p>' +\n    \"</div>\"\n  );\n  document.getElementById(\"go\").addEventListener(\"click\", signIn);\n}\n\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n    \"</div>\";\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  if (!rows.length) {\n    view(who +\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\");\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly ? \"<li><b>Quoted</b><span>\" + esc(money(r.weekly)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  view(html);\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n}\n\nstart();" + `
+
+/* ── the client's own portal ──
+   Everything above this line is about seats somebody once asked us for.
+   This is about the assistant actually working for them: the week waiting on
+   their word, what it comes to, and the way to ask for somebody different.
+
+   Appended rather than woven in, because the two halves answer different
+   questions and a client may well have one and not the other — somebody
+   matched by hand never filled in the seats form, and somebody who filled it
+   in may still be waiting. */
+var C_PLACE = [];
+var C_RATE = {};
+var C_WEEKS = [];
+var C_SWAPS = [];
+var C_OFF = false;
+
+var C_LABEL = { matched: "matched", trial: "on trial", ongoing: "kept on", ended: "ended" };
+var C_DAY = ["M", "T", "W", "T", "F", "S", "S"];
+
+function loadClient(email, rows) {
+  return Promise.all([
+    api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week," +
+        "trial_weeks,applications(name)&order=started_on.desc.nullslast"),
+    api("placement_billing?select=placement_id,rate"),
+    api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
+        "timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=26"),
+    api("swap_requests?select=id,placement_id,reason,status,created_at&order=created_at.desc")
+  ]).catch(function (e) {
+    if (String(e.message) === "signed out") throw e;
+    /* 032 is pasted by hand some time after this ships, and a client who has
+       no placement is an ordinary thing rather than a fault. Either way the
+       seats half of the page is unaffected. */
+    C_OFF = true;
+    return [[], [], [], []];
+  }).then(function (r) {
+    C_PLACE = r[0] || [];
+    C_RATE = {};
+    (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
+    C_WEEKS = r[2] || [];
+    C_SWAPS = r[3] || [];
+    render(email, rows);
+  });
+}
+
+function cIso(d) {
+  var m = d.getMonth() + 1, day = d.getDate();
+  return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+}
+function cFrom(s) {
+  var p = String(s).split("-");
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+}
+function cHours(w) {
+  var ds = (w && w.timesheet_days) || [], t = 0;
+  for (var i = 0; i < ds.length; i++) t += Number(ds[i].hours || 0);
+  return t;
+}
+function cNum(n) {
+  return (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, "").replace(/\\.$/, "");
+}
+function cMoney(n) {
+  return "$" + (Math.round(Number(n) * 100) / 100).toFixed(2);
+}
+function cWeekLabel(iso) {
+  var a = cFrom(iso), b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 6);
+  var f = { month: "short", day: "numeric" };
+  return a.toLocaleDateString(undefined, f) + " to " + b.toLocaleDateString(undefined, f);
+}
+function cDays(w) {
+  var by = {};
+  (w.timesheet_days || []).forEach(function (d) { by[d.worked_on] = Number(d.hours || 0); });
+  var mon = cFrom(w.week_starts_on), out = "";
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+    var h = by[cIso(d)] || 0;
+    out += '<i class="' + (h ? "" : "z") + '">' + C_DAY[i] + " " + esc(cNum(h)) + "</i>";
+  }
+  return '<div class="bd">' + out + "</div>";
+}
+
+function clientBlock() {
+  var live = null;
+  for (var i = 0; i < C_PLACE.length; i++) {
+    if (C_PLACE[i].status !== "ended") { live = C_PLACE[i]; break; }
+  }
+  if (!live) return "";
+
+  var who = (live.applications && live.applications.name) || "your assistant";
+  var rate = C_RATE[live.id];
+  var mine = C_WEEKS.filter(function (w) { return w.placement_id === live.id; });
+  var waiting = mine.filter(function (w) { return w.status === "submitted"; });
+  var agreed = mine.filter(function (w) { return w.status === "approved"; });
+  var asked = C_SWAPS.filter(function (s) {
+    return s.placement_id === live.id && s.status === "open";
+  });
+
+  var html =
+    '<div class="card">' +
+      '<div class="row__top"><span><span class="row__n">' + esc(who) + "</span>" +
+        '<span class="row__meta"> &middot; ' +
+          (live.started_on ? "with you since " + esc(when(live.started_on)) + " &middot; " : "") +
+          esc(live.hours_per_week) + " hours a week</span></span>" +
+        '<span class="pill pill--pl_' + esc(live.status) + '">' +
+          esc(C_LABEL[live.status] || live.status) + "</span></div>" +
+    "</div>";
+
+  /* ── the week waiting on them ── */
+  html +=
+    '<div class="card" id="c-weeks">' +
+      "<h2>Hours</h2>" +
+      (waiting.length
+        ? '<p class="msg" style="margin-top:0">' + waiting.length +
+          (waiting.length === 1 ? " week is" : " weeks are") +
+          " waiting on you. Approved hours are what goes on your statement.</p>"
+        : '<p class="msg" style="margin-top:0">Nothing waiting on you just now.</p>') +
+      (mine.length
+        ? '<div class="rows">' + mine.slice(0, 8).map(function (w) {
+            var h = cHours(w);
+            return '<div class="row" data-week="' + esc(w.id) + '">' +
+              '<div class="row__top"><span><span class="row__n">' +
+                esc(cWeekLabel(w.week_starts_on)) + "</span></span>" +
+                '<span class="pill pill--ts_' + esc(w.status) + '">' +
+                  esc(w.status === "submitted" ? "waiting on you" : w.status) + "</span>" +
+                '<span class="row__tot">' + esc(cNum(h)) + " h" +
+                  (rate !== undefined ? " &middot; " + esc(cMoney(h * rate)) : "") + "</span></div>" +
+              cDays(w) +
+              (w.status === "submitted"
+                ? '<div class="row__ctl">' +
+                    '<textarea data-c-why rows="1" aria-label="Why this week is going back" ' +
+                      'placeholder="If you are sending it back, say what needs fixing"></textarea>' +
+                    '<button class="btn btn--solid" data-c-yes type="button" style="padding:.45rem .8rem;font-size:.85rem">Approve these hours</button>' +
+                    '<button class="btn btn--ghost" data-c-no type="button" style="padding:.45rem .8rem;font-size:.85rem">Something looks wrong</button>' +
+                    '<span class="row__ok" data-c-ok></span>' +
+                  "</div>"
+                : "") +
+            "</div>";
+          }).join("") + "</div>"
+        : '<p class="msg">No hours have been sent to you yet.</p>') +
+    "</div>";
+
+  /* ── what it comes to ──
+     Called a statement rather than an invoice, deliberately. Same numbers, no
+     invoice number and no payment terms: it is what the approved hours add up
+     to, not a demand. */
+  if (rate !== undefined) {
+    var total = 0;
+    agreed.forEach(function (w) { total += cHours(w) * rate; });
+    html +=
+      '<div class="card">' +
+        "<h2>Your statement</h2>" +
+        '<p class="msg" style="margin-top:0">What the hours you have approved come to. ' +
+          "This is a running total rather than a bill &mdash; we invoice you separately.</p>" +
+        '<ul class="meta">' +
+          "<li><b>Approved hours</b><span>" +
+            esc(cNum(agreed.reduce(function (t, w) { return t + cHours(w); }, 0))) + "</span></li>" +
+          "<li><b>Rate</b><span>" + esc(cMoney(rate)) + " an hour</span></li>" +
+          "<li><b>Comes to</b><span>" + esc(cMoney(total)) + "</span></li>" +
+        "</ul>" +
+      "</div>";
+  }
+
+  /* ── asking for somebody different ── */
+  html +=
+    '<div class="card" id="c-swap">' +
+      "<h2>Not working out?</h2>" +
+      (asked.length
+        ? '<div class="note"><b>You have asked us for somebody different.</b> ' +
+          "We are on it, and we will come back to you. Nothing changes in the meantime &mdash; " +
+          esc(who.split(" ")[0]) + " is still working and you are billed as normal.</div>"
+        : '<p class="msg" style="margin-top:0">Tell us what is not working and we will find you ' +
+          "somebody else. Nothing changes today: " + esc(who.split(" ")[0]) +
+          " keeps working and you keep being billed as normal until a replacement is agreed with you.</p>" +
+          '<div class="fld"><label for="c-why">What is not working?</label>' +
+            '<textarea id="c-why" rows="3"></textarea></div>' +
+          '<p class="err" id="c-swap-err" aria-live="polite"></p>' +
+          '<div class="edit__foot"><span></span><span class="edit__act">' +
+            '<span class="row__ok" id="c-swap-ok"></span>' +
+            '<button class="btn btn--ghost" id="c-swap-go" type="button" data-place="' +
+              esc(live.id) + '">Ask for a different assistant</button>' +
+          "</span></div>") +
+    "</div>";
+
+  return html;
+}
+
+function wireClient() {
+  var box = document.getElementById("c-weeks");
+  if (box) {
+    box.querySelectorAll("[data-c-yes], [data-c-no]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var row = b.closest("[data-week]");
+        var ok = row.querySelector("[data-c-ok]");
+        var yes = b.hasAttribute("data-c-yes");
+        var note = row.querySelector("[data-c-why]").value.trim();
+        if (!yes && !note) {
+          ok.textContent = "Say what needs fixing — that is the whole message";
+          ok.classList.add("is-on", "is-bad");
+          row.querySelector("[data-c-why]").focus();
+          return;
+        }
+        ok.classList.remove("is-bad");
+        ok.textContent = "Saving\\u2026";
+        ok.classList.add("is-on");
+        api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-week")), {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: yes ? { status: "approved" } : { status: "returned", note: note }
+        }).then(function () { location.reload(); })
+          .catch(function (e) {
+            ok.textContent = "Did not save";
+            ok.classList.add("is-bad");
+          });
+      });
+    });
+  }
+
+  var go = document.getElementById("c-swap-go");
+  if (!go) return;
+  go.addEventListener("click", function () {
+    var why = document.getElementById("c-why");
+    var err = document.getElementById("c-swap-err");
+    var ok = document.getElementById("c-swap-ok");
+    err.textContent = "";
+    if (!why.value.trim()) {
+      err.textContent = "Tell us what is not working — that is what we go on.";
+      why.focus();
+      return;
+    }
+    go.disabled = true;
+    ok.textContent = "Sending\\u2026";
+    ok.classList.add("is-on");
+    api("swap_requests", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: { placement_id: go.getAttribute("data-place"), reason: why.value.trim() }
+    }).then(function () { location.reload(); })
+      .catch(function (e) {
+        go.disabled = false;
+        ok.textContent = "Did not send";
+        ok.classList.add("is-bad");
+      });
+  });
+}
+`;
 
 /* ────────────────────────── admin.html ────────────────────────── */
 
