@@ -495,8 +495,8 @@ await check("a step index past the end is refused", async () => {
 await check("lead queue behaves", async () => {
   const { execFileSync } = await import("node:child_process");
   try {
-    execFileSync(process.execPath, ["tools/test-queue.mjs"], { stdio: "pipe" });
-    return "11 behaviours";
+    const out = execFileSync(process.execPath, ["tools/test-queue.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours";
   } catch (e) {
     throw new Error("tools/test-queue.mjs failed — run it directly for the detail");
   }

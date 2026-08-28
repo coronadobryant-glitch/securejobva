@@ -2316,7 +2316,25 @@ html{scroll-behavior:smooth}
          sending it a second time. Reporting that as a failure is how somebody
          ends up seeing "one tap left" over an application we already have. */
       if (r.status === 409) return "ok";
-      if (r.status >= 400 && r.status < 500 && r.status !== 429) return "dead";
+      /* A rule said no, and it will say no again. 027 refuses a second
+         application while one is live, and refuses another for three months
+         after a decline, carrying a hint the page can recognise and a message
+         written for the person to read.
+
+         Telling those apart from a failure matters: "dead" parks the row in
+         the queue and promises we will keep trying, which for a deliberate
+         refusal is a promise that cannot be kept and an application that never
+         arrives. */
+      if (r.status >= 400 && r.status < 500 && r.status !== 429) {
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (e) {}
+          if (j && j.hint === "sjva-one-application" && j.message) {
+            return { refused: String(j.message) };
+          }
+          return "dead";
+        })["catch"](function () { return "dead"; });
+      }
       return "retry";
     })["catch"](function () { return "retry"; }); /* offline, DNS, CORS */
   }
@@ -2383,6 +2401,17 @@ html{scroll-behavior:smooth}
         postDisc();
         uploadFile();
         finish("sent", d);
+        return;
+      }
+      /* Refused on purpose. Not parked, not retried, and not dressed up as a
+         technical failure — the person is told the actual reason and what to
+         do about it, which is either sign in or come back on a date. */
+      if (v && v.refused) {
+        finish("handoff", d);
+        document.getElementById("apply-done-h").textContent = "We already have you.";
+        document.getElementById("apply-done-p").textContent = v.refused;
+        document.getElementById("apply-actions").innerHTML =
+          '<a class="btn btn--solid" href="/status">Your application</a>';
         return;
       }
       park(d);

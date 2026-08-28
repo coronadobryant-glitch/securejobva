@@ -1970,6 +1970,174 @@ function wireTabs() {
   });
 }
 
+/* ── leave requests ──
+   The other half of /hub. An assistant asks; somebody here answers. Until this
+   existed the schema allowed the answer and there was nowhere to give it, so it
+   had to be done in the Supabase table editor — which means it did not get
+   done, and somebody waited on an answer nobody could see they were owed. */
+function loadLeave() {
+  var box = document.getElementById("leave-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading leave requests&hellip;';
+  api("leave_requests?select=id,application_id,starts_on,ends_on,reason,status,created_at,decided_at,decided_by&order=starts_on.desc")
+    .then(function (rows) { drawLeave(box, rows || []); })
+    .catch(function (e) {
+      box.innerHTML = '<p class="msg msg--bad">Could not load leave: ' + esc(why(e)) + "</p>";
+    });
+}
+
+function drawLeave(box, rows) {
+  /* The request carries an application_id and nothing else about the person,
+     because the name lives on the application and copying it here would be two
+     places to be wrong. ALL is already loaded. */
+  var byId = {};
+  ALL.forEach(function (a) { byId[a.id] = a; });
+
+  var waiting = rows.filter(function (r) { return r.status === "pending"; });
+  var badge = document.getElementById("tab-leave");
+  if (badge) badge.textContent = waiting.length ? String(waiting.length) : "";
+
+  box.innerHTML =
+    "<h2>Leave requests</h2>" +
+    (rows.length
+      ? '<p class="msg" style="margin-top:0">' +
+          (waiting.length ? waiting.length + " waiting on you." : "Nothing waiting.") + "</p>" +
+        '<div class="rows">' + rows.map(function (r) {
+          var a = byId[r.application_id];
+          return '<div class="row" data-leave="' + esc(r.id) + '">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(a ? a.name : "Unknown assistant") + "</span>" +
+              '<span class="row__meta"> &middot; ' + esc(when(r.starts_on)) + " to " + esc(when(r.ends_on)) + "</span>" +
+            "</span>" +
+            '<span class="pill pill--' + esc(r.status) + '">' + esc(r.status) + "</span></div>" +
+            (r.reason ? '<p class="msg" style="margin:.3rem 0 0">' + esc(r.reason) + "</p>" : "") +
+            (r.status === "pending"
+              ? '<div class="row__ctl">' +
+                  '<button class="btn btn--solid" data-leave-yes type="button" style="padding:.45rem .8rem;font-size:.85rem">Approve</button>' +
+                  '<button class="btn btn--ghost" data-leave-no type="button" style="padding:.45rem .8rem;font-size:.85rem">Decline</button>' +
+                  '<span class="row__ok" data-leave-ok></span>' +
+                "</div>"
+              : '<p class="msg" style="margin:.3rem 0 0">' + esc(r.status) + " by " +
+                esc(r.decided_by || "somebody") + " on " + esc(when(r.decided_at)) + "</p>") +
+          "</div>";
+        }).join("") + "</div>"
+      : '<p class="msg">Nobody has asked for leave yet.</p>');
+
+  box.querySelectorAll("[data-leave-yes], [data-leave-no]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-leave]");
+      var ok = row.querySelector("[data-leave-ok]");
+      var yes = b.hasAttribute("data-leave-yes");
+      flash(ok, "Saving…");
+      api("leave_requests?id=eq." + encodeURIComponent(row.getAttribute("data-leave")), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: {
+          status: yes ? "approved" : "declined",
+          decided_at: new Date().toISOString(),
+          decided_by: ME
+        }
+      }).then(loadLeave)
+        .catch(function (e) { flash(ok, why(e), true); });
+    });
+  });
+}
+
+/* ── the notice board ──
+   Staff write, the hired read. A notice with no published_at is a draft and is
+   invisible to everybody but staff, so something half-written does not appear
+   on somebody's home page while it is being thought about. */
+function loadNotices() {
+  var box = document.getElementById("notice-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading the notice board&hellip;';
+  api("notices?select=id,title,body,pinned,published_at,created_at,created_by&order=pinned.desc,created_at.desc")
+    .then(function (rows) { drawNotices(box, rows || []); })
+    .catch(function (e) {
+      box.innerHTML = '<p class="msg msg--bad">Could not load notices: ' + esc(why(e)) + "</p>";
+    });
+}
+
+function drawNotices(box, rows) {
+  box.innerHTML =
+    "<h2>Notice board</h2>" +
+    '<p class="msg" style="margin-top:0">Everybody who has been hired sees these on their portal. A draft stays here until you publish it.</p>' +
+    '<div class="fld"><label for="nt-title">Title</label><input id="nt-title" type="text"></div>' +
+    '<div class="fld"><label for="nt-body">What it says</label><textarea id="nt-body" rows="4"></textarea></div>' +
+    '<p class="err" id="nt-err" aria-live="polite"></p>' +
+    '<div class="edit__foot">' +
+      '<label class="chk"><input type="checkbox" id="nt-pin"> Pin it to the top</label>' +
+      '<span class="edit__act">' +
+        '<span class="row__ok" id="nt-ok"></span>' +
+        '<button class="btn btn--ghost" id="nt-draft" type="button">Save as draft</button>' +
+        '<button class="btn btn--solid" id="nt-pub" type="button">Publish</button>' +
+      "</span>" +
+    "</div>" +
+    (rows.length
+      ? '<div class="rows" style="margin-top:1.2rem">' + rows.map(function (n) {
+          return '<div class="row" data-notice="' + esc(n.id) + '">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(n.title) + "</span>" +
+              '<span class="row__meta"> &middot; ' +
+                (n.published_at ? "published " + esc(when(n.published_at)) : "draft") + "</span>" +
+            "</span>" +
+            '<span class="pill pill--' + (n.published_at ? "approved" : "applied") + '">' +
+              (n.published_at ? "Live" : "Draft") + "</span></div>" +
+            '<p class="msg" style="margin:.3rem 0 0">' + esc(n.body) + "</p>" +
+            '<div class="row__ctl">' +
+              '<button class="btn btn--ghost" data-nt-toggle type="button" style="padding:.45rem .8rem;font-size:.85rem">' +
+                (n.published_at ? "Take it down" : "Publish it") + "</button>" +
+              '<button class="btn btn--ghost" data-nt-pin type="button" style="padding:.45rem .8rem;font-size:.85rem">' +
+                (n.pinned ? "Unpin" : "Pin") + "</button>" +
+              '<span class="row__ok" data-nt-ok></span>' +
+            "</div>" +
+          "</div>";
+        }).join("") + "</div>"
+      : "");
+
+  var write = function (published) {
+    var t = document.getElementById("nt-title");
+    var b = document.getElementById("nt-body");
+    var err = document.getElementById("nt-err");
+    var ok = document.getElementById("nt-ok");
+    err.textContent = "";
+    if (!t.value.trim()) { err.textContent = "Give it a title — that is what people see first."; t.focus(); return; }
+    if (!b.value.trim()) { err.textContent = "A notice with no words in it is not a notice."; b.focus(); return; }
+    flash(ok, "Saving…");
+    api("notices", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: {
+        title: t.value.trim(),
+        body: b.value.trim(),
+        pinned: document.getElementById("nt-pin").checked,
+        published_at: published ? new Date().toISOString() : null,
+        created_by: ME
+      }
+    }).then(loadNotices)
+      .catch(function (e) { flash(ok, why(e), true); });
+  };
+  document.getElementById("nt-pub").addEventListener("click", function () { write(true); });
+  document.getElementById("nt-draft").addEventListener("click", function () { write(false); });
+
+  box.querySelectorAll("[data-nt-toggle], [data-nt-pin]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-notice]");
+      var id = row.getAttribute("data-notice");
+      var rec = rows.filter(function (x) { return x.id === id; })[0];
+      var ok = row.querySelector("[data-nt-ok]");
+      var body = b.hasAttribute("data-nt-pin")
+        ? { pinned: !rec.pinned }
+        : { published_at: rec.published_at ? null : new Date().toISOString() };
+      flash(ok, "Saving…");
+      api("notices?id=eq." + encodeURIComponent(id), {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: body
+      }).then(loadNotices)
+        .catch(function (e) { flash(ok, why(e), true); });
+    });
+  });
+}
+
 /* ── seat requests ──
    The client side of the same job. Staff can move one along; they cannot edit
    what was asked for, which is the client's record of the conversation. */
@@ -2517,6 +2685,7 @@ function render(email, apps, notes, socials, docs, disc) {
       '<button class="tab" data-tab="inbox" type="button">Messages<span class="tab__n" id="tab-unread"></span></button>' +
       '<button class="tab" data-tab="clients" type="button">Clients</button>' +
       '<button class="tab" data-tab="cal" type="button">Interviews<span class="tab__n" id="tab-cal"></span></button>' +
+      '<button class="tab" data-tab="team" type="button">Team<span class="tab__n" id="tab-leave"></span></button>' +
       (can("accounts.manage") ? '<button class="tab" data-tab="accts" type="button">Accounts</button>' : "") +
     "</div>" +
     '<div data-pane="apps">' +
@@ -2527,6 +2696,8 @@ function render(email, apps, notes, socials, docs, disc) {
     '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div></div>' +
     '<div data-pane="clients" hidden><div class="card" id="clients-card"></div></div>' +
     '<div data-pane="cal" hidden><div class="card" id="cal-card"></div></div>' +
+    '<div data-pane="team" hidden><div class="card" id="leave-card"></div>' +
+      '<div class="card" id="notice-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "")
@@ -2537,6 +2708,8 @@ function render(email, apps, notes, socials, docs, disc) {
   if (can("analytics.view")) drawStats();
   if (can("accounts.manage")) loadRoles();
   loadSeats();
+  loadLeave();
+  loadNotices();
   loadInbox();
   loadClients();
   document.getElementById("q").addEventListener("input", paint);
