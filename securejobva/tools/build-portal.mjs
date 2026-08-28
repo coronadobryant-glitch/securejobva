@@ -1436,20 +1436,31 @@ function signedOut(msg) {
    reads as a closed door rather than a failure. The refusal is Postgres's:
    the query returned nothing because no policy let it through. */
 function notAdmin(email) {
+  /* Signed out on the spot rather than left holding a session for a desk they
+     cannot open. signOut() itself is no use here: it reloads, which lands back
+     on the sign-in card with the warning gone and nothing explaining why. So
+     this does what signOut does — drop the local session, revoke the token
+     best-effort — and then renders the reason instead of reloading. */
+  var s = loadSession();
+  clearSession();
+  if (s && s.access_token) {
+    fetch(SB + "/auth/v1/logout", {
+      method: "POST",
+      headers: { apikey: ANON, Authorization: "Bearer " + s.access_token }
+    })["catch"](function () {});
+  }
+
   view(
     '<div class="card">' +
-      '<div class="note note--warn"><b>' + esc(email) + " has no access to the staff desk.</b> " +
-      "Nothing here was shown to you &mdash; the database refuses every row to an account " +
-      "without a role, which is why this page is empty rather than locked. An administrator " +
-      "can grant access under Accounts. If you are looking for your own application, that is " +
-      "on the status page.</div>" +
-      '<p style="margin-top:1.2rem">' +
-        '<a class="btn btn--solid" href="/status">Go to your application</a> ' +
-        '<button class="btn btn--ghost" id="out-denied" type="button">Sign out</button>' +
-      "</p>" +
+      '<div class="note note--warn"><b>No access. You have been signed out.</b> ' +
+      esc(email) + " is not on the staff list, so this desk stays shut. Nothing here was " +
+      "shown to you &mdash; the database refuses every row to an account without a role, " +
+      "which is why the page is empty rather than locked. Access is granted by an " +
+      "administrator, not by signing in.</div>" +
+      '<p class="msg">Applied for a job? Your own page is <a href="/status">Your application</a> ' +
+      "&mdash; you will be asked to sign in again there.</p>" +
     "</div>"
   );
-  document.getElementById("out-denied").addEventListener("click", signOut);
 }
 
 function options(cur) {
