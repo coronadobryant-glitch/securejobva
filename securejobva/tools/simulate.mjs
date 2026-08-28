@@ -115,8 +115,14 @@ const PLACE = { id: "p1", application_id: A.id, client_id: CLIENT.id, status: "m
                 started_on: "2026-09-07", hours_per_week: 40, trial_weeks: 2,
                 clients: { name: CLIENT.name }, applications: { name: A.name } };
 const BILL = 7.75, PAY = 4.5;
+/* The trial runs 7 to 20 September, so this first week is inside it and is
+   ours to carry. The week beginning the 21st is the first the client pays for. */
 const WEEK = { id: "w1", placement_id: PLACE.id, week_starts_on: "2026-09-07",
-               status: "draft", note: null, timesheet_days: [] };
+               status: "draft", note: null, trial_week: true, timesheet_days: [] };
+const WEEK2 = { id: "w2", placement_id: PLACE.id, week_starts_on: "2026-09-21",
+                status: "approved", note: null, trial_week: false,
+                timesheet_days: ["2026-09-21","2026-09-22","2026-09-23","2026-09-24","2026-09-25"]
+                  .map(function (d, i) { return { id: "e" + i, worked_on: d, hours: "8.00" }; }) };
 
 console.log("\nsimulation — one person, applied to billed\n");
 
@@ -220,7 +226,8 @@ act("Rosehill open /seats and see it waiting");
   ok("they see who works for them", view.includes("Maria Santos"));
   ok("the week is waiting on them", view.includes("waiting on you"));
   ok("with the days shown", view.includes("M 8") && view.includes("F 8"));
-  ok("and what it would come to", view.includes("$310.00"), "40 × $7.75");
+  ok("the row says it is on us, not a price", view.includes("on us"),
+    "this one is inside the trial");
   ok("the statement counts nothing yet", view.includes("Comes to</b><span>$0.00"),
     "unapproved hours are not owed");
   ok("what Maria is paid is nowhere on it", !view.includes("4.5") && !view.includes("$4.50"));
@@ -245,9 +252,24 @@ act("The statement moves");
 {
   seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK], C_SWAPS: [] });
   const view = seats.clientBlock();
-  ok("approved hours now count", view.includes("Comes to</b><span>$310.00"));
-  ok("40 × $7.75 is exact", seats.cMoney(40 * BILL) === "$310.00", "no float dust");
+  ok("the trial week is not charged for", view.includes("Comes to</b><span>$0.00"),
+    "she is paid for it; we carry it");
+  ok("but it is shown, not hidden", view.includes("Trial hours, on us"),
+    "so the weeks above still add up to the total");
+  ok("and the row says so plainly", view.includes("on us"));
   ok("still nothing about what she is paid", !view.includes("$180.00"), "40 × $4.50");
+}
+
+/* ── 11b ── */
+act("The trial ends. She works the first chargeable week");
+{
+  seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK, WEEK2], C_SWAPS: [] });
+  const view = seats.clientBlock();
+  ok("now they owe something", view.includes("Comes to</b><span>$310.00"),
+    "40 × $7.75, the chargeable week only");
+  ok("the trial week still shows as ours", view.includes("Trial hours, on us"));
+  ok("chargeable hours count only the one week", view.includes("Chargeable hours</b><span>40"));
+  ok("40 × $7.75 is exact", seats.cMoney(40 * BILL) === "$310.00", "no float dust");
 }
 
 /* ── 12 ── */

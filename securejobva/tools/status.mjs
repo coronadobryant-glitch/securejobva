@@ -160,6 +160,11 @@ const checks = [
      it reports "not run yet" forever, however well the migration ran. The
      function 033 adds is the honest signal: present and refusing anon. */
   ["033 week to client",  () => fn("timesheet_is_clients", { ts: "00000000-0000-0000-0000-000000000000" }), ["locked"]]
+  /* 034 has no probe, deliberately. It adds one column, trial_week, granted to
+     nobody — so the public key cannot see it, exactly as with placement_id.
+     Probing the timesheets table instead would report "present" whether or not
+     034 had run, which is a check that cannot fail pretending to be one that
+     can. Its verification query at the bottom of the file is the honest test. */
 ];
 
 for (const [what, run, good] of checks) {

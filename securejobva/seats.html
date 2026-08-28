@@ -1401,7 +1401,7 @@ function loadClient(email, rows) {
         "trial_weeks,applications(name)&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
-        "timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=26"),
+        "trial_week,timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=26"),
     api("swap_requests?select=id,placement_id,reason,status,created_at&order=created_at.desc")
   ]).catch(function (e) {
     if (String(e.message) === "signed out") throw e;
@@ -1500,7 +1500,10 @@ function clientBlock() {
                 '<span class="pill pill--ts_' + esc(w.status) + '">' +
                   esc(w.status === "submitted" ? "waiting on you" : w.status) + "</span>" +
                 '<span class="row__tot">' + esc(cNum(h)) + " h" +
-                  (rate !== undefined ? " &middot; " + esc(cMoney(h * rate)) : "") + "</span></div>" +
+                  (w.trial_week
+                    ? ' &middot; <span style="color:var(--muted);font-weight:400">on us</span>'
+                    : rate !== undefined ? " &middot; " + esc(cMoney(h * rate)) : "") +
+                "</span></div>" +
               cDays(w) +
               (w.status === "submitted"
                 ? '<div class="row__ctl">' +
@@ -1521,16 +1524,28 @@ function clientBlock() {
      invoice number and no payment terms: it is what the approved hours add up
      to, not a demand. */
   if (rate !== undefined) {
+    /* The trial is what we spend to win the placement. Those weeks are
+       approved, real and paid — by us — and they do not reach this total. */
+    var billable = agreed.filter(function (w) { return !w.trial_week; });
+    var onUs = agreed.filter(function (w) { return w.trial_week; });
     var total = 0;
-    agreed.forEach(function (w) { total += cHours(w) * rate; });
+    billable.forEach(function (w) { total += cHours(w) * rate; });
     html +=
       '<div class="card">' +
         "<h2>Your statement</h2>" +
         '<p class="msg" style="margin-top:0">What the hours you have approved come to. ' +
           "This is a running total rather than a bill &mdash; we invoice you separately.</p>" +
         '<ul class="meta">' +
-          "<li><b>Approved hours</b><span>" +
-            esc(cNum(agreed.reduce(function (t, w) { return t + cHours(w); }, 0))) + "</span></li>" +
+          "<li><b>Chargeable hours</b><span>" +
+            esc(cNum(billable.reduce(function (t, w) { return t + cHours(w); }, 0))) + "</span></li>" +
+          /* Shown rather than quietly left out. A client who adds up the weeks
+             above and gets a different number to the total has been given a
+             puzzle instead of a statement. */
+          (onUs.length
+            ? "<li><b>Trial hours, on us</b><span>" +
+              esc(cNum(onUs.reduce(function (t, w) { return t + cHours(w); }, 0))) +
+              " &mdash; not charged</span></li>"
+            : "") +
           "<li><b>Rate</b><span>" + esc(cMoney(rate)) + " an hour</span></li>" +
           "<li><b>Comes to</b><span>" + esc(cMoney(total)) + "</span></li>" +
         "</ul>" +
