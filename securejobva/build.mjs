@@ -119,7 +119,14 @@ const ASSETS = ["og.png", "og.svg", "favicon.svg", "robots.txt"];
 /* The header used to be the only marker, but anything rendering above it -- the
    rating banner on the home page -- then landed inside <head>, which browsers
    only survive by closing the head early. Whichever marker comes first wins. */
-const BODY_STARTS = ['<section class="rated"', '<header class="nav">'];
+/* <main> is the backstop, and it is the one every page has. The two markers
+   above are both optional chrome: the rating banner appears on one page, and
+   the site header is absent from /admin, which now renders as an application
+   with its navigation in a sidebar instead. Removing that header broke this
+   split and the build with it — nothing matched, so head could not be told
+   from body. A marker list made only of things a page might not have is a list
+   that eventually finds none of them. */
+const BODY_STARTS = ['<section class="rated"', '<header class="nav">', "<main>"];
 
 function title(html) {
   const m = html.match(/<title>([\s\S]*?)<\/title>/i);

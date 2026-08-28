@@ -9,7 +9,7 @@
         node tools/check.mjs --live   also check the running site
 
    Exit status is 1 if anything failed, so it can gate a deploy. */
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { Script } from "node:vm";
 
 const LIVE = process.argv.includes("--live");
@@ -177,6 +177,34 @@ for (const p of SHIPPED.map((file) => ({ file }))) {
     return calls.length + " esc() calls";
   });
 }
+
+/* Everything below about dist/ reads files build.mjs wrote. If the build failed,
+   those files are whatever the last successful run left behind — and the checks
+   then pass against a version of the site that no longer exists.
+
+   That is not hypothetical. Removing the site header from /admin broke the
+   head-from-body split in build.mjs; the build threw, dist/ kept yesterday's
+   copies, and the checks went green on them through four commits while every
+   deploy failed. The build command runs them in sequence for exactly this
+   reason, and running them out of sequence is what hid it.
+
+   A file on disk that is older than its source means the build did not write
+   it. Cheap, and it fails in precisely the case that fooled me. */
+await check("dist was written by this build", () => {
+  const stale = [];
+  for (const f of SHIPPED) {
+    const out = "dist/" + f;
+    if (!existsSync(out)) { stale.push(f + " is missing from dist/"); continue; }
+    const src = statSync(f).mtimeMs;
+    const built = statSync(out).mtimeMs;
+    if (built < src) stale.push(f + " is newer than dist/" + f);
+  }
+  if (stale.length) {
+    throw new Error(stale.join("; ") + " — run node build.mjs. These checks read " +
+      "dist/, so without it they pass against the last build that worked");
+  }
+  return SHIPPED.length + " pages, all rebuilt";
+});
 
 /* The schema lives in sql/ as numbered files that get pasted into the Supabase
    editor one at a time. For checking purposes they are one document — a column
