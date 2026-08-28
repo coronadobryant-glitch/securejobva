@@ -422,6 +422,140 @@ await check("select=* only where the whole table is granted", () => {
   return limited.length + " column-limited tables, none queried with select=*";
 });
 
+/* ── 030, the timesheet ──────────────────────────────────────────────────
+   These numbers are what somebody gets paid on, and every rule protecting
+   them lives in a policy body or a trigger — places where a wrong word does
+   not fail loudly, it just quietly permits something. Each of the checks
+   below was written by first breaking the thing it watches and confirming it
+   went red; two of them did not, and had to be rewritten.
+
+   The bare table name is enough to find a statement, because a migration is
+   never edited after it has been run: nothing later can redefine these. */
+
+function policyBody(name) {
+  const m = sql.match(new RegExp('create policy "' + name + '"[\\s\\S]*?;', "i"));
+  if (!m) throw new Error('no policy named "' + name + '" in the sql/ folder');
+  return m[0];
+}
+
+function functionBody(name) {
+  const m = sql.match(new RegExp(
+    "create or replace function public\\." + name + "[\\s\\S]*?\\$fn\\$;", "i"));
+  if (!m) throw new Error(name + "() is not defined in the sql/ folder");
+  return m[0];
+}
+
+await check("an assistant cannot approve their own week", () => {
+  const p = policyBody("an assistant edits an open week");
+  const at = p.toLowerCase().lastIndexOf("with check");
+  if (at < 0) throw new Error("the assistant's update policy has no WITH CHECK at all, so it " +
+    "constrains nothing about the row left behind");
+  const leaves = p.slice(at);
+  if (/'approved'/i.test(leaves)) {
+    throw new Error("WITH CHECK admits 'approved' — an assistant holds UPDATE(status) on their " +
+      "own week, so this is the only thing stopping them approving it themselves");
+  }
+  if (!/'submitted'/i.test(leaves)) {
+    throw new Error("WITH CHECK does not admit 'submitted', so nobody can send a week at all");
+  }
+  return "admits draft, returned, submitted — not approved";
+});
+
+await check("a sent week is locked to the person who sent it", () => {
+  const p = policyBody("an assistant edits an open week");
+  const lower = p.toLowerCase();
+  const using = p.slice(lower.indexOf("using"), lower.lastIndexOf("with check"));
+  if (!/status\s+in\s*\(\s*'draft'\s*,\s*'returned'\s*\)/i.test(using)) {
+    throw new Error("USING does not restrict which states may be touched — a week stays editable " +
+      "after it is sent, and the total you approved is not necessarily the total in the row");
+  }
+  return "USING admits draft and returned only";
+});
+
+await check("days cannot be changed after the week is sent", () => {
+  for (const n of ["an assistant writes days on an open week",
+                   "an assistant edits days on an open week",
+                   "an assistant clears days on an open week"]) {
+    if (!/timesheet_open\s*\(/i.test(policyBody(n))) {
+      throw new Error('"' + n + '" does not go through timesheet_open(), so locking the week ' +
+        "leaves the hours in it editable — which locks nothing");
+    }
+  }
+  const fn = functionBody("timesheet_open");
+  if (!/status\s+in\s*\(\s*'draft'\s*,\s*'returned'\s*\)/i.test(fn)) {
+    throw new Error("timesheet_open() does not look at the status, so every policy leaning on it " +
+      "is open on every week");
+  }
+  if (!/owns_application\s*\(/i.test(fn)) {
+    throw new Error("timesheet_open() does not check ownership — it would be open on everybody's weeks");
+  }
+  return "three policies, all through timesheet_open()";
+});
+
+await check("nobody may write who approved a timesheet", () => {
+  const guarded = ["submitted_at", "decided_at", "decided_by"];
+  const bad = [];
+  for (const stmt of sql.replace(/--[^\n]*/g, " ").split(";")) {
+    if (!/on\s+public\.timesheets\s+to\s+/i.test(stmt)) continue;
+    const cols = stmt.match(/grant\s+(?:insert|update)\s*\(([^)]*)\)/i);
+    if (cols) {
+      for (const c of cols[1].split(",")) {
+        const t = c.trim();
+        if (guarded.includes(t)) bad.push(t + " is granted");
+      }
+      continue;
+    }
+    if (/grant\s+[a-z,\s]*\b(?:insert|update|all)\b[a-z,\s]*\s+on\s+public\.timesheets/i.test(stmt)) {
+      bad.push("a table-level INSERT/UPDATE grant covers every column");
+    }
+  }
+  if (bad.length) {
+    throw new Error(bad.join("; ") + " — these are stamped by the trigger from the verified token. " +
+      "Granted, they become numbers a request body can choose.");
+  }
+  return "submitted_at, decided_at, decided_by: trigger only";
+});
+
+await check("an assistant cannot rewrite why a week came back", () => {
+  const fn = functionBody("timesheet_stamp");
+  if (!/if\s+not\s+public\.has_permission\('applications\.edit'\)[\s\S]{0,200}?new\.note\s*:=\s*old\.note/i.test(fn)) {
+    throw new Error("the trigger does not put note back for a non-staff writer. An assistant holds " +
+      "UPDATE(note) on their own open week — staff and assistants are the same role, so the grant " +
+      "cannot separate them and this is the only thing that does.");
+  }
+  if (!/create\s+trigger\s+timesheets_stamp\s+before\s+update\s+on\s+public\.timesheets/i.test(sql)) {
+    throw new Error("timesheet_stamp() is defined but no BEFORE UPDATE trigger runs it");
+  }
+  return "note reverted for non-staff, trigger wired";
+});
+
+await check("a day cannot be filed against the wrong week", () => {
+  const fn = functionBody("timesheet_day_in_week");
+  if (!/worked_on\s*<\s*wk\s+or\s+new\.worked_on\s*>\s*wk\s*\+\s*6/i.test(fn)) {
+    throw new Error("the trigger does not compare the day against both ends of its week, so hours " +
+      "can be filed against any week and a weekly total stops meaning the hours worked in it");
+  }
+  if (!/create\s+trigger\s+timesheet_days_in_week\s+before\s+insert\s+or\s+update/i.test(sql)) {
+    throw new Error("the function exists but no BEFORE INSERT OR UPDATE trigger runs it");
+  }
+  return "checked on insert and update";
+});
+
+await check("anon holds nothing on the timesheet tables", () => {
+  for (const t of ["timesheets", "timesheet_days"]) {
+    if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
+      throw new Error("nothing revokes anon on " + t);
+    }
+    const granted = sql.replace(/--[^\n]*/g, " ").split(";").some((s) =>
+      new RegExp("grant[\\s\\S]*?on\\s+public\\." + t + "\\s+to\\s+[a-z_,\\s]*\\banon\\b", "i").test(s));
+    if (granted) throw new Error(t + " is granted to anon somewhere");
+    if (!new RegExp("alter\\s+table\\s+public\\." + t + "\\s+enable\\s+row\\s+level\\s+security", "i").test(sql)) {
+      throw new Error("row-level security is never enabled on " + t);
+    }
+  }
+  return "both revoked, both RLS on";
+});
+
 /* save() on /admin decides what changed and builds the writes. A wrong
    comparison there is invisible: the row looks saved and nothing was sent. */
 await check("admin saves what changed and nothing else", async () => {
@@ -520,6 +654,20 @@ await check("a step index past the end is refused", async () => {
   }
 });
 
+/* Which Monday a week belongs to is worked out on the assistant's own clock,
+   in their own timezone, and the database cannot check that for us — it only
+   sees the date it is handed. A wrong answer files a week of hours against the
+   week before and looks like nothing at all. */
+await check("the timesheet's weeks and totals hold up", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-timesheet.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours";
+  } catch (e) {
+    throw new Error("tools/test-timesheet.mjs failed — run it directly for the detail");
+  }
+});
+
 await check("lead queue behaves", async () => {
   const { execFileSync } = await import("node:child_process");
   try {
@@ -539,23 +687,53 @@ await check("lead queue behaves", async () => {
    has_permission(), auth.uid() or auth.jwt(). One that asks nothing is a
    privilege escalation with a friendly name, and set_role() is the shape that
    matters — anyone can call it, and only the first line stops them. */
+/* One function may ask on another's behalf. owns_timesheet() reads no token
+   itself; it asks owns_application(), which does. Demanding the primitives
+   appear in every body would mean copying the ownership test into each new
+   function, and 026 is explicit about why that is worse: one fence with two
+   gates is a fence, two fences are two things to keep in step.
+
+   So a body counts as gated if it names a primitive OR calls a function that
+   is itself gated, worked out to a fixpoint. Delegating to something ungated
+   still fails, which is the property worth keeping — verified by pointing
+   owns_timesheet() at a stub that asks nothing and watching this go red. */
 await check("SECURITY DEFINER functions check the caller", () => {
   const fns = [...sql.matchAll(
     /create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)([\s\S]*?)\$fn\$([\s\S]*?)\$fn\$/gi
   )];
   if (!fns.length) return "no definer functions defined";
+
+  const bodies = new Map(fns.map(([, name, , body]) => [name, body]));
+  const gated = new Set();
+  for (const [name, body] of bodies) {
+    if (/has_permission|auth\.uid\(\)|auth\.jwt\(\)/i.test(body)) gated.add(name);
+  }
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [name, body] of bodies) {
+      if (gated.has(name)) continue;
+      for (const other of gated) {
+        if (new RegExp("public\\." + other + "\\s*\\(", "i").test(body)) {
+          gated.add(name); grew = true; break;
+        }
+      }
+    }
+  }
+
   const ungated = [];
-  for (const [, name, sig, body] of fns) {
+  const definers = [];
+  for (const [, name, sig] of fns) {
     if (!/security\s+definer/i.test(sig)) continue;
+    definers.push(name);
     if (!new RegExp("grant\\s+execute\\s+on\\s+function\\s+public\\." + name + "\\b[^;]*authenticated", "i").test(sql)) continue;
-    if (!/has_permission|auth\.uid\(\)|auth\.jwt\(\)/i.test(body)) ungated.push(name);
+    if (!gated.has(name)) ungated.push(name);
   }
   if (ungated.length) {
     throw new Error(ungated.join(", ") + " — SECURITY DEFINER, executable by any signed-in " +
-      "user, and never asks who is calling. Gate it with has_permission() or auth.jwt().");
+      "user, and never asks who is calling, directly or through anything it calls. " +
+      "Gate it with has_permission() or auth.jwt().");
   }
-  const checked = fns.filter(([, , sig]) => /security\s+definer/i.test(sig)).map((f) => f[1]);
-  return checked.length + " gated: " + checked.join(", ");
+  return definers.length + " gated: " + definers.join(", ");
 });
 
 /* A view is the quiet way to undo every policy underneath it.

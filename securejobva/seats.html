@@ -610,6 +610,40 @@ body:has(.adm__wrap) main{padding:0}
 .nt__b{margin:.2rem 0 0;font-size:.9rem;white-space:pre-wrap}
 .pill--pending{background:var(--surface-2);color:var(--ink-2)}
 
+/* The timesheet. Its own pill classes rather than the application ones —
+   pill--approved is the signal yellow an approved *application* wears, and an
+   approved week of work reading as a warning is exactly backwards. */
+.pill--ts_draft{background:var(--surface-2);color:var(--muted)}
+.pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
+.pill--ts_approved{background:#0B7A63;color:#fff}
+.pill--ts_returned{background:#B3261E;color:#fff}
+.ts__hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem}
+.ts__wk{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--muted)}
+.sheet{margin-top:1.1rem;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.day{display:grid;grid-template-columns:5rem 1fr 4.6rem;align-items:center;gap:.6rem;padding:.45rem .75rem;border-bottom:1px solid var(--line)}
+.day:last-of-type{border-bottom:0}
+.day--wknd{background:var(--surface-2)}
+.day__d{display:flex;flex-direction:column;min-width:0}
+.day__n{font-weight:600;font-size:.88rem;color:var(--ink)}
+.day__t{font-family:"IBM Plex Mono",monospace;font-size:.65rem;color:var(--muted)}
+.day__note{font-family:inherit;font-size:.85rem;color:var(--ink-2);border:0;background:none;padding:.15rem 0;min-width:0;width:100%}
+.day__note:focus{outline:none;border-bottom:1px solid var(--accent)}
+.hrs{font-family:"IBM Plex Mono",monospace;font-size:.92rem;text-align:right;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-variant-numeric:tabular-nums;width:100%}
+.hrs:disabled{background:var(--surface-2);color:var(--muted)}
+.sum{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.6rem;padding:.65rem .75rem;background:var(--glow,var(--accent-soft));border-top:1px solid var(--line)}
+.sum__l{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sum__v{font-size:1.4rem;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
+.sum__v small{font-size:.85rem;font-weight:400;color:var(--muted)}
+.wks{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1.1rem}
+.wk{background:var(--surface);padding:.65rem .9rem;display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
+.wk__d{font-weight:600;font-size:.9rem;color:var(--ink)}
+.wk__h{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.85rem;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.wk__m{width:100%;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted)}
+.row__tot{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.bd{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.5rem}
+.bd i{font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-style:normal;border:1px solid var(--line);border-radius:4px;padding:.12rem .36rem;color:var(--ink-2);background:var(--surface-2);font-variant-numeric:tabular-nums}
+.bd i.z{color:var(--muted);opacity:.65}
+
 /* Stat tiles. The hero numbers are the answer for three of these four; a chart
    of a single figure would be a chart of nothing. */
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin:1rem 0 0}

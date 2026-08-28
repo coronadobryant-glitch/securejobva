@@ -45,7 +45,11 @@ const SEALED = [
   ["admins",               "the list of who administers this site"],
   ["user_roles",           "who holds which role"],
   ["role_requests",        "who has asked for what access"],
-  ["social_tokens",        "publishing tokens for other people's social accounts"]
+  ["social_tokens",        "publishing tokens for other people's social accounts"],
+  ["leave_requests",       "who has asked for time off, and why"],
+  ["notices",              "the notice board, including notices not yet published"],
+  ["timesheets",           "the hours everybody is paid on"],
+  ["timesheet_days",       "what each assistant worked, day by day"]
 ];
 
 /* The functions are SECURITY DEFINER, so a missing grant is the only thing

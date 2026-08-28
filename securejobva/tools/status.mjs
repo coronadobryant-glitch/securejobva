@@ -145,7 +145,11 @@ const checks = [
   ["005 queue view",      () => table("application_queue"),    ["locked"]],
   ["007 set_role()",      () => fn("set_role", { target_email: "x@y.z", role_key: "admin", grant_it: false }), ["locked"]],
   ["009 account types",   () => fn("my_account_requests"),     ["locked"]],
-  ["010 contact",         () => table("contact_messages"),     ["locked"]]
+  ["010 contact",         () => table("contact_messages"),     ["locked"]],
+  ["026 leave",           () => table("leave_requests"),       ["locked"]],
+  ["026 notices",         () => table("notices"),              ["locked"]],
+  ["030 timesheets",      () => table("timesheets"),           ["locked"]],
+  ["030 timesheet days",  () => table("timesheet_days"),       ["locked"]]
 ];
 
 for (const [what, run, good] of checks) {

@@ -610,6 +610,40 @@ body:has(.adm__wrap) main{padding:0}
 .nt__b{margin:.2rem 0 0;font-size:.9rem;white-space:pre-wrap}
 .pill--pending{background:var(--surface-2);color:var(--ink-2)}
 
+/* The timesheet. Its own pill classes rather than the application ones —
+   pill--approved is the signal yellow an approved *application* wears, and an
+   approved week of work reading as a warning is exactly backwards. */
+.pill--ts_draft{background:var(--surface-2);color:var(--muted)}
+.pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
+.pill--ts_approved{background:#0B7A63;color:#fff}
+.pill--ts_returned{background:#B3261E;color:#fff}
+.ts__hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem}
+.ts__wk{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--muted)}
+.sheet{margin-top:1.1rem;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.day{display:grid;grid-template-columns:5rem 1fr 4.6rem;align-items:center;gap:.6rem;padding:.45rem .75rem;border-bottom:1px solid var(--line)}
+.day:last-of-type{border-bottom:0}
+.day--wknd{background:var(--surface-2)}
+.day__d{display:flex;flex-direction:column;min-width:0}
+.day__n{font-weight:600;font-size:.88rem;color:var(--ink)}
+.day__t{font-family:"IBM Plex Mono",monospace;font-size:.65rem;color:var(--muted)}
+.day__note{font-family:inherit;font-size:.85rem;color:var(--ink-2);border:0;background:none;padding:.15rem 0;min-width:0;width:100%}
+.day__note:focus{outline:none;border-bottom:1px solid var(--accent)}
+.hrs{font-family:"IBM Plex Mono",monospace;font-size:.92rem;text-align:right;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-variant-numeric:tabular-nums;width:100%}
+.hrs:disabled{background:var(--surface-2);color:var(--muted)}
+.sum{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.6rem;padding:.65rem .75rem;background:var(--glow,var(--accent-soft));border-top:1px solid var(--line)}
+.sum__l{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sum__v{font-size:1.4rem;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
+.sum__v small{font-size:.85rem;font-weight:400;color:var(--muted)}
+.wks{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1.1rem}
+.wk{background:var(--surface);padding:.65rem .9rem;display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
+.wk__d{font-weight:600;font-size:.9rem;color:var(--ink)}
+.wk__h{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.85rem;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.wk__m{width:100%;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted)}
+.row__tot{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.bd{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.5rem}
+.bd i{font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-style:normal;border:1px solid var(--line);border-radius:4px;padding:.12rem .36rem;color:var(--ink-2);background:var(--surface-2);font-variant-numeric:tabular-nums}
+.bd i.z{color:var(--muted);opacity:.65}
+
 /* Stat tiles. The hero numbers are the answer for three of these four; a chart
    of a single figure would be a chart of nothing. */
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin:1rem 0 0}
@@ -1167,6 +1201,14 @@ var lead = document.getElementById("hub-lead");
 var APP = null;
 var ME = "";
 
+/* Every week this person has, keyed by its Monday, and which one the card is
+   showing. Kept out here because the card repaints itself after each save
+   rather than reloading the whole portal — a page that fetches everything
+   again to show one changed number is how a saved thing comes back looking
+   like it did not save. */
+var SHEETS = {};
+var VIEW = "";
+
 function view(html) { root.innerHTML = html; }
 
 /* How somebody would rather be paid. The choice is stored; nothing else is.
@@ -1198,10 +1240,287 @@ function shut(title, body) {
   );
 }
 
-function tile(href, label, path) {
+function tile(href, label, path, sub) {
   return '<a class="tl" href="' + href + '">' +
     '<span class="tl__art"><svg viewBox="0 0 24 24" aria-hidden="true">' + path + "</svg></span>" +
-    '<span class="tl__l">' + esc(label) + "</span></a>";
+    '<span class="tl__l">' + esc(label) +
+      (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></a>";
+}
+
+/* ── the timesheet ──
+   A week is named by its Monday and the database will not take a guess at it,
+   so the Monday is worked out here from local date parts. toISOString() would
+   be tempting and wrong: it is UTC, and for the first eight hours of every
+   Monday in Manila it would file the day against the week that just ended. */
+function isoDay(d) {
+  var m = d.getMonth() + 1, day = d.getDate();
+  return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+}
+
+function fromIso(s) {
+  var p = String(s).split("-");
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+}
+
+function addDays(d, n) {
+  var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function mondayOf(d) {
+  var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+var DAY_NAME = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+var TS_LABEL = { draft: "not sent yet", submitted: "waiting on us",
+                 approved: "approved", returned: "sent back" };
+
+/* Two decimals, then the trailing zeros taken off: 38 rather than 38.00, and
+   18.5 rather than 18.50, without turning 7.25 into 7.3. */
+function showHours(n) {
+  return (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function dayIn(sheet, iso) {
+  var ds = (sheet && sheet.timesheet_days) || [];
+  for (var i = 0; i < ds.length; i++) if (ds[i].worked_on === iso) return ds[i];
+  return null;
+}
+
+function totalOf(sheet) {
+  var ds = (sheet && sheet.timesheet_days) || [], t = 0;
+  for (var i = 0; i < ds.length; i++) t += Number(ds[i].hours || 0);
+  return t;
+}
+
+/* Hours typed in and not yet on their way anywhere. Nothing at all when there
+   is nothing to say — a tile reading "0 h not sent" is noise pretending to be
+   information, the same reason badge() prints nothing for zero. */
+function unsentLabel() {
+  var t = 0;
+  for (var k in SHEETS) {
+    var s = SHEETS[k];
+    if (s.status === "draft" || s.status === "returned") t += totalOf(s);
+  }
+  return t > 0 ? showHours(t) + " h not sent" : "";
+}
+
+function weekLabel(iso) {
+  var a = fromIso(iso), b = addDays(a, 6);
+  var f = { weekday: "short", month: "short", day: "numeric" };
+  return a.toLocaleDateString(undefined, f) + " to " + b.toLocaleDateString(undefined, f);
+}
+
+function dayRow(sheet, iso, i, open) {
+  var d = dayIn(sheet, iso);
+  var wknd = i > 4;
+  return '<div class="day' + (wknd ? " day--wknd" : "") + '" data-day="' + esc(iso) + '">' +
+    '<span class="day__d"><span class="day__n">' + DAY_NAME[i] + "</span>" +
+      '<span class="day__t">' +
+        esc(fromIso(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" })) +
+      "</span></span>" +
+    '<input class="day__note" data-note type="text" maxlength="500" value="' +
+      esc(d && d.note ? d.note : "") + '" placeholder="' +
+      (wknd ? "&mdash;" : "What you worked on (optional)") + '"' +
+      (open ? "" : " disabled") + ">" +
+    '<input class="hrs" data-hrs type="number" min="0" max="24" step="0.25" value="' +
+      esc(d ? showHours(Number(d.hours)) : "0") + '"' + (open ? "" : " disabled") +
+      ' aria-label="Hours on ' + DAY_NAME[i] + '">' +
+  "</div>";
+}
+
+/* The card shows one week at a time, and which week is a thing you can move.
+   Showing only the current week would mean that from Tuesday onwards there is
+   no way to reach the week you are actually supposed to be sending, and no way
+   at all to fix one that came back. */
+function hoursCard() {
+  var sheet = SHEETS[VIEW] || null;
+  var status = sheet ? sheet.status : "draft";
+  var open = status === "draft" || status === "returned";
+  var mon = fromIso(VIEW);
+  var here = isoDay(mondayOf(new Date()));
+  var total = totalOf(sheet);
+
+  var rows = "";
+  for (var i = 0; i < 7; i++) rows += dayRow(sheet, isoDay(addDays(mon, i)), i, open);
+
+  var back = isoDay(addDays(mon, -7));
+  var fwd = isoDay(addDays(mon, 7));
+  var floor = isoDay(addDays(mondayOf(new Date()), -8 * 7));
+
+  var foot;
+  if (status === "submitted") {
+    foot = '<span class="hint">Sent ' + esc(when(sheet.submitted_at)) +
+           ". Nobody has looked at it yet.</span>";
+  } else if (status === "approved") {
+    foot = '<span class="hint">Approved by ' + esc(sheet.decided_by || "somebody") +
+           " on " + esc(when(sheet.decided_at)) + ". This is the number pay is run from.</span>";
+  } else {
+    foot = '<span class="hint">' +
+      (status === "returned"
+        ? "Change what needs changing and send it back to us."
+        : "Nothing is sent until you press the button, and you can change any of it until you do.") +
+      "</span>" +
+      '<span class="edit__act"><span class="row__ok" id="ts-ok"></span>' +
+      '<button class="btn btn--solid" id="ts-go" type="button"' +
+        (total > 0 ? "" : " disabled") + ">" +
+        (status === "returned" ? "Send it again" : "Send this week") + "</button></span>";
+  }
+
+  return "<h2>Hours and timesheet</h2>" +
+    '<div class="ts__hd">' +
+      '<span class="ts__wk">' + esc(weekLabel(VIEW)) + "</span>" +
+      '<span class="pill pill--ts_' + esc(status) + '">' + esc(TS_LABEL[status] || status) + "</span>" +
+    "</div>" +
+    (status === "returned" && sheet.note
+      ? '<div class="note note--warn" style="margin-top:.8rem"><b>Sent back:</b> ' + esc(sheet.note) + "</div>"
+      : "") +
+    '<div class="ts__nav" style="display:flex;gap:.4rem;margin-top:.8rem">' +
+      '<button class="btn btn--ghost" data-week="' + esc(back) + '" type="button" ' +
+        'style="padding:.35rem .7rem;font-size:.85rem"' + (back < floor ? " disabled" : "") +
+        ">&larr; Week before</button>" +
+      '<button class="btn btn--ghost" data-week="' + esc(fwd) + '" type="button" ' +
+        'style="padding:.35rem .7rem;font-size:.85rem"' + (VIEW >= here ? " disabled" : "") +
+        ">Week after &rarr;</button>" +
+    "</div>" +
+    '<div class="sheet">' + rows +
+      '<div class="sum"><span class="sum__l">Total this week</span>' +
+      '<span class="sum__v">' + esc(showHours(total)) + " <small>hours</small></span></div>" +
+    "</div>" +
+    '<div class="edit__foot" style="margin-top:1rem">' + foot + "</div>" +
+    pastWeeks();
+}
+
+function pastWeeks() {
+  var out = [];
+  for (var k in SHEETS) if (k !== VIEW) out.push(SHEETS[k]);
+  out.sort(function (a, b) { return a.week_starts_on < b.week_starts_on ? 1 : -1; });
+  if (!out.length) return "";
+
+  return '<div class="wks">' + out.map(function (s) {
+    var msg = s.status === "approved"
+      ? "approved by " + (s.decided_by || "somebody") + " on " + when(s.decided_at)
+      : s.status === "returned"
+        ? (s.note || "sent back")
+        : s.status === "submitted"
+          ? "sent " + when(s.submitted_at) + " \u00b7 nobody has looked yet"
+          : "not sent yet";
+    return '<div class="wk"><button class="btn btn--ghost wk__d" data-week="' +
+      esc(s.week_starts_on) + '" type="button" style="padding:.2rem .5rem;font-size:.85rem">' +
+      esc(weekLabel(s.week_starts_on)) + "</button>" +
+      '<span class="pill pill--ts_' + esc(s.status) + '">' +
+        esc(TS_LABEL[s.status] || s.status) + "</span>" +
+      '<span class="wk__h">' + esc(showHours(totalOf(s))) + " h</span>" +
+      '<span class="wk__m">' + esc(msg) + "</span></div>";
+  }).join("") + "</div>";
+}
+
+function paintHours() {
+  var card = document.getElementById("hours");
+  if (!card) return;
+  card.innerHTML = hoursCard();
+}
+
+/* The week row is made the first time somebody actually types a number into
+   it, not when the page opens. Otherwise every assistant who looks at this
+   page and closes it leaves an empty week behind, and the admin queue fills up
+   with nothing. */
+function ensureSheet() {
+  var have = SHEETS[VIEW];
+  if (have && have.id) return Promise.resolve(have);
+  return api("timesheets", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: { application_id: APP.id, week_starts_on: VIEW }
+  }).then(function (rows) {
+    var s = (rows || [])[0];
+    if (!s) throw new Error("no row came back");
+    s.timesheet_days = [];
+    SHEETS[VIEW] = s;
+    return s;
+  });
+}
+
+function saveDay(iso, rowEl, ok) {
+  var hrsEl = rowEl.querySelector("[data-hrs]");
+  var noteEl = rowEl.querySelector("[data-note]");
+  var hours = Number(hrsEl.value || 0);
+  var note = String(noteEl.value || "").trim() || null;
+
+  if (!(hours >= 0 && hours <= 24)) {
+    flash(ok, "Hours have to be between 0 and 24", true);
+    return;
+  }
+
+  flash(ok, "Saving\u2026");
+  ensureSheet().then(function (sheet) {
+    var d = dayIn(sheet, iso);
+    if (d) {
+      return api("timesheet_days?id=eq." + encodeURIComponent(d.id), {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: { hours: hours, note: note }
+      }).then(function (rows) {
+        var got = (rows || [])[0];
+        if (got) { d.hours = got.hours; d.note = got.note; }
+      });
+    }
+    return api("timesheet_days", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: { timesheet_id: sheet.id, worked_on: iso, hours: hours, note: note }
+    }).then(function (rows) {
+      var got = (rows || [])[0];
+      if (got) sheet.timesheet_days.push(got);
+    });
+  }).then(function () {
+    paintHours();
+    var el = document.getElementById("ts-ok");
+    flash(el, "Saved");
+  }).catch(function (e) {
+    flash(document.getElementById("ts-ok") || ok, why(e), true);
+  });
+}
+
+function wireHours() {
+  var card = document.getElementById("hours");
+  if (!card) return;
+
+  card.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-week]");
+    if (!b || b.disabled) return;
+    VIEW = b.getAttribute("data-week");
+    paintHours();
+  });
+
+  /* change rather than input: a number box fires input on every keystroke, and
+     saving "1" on the way to "18" writes a wrong number and then corrects it. */
+  card.addEventListener("change", function (e) {
+    var el = e.target.closest("[data-hrs], [data-note]");
+    if (!el) return;
+    var row = el.closest("[data-day]");
+    if (row) saveDay(row.getAttribute("data-day"), row, document.getElementById("ts-ok"));
+  });
+
+  card.addEventListener("click", function (e) {
+    if (!e.target.closest("#ts-go")) return;
+    var sheet = SHEETS[VIEW];
+    var ok = document.getElementById("ts-ok");
+    if (!sheet || !sheet.id) { flash(ok, "Put some hours in first", true); return; }
+    flash(ok, "Sending\u2026");
+    api("timesheets?id=eq." + encodeURIComponent(sheet.id), {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: { status: "submitted" }
+    }).then(function (rows) {
+      var got = (rows || [])[0];
+      if (got) { got.timesheet_days = sheet.timesheet_days; SHEETS[VIEW] = got; }
+      paintHours();
+    }).catch(function (e) { flash(document.getElementById("ts-ok"), why(e), true); });
+  });
 }
 
 function leaveRow(r) {
@@ -1247,14 +1566,12 @@ function render(a, leaves, notices) {
       tile("/status", "Your profile", '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>') +
       tile("#leave", "Ask for leave", '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>') +
       tile("#pay", "Getting paid", '<rect x="3" y="6" width="18" height="12.5" rx="2"></rect><path d="M3 10.5h18M6.5 15h4"></path>') +
-      /* Named rather than hidden. Somebody hired this week wonders where their
-         hours go, and a tile saying we are building it answers that; an absence
-         does not. It is not a link, because there is nothing behind it yet and
-         a tile that goes nowhere is worse than one that says so. */
-      '<span class="tl tl--soon"><span class="tl__art">' +
-        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle>' +
-        '<path d="M12 7v5.2l3.3 2"></path></svg></span>' +
-        '<span class="tl__l">Hours and timesheet<small>Still working on it</small></span></span>' +
+      /* It said "Still working on it" from 026 until 030. The number under it
+         is the one worth seeing without opening anything: hours that are typed
+         in and not yet sent are hours nobody is being paid for. */
+      tile("#hours", "Hours and timesheet",
+        '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>',
+        unsentLabel()) +
       tile("#notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
     "</div>" +
 
@@ -1275,6 +1592,8 @@ function render(a, leaves, notices) {
         ? '<div class="lvs">' + leaves.map(leaveRow).join("") + "</div>"
         : '<p class="msg">You have not asked for any leave yet.</p>') +
     "</div>" +
+
+    '<div class="card" id="hours">' + hoursCard() + "</div>" +
 
     '<div class="card" id="pay">' +
       "<h2>Getting paid</h2>" +
@@ -1305,6 +1624,7 @@ function render(a, leaves, notices) {
   document.getElementById("out").addEventListener("click", signOut);
   wireLeave();
   wirePay();
+  wireHours();
 }
 
 function wireLeave() {
@@ -1397,8 +1717,18 @@ function load() {
          a filter somebody can change. */
       return Promise.all([
         api("leave_requests?select=id,starts_on,ends_on,reason,status&order=starts_on.desc"),
-        api("notices?select=id,title,body,pinned,published_at&order=pinned.desc,published_at.desc")
+        api("notices?select=id,title,body,pinned,published_at&order=pinned.desc,published_at.desc"),
+        /* The days come back nested under their week in one request. Fetching
+           them separately would mean the totals on screen are assembled from
+           two answers taken at different moments. */
+        api("timesheets?select=id,week_starts_on,status,note,submitted_at,decided_at,decided_by," +
+            "timesheet_days(id,worked_on,hours,note)&order=week_starts_on.desc&limit=12")
       ]).then(function (r) {
+        SHEETS = {};
+        (r[2] || []).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
+        /* Opens on the week in progress. Anything older is a click away in the
+           list underneath, which is where a week you have to fix will be. */
+        VIEW = isoDay(mondayOf(new Date()));
         render(a, r[0] || [], r[1] || []);
       });
     });

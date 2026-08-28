@@ -610,6 +610,40 @@ body:has(.adm__wrap) main{padding:0}
 .nt__b{margin:.2rem 0 0;font-size:.9rem;white-space:pre-wrap}
 .pill--pending{background:var(--surface-2);color:var(--ink-2)}
 
+/* The timesheet. Its own pill classes rather than the application ones —
+   pill--approved is the signal yellow an approved *application* wears, and an
+   approved week of work reading as a warning is exactly backwards. */
+.pill--ts_draft{background:var(--surface-2);color:var(--muted)}
+.pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
+.pill--ts_approved{background:#0B7A63;color:#fff}
+.pill--ts_returned{background:#B3261E;color:#fff}
+.ts__hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem}
+.ts__wk{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--muted)}
+.sheet{margin-top:1.1rem;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.day{display:grid;grid-template-columns:5rem 1fr 4.6rem;align-items:center;gap:.6rem;padding:.45rem .75rem;border-bottom:1px solid var(--line)}
+.day:last-of-type{border-bottom:0}
+.day--wknd{background:var(--surface-2)}
+.day__d{display:flex;flex-direction:column;min-width:0}
+.day__n{font-weight:600;font-size:.88rem;color:var(--ink)}
+.day__t{font-family:"IBM Plex Mono",monospace;font-size:.65rem;color:var(--muted)}
+.day__note{font-family:inherit;font-size:.85rem;color:var(--ink-2);border:0;background:none;padding:.15rem 0;min-width:0;width:100%}
+.day__note:focus{outline:none;border-bottom:1px solid var(--accent)}
+.hrs{font-family:"IBM Plex Mono",monospace;font-size:.92rem;text-align:right;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-variant-numeric:tabular-nums;width:100%}
+.hrs:disabled{background:var(--surface-2);color:var(--muted)}
+.sum{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.6rem;padding:.65rem .75rem;background:var(--glow,var(--accent-soft));border-top:1px solid var(--line)}
+.sum__l{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sum__v{font-size:1.4rem;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
+.sum__v small{font-size:.85rem;font-weight:400;color:var(--muted)}
+.wks{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1.1rem}
+.wk{background:var(--surface);padding:.65rem .9rem;display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
+.wk__d{font-weight:600;font-size:.9rem;color:var(--ink)}
+.wk__h{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.85rem;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.wk__m{width:100%;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted)}
+.row__tot{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.bd{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.5rem}
+.bd i{font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-style:normal;border:1px solid var(--line);border-radius:4px;padding:.12rem .36rem;color:var(--ink-2);background:var(--surface-2);font-variant-numeric:tabular-nums}
+.bd i.z{color:var(--muted);opacity:.65}
+
 /* Stat tiles. The hero numbers are the answer for three of these four; a chart
    of a single figure would be a chart of nothing. */
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin:1rem 0 0}
@@ -2020,7 +2054,8 @@ var ICON = (function () {
     seats:   s('<path d="M4 20V9l8-5 8 5v11"></path><path d="M9.5 20v-6h5v6"></path>'),
     clients: s('<circle cx="12" cy="12" r="8.5"></circle><path d="M3.5 12h17M12 3.5c4 4.5 4 12.5 0 17M12 3.5c-4 4.5-4 12.5 0 17"></path>'),
     team:    s('<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5"></path><path d="M17 6.5a3.5 3.5 0 010 7"></path>'),
-    accts:   s('<path d="M12 3.5l7 3.2v5.6c0 4.2-2.8 7.2-7 8.2-4.2-1-7-4-7-8.2V6.7z"></path>')
+    accts:   s('<path d="M12 3.5l7 3.2v5.6c0 4.2-2.8 7.2-7 8.2-4.2-1-7-4-7-8.2V6.7z"></path>'),
+    hours:   s('<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>')
   };
 })();
 
@@ -2030,7 +2065,8 @@ function badge(id, n) {
   var el = document.getElementById(id);
   if (!el) return;
   el.textContent = n ? String(n) : "";
-  el.classList.toggle("is-warn", id === "tab-unread" || id === "tab-leave" ? !!n : false);
+  el.classList.toggle("is-warn",
+    id === "tab-unread" || id === "tab-leave" || id === "tab-hours" ? !!n : false);
 }
 
 /* The summary. It answers "what needs me" before anything is read, which the
@@ -2166,6 +2202,125 @@ function drawLeave(box, rows) {
           decided_by: ME
         }
       }).then(loadLeave)
+        .catch(function (e) { flash(ok, why(e), true); });
+    });
+  });
+}
+
+/* ── timesheets ──
+   The other half of /hub's fourth tile. Drafts are excluded: a week somebody
+   is still filling in is not waiting on anybody, and a queue that shows it
+   says three people need you when none of them do. */
+var TS_D = ["M", "T", "W", "T", "F", "S", "S"];
+var TS_LABEL = { submitted: "waiting", approved: "approved", returned: "sent back" };
+
+function tsNum(n) {
+  return (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function tsTotal(r) {
+  var ds = r.timesheet_days || [], t = 0;
+  for (var i = 0; i < ds.length; i++) t += Number(ds[i].hours || 0);
+  return t;
+}
+
+/* Seven boxes, in the order they were worked, printed whether or not anything
+   was entered. A missing Wednesday and a Wednesday with 0 in it look the same
+   on a total and mean different things, and 16 hours on a Thursday is only
+   visible if Thursday is on the screen. */
+function tsBreak(r) {
+  var by = {};
+  (r.timesheet_days || []).forEach(function (d) { by[d.worked_on] = Number(d.hours || 0); });
+  var p = String(r.week_starts_on).split("-");
+  var out = "";
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + i);
+    var m = d.getMonth() + 1, day = d.getDate();
+    var iso = d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+    var h = by[iso] || 0;
+    out += '<i class="' + (h ? "" : "z") + '">' + TS_D[i] + " " + esc(tsNum(h)) + "</i>";
+  }
+  return '<div class="bd">' + out + "</div>";
+}
+
+function loadTimesheets() {
+  var box = document.getElementById("ts-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading timesheets&hellip;';
+  api("timesheets?select=id,application_id,week_starts_on,status,note,submitted_at," +
+      "decided_at,decided_by,timesheet_days(worked_on,hours,note)" +
+      "&status=neq.draft&order=week_starts_on.desc")
+    .then(function (rows) { drawTimesheets(box, rows || []); })
+    .catch(function (e) {
+      box.innerHTML = '<p class="msg msg--bad">Could not load timesheets: ' + esc(why(e)) + "</p>";
+    });
+}
+
+function drawTimesheets(box, rows) {
+  var byId = {};
+  ALL.forEach(function (a) { byId[a.id] = a; });
+
+  var waiting = rows.filter(function (r) { return r.status === "submitted"; });
+  badge("tab-hours", waiting.length);
+
+  box.innerHTML =
+    "<h2>Timesheets</h2>" +
+    (rows.length
+      ? '<p class="msg" style="margin-top:0">' +
+          (waiting.length ? waiting.length + " waiting on you." : "Nothing waiting.") + "</p>" +
+        '<div class="rows">' + rows.map(function (r) {
+          var a = byId[r.application_id];
+          return '<div class="row" data-ts="' + esc(r.id) + '">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(a ? a.name : "Unknown assistant") + "</span>" +
+              '<span class="row__meta"> &middot; week of ' + esc(when(r.week_starts_on)) + "</span>" +
+            "</span>" +
+            '<span class="pill pill--ts_' + esc(r.status) + '">' +
+              esc(TS_LABEL[r.status] || r.status) + "</span>" +
+            '<span class="row__tot">' + esc(tsNum(tsTotal(r))) + " h</span></div>" +
+            tsBreak(r) +
+            (r.status === "submitted"
+              ? '<div class="row__ctl">' +
+                  '<textarea data-ts-why rows="1" aria-label="Why this week is going back" ' +
+                    'placeholder="If you are sending it back, say what needs fixing"></textarea>' +
+                  '<button class="btn btn--solid" data-ts-yes type="button" style="padding:.45rem .8rem;font-size:.85rem">Approve</button>' +
+                  '<button class="btn btn--ghost" data-ts-no type="button" style="padding:.45rem .8rem;font-size:.85rem">Send back</button>' +
+                  '<span class="row__ok" data-ts-ok></span>' +
+                "</div>"
+              : '<p class="msg" style="margin:.4rem 0 0">' +
+                  esc(TS_LABEL[r.status] || r.status) + " by " + esc(r.decided_by || "somebody") +
+                  " on " + esc(when(r.decided_at)) +
+                  (r.status === "returned" && r.note ? " &mdash; " + esc(r.note) : "") +
+                "</p>") +
+          "</div>";
+        }).join("") + "</div>"
+      : '<p class="msg">Nobody has sent a week in yet.</p>');
+
+  box.querySelectorAll("[data-ts-yes], [data-ts-no]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-ts]");
+      var ok = row.querySelector("[data-ts-ok]");
+      var yes = b.hasAttribute("data-ts-yes");
+      var why_ = row.querySelector("[data-ts-why]").value.trim();
+
+      /* Sending a week back without saying why leaves somebody looking at
+         seven numbers they already believed were right. The reason is the
+         whole message. */
+      if (!yes && !why_) {
+        flash(ok, "Say what needs fixing — that is the whole message", true);
+        row.querySelector("[data-ts-why]").focus();
+        return;
+      }
+
+      flash(ok, "Saving…");
+      /* decided_at and decided_by are not sent and are not granted: the
+         trigger in 030 stamps both from the verified token, so the record of
+         who agreed to a number cannot be typed by anybody. */
+      api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-ts")), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: yes ? { status: "approved" } : { status: "returned", note: why_ }
+      }).then(loadTimesheets)
         .catch(function (e) { flash(ok, why(e), true); });
     });
   });
@@ -2815,6 +2970,8 @@ function render(email, apps, notes, socials, docs, disc) {
       '<span class="rail__k">The team</span>' +
       '<button class="rnav" data-tab="team" type="button">' + ICON.team +
         'Team<span class="rnav__n" id="tab-leave"></span></button>' +
+      '<button class="rnav" data-tab="hours" type="button">' + ICON.hours +
+        'Timesheets<span class="rnav__n" id="tab-hours"></span></button>' +
       (can("accounts.manage")
         ? '<button class="rnav" data-tab="accts" type="button">' + ICON.accts + "Accounts</button>"
         : "") +
@@ -2884,6 +3041,7 @@ function render(email, apps, notes, socials, docs, disc) {
     '<div data-pane="cal" hidden><div class="card" id="cal-card"></div></div>' +
     '<div data-pane="team" hidden><div class="card" id="leave-card"></div>' +
       '<div class="card" id="notice-card"></div></div>' +
+    '<div data-pane="hours" hidden><div class="card" id="ts-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "") +
@@ -2896,6 +3054,7 @@ function render(email, apps, notes, socials, docs, disc) {
   if (can("accounts.manage")) loadRoles();
   loadSeats();
   loadLeave();
+  loadTimesheets();
   loadNotices();
   loadInbox();
   loadClients();
