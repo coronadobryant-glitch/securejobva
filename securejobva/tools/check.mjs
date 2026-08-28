@@ -541,6 +541,31 @@ await check("a day cannot be filed against the wrong week", () => {
   return "checked on insert and update";
 });
 
+/* A migration ships as code first and is pasted by hand some time later, so
+   there is always a window where /hub asks for a table that does not exist.
+   Inside Promise.all that rejection is not confined to the card that needed
+   it — it takes leave and the notice board down too, and the whole portal
+   reads "We could not open your portal just now". */
+await check("the portal survives 030 not being pasted yet", () => {
+  const hub = read("hub.html");
+  const at = hub.indexOf('api("timesheets?select=');
+  if (at < 0) throw new Error("the hub does not read timesheets at all");
+  const call = hub.slice(at, at + 900);
+  if (!/\.catch\(/.test(call)) {
+    throw new Error("the timesheets request is not caught, so a missing table takes the whole " +
+      "portal down and not just the hours card");
+  }
+  if (!/TS_OFF\s*=\s*true/.test(call)) {
+    throw new Error("the failure is swallowed without recording it — the card would render as " +
+      "merely empty and invite somebody to type hours that cannot save");
+  }
+  if (!/signed out[\s\S]{0,40}throw/.test(call)) {
+    throw new Error("an expired session is caught here too, so the page shows an empty hours " +
+      "card instead of asking them to sign in again");
+  }
+  return "caught, flagged, and a signed-out session still rethrows";
+});
+
 await check("anon holds nothing on the timesheet tables", () => {
   for (const t of ["timesheets", "timesheet_days"]) {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {

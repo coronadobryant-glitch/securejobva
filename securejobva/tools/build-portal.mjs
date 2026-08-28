@@ -3529,6 +3529,11 @@ var ME = "";
 var SHEETS = {};
 var VIEW = "";
 
+/* True when the timesheet tables are not there yet — 030 written but not
+   pasted. The rest of the portal does not care, and this is what stops the
+   card pretending it is merely empty. */
+var TS_OFF = false;
+
 function view(html) { root.innerHTML = html; }
 
 /* How somebody would rather be paid. The choice is stored; nothing else is.
@@ -3657,6 +3662,12 @@ function dayRow(sheet, iso, i, open) {
    no way to reach the week you are actually supposed to be sending, and no way
    at all to fix one that came back. */
 function hoursCard() {
+  if (TS_OFF) {
+    return "<h2>Hours and timesheet</h2>" +
+      '<div class="note"><b>Not switched on yet.</b> Your hours will be entered here. ' +
+      "Nothing is missing and there is nothing for you to do &mdash; everything else on this " +
+      "page works as normal.</div>";
+  }
   var sheet = SHEETS[VIEW] || null;
   var status = sheet ? sheet.status : "draft";
   var open = status === "draft" || status === "returned";
@@ -4040,9 +4051,20 @@ function load() {
         api("notices?select=id,title,body,pinned,published_at&order=pinned.desc,published_at.desc"),
         /* The days come back nested under their week in one request. Fetching
            them separately would mean the totals on screen are assembled from
-           two answers taken at different moments. */
+           two answers taken at different moments.
+
+           Caught rather than thrown, because this is the only one of the three
+           whose table might not exist. A migration is pasted by hand some time
+           after the code that needs it ships, and in that window this request
+           404s — which, inside Promise.all, would take leave and the notice
+           board down with it. The portal keeps working and the card says why. */
         api("timesheets?select=id,week_starts_on,status,note,submitted_at,decided_at,decided_by," +
             "timesheet_days(id,worked_on,hours,note)&order=week_starts_on.desc&limit=12")
+          .catch(function (e) {
+            if (String(e.message) === "signed out") throw e;
+            TS_OFF = true;
+            return [];
+          })
       ]).then(function (r) {
         SHEETS = {};
         (r[2] || []).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
