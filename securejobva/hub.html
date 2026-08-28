@@ -1275,6 +1275,65 @@ function tile(href, label, path, sub) {
       (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></a>";
 }
 
+/* ── who they work for ──
+   The first thing on the page once somebody is placed, because it is the
+   answer to the question they open the portal asking.
+
+   No money on this card, and none anywhere else in /hub. 032 does let an
+   assistant read their own rate, so this is a choice rather than a limit: the
+   admin form promises in as many words that their portal shows hours and no
+   money at all, and a promise made on one screen has to be true on the other. */
+var PLACE = null;
+
+function trialEnds(p) {
+  if (!p.started_on || !p.trial_weeks) return null;
+  return isoDay(addDays(fromIso(p.started_on), p.trial_weeks * 7 - 1));
+}
+
+function clientCard() {
+  if (!PLACE) return "";
+  var name = (PLACE.clients && PLACE.clients.name) || "your client";
+  var ends = trialEnds(PLACE);
+
+  var says;
+  if (PLACE.status === "matched") {
+    says = "We have matched you with them. The next step is a meeting, and we will be in " +
+      "touch to arrange it &mdash; nothing is settled until after that.";
+  } else if (PLACE.status === "trial") {
+    says = "You started on " + esc(when(PLACE.started_on)) + "." +
+      (ends ? " Your trial runs until " + esc(when(ends)) +
+        " &mdash; we will let you know as soon as they confirm." : "");
+  } else if (PLACE.status === "ongoing") {
+    says = "You have been kept on. You started on " + esc(when(PLACE.started_on)) +
+      " and you stay on the SecureJobVA team throughout &mdash; we pay you, as always.";
+  } else {
+    says = "This placement has ended. Anything you worked is still on your timesheet.";
+  }
+
+  return '<div class="card" id="client">' +
+    '<div class="ts__hd"><h2>' + esc(name) + "</h2>" +
+      '<span class="pill pill--pl_' + esc(PLACE.status) + '">' +
+      esc(PLACE_LABEL[PLACE.status] || PLACE.status) + "</span></div>" +
+    '<p class="msg" style="margin-top:.4rem">' + says + "</p>" +
+    '<div class="tiles">' +
+      '<div class="tile"><span class="tile__n">' + esc(PLACE.hours_per_week) +
+        '</span><span class="tile__l">hours a week</span></div>' +
+      /* "started" is a claim, and on a matched placement it is not true yet —
+         the card says in the line above that nothing is settled, then a tile
+         underneath said they had already begun. */
+      (PLACE.started_on
+        ? '<div class="tile"><span class="tile__n" style="font-size:1.1rem">' +
+          esc(when(PLACE.started_on)) + '</span><span class="tile__l">' +
+          (PLACE.status === "matched" ? "would start" : "started") + "</span></div>"
+        : "") +
+      (ends && PLACE.status === "trial"
+        ? '<div class="tile"><span class="tile__n" style="font-size:1.1rem">' +
+          esc(when(ends)) + '</span><span class="tile__l">trial ends</span></div>'
+        : "") +
+    "</div>" +
+  "</div>";
+}
+
 /* ── the timesheet ──
    A week is named by its Monday and the database will not take a guess at it,
    so the Monday is worked out here from local date parts. toISOString() would
@@ -1312,6 +1371,8 @@ var DAY_NAME = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturda
 var WEEK_TARGET = 40;
 var TS_LABEL = { draft: "not sent yet", submitted: "waiting on us",
                  approved: "approved", returned: "sent back" };
+var PLACE_LABEL = { matched: "matched", trial: "on trial",
+                    ongoing: "kept on", ended: "ended" };
 
 /* Two decimals, then the trailing zeros taken off: 38 rather than 38.00, and
    18.5 rather than 18.50, without turning 7.25 into 7.3. */
@@ -1604,6 +1665,8 @@ function render(a, leaves, notices) {
     '<div class="hub__hi"><h2>Hello, ' + esc(first) + ".</h2>" +
       "<p>You are on the team. This is yours.</p></div>" +
 
+    clientCard() +
+
     '<div class="tls">' +
       tile("/status", "Your profile", '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>') +
       tile("#leave", "Ask for leave", '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>') +
@@ -1775,8 +1838,24 @@ function load() {
             if (String(e.message) === "signed out") throw e;
             TS_OFF = true;
             return [];
+          }),
+        /* Caught for the same reason as the timesheets above: 032 is pasted by
+           hand some time after this ships. A missing client card claims
+           nothing, so unlike the timesheet there is no message to show — an
+           assistant who has not been placed sees exactly the same page. */
+        api("placements?select=id,status,started_on,ended_on,hours_per_week,trial_weeks," +
+            "clients(name)&order=started_on.desc.nullslast&limit=5")
+          .catch(function (e) {
+            if (String(e.message) === "signed out") throw e;
+            return [];
           })
       ]).then(function (r) {
+        /* The live one, if there is one. A placement that has ended is history
+           and does not belong at the top of somebody's portal. */
+        PLACE = null;
+        (r[3] || []).forEach(function (p) {
+          if (!PLACE && p.status !== "ended") PLACE = p;
+        });
         SHEETS = {};
         (r[2] || []).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
         /* Opens on the week in progress. Anything older is a click away in the
