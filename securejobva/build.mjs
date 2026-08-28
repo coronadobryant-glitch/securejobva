@@ -48,9 +48,9 @@ const PAGES = [
   {
     src: "admin.html",
     path: "/admin",
-    title: "Applications — SecureJobVA",
+    title: "Admin portal — SecureJobVA",
     description: "Internal.",
-    ogTitle: "Applications",
+    ogTitle: "Admin portal",
     noindex: true
   },
   {

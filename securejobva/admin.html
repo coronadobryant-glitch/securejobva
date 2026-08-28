@@ -1,4 +1,4 @@
-<title>Applications — SecureJobVA</title>
+<title>Admin portal — SecureJobVA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -661,8 +661,8 @@ img{max-width:100%}
     <div class="wrap" style="max-width:60rem">
       <div class="pt__head">
         <span class="eyebrow">Internal</span>
-        <h1>Applications.</h1>
-        <p id="pt-lead">Everyone who has applied, and the stage each one is at.</p>
+        <h1>Admin portal.</h1>
+        <p id="pt-lead">Applications, seats, messages, interviews and the team.</p>
       </div>
       <div id="pt-root"></div>
     </div>
@@ -1126,6 +1126,15 @@ function signedOut(msg) {
   view(
     '<div class="card">' +
       (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
+      /* Signing in and having access are two different things, and the page
+         used to offer the button with nothing said. Anybody with a Google
+         account can prove who they are — that is all sign-in does — and then
+         every policy in the database refuses to hand them a single row. Saying
+         so up front means the refusal that follows reads as the design rather
+         than as something going wrong. */
+      '<p class="msg" style="margin-top:0"><b>This is the staff desk.</b> Signing in proves who you are; ' +
+        'it does not give you access. An administrator grants that separately. ' +
+        'If you applied for a job, your own page is <a href="/status">Your application</a>.</p>' +
       '<button class="gbtn" id="go" type="button">Sign in with Google</button>' +
     "</div>"
   );
@@ -1138,8 +1147,11 @@ function signedOut(msg) {
 function notAdmin(email) {
   view(
     '<div class="card">' +
-      '<div class="note note--warn"><b>' + esc(email) + " is not an administrator.</b> " +
-      "If you are looking for your own application, that is on the status page.</div>" +
+      '<div class="note note--warn"><b>' + esc(email) + " has no access to the staff desk.</b> " +
+      "Nothing here was shown to you &mdash; the database refuses every row to an account " +
+      "without a role, which is why this page is empty rather than locked. An administrator " +
+      "can grant access under Accounts. If you are looking for your own application, that is " +
+      "on the status page.</div>" +
       '<p style="margin-top:1.2rem">' +
         '<a class="btn btn--solid" href="/status">Go to your application</a> ' +
         '<button class="btn btn--ghost" id="out-denied" type="button">Sign out</button>' +
