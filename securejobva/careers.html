@@ -2566,6 +2566,23 @@ html{scroll-behavior:smooth}
     open();
   });
 
+  /* Arriving at /careers#apply opens the form, rather than landing beside a
+     button that opens it.
+
+     /status sends people here when we have nothing under their address, and it
+     tells them the next step is the application. Landing on the section with
+     the button still to find is a step they were not promised — small, but it
+     is the gap between "here is the form" and "here is a page about the form".
+
+     A separate hash from #apply-now on purpose. That one is the call-to-action
+     section and is linked from the nav and the FAQ; opening a dialog over
+     somebody who followed those would be a surprise. This one exists to be
+     linked, and /apply already redirects here. */
+  if (location.hash === "#apply") {
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+    open();
+  }
+
   /* Anything a previous visit could not store goes now, before the visitor
      does anything at all — they may never open this dialog again. */
   drain();
