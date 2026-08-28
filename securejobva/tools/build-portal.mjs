@@ -289,6 +289,31 @@ const PAGE_CSS = `
 .edit__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid var(--line)}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
+.hub__hi{text-align:center;margin:1.6rem 0 1.4rem}
+.hub__hi h2{font-size:1.6rem;margin:0 0 .2rem}
+.hub__hi p{margin:0;color:var(--muted);font-size:.95rem}
+.tls{display:grid;gap:.8rem;grid-template-columns:repeat(2,1fr);margin-bottom:1.6rem}
+@media(min-width:720px){.tls{grid-template-columns:repeat(4,1fr)}}
+.tl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);text-decoration:none}
+.tl:hover{border-color:var(--accent)}
+.tl__art{background:var(--surface-2);display:grid;place-items:center;padding:1.2rem .8rem;border-bottom:1px solid var(--line)}
+.tl__art svg{width:32px;height:32px;stroke:var(--accent);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tl__l{background:var(--ink);color:var(--paper);padding:.55rem .6rem;text-align:center;font-size:.82rem;font-weight:600}
+.lvs{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1.2rem}
+.lv{background:var(--surface);padding:.7rem .9rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.lv__w{display:block;font-size:.85rem;color:var(--muted)}
+.pays{display:grid;gap:.6rem;margin:.4rem 0 1rem}
+.pay{display:flex;gap:.7rem;align-items:flex-start;border:1px solid var(--line);border-radius:7px;padding:.75rem .9rem;cursor:pointer}
+.pay.is-on{border-color:var(--accent);background:var(--accent-soft)}
+.pay b{display:block;color:var(--ink);font-size:.93rem}
+.pay span span{font-size:.85rem;color:var(--muted)}
+.nts{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1rem}
+.nt{background:var(--surface);padding:.85rem 1rem;display:grid;gap:.25rem}
+.nt__t{color:var(--ink);font-weight:600;font-size:.95rem}
+.nt__pin{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-deep);background:var(--accent-soft);padding:.1rem .35rem;border-radius:3px}
+.nt__d{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted)}
+.nt__b{margin:.2rem 0 0;font-size:.9rem;white-space:pre-wrap}
+.pill--pending{background:var(--surface-2);color:var(--ink-2)}
 
 /* Stat tiles. The hero numbers are the answer for three of these four; a chart
    of a single figure would be a chart of nothing. */
@@ -342,6 +367,7 @@ const PAGE_CSS = `
 .pill--shortlist{background:var(--accent);color:var(--accent-ink)}
 .pill--running{background:var(--signal);color:var(--signal-ink)}
 .pill--closed{background:var(--surface-2);color:var(--muted)}
+.pill--hired{background:#0B7A63;color:#fff}
 .pill--applied{background:var(--surface-2);color:var(--ink-2)}
 .pill--assessment{background:var(--accent-soft);color:var(--accent-deep)}
 .pill--interview{background:var(--accent);color:var(--accent-ink)}
@@ -693,10 +719,14 @@ var STAGES = [
   ["applied",    "Application received",  "We have it, and a person reads every one."],
   ["assessment", "Exams and strengths test", "A written task in your track, the qualification exams, and the strengths test."],
   ["interview",  "Two interviews",        "One on how you work, one on your setup and connection."],
-  ["approved",   "Approved &mdash; paid training", "You are through. Paid training starts within a week."]
+  ["approved",   "Approved &mdash; paid training", "You are through. Paid training starts within a week."],
+  /* The ladder used to end at approved, which left the story stopping halfway:
+     you passed, and then nothing. Being placed with a client is a different day
+     and somebody decides it, so it is a rung rather than something inferred. */
+  ["hired",      "Hired", "You are on the team. Your portal is at /hub."]
 ];
 var LABEL = { applied: "Applied", assessment: "Assessment", interview: "Interview",
-              approved: "Approved", declined: "Declined" };
+              approved: "Approved", hired: "Hired", declined: "Declined" };
 
 
 var SKILL_LEVELS = ["beginner", "intermediate", "advanced", "fluent"];
@@ -1408,7 +1438,7 @@ function notAdmin(email) {
 }
 
 function options(cur) {
-  var keys = ["applied", "assessment", "interview", "approved", "declined"];
+  var keys = ["applied", "assessment", "interview", "approved", "hired", "declined"];
   var out = "";
   for (var i = 0; i < keys.length; i++) {
     out += '<option value="' + keys[i] + '"' + (keys[i] === cur ? " selected" : "") + ">" +
@@ -2899,6 +2929,303 @@ writeFileSync("admin.html", shell({
 }));
 
 console.log("admin.html written");
+
+/* ────────────────────────── hub.html ──────────────────────────
+
+   The portal for people who have been hired. Everything here is gated on one
+   thing — status === "hired" — which is set by hand in /admin, because being
+   placed with a client is a decision somebody makes rather than something the
+   database can work out.
+
+   Deliberately not in this first build: hours and timesheets, because the
+   tracker does not exist yet and a page showing hours nobody is recording
+   teaches people to distrust the portal in week one.
+*/
+
+const HUB_BODY = [
+  '  <section class="pt">',
+  '    <div class="wrap" style="max-width:60rem">',
+  '      <div class="pt__head">',
+  '        <span class="eyebrow">Your portal</span>',
+  "        <h1>Everything you need, in one place.</h1>",
+  '        <p id="hub-lead">Sign in with the address on your application.</p>',
+  "      </div>",
+  '      <div id="hub-root"></div>',
+  "    </div>",
+  "  </section>"
+].join(nl);
+
+const HUB_SCRIPT = `
+var root = document.getElementById("hub-root");
+var lead = document.getElementById("hub-lead");
+var APP = null;
+var ME = "";
+
+function view(html) { root.innerHTML = html; }
+
+/* How somebody would rather be paid. The choice is stored; nothing else is.
+   No account number, no bank detail, no wallet credential ever reaches this
+   database — those are set up on the provider's own site with a person. */
+var PAY = [
+  ["wise_bank",   "Wise, into your bank",        "Pesos into a Philippine bank account. Usually lands in under a minute."],
+  ["wise_wallet", "Wise, into GCash or Maya",    "Pesos into your wallet by mobile number. Also GrabPay and ShopeePay."],
+  ["payoneer",    "Payoneer",                    "If you already have an account and would rather keep using it."]
+];
+
+function signedOut(msg) {
+  view(
+    '<div class="card">' +
+      (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
+      '<button class="gbtn" id="go" type="button">Continue with Google</button>' +
+      '<p class="msg">Use the address on your application &mdash; that is how we find you.</p>' +
+    "</div>"
+  );
+  document.getElementById("go").addEventListener("click", signIn);
+}
+
+function shut(title, body) {
+  view(
+    '<div class="card">' +
+      '<div class="note"><b>' + esc(title) + "</b> " + body + "</div>" +
+      '<p style="margin-top:1.2rem"><a class="btn btn--ghost" href="/status">See where your application is</a></p>' +
+    "</div>"
+  );
+}
+
+function tile(href, label, path) {
+  return '<a class="tl" href="' + href + '">' +
+    '<span class="tl__art"><svg viewBox="0 0 24 24" aria-hidden="true">' + path + "</svg></span>" +
+    '<span class="tl__l">' + esc(label) + "</span></a>";
+}
+
+function leaveRow(r) {
+  return '<div class="lv">' +
+    "<span><b>" + esc(when(r.starts_on)) + " to " + esc(when(r.ends_on)) + "</b>" +
+      (r.reason ? '<span class="lv__w">' + esc(r.reason) + "</span>" : "") + "</span>" +
+    '<span class="pill pill--' + esc(r.status) + '">' + esc(r.status) + "</span>" +
+  "</div>";
+}
+
+function noticeRow(n) {
+  return '<div class="nt">' +
+    '<span class="nt__t">' + (n.pinned ? '<span class="nt__pin">Pinned</span> ' : "") + esc(n.title) + "</span>" +
+    '<span class="nt__d">' + esc(when(n.published_at)) + "</span>" +
+    '<p class="nt__b">' + esc(n.body) + "</p>" +
+  "</div>";
+}
+
+function render(a, leaves, notices) {
+  APP = a;
+  var first = String(a.name || "").trim().split(/\\s+/)[0] || "there";
+  lead.textContent = "Signed in as " + ME + ".";
+
+  var pay = PAY.map(function (p) {
+    return '<label class="pay' + (a.payout_method === p[0] ? " is-on" : "") + '">' +
+      '<input type="radio" name="pay" value="' + p[0] + '"' +
+        (a.payout_method === p[0] ? " checked" : "") + ">" +
+      "<span><b>" + esc(p[1]) + "</b><span>" + esc(p[2]) + "</span></span></label>";
+  }).join("");
+
+  view(
+    '<div class="who">' +
+      '<div class="who__id"><span class="who__av">' + esc(first.charAt(0).toUpperCase()) + "</span>" +
+      '<span class="who__t"><span class="who__n">' + esc(a.name || "Your account") + "</span>" +
+      '<span class="who__e">' + esc(ME) + "</span></span></div>" +
+      '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
+    "</div>" +
+
+    '<div class="hub__hi"><h2>Hello, ' + esc(first) + ".</h2>" +
+      "<p>You are on the team. This is yours.</p></div>" +
+
+    '<div class="tls">' +
+      tile("/status", "Your profile", '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>') +
+      tile("#leave", "Ask for leave", '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>') +
+      tile("#pay", "Getting paid", '<rect x="3" y="6" width="18" height="12.5" rx="2"></rect><path d="M3 10.5h18M6.5 15h4"></path>') +
+      tile("#notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
+    "</div>" +
+
+    '<div class="card" id="leave">' +
+      "<h2>Ask for leave</h2>" +
+      '<p class="msg" style="margin-top:0">Tell us the dates and we will come back to you. Nothing is booked until it says approved.</p>' +
+      '<div class="edit__grid">' +
+        '<div class="fld"><label for="lv-from">First day off</label><input id="lv-from" type="date"></div>' +
+        '<div class="fld"><label for="lv-to">Last day off</label><input id="lv-to" type="date"></div>' +
+      "</div>" +
+      '<div class="fld"><label for="lv-why">Why, briefly</label><textarea id="lv-why" rows="2"></textarea></div>' +
+      '<p class="err" id="lv-err" aria-live="polite"></p>' +
+      '<div class="edit__foot"><span></span><span class="edit__act">' +
+        '<span class="row__ok" id="lv-ok"></span>' +
+        '<button class="btn btn--solid" id="lv-go" type="button">Send the request</button>' +
+      "</span></div>" +
+      (leaves.length
+        ? '<div class="lvs">' + leaves.map(leaveRow).join("") + "</div>"
+        : '<p class="msg">You have not asked for any leave yet.</p>') +
+    "</div>" +
+
+    '<div class="card" id="pay">' +
+      "<h2>Getting paid</h2>" +
+      '<p class="msg" style="margin-top:0">We send through Wise, which reaches a Philippine bank account or a GCash, Maya, GrabPay or ShopeePay wallet. Tell us which you would rather, and we will set it up with you.</p>' +
+      '<div class="pays">' + pay + "</div>" +
+      '<p class="msg"><b>We never ask for your account details on this page.</b> Nothing about where your money goes is stored here &mdash; that is agreed with a person and set up on the provider\\'s own site.</p>' +
+      '<span class="row__ok" id="pay-ok"></span>' +
+    "</div>" +
+
+    '<div class="card" id="notices">' +
+      "<h2>Notice board</h2>" +
+      (notices.length
+        ? '<div class="nts">' + notices.map(noticeRow).join("") + "</div>"
+        : '<p class="msg">Nothing on the board just now.</p>') +
+    "</div>" +
+
+    '<div class="card">' +
+      "<h2>Support</h2>" +
+      '<div class="edit__grid">' +
+        '<p class="msg"><b>Something broken</b><br>Your laptop, your connection, anything technical. ' +
+          '<a href="/contact?about=tech">Tell us</a> and a person answers.</p>' +
+        '<p class="msg"><b>Your work or your pay</b><br>Hours, a client that is not working out, anything about money. ' +
+          '<a href="/contact?about=work">Tell us</a>.</p>' +
+      "</div>" +
+    "</div>"
+  );
+
+  document.getElementById("out").addEventListener("click", signOut);
+  wireLeave();
+  wirePay();
+}
+
+function wireLeave() {
+  var go = document.getElementById("lv-go");
+  go.addEventListener("click", function () {
+    var from = document.getElementById("lv-from");
+    var to = document.getElementById("lv-to");
+    var reason = document.getElementById("lv-why");
+    var err = document.getElementById("lv-err");
+    var ok = document.getElementById("lv-ok");
+
+    /* Said here as well as in the constraint. The database refuses a backwards
+       range either way; being told which end is wrong is the difference between
+       fixing it and guessing. */
+    err.textContent = "";
+    if (!from.value) { err.textContent = "Which day do you want off first?"; from.focus(); return; }
+    if (!to.value) { err.textContent = "And the last day?"; to.focus(); return; }
+    if (to.value < from.value) { err.textContent = "The last day is before the first one."; to.focus(); return; }
+
+    go.disabled = true;
+    flash(ok, "Sending\\u2026");
+    api("leave_requests", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: {
+        application_id: APP.id,
+        starts_on: from.value,
+        ends_on: to.value,
+        reason: reason.value.trim() || null
+      }
+    }).then(function () {
+      return load();
+    }).catch(function (e) {
+      go.disabled = false;
+      flash(ok, why(e), true);
+    });
+  });
+}
+
+function wirePay() {
+  var ok = document.getElementById("pay-ok");
+  Array.prototype.forEach.call(document.querySelectorAll("[name=pay]"), function (r) {
+    r.addEventListener("change", function () {
+      flash(ok, "Saving\\u2026");
+      api("applications?id=eq." + encodeURIComponent(APP.id), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: { payout_method: r.value }
+      }).then(function () {
+        APP.payout_method = r.value;
+        Array.prototype.forEach.call(document.querySelectorAll(".pay"), function (l) {
+          l.classList.toggle("is-on", l.contains(r) ? true : false);
+        });
+        flash(ok, "Saved");
+      }).catch(function (e) { flash(ok, why(e), true); });
+    });
+  });
+}
+
+function flash(el, text, bad) {
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
+  el.classList.add("is-on");
+}
+
+function why(e) {
+  var m = String(e && e.message ? e.message : e);
+  if (m === "signed out") return "Signed out";
+  return "Did not save";
+}
+
+function load() {
+  return api("applications?select=id,name,email,status,payout_method&order=created_at.desc")
+    .then(function (rows) {
+      var a = (rows || [])[0];
+      if (!a) {
+        shut("Nothing here under this address.",
+          "We cannot find an application for " + esc(ME) + ". If you applied with a different address, sign out and use that one.");
+        return;
+      }
+      if (a.status !== "hired") {
+        shut("This opens when you are hired.",
+          "Your application is at <b>" + esc(a.status) + "</b>. The portal appears here the day you are placed &mdash; nothing to do in the meantime.");
+        return;
+      }
+      /* Both are fenced by policy: the leave rows are matched to applications
+         this person owns, and a notice is only visible once it is published.
+         Neither filter is written here, because a filter written in a page is
+         a filter somebody can change. */
+      return Promise.all([
+        api("leave_requests?select=id,starts_on,ends_on,reason,status&order=starts_on.desc"),
+        api("notices?select=id,title,body,pinned,published_at&order=pinned.desc,published_at.desc")
+      ]).then(function (r) {
+        render(a, r[0] || [], r[1] || []);
+      });
+    });
+}
+
+function start() {
+  captureRedirect();
+  if (CAME_FROM_RESET) { passwordForm(""); return; }
+  var err = authError();
+  if (!session()) { signedOut(err); return; }
+
+  var claims = readToken(session().access_token);
+  if (!claims || !claims.email) {
+    clearSession();
+    signedOut("That sign-in did not carry an email address.");
+    return;
+  }
+  ME = claims.email;
+
+  view('<div class="card"><span class="spin"></span>Opening your portal&hellip;</div>');
+  load().catch(function (e) {
+    if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
+    view('<div class="card"><p class="msg msg--bad">We could not open your portal just now. ' +
+         "Refresh, or try again in a minute.</p></div>");
+  });
+}
+
+start();
+`.trim();
+
+writeFileSync("hub.html", shell({
+  title: "Your portal — SecureJobVA",
+  links: [
+    '        <a href="/status">Your application</a>',
+    '        <a href="/careers">Careers</a>'
+  ].join(nl),
+  body: HUB_BODY,
+  script: HUB_SCRIPT
+}));
+
+console.log("hub.html written");
 
 /* ────────────────────────── seats.html ────────────────────────── */
 

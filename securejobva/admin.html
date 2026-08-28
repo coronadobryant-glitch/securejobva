@@ -523,6 +523,31 @@ img{max-width:100%}
 .edit__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid var(--line)}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
+.hub__hi{text-align:center;margin:1.6rem 0 1.4rem}
+.hub__hi h2{font-size:1.6rem;margin:0 0 .2rem}
+.hub__hi p{margin:0;color:var(--muted);font-size:.95rem}
+.tls{display:grid;gap:.8rem;grid-template-columns:repeat(2,1fr);margin-bottom:1.6rem}
+@media(min-width:720px){.tls{grid-template-columns:repeat(4,1fr)}}
+.tl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);text-decoration:none}
+.tl:hover{border-color:var(--accent)}
+.tl__art{background:var(--surface-2);display:grid;place-items:center;padding:1.2rem .8rem;border-bottom:1px solid var(--line)}
+.tl__art svg{width:32px;height:32px;stroke:var(--accent);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tl__l{background:var(--ink);color:var(--paper);padding:.55rem .6rem;text-align:center;font-size:.82rem;font-weight:600}
+.lvs{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1.2rem}
+.lv{background:var(--surface);padding:.7rem .9rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.lv__w{display:block;font-size:.85rem;color:var(--muted)}
+.pays{display:grid;gap:.6rem;margin:.4rem 0 1rem}
+.pay{display:flex;gap:.7rem;align-items:flex-start;border:1px solid var(--line);border-radius:7px;padding:.75rem .9rem;cursor:pointer}
+.pay.is-on{border-color:var(--accent);background:var(--accent-soft)}
+.pay b{display:block;color:var(--ink);font-size:.93rem}
+.pay span span{font-size:.85rem;color:var(--muted)}
+.nts{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:1rem}
+.nt{background:var(--surface);padding:.85rem 1rem;display:grid;gap:.25rem}
+.nt__t{color:var(--ink);font-weight:600;font-size:.95rem}
+.nt__pin{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-deep);background:var(--accent-soft);padding:.1rem .35rem;border-radius:3px}
+.nt__d{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted)}
+.nt__b{margin:.2rem 0 0;font-size:.9rem;white-space:pre-wrap}
+.pill--pending{background:var(--surface-2);color:var(--ink-2)}
 
 /* Stat tiles. The hero numbers are the answer for three of these four; a chart
    of a single figure would be a chart of nothing. */
@@ -576,6 +601,7 @@ img{max-width:100%}
 .pill--shortlist{background:var(--accent);color:var(--accent-ink)}
 .pill--running{background:var(--signal);color:var(--signal-ink)}
 .pill--closed{background:var(--surface-2);color:var(--muted)}
+.pill--hired{background:#0B7A63;color:#fff}
 .pill--applied{background:var(--surface-2);color:var(--ink-2)}
 .pill--assessment{background:var(--accent-soft);color:var(--accent-deep)}
 .pill--interview{background:var(--accent);color:var(--accent-ink)}
@@ -1018,10 +1044,14 @@ var STAGES = [
   ["applied",    "Application received",  "We have it, and a person reads every one."],
   ["assessment", "Exams and strengths test", "A written task in your track, the qualification exams, and the strengths test."],
   ["interview",  "Two interviews",        "One on how you work, one on your setup and connection."],
-  ["approved",   "Approved &mdash; paid training", "You are through. Paid training starts within a week."]
+  ["approved",   "Approved &mdash; paid training", "You are through. Paid training starts within a week."],
+  /* The ladder used to end at approved, which left the story stopping halfway:
+     you passed, and then nothing. Being placed with a client is a different day
+     and somebody decides it, so it is a rung rather than something inferred. */
+  ["hired",      "Hired", "You are on the team. Your portal is at /hub."]
 ];
 var LABEL = { applied: "Applied", assessment: "Assessment", interview: "Interview",
-              approved: "Approved", declined: "Declined" };
+              approved: "Approved", hired: "Hired", declined: "Declined" };
 
 
 var SKILL_LEVELS = ["beginner", "intermediate", "advanced", "fluent"];
@@ -1120,7 +1150,7 @@ function notAdmin(email) {
 }
 
 function options(cur) {
-  var keys = ["applied", "assessment", "interview", "approved", "declined"];
+  var keys = ["applied", "assessment", "interview", "approved", "hired", "declined"];
   var out = "";
   for (var i = 0; i < keys.length; i++) {
     out += '<option value="' + keys[i] + '"' + (keys[i] === cur ? " selected" : "") + ">" +

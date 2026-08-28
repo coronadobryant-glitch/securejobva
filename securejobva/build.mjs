@@ -54,6 +54,16 @@ const PAGES = [
     noindex: true
   },
   {
+    src: "hub.html",
+    path: "/hub",
+    title: "Your portal — SecureJobVA",
+    description:
+      "The portal for assistants working with SecureJobVA. Sign in with the address on your application.",
+    ogTitle: "Your portal",
+    /* Signed in, and only for people who have been hired. */
+    noindex: true
+  },
+  {
     src: "privacy.html",
     path: "/privacy",
     title: "Privacy Policy — SecureJobVA",
