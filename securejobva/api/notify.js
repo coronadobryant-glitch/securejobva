@@ -294,6 +294,87 @@ const DECIDE = {
     }
   },
 
+  /* ── being placed ───────────────────────────────────────────────────────
+     Three moments, and they are three different messages. The first exists to
+     stop the silence while a meeting is arranged; the second is the one with
+     dates in it; the third is the one she has been waiting for. */
+  placements: {
+    decided: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name) + ",";
+      const client = r.client || "one of our clients";
+      const hours = r.hours_per_week || 40;
+
+      if (r.status === "matched") {
+        return {
+          subject: "We have found you a client",
+          text: [hi, "",
+            "We have matched you with " + client + ", one of our clients. The next " +
+              "step is a meeting with them, and we will be in touch to arrange it.",
+            "", "Nothing is settled until after that meeting — we will tell you either way.",
+            "", "SecureJobVA"].join("\n"),
+          html: wrap([
+            "<p>" + esc(hi) + "</p>",
+            "<p>We have matched you with <b>" + esc(client) + "</b>, one of our clients. " +
+              "The next step is a meeting with them, and we will be in touch to arrange it.</p>",
+            "<p>Nothing is settled until after that meeting &mdash; we will tell you " +
+              "either way.</p>"
+          ], site, "/hub", "See your portal")
+        };
+      }
+
+      if (r.status === "trial") {
+        const day = r.started_on ? dayText(r.started_on) : null;
+        const trial = r.trial_weeks
+          ? "It begins as a " + r.trial_weeks + "-week trial. If they want you to stay " +
+            "after that, it simply carries on and we will tell you."
+          : "We will let you know as soon as they confirm.";
+        /* The sentence that matters most in the whole set. Being started by a
+           client is exactly the moment somebody could think they have been
+           handed over to a different employer. */
+        const stays = "You stay on the SecureJobVA team throughout, and we pay you as we " +
+          "always have. Nothing about that changes.";
+        return {
+          subject: day ? "You start with " + client + " on " + day
+                       : "You are starting with " + client,
+          text: [hi, "",
+            client + " would like you to start." +
+              (day ? " Your first day is " + day + ", at " + hours + " hours a week." : ""),
+            "", trial, "", stays,
+            "", "You can see it at " + site + "/hub.", "", "SecureJobVA"].join("\n"),
+          html: wrap([
+            "<p>" + esc(hi) + "</p>",
+            "<p><b>" + esc(client) + "</b> would like you to start." +
+              (day ? " Your first day is <b>" + esc(day) + "</b>, at <b>" + esc(hours) +
+                " hours a week</b>." : "") + "</p>",
+            "<p>" + esc(trial) + "</p>",
+            "<p>" + esc(stays) + "</p>"
+          ], site, "/hub", "See your portal")
+        };
+      }
+
+      /* Anything else — an ended placement above all — has no message here.
+         035 already declines to post for it, but the trigger and this file are
+         two lists in two places and only one of them can be right when they
+         disagree. Falling through to the branch below would have told somebody
+         they were staying on at the moment their placement ended. */
+      if (r.status !== "ongoing") return null;
+
+      /* Kept on. Short on purpose — the news is the whole message. */
+      return {
+        subject: "You are staying on with " + client,
+        text: [hi, "",
+          client + " would like to keep you on, so your placement simply carries on. " +
+            "Nothing changes and there is nothing you need to do.",
+          "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p><b>" + esc(client) + "</b> would like to keep you on, so your placement " +
+            "simply carries on. Nothing changes and there is nothing you need to do.</p>"
+        ], site, "/hub", "See your portal")
+      };
+    }
+  },
+
   timesheets: {
     /* To you and Bryant. The days are printed because a wrong number is the
        whole reason the queue exists, and it is only visible if the days are. */

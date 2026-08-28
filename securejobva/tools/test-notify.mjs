@@ -378,6 +378,55 @@ const dup = await call(STAGE("applied"));
 is("no second email for merely having applied", dup.code, 200);
 is("and nothing is sent", all.length, 0);
 
+/* ── being placed with a client ────────────────────────────────────────── */
+
+const PLACED = (status, over) => ({
+  type: "STATUS", event: "decided", table: "placements",
+  person: { name: "Maricel Ordoñez", email: "maricel@example.com" },
+  record: { id: "p1", status, client: "Rosehill Plumbing", started_on: "2026-09-07",
+            hours_per_week: 40, trial_weeks: 2, ...over }
+});
+
+await call(PLACED("matched"));
+is("being matched is told, not left silent", sent.body.to, ["maricel@example.com"]);
+is("the subject says a client was found", sent.body.subject, "We have found you a client");
+is("it names the client", sent.body.text.includes("Rosehill Plumbing"), true);
+is("and says a meeting comes first", sent.body.text.includes("meeting"), true);
+/* The whole point of this one: it must not read as a job offer. */
+is("it promises nothing", sent.body.text.includes("Nothing is settled"), true);
+
+await call(PLACED("trial"));
+is("starting names the day", sent.body.subject, "You start with Rosehill Plumbing on 7 September");
+is("and the hours", sent.body.text.includes("40 hours a week"), true);
+is("and how long the trial runs", sent.body.text.includes("2-week trial"), true);
+/* The sentence that stops somebody thinking they have been handed over. */
+is("it says who still employs them",
+  sent.body.text.includes("stay on the SecureJobVA team"), true);
+is("and that pay does not change", sent.body.text.includes("we pay you as we always have"), true);
+
+await call(PLACED("trial", { started_on: null, trial_weeks: null }));
+is("no start date still reads as a sentence",
+  sent.body.subject, "You are starting with Rosehill Plumbing");
+is("and does not leave a dangling date", /on \.|on ,/.test(sent.body.text), false);
+
+await call(PLACED("ongoing"));
+is("being kept on is told", sent.body.subject, "You are staying on with Rosehill Plumbing");
+is("and asks nothing of them", sent.body.text.includes("nothing you need to do"), true);
+
+/* Losing a placement is a conversation, not an email. */
+const gone = await call(PLACED("ended"));
+is("a placement ending sends nothing", all.length, 0);
+is("and is skipped quietly", gone.code, 200);
+
+/* None of these may carry the queue or anybody else. */
+await call(PLACED("trial"));
+is("no placement email links the admin queue",
+  /\/admin/.test(sent.body.text + sent.body.html), false);
+is("and none names another address", /david@example\.com|bryant@example\.com/
+  .test(sent.body.text + sent.body.html), false);
+is("and none mentions money", /\$|rate|per hour|an hour/i
+  .test(sent.body.text), false, "her portal shows hours and no money");
+
 /* ── the retry rule, which is the whole point of splitting them ── */
 resendStatus = 500;
 is("a failed email to you is retried", (await call(WEEK)).code, 502);
