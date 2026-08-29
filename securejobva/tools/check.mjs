@@ -438,11 +438,16 @@ function policyBody(name) {
   return m[0];
 }
 
+/* The LAST definition, not the first. A function may be replaced by a later
+   migration — notify_decision is written in 031, again in 035 and again in
+   037 — and the one the database ends up running is the last file to define
+   it. Reading the first would check a version that no longer exists, which is
+   worse than not checking: it passes or fails on dead code. */
 function functionBody(name) {
-  const m = sql.match(new RegExp(
-    "create or replace function public\\." + name + "[\\s\\S]*?\\$fn\\$;", "i"));
-  if (!m) throw new Error(name + "() is not defined in the sql/ folder");
-  return m[0];
+  const all = [...sql.matchAll(new RegExp(
+    "create or replace function public\\." + name + "[\\s\\S]*?\\$fn\\$;", "gi"))];
+  if (!all.length) throw new Error(name + "() is not defined in the sql/ folder");
+  return all[all.length - 1][0];
 }
 
 await check("an assistant cannot approve their own week", () => {
@@ -681,6 +686,35 @@ await check("a client can only decide a week that is waiting on them", () => {
     throw new Error("a client cannot both approve and send back");
   }
   return "submitted only, left approved or returned";
+});
+
+/* One CASE cannot cover four table shapes. PL/pgSQL prepares an expression as
+   a single statement, so every field reference in it resolves against the
+   actual record type of NEW — including the branches not taken. 035 added
+   new.started_on to a placements branch and every application stage change in
+   /admin started failing with `record "new" has no field "started_on"`, which
+   no test here caught because none of them run Postgres.
+
+   The shape is the thing to forbid: separate IF branches per table, so a
+   branch that is not reached is never prepared. */
+await check("the notify trigger does not read fields across table shapes", () => {
+  const fn = functionBody("notify_decision");
+  const body = fn.replace(/--[^\n]*/g, " ");
+  const bad = [...body.matchAll(/case\s+tg_table_name([\s\S]*?)\bend\b/gi)];
+  for (const [, arm] of bad) {
+    const fields = [...arm.matchAll(/\bnew\.([a-z_]+)/gi)].map((m) => m[1].toLowerCase());
+    const shared = new Set(["id", "status", "application_id", "client_id"]);
+    const risky = [...new Set(fields.filter((f) => !shared.has(f)))];
+    if (risky.length > 1) {
+      throw new Error("a CASE on tg_table_name reads " + risky.join(", ") + " — those do not all " +
+        "exist on every table this fires for, and PL/pgSQL resolves every branch. " +
+        "Use separate IF blocks so an untaken branch is never prepared.");
+    }
+  }
+  if (!/if\s+tg_table_name\s*=\s*'applications'/i.test(body)) {
+    throw new Error("the per-table branches are gone — the payload is being built some other way");
+  }
+  return "per-table IF blocks, no cross-shape CASE";
 });
 
 await check("anon holds nothing on the placement tables", () => {
