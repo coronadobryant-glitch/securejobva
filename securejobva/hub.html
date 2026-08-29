@@ -524,7 +524,13 @@ img{max-width:100%}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
 .adm__wrap{display:grid;grid-template-columns:1fr;gap:0;align-items:stretch;min-height:100vh}
-@media(min-width:900px){.adm__wrap{grid-template-columns:16rem 1fr}}
+@media(min-width:900px){
+  .adm__wrap{grid-template-columns:16rem 1fr}
+  /* Without this the rail is only as tall as its links and the column below it
+     goes white, which reads as the page having run out rather than as a
+     sidebar. */
+  .rail{min-height:100vh}
+}
 .adm__main{min-width:0}
 .rail{display:flex;flex-direction:column;gap:.12rem;background:var(--ink);border-radius:0;padding:0 0 1rem;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
 @media(max-width:899px){.rail{position:static;flex-direction:column;max-height:none;gap:.12rem}}
@@ -1262,6 +1268,62 @@ function trialEnds(p) {
   return isoDay(addDays(fromIso(p.started_on), p.trial_weeks * 7 - 1));
 }
 
+/* What she needs to know before deciding what to do, on one screen. Landing
+   somebody on a data-entry form asks them to work before telling them anything;
+   this answers the four questions first — how many hours am I on, who am I
+   with, when does the trial end, and is anything waiting on me. */
+function overviewCard(leaves, notices) {
+  var week = SHEETS[VIEW];
+  var hours = totalOf(week);
+  var status = week ? week.status : "draft";
+  var pending = (leaves || []).filter(function (l) { return l.status === "pending"; });
+  var live = (notices || []).filter(function (n) { return n.published_at; });
+
+  var tile = function (n, label, kind) {
+    return '<div class="tile' + (kind ? " tile--" + kind : "") + '">' +
+      '<span class="tile__n">' + n + '</span><span class="tile__l">' + label + "</span></div>";
+  };
+
+  var says;
+  if (!PLACE) {
+    says = "You are on the team. We are matching you with a client now, and we will email you " +
+      "the moment we have somebody.";
+  } else if (status === "approved") {
+    says = "This week is agreed. Nothing else is needed from you for it.";
+  } else if (status === "submitted") {
+    says = "This week is with " + esc((PLACE.clients && PLACE.clients.name) || "your client") +
+      ". They will approve it or send it back, and we will email you either way.";
+  } else if (status === "returned") {
+    says = "This week came back to you with a note. Open Hours and timesheet to see it.";
+  } else if (hours > 0) {
+    says = "You have " + esc(showHours(hours)) + " hours down and have not sent them yet.";
+  } else {
+    says = "Nothing recorded for this week yet.";
+  }
+
+  return '<div class="card">' +
+    "<h2>This week</h2>" +
+    '<p class="msg" style="margin-top:.35rem">' + says + "</p>" +
+    '<div class="tiles">' +
+      tile(esc(showHours(hours)) + '<span style="font-size:.9rem;font-weight:400"> / ' +
+        WEEK_TARGET + "</span>", "hours this week") +
+      (PLACE
+        ? tile('<span style="font-size:1.05rem">' +
+            esc((PLACE.clients && PLACE.clients.name) || "your client") + "</span>", "your client")
+        : tile('<span style="font-size:1.05rem">&mdash;</span>', "no client yet")) +
+      (PLACE && PLACE.status === "trial" && trialEnds(PLACE)
+        ? tile('<span style="font-size:1.05rem">' + esc(when(trialEnds(PLACE))) + "</span>",
+            "trial ends")
+        : tile('<span style="font-size:1.05rem">' +
+            esc(TS_LABEL[status] || status) + "</span>", "this week")) +
+      tile(pending.length, "leave waiting", pending.length ? "warn" : "") +
+    "</div>" +
+    (live.length
+      ? '<div class="nts" style="margin-top:1.1rem">' + noticeRow(live[0]) + "</div>"
+      : "") +
+  "</div>";
+}
+
 function clientCard() {
   /* Nothing here used to render at all before somebody was matched, on the
      reasoning that an absence claims nothing. Walking it as the assistant
@@ -1293,7 +1355,11 @@ function clientCard() {
   } else if (PLACE.status === "trial") {
     says = "You started on " + esc(when(PLACE.started_on)) + "." +
       (ends ? " Your trial runs until " + esc(when(ends)) +
-        " &mdash; we will let you know as soon as they confirm." : "");
+        " &mdash; we will let you know as soon as they confirm." : "") +
+      /* Said plainly because it is the question somebody on a trial actually
+         has, and because a trial that does not say it is paid reads as one
+         that is not. */
+      " <b>The trial is paid</b>, by us, the same as any other week.";
   } else if (PLACE.status === "ongoing") {
     says = "You have been kept on. You started on " + esc(when(PLACE.started_on)) +
       " and you stay on the SecureJobVA team throughout &mdash; we pay you, as always.";
@@ -1668,8 +1734,10 @@ function render(a, leaves, notices) {
           esc(a.name || "Your account") + "</b>" + esc(ME) + "</span></div>" +
 
         '<span class="rail__k">Your work</span>' +
+        nav("home", "Overview",
+          '<path d="M4 11.5 12 4l8 7.5"></path><path d="M6.5 10.5V20h11v-9.5"></path>', "", true) +
         nav("hours", "Hours and timesheet",
-          '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>', unsent, true) +
+          '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>', unsent) +
         nav("client", "Your client",
           '<path d="M12 21s7-5.2 7-11a7 7 0 10-14 0c0 5.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.6"></circle>') +
 
@@ -1703,7 +1771,8 @@ function render(a, leaves, notices) {
         "</div>" +
 
         '<div class="hub__body">' +
-          '<div data-hpane="hours"><div class="card" id="hours">' + hoursCard() + "</div></div>" +
+          '<div data-hpane="home">' + overviewCard(leaves, notices) + "</div>" +
+          '<div data-hpane="hours" hidden><div class="card" id="hours">' + hoursCard() + "</div></div>" +
           '<div data-hpane="client" hidden>' + clientCard() + "</div>" +
           '<div data-hpane="leave" hidden>' +
     '<div class="card" id="leave">' +

@@ -524,7 +524,13 @@ img{max-width:100%}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
 .adm__wrap{display:grid;grid-template-columns:1fr;gap:0;align-items:stretch;min-height:100vh}
-@media(min-width:900px){.adm__wrap{grid-template-columns:16rem 1fr}}
+@media(min-width:900px){
+  .adm__wrap{grid-template-columns:16rem 1fr}
+  /* Without this the rail is only as tall as its links and the column below it
+     goes white, which reads as the page having run out rather than as a
+     sidebar. */
+  .rail{min-height:100vh}
+}
 .adm__main{min-width:0}
 .rail{display:flex;flex-direction:column;gap:.12rem;background:var(--ink);border-radius:0;padding:0 0 1rem;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
 @media(max-width:899px){.rail{position:static;flex-direction:column;max-height:none;gap:.12rem}}
@@ -1516,7 +1522,7 @@ function clientBlock() {
                   esc(w.status === "submitted" ? "waiting on you" : w.status) + "</span>" +
                 '<span class="row__tot">' + esc(cNum(h)) + " h" +
                   (w.trial_week
-                    ? ' &middot; <span style="color:var(--muted);font-weight:400">on us</span>'
+                    ? ' &middot; <span style="color:var(--muted);font-weight:400">free &mdash; trial</span>'
                     : rate !== undefined ? " &middot; " + esc(cMoney(h * rate)) : "") +
                 "</span></div>" +
               cDays(w) +
@@ -1557,9 +1563,9 @@ function clientBlock() {
              above and gets a different number to the total has been given a
              puzzle instead of a statement. */
           (onUs.length
-            ? "<li><b>Trial hours, on us</b><span>" +
+            ? "<li><b>Trial hours</b><span>" +
               esc(cNum(onUs.reduce(function (t, w) { return t + cHours(w); }, 0))) +
-              " &mdash; not charged</span></li>"
+              " &mdash; free, we cover the trial</span></li>"
             : "") +
           "<li><b>Rate</b><span>" + esc(cMoney(rate)) + " an hour</span></li>" +
           "<li><b>Comes to</b><span>" + esc(cMoney(total)) + "</span></li>" +

@@ -232,8 +232,8 @@ act("Rosehill open /seats and see it waiting");
   ok("they see who works for them", view.includes("Maria Santos"));
   ok("the week is waiting on them", view.includes("waiting on you"));
   ok("with the days shown", view.includes("M 8") && view.includes("F 8"));
-  ok("the row says it is on us, not a price", view.includes("on us"),
-    "this one is inside the trial");
+  ok("the row says free rather than a price", view.includes("free &mdash; trial"),
+    "this one is inside the trial, and the trial costs them nothing");
   ok("the statement counts nothing yet", view.includes("Comes to</b><span>$0.00"),
     "unapproved hours are not owed");
   ok("what Maria is paid is nowhere on it", !view.includes("4.5") && !view.includes("$4.50"));
@@ -260,9 +260,9 @@ act("The statement moves");
   const view = seats.clientBlock();
   ok("the trial week is not charged for", view.includes("Comes to</b><span>$0.00"),
     "she is paid for it; we carry it");
-  ok("but it is shown, not hidden", view.includes("Trial hours, on us"),
+  ok("but it is shown, not hidden", view.includes("Trial hours"),
     "so the weeks above still add up to the total");
-  ok("and the row says so plainly", view.includes("on us"));
+  ok("and says who covers it", view.includes("we cover the trial"));
   ok("still nothing about what she is paid", !view.includes("$180.00"), "40 × $4.50");
 }
 
@@ -273,7 +273,7 @@ act("The trial ends. She works the first chargeable week");
   const view = seats.clientBlock();
   ok("now they owe something", view.includes("Comes to</b><span>$310.00"),
     "40 × $7.75, the chargeable week only");
-  ok("the trial week still shows as ours", view.includes("Trial hours, on us"));
+  ok("the trial week still shows as free", view.includes("Trial hours"));
   ok("chargeable hours count only the one week", view.includes("Chargeable hours</b><span>40"));
   ok("40 × $7.75 is exact", seats.cMoney(40 * BILL) === "$310.00", "no float dust");
 }
