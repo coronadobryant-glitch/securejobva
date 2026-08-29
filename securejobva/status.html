@@ -1009,13 +1009,22 @@ function signOut() {
    signed you in and showed you the normal page. The mail worked, the link
    worked, and nothing anywhere offered to change the password. */
 var CAME_FROM_RESET = false;
+var CAME_FROM_LINK = false;
 
 function captureRedirect() {
   if (!location.hash || location.hash.indexOf("access_token") === -1) return false;
   var p = new URLSearchParams(location.hash.slice(1));
   var tok = p.get("access_token");
   if (!tok) return false;
-  if (p.get("type") === "recovery") CAME_FROM_RESET = true;
+  var kind = p.get("type");
+  if (kind === "recovery") CAME_FROM_RESET = true;
+  /* Arrived by a link from an email rather than by typing anything. Worth
+     knowing, because on a phone that link usually opens inside the mail app's
+     own browser: the sign-in genuinely works, and the session is written to
+     that webview's storage, which is a different box from Safari or Chrome.
+     Close it, open your real browser, and you are signed out — same link, same
+     code, different container. A password is the thing that survives that. */
+  else if (kind === "magiclink" || kind === "invite" || kind === "signup") CAME_FROM_LINK = true;
   saveSession({
     access_token: tok,
     refresh_token: p.get("refresh_token") || "",
