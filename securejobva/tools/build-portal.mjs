@@ -346,18 +346,21 @@ body:has(.adm__wrap) main{padding:0}
 .kpi--warn{border-color:var(--signal)}
 .kpi--warn b{color:var(--signal-ink)}
 .kpi--good b{color:#0B7A63}
-.hub__hi{text-align:center;margin:1.6rem 0 1.4rem}
 /* The cards below the tiles used to be one narrow column down the middle of
    however wide a screen was, which on a large monitor is a thin ribbon in a
    field of nothing. Columns flow them side by side once there is room, and
    break-inside keeps a card whole rather than splitting it across the fold. */
-.hub__cols{margin-top:0}
-@media(min-width:64rem){
-  .hub__cols{column-count:2;column-gap:1.1rem}
-  .hub__cols>.card{break-inside:avoid;margin:0 0 1.1rem;display:inline-block;width:100%}
-}
-.hub__hi h2{font-size:1.6rem;margin:0 0 .2rem}
-.hub__hi p{margin:0;color:var(--muted);font-size:.95rem}
+/* Two real columns, not flowed ones. column-count split the timesheet in
+   half — its Send button ended up at the top of the other column, away from
+   the days it belonged to — because a tall card is exactly what column flow
+   breaks. A grid cannot split anything. */
+.hub__cols{display:grid;gap:1.1rem;grid-template-columns:1fr;align-items:start}
+@media(min-width:64rem){.hub__cols{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}}
+.hub__col{display:flex;flex-direction:column;gap:1.1rem;min-width:0}
+.hub__body{padding:1.3rem clamp(1rem,2.5vw,1.9rem) 3rem}
+.hub__hi{text-align:left;margin:0}
+.hub__hi h2{font-size:1.35rem;margin:0;color:#fff}
+.hub__hi p{color:#9DB3D0;font-size:.86rem}
 .tls{display:grid;gap:.8rem;grid-template-columns:repeat(2,1fr);margin-bottom:1.6rem}
 /* auto-fit rather than a fixed four. There are five tiles, and four columns
    left Notice board alone on a second row looking like an afterthought. This
@@ -4140,17 +4143,15 @@ console.log("admin.html written");
    teaches people to distrust the portal in week one.
 */
 
+/* Bare, like the admin page. The shell — rail, header bar, columns — is
+   built in render() once we know who is signed in, because a rail carrying
+   somebody's name cannot be static HTML. Signed out, render() falls back to a
+   centred card and this stays out of the way. */
 const HUB_BODY = [
-  '  <section class="pt">',
-  '    <div class="wrap" style="max-width:72rem">',
-  '      <div class="pt__head">',
-  '        <span class="eyebrow">Your portal</span>',
-  "        <h1>Everything you need, in one place.</h1>",
-  '        <p id="hub-lead">Sign in with the address on your application.</p>',
-  "      </div>",
-  '      <div id="hub-root"></div>',
-  "    </div>",
-  "  </section>"
+  '  <div class="adm__page">',
+  '    <p id="hub-lead" hidden></p>',
+  '    <div id="hub-root"></div>',
+  "  </div>"
 ].join(nl);
 
 const HUB_SCRIPT = `
@@ -4611,34 +4612,67 @@ function render(a, leaves, notices) {
       "<span><b>" + esc(p[1]) + "</b><span>" + esc(p[2]) + "</span></span></label>";
   }).join("");
 
+  /* The rail replaces the tiles. They were doing a rail's job — six links to
+     the same page — while a narrow column of cards ran down the middle of
+     whatever screen somebody had. Same links, at the side, and the content
+     gets the whole width. */
+  var nav = function (href, label, path, badge) {
+    return '<a class="rnav" href="' + href + '"><svg viewBox="0 0 24 24">' + path + "</svg>" +
+      esc(label) + (badge ? '<span class="rnav__n is-warn">' + esc(badge) + "</span>" : "") + "</a>";
+  };
+  var unsent = unsentLabel();
+
   view(
-    '<div class="who">' +
-      '<div class="who__id"><span class="who__av">' + esc(first.charAt(0).toUpperCase()) + "</span>" +
-      '<span class="who__t"><span class="who__n">' + esc(a.name || "Your account") + "</span>" +
-      '<span class="who__e">' + esc(ME) + "</span></span></div>" +
-      '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
-    "</div>" +
+    '<div class="adm__wrap">' +
+      '<nav class="rail">' +
+        '<a class="rail__brand" href="/">SecureJob<b>VA</b></a>' +
+        '<div class="rail__me"><span class="who__av">' +
+          esc(first.charAt(0).toUpperCase()) + "</span><span><b>" +
+          esc(a.name || "Your account") + "</b>" + esc(ME) + "</span></div>" +
 
-    '<div class="hub__hi"><h2>Hello, ' + esc(first) + ".</h2>" +
-      "<p>You are on the team. This is yours.</p></div>" +
+        '<span class="rail__k">Your work</span>' +
+        nav("#client", "Your client",
+          '<path d="M12 21s7-5.2 7-11a7 7 0 10-14 0c0 5.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.6"></circle>') +
+        nav("#hours", "Hours and timesheet",
+          '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>', unsent) +
 
-    clientCard() +
+        '<span class="rail__k">Your account</span>' +
+        nav("#leave", "Ask for leave",
+          '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>') +
+        nav("#pay", "Getting paid",
+          '<rect x="3" y="6" width="18" height="12.5" rx="2"></rect><path d="M3 10.5h18M6.5 15h4"></path>') +
+        nav("#notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
 
-    '<div class="tls">' +
-      tile("/status", "Your profile", '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>') +
-      tile("#leave", "Ask for leave", '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>') +
-      tile("#pay", "Getting paid", '<rect x="3" y="6" width="18" height="12.5" rx="2"></rect><path d="M3 10.5h18M6.5 15h4"></path>') +
-      /* It said "Still working on it" from 026 until 030. The number under it
-         is the one worth seeing without opening anything: hours that are typed
-         in and not yet sent are hours nobody is being paid for. */
-      tile("#hours", "Hours and timesheet",
-        '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>',
-        unsentLabel()) +
-      tile("#notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
-    "</div>" +
+        '<span class="rail__k">Elsewhere</span>' +
+        nav("/status", "Your application",
+          '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>') +
 
-    '<div class="hub__cols">' +
+        '<div class="rail__foot">' +
+          '<a class="rlink" href="/contact?about=tech">Something broken</a>' +
+          '<a class="rlink" href="/contact?about=work">Your work or your pay</a>' +
+          '<div class="rail__acts">' +
+            '<button class="rbtn" id="out" type="button">Sign out</button></div>' +
+        "</div>" +
+      "</nav>" +
 
+      '<div class="adm__main">' +
+        '<div class="adm__top">' +
+          '<span><span class="k">Your portal</span>' +
+            '<div class="hub__hi"><h2>Hello, ' + esc(first) + ".</h2>" +
+            "<p>You are on the team. This is yours.</p></div></span>" +
+          '<span class="adm__topn"><span class="k">this week</span><b>' +
+            esc(showHours(totalOf(SHEETS[VIEW]))) + "</b></span>" +
+        "</div>" +
+
+        '<div class="hub__body"><div class="hub__cols">' +
+          '<div class="hub__col">' +
+            clientCard() +
+
+
+    '<div class="card" id="hours">' + hoursCard() + "</div>" +
+          "</div>" +
+
+          '<div class="hub__col">' +
     '<div class="card" id="leave">' +
       "<h2>Ask for leave</h2>" +
       '<p class="msg" style="margin-top:0">Tell us the dates and we will come back to you. Nothing is booked until it says approved.</p>' +
@@ -4657,7 +4691,9 @@ function render(a, leaves, notices) {
         : '<p class="msg">You have not asked for any leave yet.</p>') +
     "</div>" +
 
-    '<div class="card" id="hours">' + hoursCard() + "</div>" +
+          "</div>" +
+
+          '<div class="hub__col">' +
 
     '<div class="card" id="pay">' +
       "<h2>Getting paid</h2>" +
@@ -4682,7 +4718,11 @@ function render(a, leaves, notices) {
         '<p class="msg"><b>Your work or your pay</b><br>Hours, a client that is not working out, anything about money. ' +
           '<a href="/contact?about=work">Tell us</a>.</p>' +
       "</div>" +
-    "</div>" + "</div>"
+    "</div>" +
+          "</div>" +
+        "</div></div>" +
+      "</div>" +
+    "</div>"
   );
 
   document.getElementById("out").addEventListener("click", signOut);

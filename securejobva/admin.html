@@ -580,18 +580,21 @@ body:has(.adm__wrap) main{padding:0}
 .kpi--warn{border-color:var(--signal)}
 .kpi--warn b{color:var(--signal-ink)}
 .kpi--good b{color:#0B7A63}
-.hub__hi{text-align:center;margin:1.6rem 0 1.4rem}
 /* The cards below the tiles used to be one narrow column down the middle of
    however wide a screen was, which on a large monitor is a thin ribbon in a
    field of nothing. Columns flow them side by side once there is room, and
    break-inside keeps a card whole rather than splitting it across the fold. */
-.hub__cols{margin-top:0}
-@media(min-width:64rem){
-  .hub__cols{column-count:2;column-gap:1.1rem}
-  .hub__cols>.card{break-inside:avoid;margin:0 0 1.1rem;display:inline-block;width:100%}
-}
-.hub__hi h2{font-size:1.6rem;margin:0 0 .2rem}
-.hub__hi p{margin:0;color:var(--muted);font-size:.95rem}
+/* Two real columns, not flowed ones. column-count split the timesheet in
+   half — its Send button ended up at the top of the other column, away from
+   the days it belonged to — because a tall card is exactly what column flow
+   breaks. A grid cannot split anything. */
+.hub__cols{display:grid;gap:1.1rem;grid-template-columns:1fr;align-items:start}
+@media(min-width:64rem){.hub__cols{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}}
+.hub__col{display:flex;flex-direction:column;gap:1.1rem;min-width:0}
+.hub__body{padding:1.3rem clamp(1rem,2.5vw,1.9rem) 3rem}
+.hub__hi{text-align:left;margin:0}
+.hub__hi h2{font-size:1.35rem;margin:0;color:#fff}
+.hub__hi p{color:#9DB3D0;font-size:.86rem}
 .tls{display:grid;gap:.8rem;grid-template-columns:repeat(2,1fr);margin-bottom:1.6rem}
 /* auto-fit rather than a fixed four. There are five tiles, and four columns
    left Notice board alone on a second row looking like an afterthought. This
