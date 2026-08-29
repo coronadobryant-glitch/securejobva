@@ -1058,9 +1058,19 @@ await check("a client may read the name of the assistant placed with them", () =
   if (/\bapplications\(/.test(q[0])) {
     throw new Error("the client portal embeds applications( … ) — 018 grants that whole " +
       "table to authenticated, so any policy that lets a client read it also hands over " +
-      "the email, phone, CV and skill ratings. Embed application_public instead.");
+      "the email, phone, CV and skill ratings. Read application_public instead.");
   }
-  if (!/application_public\(/.test(q[0])) {
+  /* 041 shipped it as an embed and PostgREST answered 400: there is no foreign
+     key between placements and application_public, and both pointing at
+     applications is not a relationship it can traverse. loadClient catches a
+     failure there by hiding the entire client block, so the portal said
+     "Nothing here under this address yet" over a live placement. */
+  if (/application_public\(/.test(q[0])) {
+    throw new Error("the client portal embeds application_public( … ) inside its placements " +
+      "select — there is no foreign key between those tables, so PostgREST refuses the whole " +
+      "query with 400 and loadClient hides the client's entire portal. Read it separately.");
+  }
+  if (!/application_public\?select=/.test(html)) {
     throw new Error("the client portal reads no name for the assistant — the card falls " +
       'through to "your assistant"');
   }

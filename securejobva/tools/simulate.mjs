@@ -79,10 +79,10 @@ const seatFns = ["when", "cIso", "cFrom", "cHours", "cNum", "cMoney", "cWeekLabe
                  "clientBlock"];
 const seats = new Function("esc",
   varOf(SEATS, "C_LABEL") + "\n" + 'var C_DAY = ["M","T","W","T","F","S","S"];\n' +
-  "var C_PLACE = [], C_RATE = {}, C_WEEKS = [], C_SWAPS = [], C_STARTS = [], C_OFF = false;\n" +
+  "var C_PLACE = [], C_RATE = {}, C_WEEKS = [], C_SWAPS = [], C_STARTS = [], C_NAMES = [], C_OFF = false;\n" +
   seatFns.map((n) => grab(SEATS, n)).join("\n") +
   "\nreturn { set: function (s) { C_PLACE = s.C_PLACE; C_RATE = s.C_RATE; C_WEEKS = s.C_WEEKS;" +
-  " C_SWAPS = s.C_SWAPS; C_STARTS = s.C_STARTS || []; }, " + seatFns.map((n) => n + ": " + n).join(", ") + " };"
+  " C_SWAPS = s.C_SWAPS; C_STARTS = s.C_STARTS || []; C_NAMES = s.C_NAMES || []; }, " + seatFns.map((n) => n + ": " + n).join(", ") + " };"
 )(esc);
 
 /* ── the mail, through the real endpoint ────────────────────────────────── */
@@ -122,12 +122,12 @@ const CLIENT = { id: "c1", name: "Rosehill Plumbing", contact_email: "ops@rosehi
    with". If this embed is ever changed, that check is the other half. */
 const PLACE = { id: "p1", application_id: A.id, client_id: CLIENT.id, status: "matched",
                 started_on: "2026-09-07", hours_per_week: 40, trial_weeks: 2,
-                clients: { name: CLIENT.name },
-                /* application_public, not applications: 041 moved the one field
-                   a client may read into its own table, because 018 grants the
-                   whole applications table to authenticated and a policy on it
-                   would hand over the email, the CV and the skill ratings too. */
-                application_public: { name: A.name } };
+                /* clients is still an embed, because placements really does
+                   have a foreign key to it. The assistant's name is not: 041
+                   tried that and PostgREST answered 400, so /seats reads
+                   application_public separately and it is passed in as
+                   C_NAMES below. */
+                clients: { name: CLIENT.name } };
 const BILL = 7.75, PAY = 4.5;
 /* The trial runs 7 to 20 September, so this first week is inside it and is
    ours to carry. The week beginning the 21st is the first the client pays for. */
@@ -241,7 +241,8 @@ act("She sends the week");
 /* ── 9 ── */
 act("Rosehill open /seats and see it waiting");
 {
-  seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK], C_SWAPS: [] });
+  seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK], C_SWAPS: [],
+    C_NAMES: [{ application_id: A.id, name: A.name }] });
   const view = seats.clientBlock();
   ok("they see who works for them", view.includes("Maria Santos"));
   ok("the week is waiting on them", view.includes("waiting on you"));
@@ -270,7 +271,8 @@ act("They approve it");
 /* ── 11 ── */
 act("The statement moves");
 {
-  seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK], C_SWAPS: [] });
+  seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK], C_SWAPS: [],
+    C_NAMES: [{ application_id: A.id, name: A.name }] });
   const view = seats.clientBlock();
   ok("the trial week is not charged for", view.includes("Comes to</b><span>$0.00"),
     "she is paid for it; we carry it");
@@ -317,7 +319,8 @@ console.log("\n  the cut\n");
 {
   hub.set({ SHEETS: { "2026-09-07": WEEK }, VIEW: "2026-09-07", PLACE });
   const hers = hub.clientCard() + hub.hoursCard();
-  seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK], C_SWAPS: [] });
+  seats.set({ C_PLACE: [PLACE], C_RATE: { p1: BILL }, C_WEEKS: [WEEK], C_SWAPS: [],
+    C_NAMES: [{ application_id: A.id, name: A.name }] });
   const theirs = seats.clientBlock();
 
   ok("she sees no money anywhere", !/\$/.test(hers));
