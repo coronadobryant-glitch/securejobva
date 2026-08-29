@@ -4235,6 +4235,211 @@ function trialEnds(p) {
   return isoDay(addDays(fromIso(p.started_on), p.trial_weeks * 7 - 1));
 }
 
+/* Small on purpose. Only the four things she can actually change and would
+   think to look for — the rest of her application is edited on /status, where
+   that form already lives, and duplicating it here would be two forms writing
+   the same columns and drifting apart.
+
+   Every field here is in 006's column grant. A box she can type in and not
+   save is worse than no box. */
+var SET_FIELDS = [
+  ["phone",        "WhatsApp or phone",  "tel"],
+  ["region",       "State or region",    "text"],
+  ["availability", "Hours you can work", "text"],
+  ["cv",           "Link to your CV",    "url"]
+];
+
+/* The exact words shown beside the box. Stored with the answer, because 004
+   keeps three columns for this on purpose: the boolean says they agreed, the
+   timestamp says when, and this says which wording they were agreeing to.
+   Change the sentence and the record of who agreed to what still holds. */
+var CONSENT_TEXT = "SecureJobVA may post about my work, and use my first name and photo, " +
+  "on its own social accounts and website.";
+
+function settingsCard(a) {
+  var rows = SET_FIELDS.map(function (f) {
+    return '<div class="fld"><label for="set-' + f[0] + '">' + esc(f[1]) + "</label>" +
+      '<input id="set-' + f[0] + '" type="' + f[2] + '" value="' +
+      esc(a[f[0]] === null || a[f[0]] === undefined ? "" : a[f[0]]) + '"></div>';
+  }).join("");
+
+  /* She gets better at things. A level set the day she applied and never
+     changeable is a level that goes stale and stops meaning anything. */
+  var skills = SKILLS.map(function (sk) {
+    return '<div class="fld"><label for="set-' + sk[0] + '">' + esc(sk[1]) + "</label>" +
+      '<select id="set-' + sk[0] + '">' +
+      LEVELS.map(function (lv) {
+        return '<option value="' + lv + '"' +
+          ((a[sk[0]] || "beginner") === lv ? " selected" : "") + ">" +
+          esc(LEVEL_LABEL[lv]) + "</option>";
+      }).join("") + "</select></div>";
+  }).join("");
+
+  return '<div class="card">' +
+      "<h2>Your details</h2>" +
+      '<p class="msg" style="margin-top:.35rem">Keep these current &mdash; they are how we reach ' +
+        "you and how we know what hours you can work.</p>" +
+      '<div class="edit__grid">' + rows + "</div>" +
+      '<label class="chk" style="margin-top:.4rem"><input type="checkbox" id="set-kit"' +
+        (a.has_equipment ? " checked" : "") + "> I have my own computer and internet</label>" +
+      '<div class="fld" style="margin-top:.9rem"><label for="set-note">Anything we should know' +
+        '</label><textarea id="set-note" rows="3">' +
+        esc(a.note === null || a.note === undefined ? "" : a.note) + "</textarea></div>" +
+      '<p class="err" id="set-err" aria-live="polite"></p>' +
+      '<div class="edit__foot"><span></span><span class="edit__act">' +
+        '<span class="row__ok" id="set-ok"></span>' +
+        '<button class="btn btn--solid" id="set-go" type="button">Save</button>' +
+      "</span></div>" +
+    "</div>" +
+
+    '<div class="card">' +
+      "<h2>Your skills</h2>" +
+      '<p class="msg" style="margin-top:.35rem">Say where you are now, not where you were when ' +
+        "you applied. This is what we match you on.</p>" +
+      '<div class="edit__grid">' + skills + "</div>" +
+      '<div class="edit__foot"><span></span><span class="edit__act">' +
+        '<span class="row__ok" id="skill-ok"></span>' +
+        '<button class="btn btn--solid" id="skill-go" type="button">Save skills</button>' +
+      "</span></div>" +
+    "</div>" +
+
+    '<div class="card">' +
+      "<h2>Posting about your work</h2>" +
+      '<p class="msg" style="margin-top:.35rem">This is yours to decide and yours to change, ' +
+        "at any time. Turning it off does not affect your work or your pay in any way.</p>" +
+      '<label class="chk" style="margin-top:.6rem"><input type="checkbox" id="set-consent"' +
+        (a.posting_consent ? " checked" : "") + "> " + esc(CONSENT_TEXT) + "</label>" +
+      (a.posting_consent && a.posting_consent_at
+        ? '<p class="msg">You agreed to this on ' + esc(when(a.posting_consent_at)) + ".</p>"
+        : "") +
+      '<div class="edit__foot"><span></span><span class="edit__act">' +
+        '<span class="row__ok" id="consent-ok"></span>' +
+        '<button class="btn btn--ghost" id="consent-go" type="button">Save this choice</button>' +
+      "</span></div>" +
+    "</div>" +
+
+    '<div class="card">' +
+      "<h2>Your account</h2>" +
+      '<ul class="meta">' +
+        "<li><b>Signed in as</b><span>" + esc(ME) + "</span></li>" +
+        "<li><b>Name</b><span>" + (a.name ? esc(a.name) : "&mdash;") + "</span></li>" +
+      "</ul>" +
+      '<p class="msg">Your name and email are how your application is found, so they are ' +
+        "changed by asking us rather than here. Write to " +
+        '<a href="mailto:support@securejobva.com">support@securejobva.com</a> and a person ' +
+        "will do it.</p>" +
+      '<p class="msg">The whole of your application &mdash; skills, equipment, the rest &mdash; ' +
+        'is on <a href="/status">your application page</a>.</p>' +
+    "</div>" +
+
+    '<div class="card">' +
+      "<h2>Appearance</h2>" +
+      '<p class="msg" style="margin-top:.35rem">This portal follows your device by default. ' +
+        "Pick one if you would rather it stayed put.</p>" +
+      '<div class="row__ctl" style="margin-top:.8rem">' +
+        '<button class="btn btn--ghost" data-theme-set="light" type="button">Light</button>' +
+        '<button class="btn btn--ghost" data-theme-set="dark" type="button">Dark</button>' +
+        '<button class="btn btn--ghost" data-theme-set="" type="button">Follow my device</button>' +
+        '<span class="row__ok" id="theme-ok"></span>' +
+      "</div>" +
+    "</div>";
+}
+
+function wireSettings(a) {
+  var go = document.getElementById("set-go");
+  if (go) {
+    go.addEventListener("click", function () {
+      var err = document.getElementById("set-err");
+      var ok = document.getElementById("set-ok");
+      var body = {};
+      err.textContent = "";
+      for (var i = 0; i < SET_FIELDS.length; i++) {
+        var el = document.getElementById("set-" + SET_FIELDS[i][0]);
+        body[SET_FIELDS[i][0]] = el.value.trim() || null;
+      }
+      body.has_equipment = document.getElementById("set-kit").checked;
+      body.note = document.getElementById("set-note").value.trim() || null;
+      go.disabled = true;
+      flash(ok, "Saving\\u2026");
+      api("applications?id=eq." + encodeURIComponent(a.id), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: body
+      }).then(function () {
+        go.disabled = false;
+        for (var k in body) a[k] = body[k];
+        flash(ok, "Saved");
+      }).catch(function (e) {
+        go.disabled = false;
+        flash(ok, why(e), true);
+      });
+    });
+  }
+
+  var skillGo = document.getElementById("skill-go");
+  if (skillGo) {
+    skillGo.addEventListener("click", function () {
+      var ok = document.getElementById("skill-ok");
+      var body = {};
+      for (var i = 0; i < SKILLS.length; i++) {
+        body[SKILLS[i][0]] = document.getElementById("set-" + SKILLS[i][0]).value;
+      }
+      skillGo.disabled = true;
+      flash(ok, "Saving\\u2026");
+      api("applications?id=eq." + encodeURIComponent(a.id), {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: body
+      }).then(function () {
+        skillGo.disabled = false;
+        for (var k in body) a[k] = body[k];
+        flash(ok, "Saved");
+      }).catch(function (e) { skillGo.disabled = false; flash(ok, why(e), true); });
+    });
+  }
+
+  /* All three columns together or none. The boolean on its own is a claim
+     nobody can check later — 004 keeps the timestamp and the wording precisely
+     so that "they agreed" can be answered with "to this, on that day". */
+  var consentGo = document.getElementById("consent-go");
+  if (consentGo) {
+    consentGo.addEventListener("click", function () {
+      var ok = document.getElementById("consent-ok");
+      var on = document.getElementById("set-consent").checked;
+      consentGo.disabled = true;
+      flash(ok, "Saving\\u2026");
+      api("applications?id=eq." + encodeURIComponent(a.id), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: {
+          posting_consent: on,
+          posting_consent_at: on ? new Date().toISOString() : null,
+          posting_consent_text: on ? CONSENT_TEXT : null
+        }
+      }).then(function () {
+        consentGo.disabled = false;
+        a.posting_consent = on;
+        flash(ok, on ? "Saved — thank you" : "Saved — we will not post about you");
+      }).catch(function (e) { consentGo.disabled = false; flash(ok, why(e), true); });
+    });
+  }
+
+  /* Same store the rest of the site's toggle uses, so a choice made here is
+     the choice everywhere. An empty value means follow the device, which is
+     what removing the attribute does. */
+  document.querySelectorAll("[data-theme-set]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var want = b.getAttribute("data-theme-set");
+      var root = document.documentElement;
+      if (want) { root.setAttribute("data-theme", want); }
+      else { root.removeAttribute("data-theme"); }
+      try {
+        if (want) localStorage.setItem("sjva-theme", want);
+        else localStorage.removeItem("sjva-theme");
+      } catch (e) {}
+      flash(document.getElementById("theme-ok"), "Saved");
+    });
+  });
+}
+
 /* What she needs to know before deciding what to do, on one screen. Landing
    somebody on a data-entry form asks them to work before telling them anything;
    this answers the four questions first — how many hours am I on, who am I
@@ -4714,6 +4919,8 @@ function render(a, leaves, notices) {
         nav("pay", "Getting paid",
           '<rect x="3" y="6" width="18" height="12.5" rx="2"></rect><path d="M3 10.5h18M6.5 15h4"></path>') +
         nav("notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
+        nav("settings", "Settings",
+          '<circle cx="12" cy="12" r="3.2"></circle><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"></path>') +
 
         '<span class="rail__k">Elsewhere</span>' +
         '<a class="rnav" href="/status"><svg viewBox="0 0 24 24">' +
@@ -4791,6 +4998,8 @@ function render(a, leaves, notices) {
       "</div>" +
     "</div>" +
         "</div>" +
+
+        '<div data-hpane="settings" hidden>' + settingsCard(a) + "</div>" +
       "</div>" +
     "</div>" +
   "</div>"
@@ -4798,6 +5007,7 @@ function render(a, leaves, notices) {
 
   document.getElementById("out").addEventListener("click", signOut);
   wireHubTabs();
+  wireSettings(a);
   wireLeave();
   wirePay();
   wireHours();
@@ -4893,7 +5103,13 @@ function why(e) {
 }
 
 function load() {
-  return api("applications?select=id,name,email,status,payout_method&order=created_at.desc")
+  /* Everything the settings pane shows. The check that a portal page only
+     reads columns it is granted covers this list, so a typo here fails the
+     build rather than the page. */
+  return api("applications?select=id,name,email,status,payout_method,phone,cv,note," +
+             "region,availability,has_equipment,posting_consent,posting_consent_at," +
+             "skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping" +
+             "&order=created_at.desc")
     .then(function (rows) {
       var a = (rows || [])[0];
       if (!a) {
