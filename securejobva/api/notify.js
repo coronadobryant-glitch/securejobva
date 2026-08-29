@@ -438,6 +438,25 @@ const DECIDE = {
     }
   },
 
+  /* ── a client wants somebody different ──────────────────────────────────
+     To you and Bryant, and there is deliberately no `decided` half. The
+     assistant is not told and must never be: 032 keeps her out of the table
+     and this keeps her out of the mail. Somebody tells her in their own words
+     once it is known what is actually happening. */
+  swap_requests: {
+    arrived: (r) => ({
+      subject: "Replacement asked for — " + (r.client || "a client") +
+        " on " + (r.assistant || "an assistant"),
+      lines: [
+        ["Client", r.client],
+        ["Assistant", r.assistant],
+        ["With them since", r.since ? dayText(r.since) : ""],
+        ["Their reason", r.reason]
+      ],
+      where: "/admin"
+    })
+  },
+
   leave_requests: {
     arrived: (r, p) => ({
       subject: "Leave requested — " + (p.name || "an assistant") + ", " +

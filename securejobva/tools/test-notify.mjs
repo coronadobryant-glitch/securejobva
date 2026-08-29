@@ -427,6 +427,49 @@ is("and none names another address", /david@example\.com|bryant@example\.com/
 is("and none mentions money", /\$|rate|per hour|an hour/i
   .test(sent.body.text), false, "her portal shows hours and no money");
 
+/* ── a client asking for somebody different ────────────────────────────────
+   The worst thing in the system to go unnoticed: somebody's job is the
+   subject and a client is waiting on a reply. */
+
+const SWAP = {
+  type: "STATUS", event: "arrived", table: "swap_requests", person: {},
+  record: { id: "s1", client: "Rosehill Plumbing", assistant: "Maricel Ordoñez",
+            since: "2026-09-07", placement: "ongoing",
+            reason: "Timezone overlap is not working — we need mornings covered." }
+};
+
+const swap = await call(SWAP);
+is("a swap request reaches you", swap.code, 200);
+is("you and Bryant, nobody else", sent.body.to, ["david@example.com", "bryant@example.com"]);
+is("the subject names both sides",
+  sent.body.subject, "Replacement asked for — Rosehill Plumbing on Maricel Ordoñez");
+is("their reason is in it", sent.body.text.includes("Timezone overlap"), true);
+is("and how long they have had her", sent.body.text.includes("7 September"), true);
+is("only one email goes out", all.length, 1);
+
+/* The rule this whole feature rests on. */
+is("nothing is addressed to the assistant",
+  /maricel@|@example\.com/.test(sent.body.to.join(",").replace(/david@example\.com|bryant@example\.com/g, "")),
+  false, "she must not learn this from an inbox");
+
+/* There is no outbound half at all, so asking for one must send nothing.
+
+   Given a real address on purpose. Asking with an empty person block would
+   pass whether or not a message to her existed — the handler stops at "no
+   address, no email" long before it looks for one — and this has to fail if
+   somebody ever writes that message, not merely if they forget the address. */
+const swapOut = await call({ ...SWAP, event: "decided",
+  person: { name: "Maricel Ordoñez", email: "maricel@example.com" } });
+is("there is no message to the assistant, even with her address in hand",
+  all.length, 0);
+is("and asking for one is skipped", swapOut.code, 200);
+is("it is skipped by name", swapOut.body.skipped, "swap_requests/decided");
+
+/* Resend failing here must be retried — this is the one holding a reply. */
+resendStatus = 500;
+is("a failed swap email is retried", (await call(SWAP)).code, 502);
+resendStatus = 200;
+
 /* ── the retry rule, which is the whole point of splitting them ── */
 resendStatus = 500;
 is("a failed email to you is retried", (await call(WEEK)).code, 502);
