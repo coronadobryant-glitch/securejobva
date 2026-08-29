@@ -803,6 +803,36 @@ await check("an assistant may read the business she is placed with", () => {
   return "the placed assistant is named in the policy";
 });
 
+/* seat_requests is the enquiry form on the home page. A client we matched by
+   hand in /admin never filled it in, so they have no row in it — and /seats
+   returned early on that emptiness, which meant the placement, the week
+   waiting to be approved and the statement were unreachable for every client
+   who arrived the way clients actually arrive. The page rendered, said
+   "Nothing here under this address yet", and was wrong.
+
+   Nothing could catch it but a person signing in as a client, because the two
+   halves of that page come from two different tables and only one of them was
+   empty. */
+await check("a client with no seat request still sees their placement", () => {
+  if (!existsSync("seats.html")) return "no seats page";
+  const html = read("seats.html");
+  const at = html.indexOf("if (!rows.length) {");
+  if (at < 0) throw new Error("the empty-seats branch is gone — this check needs rewriting");
+  const end = html.indexOf("return;", at);
+  if (end < 0) throw new Error("could not find the end of the empty-seats branch");
+  const branch = html.slice(at, end);
+  if (!/clientBlock\(\)/.test(branch)) {
+    throw new Error("the no-seat-request branch never calls clientBlock() — a client " +
+      "matched in /admin has no seat_requests row, so they would see " +
+      '"Nothing here under this address yet" while a week sits waiting for them to approve');
+  }
+  if (!/wireClient\(\)/.test(branch)) {
+    throw new Error("the no-seat-request branch renders the placement but never calls " +
+      "wireClient(), so the approve and decline buttons do nothing");
+  }
+  return "placement and its buttons reachable with no seat request";
+});
+
 /* These pages talk to GoTrue's REST API directly rather than through
    supabase-js, and the two disagree about where the return address goes.
    supabase-js takes options: { emailRedirectTo }. The REST endpoint takes

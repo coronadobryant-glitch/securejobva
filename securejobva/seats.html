@@ -1452,14 +1452,23 @@ function render(email, rows) {
 
   lead.textContent = "Signed in as " + email + ".";
 
+  /* A client made in /admin has no seat_requests row — that table is the
+     enquiry form on the home page, and a business we matched by hand never
+     filled it in. This branch used to return here, so the placement, the week
+     waiting to be approved and the statement were all unreachable for every
+     client who arrived the way clients actually arrive. The note below is
+     about seat requests, so it now only stands in when there is genuinely
+     nothing else to show. */
   if (!rows.length) {
-    view(who +
+    var only = clientBlock();
+    view(who + (only ||
       '<div class="card">' +
         '<div class="note"><b>Nothing here under this address yet.</b> ' +
         "A seat request appears here once you have sent one. If you booked a call with a " +
         "different email, sign out and use that one.</div>" +
         '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/#book">Book a 20-minute call</a></p>' +
-      "</div>");
+      "</div>"));
+    if (only) wireClient();
     document.getElementById("out").addEventListener("click", signOut);
   document.getElementById("setpw").addEventListener("click", function () { passwordForm("", start); });
     return;
