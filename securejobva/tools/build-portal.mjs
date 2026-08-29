@@ -601,11 +601,18 @@ function signInPassword(email, password) {
 /* Supabase may or may not return a session depending on whether the project
    requires email confirmation, so the caller is told which happened rather
    than being left to guess from a missing token. */
+/* redirect_to as a query parameter, for the reason spelled out over
+   resetPassword below. This one was left on the options shape when that was
+   fixed, so the confirmation link kept falling back to the project's Site URL
+   and landing people on the home page — a page with nothing that reads an auth
+   fragment, so the token sat in the address bar and the account stayed
+   unconfirmed. It looked, from the outside, exactly like an email that had not
+   arrived. */
 function signUpPassword(email, password) {
-  return authPost("signup", {
+  var back = location.origin + location.pathname;
+  return authPost("signup?redirect_to=" + encodeURIComponent(back), {
     email: email,
-    password: password,
-    options: { emailRedirectTo: location.origin + location.pathname }
+    password: password
   }).then(function (j) {
     if (j && j.access_token) { keepSession(j); return "in"; }
     return "confirm";

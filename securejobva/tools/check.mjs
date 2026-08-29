@@ -803,6 +803,40 @@ await check("an assistant may read the business she is placed with", () => {
   return "the placed assistant is named in the policy";
 });
 
+/* These pages talk to GoTrue's REST API directly rather than through
+   supabase-js, and the two disagree about where the return address goes.
+   supabase-js takes options: { emailRedirectTo }. The REST endpoint takes
+   ?redirect_to= and silently ignores a body it does not recognise — so the
+   wrong shape does not fail, it falls back to the project's Site URL and
+   drops people on the home page, which has nothing that reads an auth
+   fragment. The token sits in the address bar and the account stays
+   unconfirmed, which from the outside is indistinguishable from an email that
+   never arrived.
+
+   It was fixed on recover and left on signup, and cost an afternoon. */
+await check("email links come back to the page that sent them", () => {
+  const src = read("tools/build-portal.mjs");
+  const wrong = src.match(/options\s*:\s*\{[^}]*(?:emailRedirectTo|redirectTo)/);
+  if (wrong) {
+    throw new Error("an auth call passes the return address as options: { emailRedirectTo } — " +
+      "that is the supabase-js shape and the REST endpoint ignores it. Use " +
+      "?redirect_to= on the path instead.");
+  }
+  const missing = [];
+  for (const call of ["signup", "recover"]) {
+    const re = new RegExp('authPost\\("' + call + '([^"]*)"');
+    const m = src.match(re);
+    if (!m) continue;
+    if (!/redirect_to=/.test(m[1])) missing.push(call);
+  }
+  if (missing.length) {
+    throw new Error("no redirect_to on: " + missing.join(", ") +
+      " — the link will fall back to the project Site URL rather than the portal " +
+      "the person was standing on");
+  }
+  return "signup and recover both carry a return address";
+});
+
 /* Every file in api/ is a URL on the public internet. notify describes real
    applicants and invite mails real people, so both stand on the same shared
    secret and both must refuse when it is unset rather than defaulting open. */
