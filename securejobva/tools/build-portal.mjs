@@ -4616,9 +4616,13 @@ function render(a, leaves, notices) {
      the same page — while a narrow column of cards ran down the middle of
      whatever screen somebody had. Same links, at the side, and the content
      gets the whole width. */
-  var nav = function (href, label, path, badge) {
-    return '<a class="rnav" href="' + href + '"><svg viewBox="0 0 24 24">' + path + "</svg>" +
-      esc(label) + (badge ? '<span class="rnav__n is-warn">' + esc(badge) + "</span>" : "") + "</a>";
+  /* Buttons, not links. An anchor scrolled the page to a card further down,
+     which is not what a rail is for — you press a thing on the left and the
+     right changes. Same behaviour as the staff desk. */
+  var nav = function (pane, label, path, badge, on) {
+    return '<button class="rnav' + (on ? " is-on" : "") + '" data-hub="' + pane +
+      '" type="button"><svg viewBox="0 0 24 24">' + path + "</svg>" + esc(label) +
+      (badge ? '<span class="rnav__n is-warn">' + esc(badge) + "</span>" : "") + "</button>";
   };
   var unsent = unsentLabel();
 
@@ -4631,21 +4635,22 @@ function render(a, leaves, notices) {
           esc(a.name || "Your account") + "</b>" + esc(ME) + "</span></div>" +
 
         '<span class="rail__k">Your work</span>' +
-        nav("#client", "Your client",
+        nav("hours", "Hours and timesheet",
+          '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>', unsent, true) +
+        nav("client", "Your client",
           '<path d="M12 21s7-5.2 7-11a7 7 0 10-14 0c0 5.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.6"></circle>') +
-        nav("#hours", "Hours and timesheet",
-          '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>', unsent) +
 
         '<span class="rail__k">Your account</span>' +
-        nav("#leave", "Ask for leave",
+        nav("leave", "Ask for leave",
           '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path>') +
-        nav("#pay", "Getting paid",
+        nav("pay", "Getting paid",
           '<rect x="3" y="6" width="18" height="12.5" rx="2"></rect><path d="M3 10.5h18M6.5 15h4"></path>') +
-        nav("#notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
+        nav("notices", "Notice board", '<path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9"></path>') +
 
         '<span class="rail__k">Elsewhere</span>' +
-        nav("/status", "Your application",
-          '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>') +
+        '<a class="rnav" href="/status"><svg viewBox="0 0 24 24">' +
+          '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>' +
+          "</svg>Your application</a>" +
 
         '<div class="rail__foot">' +
           '<a class="rlink" href="/contact?about=tech">Something broken</a>' +
@@ -4664,15 +4669,10 @@ function render(a, leaves, notices) {
             esc(showHours(totalOf(SHEETS[VIEW]))) + "</b></span>" +
         "</div>" +
 
-        '<div class="hub__body"><div class="hub__cols">' +
-          '<div class="hub__col">' +
-            clientCard() +
-
-
-    '<div class="card" id="hours">' + hoursCard() + "</div>" +
-          "</div>" +
-
-          '<div class="hub__col">' +
+        '<div class="hub__body">' +
+          '<div data-hpane="hours"><div class="card" id="hours">' + hoursCard() + "</div></div>" +
+          '<div data-hpane="client" hidden>' + clientCard() + "</div>" +
+          '<div data-hpane="leave" hidden>' +
     '<div class="card" id="leave">' +
       "<h2>Ask for leave</h2>" +
       '<p class="msg" style="margin-top:0">Tell us the dates and we will come back to you. Nothing is booked until it says approved.</p>' +
@@ -4691,9 +4691,9 @@ function render(a, leaves, notices) {
         : '<p class="msg">You have not asked for any leave yet.</p>') +
     "</div>" +
 
-          "</div>" +
+        "</div>" +
 
-          '<div class="hub__col">' +
+        '<div data-hpane="pay" hidden>' +
 
     '<div class="card" id="pay">' +
       "<h2>Getting paid</h2>" +
@@ -4702,7 +4702,9 @@ function render(a, leaves, notices) {
       '<p class="msg"><b>We never ask for your account details on this page.</b> Nothing about where your money goes is stored here &mdash; that is agreed with a person and set up on the provider\\'s own site.</p>' +
       '<span class="row__ok" id="pay-ok"></span>' +
     "</div>" +
+        "</div>" +
 
+        '<div data-hpane="notices" hidden>' +
     '<div class="card" id="notices">' +
       "<h2>Notice board</h2>" +
       (notices.length
@@ -4719,16 +4721,36 @@ function render(a, leaves, notices) {
           '<a href="/contact?about=work">Tell us</a>.</p>' +
       "</div>" +
     "</div>" +
-          "</div>" +
-        "</div></div>" +
+        "</div>" +
       "</div>" +
-    "</div>"
+    "</div>" +
+  "</div>"
   );
 
   document.getElementById("out").addEventListener("click", signOut);
+  wireHubTabs();
   wireLeave();
   wirePay();
   wireHours();
+}
+
+/* Press a thing on the left, the right changes. An anchor scrolled the page to
+   a card further down, which is not what a rail is for. */
+function wireHubTabs() {
+  var rail = document.querySelector(".rail");
+  if (!rail) return;
+  rail.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-hub]");
+    if (!b) return;
+    var want = b.getAttribute("data-hub");
+    rail.querySelectorAll("[data-hub]").forEach(function (x) {
+      x.classList.toggle("is-on", x === b);
+    });
+    document.querySelectorAll("[data-hpane]").forEach(function (pane) {
+      if (pane.getAttribute("data-hpane") === want) pane.removeAttribute("hidden");
+      else pane.setAttribute("hidden", "");
+    });
+  });
 }
 
 function wireLeave() {
@@ -4892,6 +4914,7 @@ start();
 `.trim();
 
 writeFileSync("hub.html", shell({
+  app: true,
   title: "Your portal — SecureJobVA",
   links: [
     '        <a href="/status">Your application</a>',
