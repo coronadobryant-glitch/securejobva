@@ -688,6 +688,55 @@ await check("a client can only decide a week that is waiting on them", () => {
   return "submitted only, left approved or returned";
 });
 
+/* A row must satisfy EVERY check constraint on its table, so two constraints
+   naming different status lists is not two opinions — it is the narrower one
+   winning, silently, forever.
+
+   003 wrote applications_status_valid with five stages. 026 added `hired` by
+   creating applications_status_check under a new name instead of replacing the
+   first, so the old one kept vetoing it. Hired was unreachable from that day
+   until 038, and looked fine because nobody had tried.
+
+   This walks the folder in order, tracks whether each named constraint ends up
+   added or dropped, and requires every one still standing to permit the same
+   set. */
+await check("only one live constraint decides which stages exist", () => {
+  const live = new Map();                       /* name -> Set of statuses */
+  const text = sql.replace(/--[^\n]*/g, " ");
+
+  for (const m of text.matchAll(
+    /alter\s+table\s+(?:only\s+)?public\.(\w+)\s+drop\s+constraint\s+if\s+exists\s+(\w+)/gi)) {
+    live.delete(m[2].toLowerCase());
+  }
+  /* Adds are collected after drops only if they appear later; walk both in one
+     pass over the text so file order decides. */
+  live.clear();
+  const events = [...text.matchAll(
+    /alter\s+table\s+(?:only\s+)?public\.(\w+)\s+(drop\s+constraint\s+if\s+exists\s+(\w+)|add\s+constraint\s+(\w+)\s+check\s*\(\s*status\s+in\s*\(([^)]*)\))/gi)];
+  for (const e of events) {
+    const table = e[1].toLowerCase();
+    if (table !== "applications") continue;
+    if (e[3]) live.delete(e[3].toLowerCase());
+    else if (e[4]) {
+      live.set(e[4].toLowerCase(),
+        new Set(e[5].split(",").map((s) => s.trim().replace(/'/g, "")).filter(Boolean)));
+    }
+  }
+
+  if (!live.size) throw new Error("nothing constrains applications.status any more");
+  const lists = [...live.entries()];
+  const first = [...lists[0][1]].sort().join(",");
+  for (const [name, set] of lists.slice(1)) {
+    const here = [...set].sort().join(",");
+    if (here !== first) {
+      throw new Error(lists[0][0] + " allows [" + first + "] and " + name + " allows [" + here +
+        "] — both are live, so only the stages in BOTH are reachable. Replacing a constraint " +
+        "under a new name doubles it rather than replacing it.");
+    }
+  }
+  return lists.length + " live, all agreeing on " + live.get(lists[0][0]).size + " stages";
+});
+
 /* One CASE cannot cover four table shapes. PL/pgSQL prepares an expression as
    a single statement, so every field reference in it resolves against the
    actual record type of NEW — including the branches not taken. 035 added
