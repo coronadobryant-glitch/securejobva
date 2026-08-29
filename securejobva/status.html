@@ -1239,16 +1239,19 @@ function when(iso) {
   if (isNaN(d)) return "";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
-
-var root = document.getElementById("pt-root");
-var lead = document.getElementById("pt-lead");
-
-function view(html) { root.innerHTML = html; }
+var SIGNIN_HINT = "Use the same address you applied with &mdash; that is how we find your application.";
 
 function signedOut(msg, mode) {
   /* One card, three states: sign in, create an account, reset. They share the
      email field and most of the markup, so they are one function rather than
-     three that drift apart. */
+     three that drift apart.
+
+     Every portal gets all three. /hub and /seats used to override this with a
+     Google button and nothing else, which locked out everybody whose address
+     is not a Google account — an assistant who set a password on /status could
+     not open her own portal, and a client contact on a company address had no
+     door at all. The functions this form calls were sitting unused in both
+     files the whole time. */
   mode = mode || "in";
   var isUp    = mode === "up";
   var isReset = mode === "reset";
@@ -1287,11 +1290,11 @@ function signedOut(msg, mode) {
         (isReset
           ? '<button class="lnk" data-mode="in" type="button">Back to signing in</button>'
           : isUp
-            ? 'Already applied and have an account? <button class="lnk" data-mode="in" type="button">Sign in</button>'
+            ? 'Already have an account? <button class="lnk" data-mode="in" type="button">Sign in</button>'
             : 'No account yet? <button class="lnk" data-mode="up" type="button">Create one</button>' +
               ' &middot; <button class="lnk" data-mode="reset" type="button">Forgot password</button>') +
       "</p>" +
-      '<p class="msg">Use the same address you applied with &mdash; that is how we find your application.</p>' +
+      '<p class="msg">' + SIGNIN_HINT + "</p>" +
     "</div>"
   );
 
@@ -1348,6 +1351,19 @@ function signedOut(msg, mode) {
     });
   });
 }
+
+var root = document.getElementById("pt-root");
+var lead = document.getElementById("pt-lead");
+
+function view(html) { root.innerHTML = html; }
+
+/* The line under the sign-in card, which is the only part of it that differs
+   between portals. Each page overwrites this before start() runs. Held as a
+   variable rather than an argument because signedOut() is called from a dozen
+   places that have no business knowing which portal they are in.
+
+   It is our own markup and goes in unescaped, which is what lets the client
+   one carry a link. Nothing from a user reaches it. */
 
 function stages(app) {
   var at = stageIndex(app.status);

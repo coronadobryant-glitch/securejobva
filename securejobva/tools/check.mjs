@@ -803,6 +803,38 @@ await check("an assistant may read the business she is placed with", () => {
   return "the placed assistant is named in the policy";
 });
 
+/* /hub and /seats each shadowed the shared signedOut() with a Google button
+   and nothing else, while signInPassword, signUpPassword and resetPassword sat
+   defined and uncalled in both files. Nothing errored: the page rendered, the
+   button worked, and it worked for everybody who happened to have a Google
+   account. An assistant who set a password on /status could not open her own
+   portal, and a client contact on a company address had no door at all —
+   they never apply, so they never had a /status account either.
+
+   admin.html is not in this list and that is deliberate: the staff desk is the
+   most privileged page here, access is granted by an administrator rather than
+   asked for, and one narrow door is the design. */
+await check("no portal offers only one way in", () => {
+  const doors = [];
+  for (const f of ["status.html", "hub.html", "seats.html"]) {
+    if (!existsSync(f)) continue;
+    const html = read(f);
+    const google = /gbtn/.test(html);
+    const form = /id="pw" novalidate/.test(html);
+    const wired = /signInPassword\(em, pwd\)/.test(html);
+    if (!google) throw new Error(f + " offers no Google sign-in");
+    if (!form || !wired) {
+      throw new Error(f + " offers Google and nothing else" +
+        (form ? " — the form is there but nothing calls signInPassword" : "") +
+        ". Anybody whose address is not a Google account cannot reach it, and " +
+        "the page will not say so — it just shows them one button that is no use.");
+    }
+    doors.push(f.replace(".html", ""));
+  }
+  if (!doors.length) throw new Error("no portal pages found to check");
+  return doors.join(", ") + " — Google, password, and a way to make one";
+});
+
 /* The other half of 039: the name is readable because everything worth
    hiding left the table. If a private column comes back, the policy above
    hands it to her along with the name. */

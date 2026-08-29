@@ -1193,6 +1193,118 @@ function when(iso) {
   if (isNaN(d)) return "";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
+var SIGNIN_HINT = "Use the same address you applied with &mdash; that is how we find your application.";
+
+function signedOut(msg, mode) {
+  /* One card, three states: sign in, create an account, reset. They share the
+     email field and most of the markup, so they are one function rather than
+     three that drift apart.
+
+     Every portal gets all three. /hub and /seats used to override this with a
+     Google button and nothing else, which locked out everybody whose address
+     is not a Google account — an assistant who set a password on /status could
+     not open her own portal, and a client contact on a company address had no
+     door at all. The functions this form calls were sitting unused in both
+     files the whole time. */
+  mode = mode || "in";
+  var isUp    = mode === "up";
+  var isReset = mode === "reset";
+
+  view(
+    '<div class="card">' +
+      (msg ? '<p class="msg msg--bad" id="err">' + esc(msg) + "</p>" : "") +
+      '<button class="gbtn" id="go" type="button">' +
+        '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">' +
+          '<path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"></path>' +
+          '<path fill="#4285F4" d="M46.98 24.55c0-1.6-.15-3.15-.42-4.65H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.6 5.9c4.44-4.1 7.22-10.15 7.22-17.45z"></path>' +
+          '<path fill="#FBBC05" d="M10.42 28.68A14.4 14.4 0 0 1 9.66 24c0-1.63.28-3.2.76-4.68l-7.8-6.1A24 24 0 0 0 0 24c0 3.87.92 7.52 2.62 10.78l7.8-6.1z"></path>' +
+          '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.8l-7.6-5.9c-2.12 1.42-4.84 2.26-8.3 2.26-6.3 0-11.7-3.7-13.6-9.8l-7.8 6.1C6.44 42.6 14.55 48 24 48z"></path>' +
+        "</svg>" +
+        "Continue with Google" +
+      "</button>" +
+      '<div class="or">or</div>' +
+      '<form id="pw" novalidate>' +
+        '<div class="fld">' +
+          '<label for="em">Email</label>' +
+          '<input id="em" type="email" autocomplete="email" required placeholder="you@example.com">' +
+        "</div>" +
+        (isReset ? "" :
+          '<div class="fld">' +
+            '<label for="pwd">Password</label>' +
+            '<input id="pwd" type="password" autocomplete="' +
+              (isUp ? "new-password" : "current-password") +
+              '" required minlength="8" placeholder="' +
+              (isUp ? "At least 8 characters" : "Your password") + '">' +
+          "</div>") +
+        '<button class="btn btn--solid" id="sub" type="submit" style="width:100%;justify-content:center">' +
+          (isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in") +
+        "</button>" +
+      "</form>" +
+      '<p class="msg" id="alt">' +
+        (isReset
+          ? '<button class="lnk" data-mode="in" type="button">Back to signing in</button>'
+          : isUp
+            ? 'Already have an account? <button class="lnk" data-mode="in" type="button">Sign in</button>'
+            : 'No account yet? <button class="lnk" data-mode="up" type="button">Create one</button>' +
+              ' &middot; <button class="lnk" data-mode="reset" type="button">Forgot password</button>') +
+      "</p>" +
+      '<p class="msg">' + SIGNIN_HINT + "</p>" +
+    "</div>"
+  );
+
+  document.getElementById("go").addEventListener("click", signIn);
+
+  root.querySelectorAll("[data-mode]").forEach(function (b) {
+    b.addEventListener("click", function () { signedOut("", b.getAttribute("data-mode")); });
+  });
+
+  function fail(t) {
+    var e = document.getElementById("err");
+    if (!e) {
+      e = document.createElement("p");
+      e.className = "msg msg--bad";
+      e.id = "err";
+      root.querySelector(".card").insertBefore(e, root.querySelector(".card").firstChild);
+    }
+    e.textContent = t;
+  }
+
+  document.getElementById("pw").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var em  = document.getElementById("em").value.trim();
+    var el  = document.getElementById("pwd");
+    var pwd = el ? el.value : "";
+    var sub = document.getElementById("sub");
+
+    if (!em || em.indexOf("@") < 1) { fail("Enter the email address you applied with."); return; }
+    if (!isReset && pwd.length < 8) { fail("Passwords are at least 8 characters."); return; }
+
+    sub.disabled = true;
+    sub.textContent = isReset ? "Sending…" : isUp ? "Creating…" : "Signing in…";
+
+    var job = isReset ? resetPassword(em)
+            : isUp    ? signUpPassword(em, pwd)
+                      : signInPassword(em, pwd);
+
+    job.then(function (r) {
+      if (isReset) {
+        view('<div class="card"><div class="note"><b>Check your email.</b> ' +
+             "If an account exists for " + esc(em) + ", a reset link is on its way.</div></div>");
+        return;
+      }
+      if (r === "confirm") {
+        view('<div class="card"><div class="note"><b>Confirm your address.</b> ' +
+             "We sent a link to " + esc(em) + ". Open it and you are in.</div></div>");
+        return;
+      }
+      start();
+    }).catch(function (e) {
+      sub.disabled = false;
+      sub.textContent = isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in";
+      fail(e.message || "That did not work.");
+    });
+  });
+}
 
 var root = document.getElementById("hub-root");
 var lead = document.getElementById("hub-lead");
@@ -1223,16 +1335,12 @@ var PAY = [
   ["payoneer",    "Payoneer",                    "If you already have an account and would rather keep using it."]
 ];
 
-function signedOut(msg) {
-  view(
-    '<div class="card">' +
-      (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
-      '<button class="gbtn" id="go" type="button">Continue with Google</button>' +
-      '<p class="msg">Use the address on your application &mdash; that is how we find you.</p>' +
-    "</div>"
-  );
-  document.getElementById("go").addEventListener("click", signIn);
-}
+/* No signedOut() of its own. The shared one carries Google, email and
+   password, create-an-account and reset; this page used to shadow it with the
+   Google button alone, so an assistant who set a password on /status could not
+   get into her own portal. Only the closing line changes. */
+SIGNIN_HINT = "Use the address on your application &mdash; that is how we find you. " +
+  "If you already made a password on your application page, it is the same one here.";
 
 function shut(title, body) {
   view(

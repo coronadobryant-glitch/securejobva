@@ -914,6 +914,119 @@ function when(iso) {
   if (isNaN(d)) return "";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
+var SIGNIN_HINT = "Use the same address you applied with &mdash; that is how we find your application.";
+
+function signedOut(msg, mode) {
+  /* One card, three states: sign in, create an account, reset. They share the
+     email field and most of the markup, so they are one function rather than
+     three that drift apart.
+
+     Every portal gets all three. /hub and /seats used to override this with a
+     Google button and nothing else, which locked out everybody whose address
+     is not a Google account — an assistant who set a password on /status could
+     not open her own portal, and a client contact on a company address had no
+     door at all. The functions this form calls were sitting unused in both
+     files the whole time. */
+  mode = mode || "in";
+  var isUp    = mode === "up";
+  var isReset = mode === "reset";
+
+  view(
+    '<div class="card">' +
+      (msg ? '<p class="msg msg--bad" id="err">' + esc(msg) + "</p>" : "") +
+      '<button class="gbtn" id="go" type="button">' +
+        '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">' +
+          '<path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"></path>' +
+          '<path fill="#4285F4" d="M46.98 24.55c0-1.6-.15-3.15-.42-4.65H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.6 5.9c4.44-4.1 7.22-10.15 7.22-17.45z"></path>' +
+          '<path fill="#FBBC05" d="M10.42 28.68A14.4 14.4 0 0 1 9.66 24c0-1.63.28-3.2.76-4.68l-7.8-6.1A24 24 0 0 0 0 24c0 3.87.92 7.52 2.62 10.78l7.8-6.1z"></path>' +
+          '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.8l-7.6-5.9c-2.12 1.42-4.84 2.26-8.3 2.26-6.3 0-11.7-3.7-13.6-9.8l-7.8 6.1C6.44 42.6 14.55 48 24 48z"></path>' +
+        "</svg>" +
+        "Continue with Google" +
+      "</button>" +
+      '<div class="or">or</div>' +
+      '<form id="pw" novalidate>' +
+        '<div class="fld">' +
+          '<label for="em">Email</label>' +
+          '<input id="em" type="email" autocomplete="email" required placeholder="you@example.com">' +
+        "</div>" +
+        (isReset ? "" :
+          '<div class="fld">' +
+            '<label for="pwd">Password</label>' +
+            '<input id="pwd" type="password" autocomplete="' +
+              (isUp ? "new-password" : "current-password") +
+              '" required minlength="8" placeholder="' +
+              (isUp ? "At least 8 characters" : "Your password") + '">' +
+          "</div>") +
+        '<button class="btn btn--solid" id="sub" type="submit" style="width:100%;justify-content:center">' +
+          (isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in") +
+        "</button>" +
+      "</form>" +
+      '<p class="msg" id="alt">' +
+        (isReset
+          ? '<button class="lnk" data-mode="in" type="button">Back to signing in</button>'
+          : isUp
+            ? 'Already have an account? <button class="lnk" data-mode="in" type="button">Sign in</button>'
+            : 'No account yet? <button class="lnk" data-mode="up" type="button">Create one</button>' +
+              ' &middot; <button class="lnk" data-mode="reset" type="button">Forgot password</button>') +
+      "</p>" +
+      '<p class="msg">' + SIGNIN_HINT + "</p>" +
+    "</div>"
+  );
+
+  document.getElementById("go").addEventListener("click", signIn);
+
+  root.querySelectorAll("[data-mode]").forEach(function (b) {
+    b.addEventListener("click", function () { signedOut("", b.getAttribute("data-mode")); });
+  });
+
+  function fail(t) {
+    var e = document.getElementById("err");
+    if (!e) {
+      e = document.createElement("p");
+      e.className = "msg msg--bad";
+      e.id = "err";
+      root.querySelector(".card").insertBefore(e, root.querySelector(".card").firstChild);
+    }
+    e.textContent = t;
+  }
+
+  document.getElementById("pw").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var em  = document.getElementById("em").value.trim();
+    var el  = document.getElementById("pwd");
+    var pwd = el ? el.value : "";
+    var sub = document.getElementById("sub");
+
+    if (!em || em.indexOf("@") < 1) { fail("Enter the email address you applied with."); return; }
+    if (!isReset && pwd.length < 8) { fail("Passwords are at least 8 characters."); return; }
+
+    sub.disabled = true;
+    sub.textContent = isReset ? "Sending…" : isUp ? "Creating…" : "Signing in…";
+
+    var job = isReset ? resetPassword(em)
+            : isUp    ? signUpPassword(em, pwd)
+                      : signInPassword(em, pwd);
+
+    job.then(function (r) {
+      if (isReset) {
+        view('<div class="card"><div class="note"><b>Check your email.</b> ' +
+             "If an account exists for " + esc(em) + ", a reset link is on its way.</div></div>");
+        return;
+      }
+      if (r === "confirm") {
+        view('<div class="card"><div class="note"><b>Confirm your address.</b> ' +
+             "We sent a link to " + esc(em) + ". Open it and you are in.</div></div>");
+        return;
+      }
+      start();
+    }).catch(function (e) {
+      sub.disabled = false;
+      sub.textContent = isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in";
+      fail(e.message || "That did not work.");
+    });
+  });
+}
+
 `.trim();
 
 function shell(o) {
@@ -1019,109 +1132,13 @@ var lead = document.getElementById("pt-lead");
 
 function view(html) { root.innerHTML = html; }
 
-function signedOut(msg, mode) {
-  /* One card, three states: sign in, create an account, reset. They share the
-     email field and most of the markup, so they are one function rather than
-     three that drift apart. */
-  mode = mode || "in";
-  var isUp    = mode === "up";
-  var isReset = mode === "reset";
+/* The line under the sign-in card, which is the only part of it that differs
+   between portals. Each page overwrites this before start() runs. Held as a
+   variable rather than an argument because signedOut() is called from a dozen
+   places that have no business knowing which portal they are in.
 
-  view(
-    '<div class="card">' +
-      (msg ? '<p class="msg msg--bad" id="err">' + esc(msg) + "</p>" : "") +
-      '<button class="gbtn" id="go" type="button">' +
-        '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">' +
-          '<path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"></path>' +
-          '<path fill="#4285F4" d="M46.98 24.55c0-1.6-.15-3.15-.42-4.65H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.6 5.9c4.44-4.1 7.22-10.15 7.22-17.45z"></path>' +
-          '<path fill="#FBBC05" d="M10.42 28.68A14.4 14.4 0 0 1 9.66 24c0-1.63.28-3.2.76-4.68l-7.8-6.1A24 24 0 0 0 0 24c0 3.87.92 7.52 2.62 10.78l7.8-6.1z"></path>' +
-          '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.8l-7.6-5.9c-2.12 1.42-4.84 2.26-8.3 2.26-6.3 0-11.7-3.7-13.6-9.8l-7.8 6.1C6.44 42.6 14.55 48 24 48z"></path>' +
-        "</svg>" +
-        "Continue with Google" +
-      "</button>" +
-      '<div class="or">or</div>' +
-      '<form id="pw" novalidate>' +
-        '<div class="fld">' +
-          '<label for="em">Email</label>' +
-          '<input id="em" type="email" autocomplete="email" required placeholder="you@example.com">' +
-        "</div>" +
-        (isReset ? "" :
-          '<div class="fld">' +
-            '<label for="pwd">Password</label>' +
-            '<input id="pwd" type="password" autocomplete="' +
-              (isUp ? "new-password" : "current-password") +
-              '" required minlength="8" placeholder="' +
-              (isUp ? "At least 8 characters" : "Your password") + '">' +
-          "</div>") +
-        '<button class="btn btn--solid" id="sub" type="submit" style="width:100%;justify-content:center">' +
-          (isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in") +
-        "</button>" +
-      "</form>" +
-      '<p class="msg" id="alt">' +
-        (isReset
-          ? '<button class="lnk" data-mode="in" type="button">Back to signing in</button>'
-          : isUp
-            ? 'Already applied and have an account? <button class="lnk" data-mode="in" type="button">Sign in</button>'
-            : 'No account yet? <button class="lnk" data-mode="up" type="button">Create one</button>' +
-              ' &middot; <button class="lnk" data-mode="reset" type="button">Forgot password</button>') +
-      "</p>" +
-      '<p class="msg">Use the same address you applied with &mdash; that is how we find your application.</p>' +
-    "</div>"
-  );
-
-  document.getElementById("go").addEventListener("click", signIn);
-
-  root.querySelectorAll("[data-mode]").forEach(function (b) {
-    b.addEventListener("click", function () { signedOut("", b.getAttribute("data-mode")); });
-  });
-
-  function fail(t) {
-    var e = document.getElementById("err");
-    if (!e) {
-      e = document.createElement("p");
-      e.className = "msg msg--bad";
-      e.id = "err";
-      root.querySelector(".card").insertBefore(e, root.querySelector(".card").firstChild);
-    }
-    e.textContent = t;
-  }
-
-  document.getElementById("pw").addEventListener("submit", function (ev) {
-    ev.preventDefault();
-    var em  = document.getElementById("em").value.trim();
-    var el  = document.getElementById("pwd");
-    var pwd = el ? el.value : "";
-    var sub = document.getElementById("sub");
-
-    if (!em || em.indexOf("@") < 1) { fail("Enter the email address you applied with."); return; }
-    if (!isReset && pwd.length < 8) { fail("Passwords are at least 8 characters."); return; }
-
-    sub.disabled = true;
-    sub.textContent = isReset ? "Sending…" : isUp ? "Creating…" : "Signing in…";
-
-    var job = isReset ? resetPassword(em)
-            : isUp    ? signUpPassword(em, pwd)
-                      : signInPassword(em, pwd);
-
-    job.then(function (r) {
-      if (isReset) {
-        view('<div class="card"><div class="note"><b>Check your email.</b> ' +
-             "If an account exists for " + esc(em) + ", a reset link is on its way.</div></div>");
-        return;
-      }
-      if (r === "confirm") {
-        view('<div class="card"><div class="note"><b>Confirm your address.</b> ' +
-             "We sent a link to " + esc(em) + ". Open it and you are in.</div></div>");
-        return;
-      }
-      start();
-    }).catch(function (e) {
-      sub.disabled = false;
-      sub.textContent = isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in";
-      fail(e.message || "That did not work.");
-    });
-  });
-}
+   It is our own markup and goes in unescaped, which is what lets the client
+   one carry a link. Nothing from a user reaches it. */
 
 function stages(app) {
   var at = stageIndex(app.status);
@@ -1506,7 +1523,7 @@ writeFileSync("status.html", shell({
 
 console.log("status.html written");
 
-const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\nfunction signedOut(msg) {\n  view(\n    '<div class=\"card\">' +\n      (msg ? '<p class=\"msg msg--bad\">' + esc(msg) + \"</p>\" : \"\") +\n      '<button class=\"gbtn\" id=\"go\" type=\"button\">Continue with Google</button>' +\n      '<p class=\"msg\">Use the address you booked the call with &mdash; that is how we find your seats. ' +\n      'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.</p>' +\n    \"</div>\"\n  );\n  document.getElementById(\"go\").addEventListener(\"click\", signIn);\n}\n\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n    \"</div>\";\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  if (!rows.length) {\n    view(who +\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\");\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly ? \"<li><b>Quoted</b><span>\" + esc(money(r.weekly)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  view(html);\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n}\n\nstart();" + `
+const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\n/* No signedOut() of its own — the shared one carries Google, email and\n   password, create-an-account and reset. This page used to shadow it with the\n   Google button alone, which left a client contact on a company address with\n   no way in at all: they never apply, never set a password, and nothing ever\n   invited them. Creating an account is the path they actually need, so the\n   line below points at it. */\nSIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your seats. ' +\n  'No account yet? Create one with that address and it becomes how you sign in. ' +\n  'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.';\n\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n    \"</div>\";\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  if (!rows.length) {\n    view(who +\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\");\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly ? \"<li><b>Quoted</b><span>\" + esc(money(r.weekly)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  view(html);\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n}\n\nstart();" + `
 
 /* ── the client's own portal ──
    Everything above this line is about seats somebody once asked us for.
@@ -1829,10 +1846,19 @@ function signedOut(msg) {
       '<p class="msg" style="margin-top:0"><b>This is the staff desk.</b> Signing in proves who you are; ' +
         'it does not give you access. An administrator grants that separately. ' +
         'If you applied for a job, your own page is <a href="/status">Your application</a>.</p>' +
-      '<button class="gbtn" id="go" type="button">Sign in with Google</button>'
+      /* go-staff, not go: the shared signedOut() in LIB also builds a #go, and
+         although this function shadows it so only one ever renders, two of the
+         same id in one file is a real smell and the audit is right to say so.
+
+         This page keeps its own sign-in deliberately. /hub and /seats gained
+         email and password because people who cannot use Google were locked
+         out of their own portals; the staff desk is the opposite case — it is
+         the most privileged page here, access is granted by an administrator
+         rather than asked for, and one narrow door is the point. */
+      '<button class="gbtn" id="go-staff" type="button">Sign in with Google</button>'
     )
   );
-  document.getElementById("go").addEventListener("click", signIn);
+  document.getElementById("go-staff").addEventListener("click", signIn);
 }
 
 /* Being refused here is the normal case for anyone who is not staff, so it
@@ -4214,16 +4240,12 @@ var PAY = [
   ["payoneer",    "Payoneer",                    "If you already have an account and would rather keep using it."]
 ];
 
-function signedOut(msg) {
-  view(
-    '<div class="card">' +
-      (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
-      '<button class="gbtn" id="go" type="button">Continue with Google</button>' +
-      '<p class="msg">Use the address on your application &mdash; that is how we find you.</p>' +
-    "</div>"
-  );
-  document.getElementById("go").addEventListener("click", signIn);
-}
+/* No signedOut() of its own. The shared one carries Google, email and
+   password, create-an-account and reset; this page used to shadow it with the
+   Google button alone, so an assistant who set a password on /status could not
+   get into her own portal. Only the closing line changes. */
+SIGNIN_HINT = "Use the address on your application &mdash; that is how we find you. " +
+  "If you already made a password on your application page, it is the same one here.";
 
 function shut(title, body) {
   view(
