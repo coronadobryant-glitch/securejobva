@@ -1633,6 +1633,7 @@ var C_PLACE = [];
 var C_RATE = {};
 var C_WEEKS = [];
 var C_SWAPS = [];
+var C_STARTS = [];
 var C_OFF = false;
 
 var C_LABEL = { matched: "matched", trial: "on trial", ongoing: "kept on", ended: "ended" };
@@ -1650,20 +1651,24 @@ function loadClient(email, rows) {
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
         "trial_week,timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=26"),
-    api("swap_requests?select=id,placement_id,reason,status,created_at&order=created_at.desc")
+    api("swap_requests?select=id,placement_id,reason,status,created_at&order=created_at.desc"),
+    /* 042. A row here means this client has already said when the work starts,
+       so the card asking them stops asking. */
+    api("placement_starts?select=placement_id,starts_on,confirmed_at")
   ]).catch(function (e) {
     if (String(e.message) === "signed out") throw e;
     /* 032 is pasted by hand some time after this ships, and a client who has
        no placement is an ordinary thing rather than a fault. Either way the
        seats half of the page is unaffected. */
     C_OFF = true;
-    return [[], [], [], []];
+    return [[], [], [], [], []];
   }).then(function (r) {
     C_PLACE = r[0] || [];
     C_RATE = {};
     (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
     C_WEEKS = r[2] || [];
     C_SWAPS = r[3] || [];
+    C_STARTS = r[4] || [];
     render(email, rows);
   });
 }
@@ -1734,6 +1739,38 @@ function clientBlock() {
         '<span class="pill pill--pl_' + esc(live.status) + '">' +
           esc(C_LABEL[live.status] || live.status) + "</span></div>" +
     "</div>";
+
+  /* ── when the work starts ──
+     042. started_on is a proposal until the client says otherwise: at matching
+     nobody has met yet, and the trial — and therefore the first week anybody
+     pays for — is counted from it. So it is asked rather than assumed, and
+     asked of the only person who knows. */
+  var said = null;
+  for (var j = 0; j < C_STARTS.length; j++) {
+    if (C_STARTS[j].placement_id === live.id) { said = C_STARTS[j]; break; }
+  }
+  if (live.status === "matched") {
+    html +=
+      '<div class="card" id="c-start">' +
+        "<h2>When can they start?</h2>" +
+        (said
+          ? '<div class="note"><b>You said ' + esc(when(said.starts_on)) + ".</b> " +
+            esc(who.split(" ")[0]) + " has been told, and the trial runs from that day.</div>"
+          : '<p class="msg" style="margin-top:0">We have pencilled in <b>' +
+              esc(when(live.started_on) || "a date to agree") + "</b>. Confirm it, or give us " +
+              "the day that actually suits you &mdash; the trial is counted from the day work " +
+              "begins, so this is the date your free weeks run from.</p>" +
+            '<div class="fld"><label for="c-when">First day</label>' +
+              '<input id="c-when" type="date"' +
+              (live.started_on ? ' value="' + esc(live.started_on) + '"' : "") + "></div>" +
+            '<p class="err" id="c-start-err" aria-live="polite"></p>' +
+            '<div class="edit__foot"><span></span><span class="edit__act">' +
+              '<span class="row__ok" id="c-start-ok"></span>' +
+              '<button class="btn btn--solid" id="c-start-go" type="button" data-place="' +
+                esc(live.id) + '">That is the day</button>' +
+            "</span></div>") +
+      "</div>";
+  }
 
   /* ── the week waiting on them ── */
   html +=
@@ -1857,6 +1894,39 @@ function wireClient() {
             ok.classList.add("is-bad");
           });
       });
+    });
+  }
+
+  /* Wired before the swap form's early return, because a matched placement has
+     this card and may not have that one. */
+  var startGo = document.getElementById("c-start-go");
+  if (startGo) {
+    startGo.addEventListener("click", function () {
+      var when_ = document.getElementById("c-when");
+      var err = document.getElementById("c-start-err");
+      var ok = document.getElementById("c-start-ok");
+      err.textContent = "";
+      if (!when_.value) {
+        err.textContent = "Pick the first day and we will set everything from it.";
+        when_.focus();
+        return;
+      }
+      startGo.disabled = true;
+      ok.textContent = "Saving\u2026";
+      ok.classList.add("is-on");
+      /* confirmed_by is not sent and is not grantable — the trigger stamps it
+         from the token, because a field the browser fills is a field the
+         browser can lie about, and this is the record of who agreed a date. */
+      api("placement_starts", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: { placement_id: startGo.getAttribute("data-place"), starts_on: when_.value }
+      }).then(function () { location.reload(); })
+        .catch(function (e) {
+          startGo.disabled = false;
+          ok.classList.remove("is-on");
+          err.textContent = why(e);
+        });
     });
   }
 

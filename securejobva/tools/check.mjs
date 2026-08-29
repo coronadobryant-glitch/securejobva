@@ -867,6 +867,40 @@ await check("email links come back to the page that sent them", () => {
   return "signup, recover and resend all carry a return address";
 });
 
+/* 042 lets a client say when work starts. The obvious build — a policy letting
+   them update their own placement row — would also let them rewrite
+   hours_per_week and trial_weeks, because a policy gates rows and the grant on
+   those columns is shared with every other authenticated person. The two
+   numbers that decide what they pay would become theirs to edit.
+
+   So the confirmation is its own row and placements stays staff-writable. This
+   fails if anybody ever takes the shortcut. */
+await check("a client cannot write the terms they are billed on", () => {
+  const updates = sql.split(";").filter((s) =>
+    /create\s+policy[\s\S]*on\s+public\.placements\s+for\s+update/i.test(s));
+  const loose = updates.filter((p) => /is_placement_client|is_client_contact/i.test(p));
+  if (loose.length) {
+    throw new Error("a client can UPDATE public.placements — the grant on that table covers " +
+      "hours_per_week and trial_weeks, and a policy cannot separate columns. Their side of a " +
+      "placement belongs in its own table, the way placement_starts and swap_requests are.");
+  }
+  if (!/create\s+table[^;]*public\.placement_starts/i.test(sql)) {
+    return "no placement_starts yet — nothing else to guard";
+  }
+  const ins = sql.split(";").filter((s) =>
+    /create\s+policy[\s\S]*on\s+public\.placement_starts\s+for\s+insert/i.test(s));
+  if (!ins.some((p) => /is_placement_client/i.test(p))) {
+    throw new Error("nothing lets the client confirm their own start date");
+  }
+  /* confirmed_by is the record of who agreed a date, so it is stamped from the
+     token rather than sent. A grant on it would make it the browser's word. */
+  if (/grant\s+insert\s*\([^)]*confirmed_by[^)]*\)\s*on\s+public\.placement_starts/i.test(sql)) {
+    throw new Error("confirmed_by is grantable, so the page could send any name it liked — " +
+      "the trigger stamps it from the token for exactly that reason");
+  }
+  return "the client names a day and nothing else";
+});
+
 /* session() used to clear storage the moment the access token expired, which
    threw the refresh token away with it. So an hour was a hard cap on being
    signed in, and it never announced itself — it simply refused the next thing
@@ -1056,7 +1090,7 @@ await check("nothing private is left on clients", () => {
 });
 
 await check("anon holds nothing on the placement tables", () => {
-  for (const t of ["clients", "client_private", "application_public", "placements", "placement_billing", "placement_pay", "swap_requests"]) {
+  for (const t of ["clients", "client_private", "application_public", "placements", "placement_billing", "placement_pay", "swap_requests", "placement_starts"]) {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
       throw new Error("nothing revokes anon on " + t);
     }
@@ -1064,7 +1098,7 @@ await check("anon holds nothing on the placement tables", () => {
       throw new Error("row-level security is never enabled on " + t);
     }
   }
-  return "seven tables, all revoked and all RLS on";
+  return "eight tables, all revoked and all RLS on";
 });
 
 await check("anon holds nothing on the timesheet tables", () => {

@@ -79,10 +79,10 @@ const seatFns = ["when", "cIso", "cFrom", "cHours", "cNum", "cMoney", "cWeekLabe
                  "clientBlock"];
 const seats = new Function("esc",
   varOf(SEATS, "C_LABEL") + "\n" + 'var C_DAY = ["M","T","W","T","F","S","S"];\n' +
-  "var C_PLACE = [], C_RATE = {}, C_WEEKS = [], C_SWAPS = [], C_OFF = false;\n" +
+  "var C_PLACE = [], C_RATE = {}, C_WEEKS = [], C_SWAPS = [], C_STARTS = [], C_OFF = false;\n" +
   seatFns.map((n) => grab(SEATS, n)).join("\n") +
   "\nreturn { set: function (s) { C_PLACE = s.C_PLACE; C_RATE = s.C_RATE; C_WEEKS = s.C_WEEKS;" +
-  " C_SWAPS = s.C_SWAPS; }, " + seatFns.map((n) => n + ": " + n).join(", ") + " };"
+  " C_SWAPS = s.C_SWAPS; C_STARTS = s.C_STARTS || []; }, " + seatFns.map((n) => n + ": " + n).join(", ") + " };"
 )(esc);
 
 /* ── the mail, through the real endpoint ────────────────────────────────── */
