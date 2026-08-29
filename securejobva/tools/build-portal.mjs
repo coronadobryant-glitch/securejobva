@@ -350,7 +350,10 @@ body:has(.adm__wrap) main{padding:0}
 .hub__hi h2{font-size:1.6rem;margin:0 0 .2rem}
 .hub__hi p{margin:0;color:var(--muted);font-size:.95rem}
 .tls{display:grid;gap:.8rem;grid-template-columns:repeat(2,1fr);margin-bottom:1.6rem}
-@media(min-width:720px){.tls{grid-template-columns:repeat(4,1fr)}}
+/* auto-fit rather than a fixed four. There are five tiles, and four columns
+   left Notice board alone on a second row looking like an afterthought. This
+   lays out however many there are, at whatever width there is. */
+@media(min-width:720px){.tls{grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr))}}
 .tl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);text-decoration:none}
 .tl:hover{border-color:var(--accent)}
 .tl__art{background:var(--surface-2);display:grid;place-items:center;padding:1.2rem .8rem;border-bottom:1px solid var(--line)}
@@ -4130,7 +4133,7 @@ console.log("admin.html written");
 
 const HUB_BODY = [
   '  <section class="pt">',
-  '    <div class="wrap" style="max-width:60rem">',
+  '    <div class="wrap" style="max-width:72rem">',
   '      <div class="pt__head">',
   '        <span class="eyebrow">Your portal</span>',
   "        <h1>Everything you need, in one place.</h1>",
@@ -4207,6 +4210,9 @@ function tile(href, label, path, sub) {
    admin form promises in as many words that their portal shows hours and no
    money at all, and a promise made on one screen has to be true on the other. */
 var PLACE = null;
+/* True when 032 is not pasted, so the page cannot tell whether somebody has a
+   client. Different from having none, and it must not be shown as having none. */
+var PLACE_OFF = false;
 
 function trialEnds(p) {
   if (!p.started_on || !p.trial_weeks) return null;
@@ -4214,7 +4220,26 @@ function trialEnds(p) {
 }
 
 function clientCard() {
-  if (!PLACE) return "";
+  /* Nothing here used to render at all before somebody was matched, on the
+     reasoning that an absence claims nothing. Walking it as the assistant
+     showed that is wrong: she is hired, the portal is open, and the one
+     question she has — am I getting a client? — went unanswered by a blank
+     space. Silence is not neutral when somebody is waiting on you.
+
+     PLACE_OFF is the other case: 032 not pasted. That one really does render
+     nothing, because "we are finding you a client" would be a claim made by a
+     page that cannot see whether it is true. */
+  if (!PLACE) {
+    if (PLACE_OFF) return "";
+    return '<div class="card" id="client">' +
+      "<h2>Finding you a client</h2>" +
+      '<p class="msg" style="margin-top:.4rem">You are on the team and we are matching you ' +
+        "with a business now. There is nothing for you to do while we do it &mdash; " +
+        "we will email you the moment we have somebody, and this is where it will appear.</p>" +
+      '<p class="msg">In the meantime your hours, your leave and the notice board below are ' +
+        "all yours to use.</p>" +
+    "</div>";
+  }
   var name = (PLACE.clients && PLACE.clients.name) || "your client";
   var ends = trialEnds(PLACE);
 
@@ -4770,6 +4795,7 @@ function load() {
             "clients(name)&order=started_on.desc.nullslast&limit=5")
           .catch(function (e) {
             if (String(e.message) === "signed out") throw e;
+            PLACE_OFF = true;
             return [];
           })
       ]).then(function (r) {

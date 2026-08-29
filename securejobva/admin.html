@@ -584,7 +584,10 @@ body:has(.adm__wrap) main{padding:0}
 .hub__hi h2{font-size:1.6rem;margin:0 0 .2rem}
 .hub__hi p{margin:0;color:var(--muted);font-size:.95rem}
 .tls{display:grid;gap:.8rem;grid-template-columns:repeat(2,1fr);margin-bottom:1.6rem}
-@media(min-width:720px){.tls{grid-template-columns:repeat(4,1fr)}}
+/* auto-fit rather than a fixed four. There are five tiles, and four columns
+   left Notice board alone on a second row looking like an afterthought. This
+   lays out however many there are, at whatever width there is. */
+@media(min-width:720px){.tls{grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr))}}
 .tl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);text-decoration:none}
 .tl:hover{border-color:var(--accent)}
 .tl__art{background:var(--surface-2);display:grid;place-items:center;padding:1.2rem .8rem;border-bottom:1px solid var(--line)}

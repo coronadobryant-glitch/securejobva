@@ -69,7 +69,7 @@ const hubFns = ["when", "isoDay", "fromIso", "addDays", "mondayOf", "showHours",
                 "trialEnds", "clientCard"];
 const hub = new Function("esc",
   varOf(HUB, "DAY_NAME") + "\n" + varOf(HUB, "TS_LABEL") + "\n" + varOf(HUB, "PLACE_LABEL") + "\n" +
-  "var WEEK_TARGET = 40;\nvar SHEETS = {}, VIEW = '', TS_OFF = false, PLACE = null, APP = null;\n" +
+  "var WEEK_TARGET = 40;\nvar SHEETS = {}, VIEW = '', TS_OFF = false, PLACE = null, PLACE_OFF = false, APP = null;\n" +
   hubFns.map((n) => grab(HUB, n)).join("\n") +
   "\nreturn { set: function (s) { SHEETS = s.SHEETS; VIEW = s.VIEW; PLACE = s.PLACE; }," +
   hubFns.map((n) => n + ": " + n).join(", ") + " };"
@@ -160,7 +160,13 @@ act("She passes. You hire her");
 act("She opens /hub before she has a client");
 {
   hub.set({ SHEETS: {}, VIEW: "2026-09-07", PLACE: null });
-  ok("no client card at all", hub.clientCard() === "", "absence claims nothing");
+  /* A blank space is not an answer. She is hired, the portal is open, and the
+     one thing she wants to know is whether a client is coming. */
+  const waiting = hub.clientCard();
+  ok("she is told a client is being found", waiting.includes("Finding you a client"),
+    "not an empty space where the answer should be");
+  ok("and told there is nothing for her to do", waiting.includes("nothing for you to do"), true);
+  ok("and that the email will come", waiting.includes("email you the moment"), true);
   const card = hub.hoursCard();
   ok("her week is already there", card.includes("Monday") && card.includes("Sunday"));
   ok("and measured against 40", card.includes("of 40 hours"));
