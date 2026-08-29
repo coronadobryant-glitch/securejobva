@@ -2035,20 +2035,44 @@ function refreshTotals() {
    it, not when the page opens. Otherwise every assistant who looks at this
    page and closes it leaves an empty week behind, and the admin queue fills up
    with nothing. */
+/* One request for the week, however many days are typed at once.
+
+   Filling five boxes in a burst calls this five times before any of them has
+   come back. Each looked, saw no week yet, and posted one — and the unique key
+   on (application_id, week_starts_on) refuses the four that lose, so four days
+   never saved at all. Monday won the race and Friday arrived late enough to
+   find the week already made; the three in the middle were dropped, and the
+   running total was the only thing that ever said so.
+
+   The same shape as RENEWING on the token refresh: work that must happen once
+   has to be held, not merely checked for. Keyed by week, because the person
+   can change week while the request is still out. */
+var MAKING = null;
+var MAKING_WEEK = "";
+
 function ensureSheet() {
   var have = SHEETS[VIEW];
   if (have && have.id) return Promise.resolve(have);
-  return api("timesheets", {
+  if (MAKING && MAKING_WEEK === VIEW) return MAKING;
+
+  var week = VIEW;
+  MAKING_WEEK = week;
+  MAKING = api("timesheets", {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: { application_id: APP.id, week_starts_on: VIEW }
+    body: { application_id: APP.id, week_starts_on: week }
   }).then(function (rows) {
     var s = (rows || [])[0];
     if (!s) throw new Error("no row came back");
     s.timesheet_days = [];
-    SHEETS[VIEW] = s;
+    SHEETS[week] = s;
+    MAKING = null;
     return s;
+  }, function (e) {
+    MAKING = null;
+    throw e;
   });
+  return MAKING;
 }
 
 function saveDay(iso, rowEl, ok) {
@@ -2088,6 +2112,15 @@ function saveDay(iso, rowEl, ok) {
     var el = document.getElementById("ts-ok");
     flash(el, "Saved");
   }).catch(function (e) {
+    /* Put the box back to what the database actually holds. A number that
+       failed to save must not sit there looking saved — that is precisely what
+       made the week race so hard to see, because the screen went on agreeing
+       with itself while three days were missing. Until the redraw was fixed
+       this happened by accident; now it has to be done on purpose. */
+    var sheet = SHEETS[VIEW];
+    var d = sheet && dayIn(sheet, iso);
+    hrsEl.value = d ? Number(d.hours) : 0;
+    refreshTotals();
     flash(document.getElementById("ts-ok") || ok, why(e), true);
   });
 }

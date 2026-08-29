@@ -943,6 +943,39 @@ await check("an expired token is renewed, not thrown away", () => {
    three days out of five, and each one looked like a slip of the hand.
 
    Found by doing it, not by reading it. */
+/* The week row is made on the first day somebody types. Five boxes filled at
+   speed call ensureSheet five times before any returns, and without a held
+   promise each one posts its own week — the unique key refuses four, and four
+   days are silently dropped. Same shape as the token refresh: work that must
+   happen once has to be held, not merely checked for.
+
+   It hid behind the redraw bug. Once the boxes stopped being wiped, the three
+   lost days sat on screen looking saved, and only the running total disagreed.
+   A failed save must also put the box back, or the screen keeps the lie. */
+await check("the week is made once, however fast the days are typed", () => {
+  const src = read("tools/build-portal.mjs");
+  const at = src.indexOf("function ensureSheet(");
+  if (at < 0) throw new Error("ensureSheet is gone — this check needs rewriting");
+  const end = src.indexOf("function saveDay(", at);
+  const body = src.slice(at, end);
+  /* The guard itself, not merely the word. The first version of this looked
+     for /MAKING/ anywhere in the function, which the assignments alone satisfy
+     — so it stayed green with the early return deleted, over the exact bug it
+     was written for. Twice in one day. */
+  if (!/if\s*\(\s*MAKING[^)]*\)\s*return\s+MAKING\s*;/.test(body)) {
+    throw new Error("ensureSheet does not return the in-flight request — days typed together " +
+      "each post their own week, the unique key refuses all but one, and every day that lost " +
+      "is dropped without a word");
+  }
+  const sAt = src.indexOf("function saveDay(");
+  const sEnd = src.indexOf("function wireHours", sAt);
+  if (!/hrsEl\.value =/.test(src.slice(sAt, sEnd))) {
+    throw new Error("a failed day save leaves the typed number on screen, so the page shows " +
+      "an hour that was never stored — put the box back to what the database holds");
+  }
+  return "one week per burst, and a refused day is put back";
+});
+
 await check("saving a day does not redraw the boxes", () => {
   if (!existsSync("hub.html")) return "no hub page";
   const html = read("hub.html");
