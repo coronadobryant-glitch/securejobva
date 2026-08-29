@@ -162,7 +162,12 @@ const checks = [
   ["033 week to client",  () => fn("timesheet_is_clients", { ts: "00000000-0000-0000-0000-000000000000" }), ["locked"]],
   /* 039 splits the client in two. The new table is the honest signal that it
      ran: before it, client_private does not exist at all. */
-  ["039 client details",  () => table("client_private"),        ["locked"]]
+  ["039 client details",  () => table("client_private"),        ["locked"]],
+  /* 041 can be probed and 040 cannot: this one makes a table, where 040 only
+     adds a trigger function PostgREST will not expose. A probe for 040 would
+     report "present" whether or not it had run, which is the shape 034 already
+     refuses. Its verification block is the honest test there. */
+  ["041 assistant name",  () => table("application_public"),    ["locked"]]
   /* 034 has no probe, deliberately. It adds one column, trial_week, granted to
      nobody — so the public key cannot see it, exactly as with placement_id.
      Probing the timesheets table instead would report "present" whether or not
