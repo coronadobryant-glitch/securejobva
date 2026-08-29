@@ -964,20 +964,30 @@ function captureRedirect() {
 /* The form the reset link should have led to all along. Kept deliberately
    plain: one field, one button, and no way to wander off into the rest of the
    portal until the password is actually set. */
-function passwordForm(msg) {
+/* back is where Cancel goes. Signing out is right when somebody arrived here
+   from a reset link and has no portal behind them; it is wrong for a client
+   who is already signed in and chose to set a password — throwing them out for
+   changing their mind is a strange thing to do. Defaults to the old behaviour
+   so the reset path is untouched. */
+function passwordForm(msg, back) {
+  var already = typeof back === "function";
   view(
     '<div class="card">' +
-      '<h2 class="edit__h">Choose a new password</h2>' +
+      '<h2 class="edit__h">' +
+        (already ? "Choose a password" : "Choose a new password") + "</h2>" +
       (msg ? '<p class="msg msg--bad">' + esc(msg) + "</p>" : "") +
       '<p class="msg" style="margin-top:0">At least eight characters. ' +
-      "You will be signed in once it is saved.</p>" +
+      (already
+        ? "Once it is saved you can sign in with it instead of waiting for a link."
+        : "You will be signed in once it is saved.") + "</p>" +
       '<div class="field" style="margin-top:1rem">' +
         '<input id="pw1" type="password" autocomplete="new-password" ' +
         'placeholder="New password" aria-label="New password">' +
       "</div>" +
       '<button class="btn btn--solid" id="pwgo" type="button" style="margin-top:1rem">Save password</button>' +
       '<p class="msg" style="margin-top:1rem">' +
-        '<button class="lnk" id="pwskip" type="button">Cancel and sign out</button></p>' +
+        '<button class="lnk" id="pwskip" type="button">' +
+        (already ? "Cancel" : "Cancel and sign out") + "</button></p>" +
     "</div>"
   );
 
@@ -996,7 +1006,7 @@ function passwordForm(msg) {
     });
   });
 
-  document.getElementById("pwskip").addEventListener("click", signOut);
+  document.getElementById("pwskip").addEventListener("click", already ? back : signOut);
 }
 
 function authError() {

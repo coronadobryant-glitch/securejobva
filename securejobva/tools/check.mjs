@@ -803,6 +803,52 @@ await check("an assistant may read the business she is placed with", () => {
   return "the placed assistant is named in the policy";
 });
 
+/* Every file in api/ is a URL on the public internet. notify describes real
+   applicants and invite mails real people, so both stand on the same shared
+   secret and both must refuse when it is unset rather than defaulting open. */
+await check("every endpoint checks the shared secret", () => {
+  const dir = "api";
+  if (!existsSync(dir)) return "no api/ folder";
+  const files = readdirSync(dir).filter((f) => f.endsWith(".js"));
+  if (!files.length) throw new Error("no endpoints found in api/");
+  for (const f of files) {
+    const src = read(dir + "/" + f);
+    if (!/process\.env\.WEBHOOK_SECRET/.test(src)) {
+      throw new Error("api/" + f + " never reads WEBHOOK_SECRET — it is open to anyone");
+    }
+    if (!/x-webhook-secret/.test(src)) {
+      throw new Error("api/" + f + " reads the secret but never compares the header");
+    }
+    if (!/if\s*\(\s*!expected\s*\)/.test(src)) {
+      throw new Error("api/" + f + " does not refuse when WEBHOOK_SECRET is unset — " +
+        "an endpoint with no secret configured must close, not open");
+    }
+  }
+  return files.length + " endpoint(s), all gated";
+});
+
+/* 040 chose the publishable key over the service-role key deliberately. The
+   service key ignores every policy in this database, and the whole argument
+   here is that the database decides who sees what — so it does not belong in
+   a web-facing function, and this fails the build if one ever arrives. */
+await check("no endpoint holds a key that bypasses the database", () => {
+  const dir = "api";
+  if (!existsSync(dir)) return "no api/ folder";
+  const bad = [];
+  for (const f of readdirSync(dir).filter((x) => x.endsWith(".js"))) {
+    const src = read(dir + "/" + f);
+    if (/SERVICE_ROLE|service_role|SUPABASE_SECRET|sb_secret_/.test(src.replace(/^\s*\*.*$/gm, ""))) {
+      bad.push(f);
+    }
+  }
+  if (bad.length) {
+    throw new Error("service-role credentials referenced in api/" + bad.join(", api/") +
+      " — that key ignores every RLS policy. /auth/v1/otp with create_user does " +
+      "the same job with the publishable key; see 040.");
+  }
+  return "publishable key only";
+});
+
 /* /hub and /seats each shadowed the shared signedOut() with a Google button
    and nothing else, while signInPassword, signUpPassword and resetPassword sat
    defined and uncalled in both files. Nothing errored: the page rendered, the
