@@ -619,6 +619,17 @@ function signUpPassword(email, password) {
   });
 }
 
+/* Sends the confirmation link again. redirect_to is a query parameter here for
+   exactly the reason spelled out below, and getting it wrong on this one would
+   be the same bug a third time. */
+function resendConfirmation(email) {
+  var back = location.origin + location.pathname;
+  return authPost("resend?redirect_to=" + encodeURIComponent(back), {
+    type: "signup",
+    email: email
+  });
+}
+
 /* redirect_to is a QUERY parameter on GoTrue's REST endpoint. An options object
    carrying redirectTo is the shape supabase-js takes, and this talks to the API
    directly — so it was being ignored, Supabase fell back to the project's Site
@@ -1039,7 +1050,10 @@ function signedOut(msg, mode) {
     }).catch(function (e) {
       sub.disabled = false;
       sub.textContent = isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in";
-      fail(e.message || "That did not work.");
+      var msg = String((e && e.message) || "");
+      /* The one refusal that is not the person's fault and has a way out. */
+      if (/not confirmed/i.test(msg)) { unconfirmed(em); return; }
+      fail(msg || "That did not work.");
     });
   });
 }
@@ -1148,6 +1162,41 @@ var root = document.getElementById("pt-root");
 var lead = document.getElementById("pt-lead");
 
 function view(html) { root.innerHTML = html; }
+
+/* "Email not confirmed" is Supabase's own wording and a dead end. It is shown
+   to somebody whose address and password are both correct, names what is
+   wrong, and offers nothing to do about it — while the one thing they need is
+   a link they may never have received. A red line is not an answer here. */
+function unconfirmed(email) {
+  view(
+    '<div class="card">' +
+      '<div class="note"><b>Almost there.</b> That password is right, but ' +
+      esc(email) + " has not been confirmed yet. We sent a link when the account " +
+      "was made &mdash; it is worth checking your spam folder.</div>" +
+      '<button class="btn btn--solid" id="again" type="button" style="margin-top:1.1rem">' +
+        "Send the link again</button>" +
+      '<p class="msg" id="againmsg"></p>' +
+      '<p class="msg"><button class="lnk" id="againback" type="button">Back to signing in</button></p>' +
+    "</div>"
+  );
+
+  document.getElementById("againback").addEventListener("click", function () { signedOut(""); });
+
+  document.getElementById("again").addEventListener("click", function () {
+    var b = document.getElementById("again");
+    var m = document.getElementById("againmsg");
+    b.disabled = true;
+    b.textContent = "Sending\\u2026";
+    resendConfirmation(email).then(function () {
+      b.textContent = "Sent";
+      m.textContent = "Open the link in that email and you are in.";
+    })["catch"](function (e) {
+      b.disabled = false;
+      b.textContent = "Send the link again";
+      m.textContent = (e && e.message) || "That did not work.";
+    });
+  });
+}
 
 /* The line under the sign-in card, which is the only part of it that differs
    between portals. Each page overwrites this before start() runs. Held as a
@@ -4829,6 +4878,37 @@ function paintHours() {
   card.innerHTML = hoursCard();
 }
 
+/* What a day edit is allowed to redraw.
+
+   Saving happens on the change event, which is on blur — so by the time the write
+   comes back the person has almost always moved on and is typing in the next
+   box. paintHours() replaces the card's innerHTML, which threw that away: the
+   half-typed number vanished, the focus went with it, and nothing said so. The
+   only sign was the total refusing to add up. Filling a week in quickly lost
+   three days out of five, and every one of them looked like a slip of the
+   hand rather than the page.
+
+   A day edit can only move three things, so it moves exactly those three and
+   leaves every input alone. Anything wider is redrawn by the next real paint —
+   changing week, sending, reloading. */
+function refreshTotals() {
+  var sheet = SHEETS[VIEW];
+  var total = totalOf(sheet);
+
+  var sum = document.querySelector("#hours .sum__v");
+  if (sum) {
+    sum.innerHTML = esc(showHours(total)) +
+      " <small>of " + WEEK_TARGET + " hours</small>";
+  }
+  /* Send is refused on an empty week, and the first number typed is what makes
+     it allowed. */
+  var go = document.getElementById("ts-go");
+  if (go) go.disabled = !(total > 0);
+
+  var top = document.querySelector(".adm__topn b");
+  if (top) top.textContent = showHours(total);
+}
+
 /* The week row is made the first time somebody actually types a number into
    it, not when the page opens. Otherwise every assistant who looks at this
    page and closes it leaves an empty week behind, and the admin queue fills up
@@ -4882,7 +4962,7 @@ function saveDay(iso, rowEl, ok) {
       if (got) sheet.timesheet_days.push(got);
     });
   }).then(function () {
-    paintHours();
+    refreshTotals();
     var el = document.getElementById("ts-ok");
     flash(el, "Saved");
   }).catch(function (e) {

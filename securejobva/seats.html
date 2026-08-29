@@ -944,6 +944,17 @@ function signUpPassword(email, password) {
   });
 }
 
+/* Sends the confirmation link again. redirect_to is a query parameter here for
+   exactly the reason spelled out below, and getting it wrong on this one would
+   be the same bug a third time. */
+function resendConfirmation(email) {
+  var back = location.origin + location.pathname;
+  return authPost("resend?redirect_to=" + encodeURIComponent(back), {
+    type: "signup",
+    email: email
+  });
+}
+
 /* redirect_to is a QUERY parameter on GoTrue's REST endpoint. An options object
    carrying redirectTo is the shape supabase-js takes, and this talks to the API
    directly — so it was being ignored, Supabase fell back to the project's Site
@@ -1364,7 +1375,10 @@ function signedOut(msg, mode) {
     }).catch(function (e) {
       sub.disabled = false;
       sub.textContent = isReset ? "Send a reset link" : isUp ? "Create account" : "Sign in";
-      fail(e.message || "That did not work.");
+      var msg = String((e && e.message) || "");
+      /* The one refusal that is not the person's fault and has a way out. */
+      if (/not confirmed/i.test(msg)) { unconfirmed(em); return; }
+      fail(msg || "That did not work.");
     });
   });
 }

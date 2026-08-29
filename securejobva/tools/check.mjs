@@ -853,7 +853,7 @@ await check("email links come back to the page that sent them", () => {
       "?redirect_to= on the path instead.");
   }
   const missing = [];
-  for (const call of ["signup", "recover"]) {
+  for (const call of ["signup", "recover", "resend"]) {
     const re = new RegExp('authPost\\("' + call + '([^"]*)"');
     const m = src.match(re);
     if (!m) continue;
@@ -864,7 +864,35 @@ await check("email links come back to the page that sent them", () => {
       " — the link will fall back to the project Site URL rather than the portal " +
       "the person was standing on");
   }
-  return "signup and recover both carry a return address";
+  return "signup, recover and resend all carry a return address";
+});
+
+/* A day saves on the change event, which fires on blur — so the write lands
+   while the person is already typing in the next box. saveDay() used to finish
+   by calling paintHours(), which replaces the card's innerHTML: the half-typed
+   number went with the old DOM, along with the focus, and nothing said so. The
+   only sign was the total refusing to add up. Filling a week in at speed lost
+   three days out of five, and each one looked like a slip of the hand.
+
+   Found by doing it, not by reading it. */
+await check("saving a day does not redraw the boxes", () => {
+  if (!existsSync("hub.html")) return "no hub page";
+  const html = read("hub.html");
+  const at = html.indexOf("function saveDay(");
+  if (at < 0) throw new Error("saveDay is gone — this check needs rewriting");
+  const end = html.indexOf("function wireHours", at);
+  if (end < 0) throw new Error("could not find the end of saveDay");
+  const body = html.slice(at, end);
+  if (/paintHours\(\)/.test(body)) {
+    throw new Error("saveDay calls paintHours(), which replaces the card's innerHTML — " +
+      "the save fires on blur, so it lands while the person is typing the next day and " +
+      "throws that number away with the old DOM");
+  }
+  if (!/refreshTotals\(\)/.test(body)) {
+    throw new Error("saveDay never refreshes the total, so the running figure and the " +
+      "send button go stale until something else redraws the card");
+  }
+  return "totals refresh, inputs left alone";
 });
 
 /* Every file in api/ is a URL on the public internet. notify describes real
