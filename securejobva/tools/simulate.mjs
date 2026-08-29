@@ -122,7 +122,12 @@ const CLIENT = { id: "c1", name: "Rosehill Plumbing", contact_email: "ops@rosehi
    with". If this embed is ever changed, that check is the other half. */
 const PLACE = { id: "p1", application_id: A.id, client_id: CLIENT.id, status: "matched",
                 started_on: "2026-09-07", hours_per_week: 40, trial_weeks: 2,
-                clients: { name: CLIENT.name }, applications: { name: A.name } };
+                clients: { name: CLIENT.name },
+                /* application_public, not applications: 041 moved the one field
+                   a client may read into its own table, because 018 grants the
+                   whole applications table to authenticated and a policy on it
+                   would hand over the email, the CV and the skill ratings too. */
+                application_public: { name: A.name } };
 const BILL = 7.75, PAY = 4.5;
 /* The trial runs 7 to 20 September, so this first week is inside it and is
    ours to carry. The week beginning the 21st is the first the client pays for. */

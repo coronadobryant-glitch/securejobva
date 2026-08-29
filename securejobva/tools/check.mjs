@@ -945,6 +945,38 @@ await check("no portal offers only one way in", () => {
   return doors.join(", ") + " — Google, password, and a way to make one";
 });
 
+/* The same hole in the other direction, and the reason this one is separate:
+   039 guarded the assistant's view of the client, and the client's view of the
+   assistant went on being broken for another day because the check only
+   watched the side that had been fixed. A mirror bug needs a mirror check.
+
+   041 could not repeat 039's move — applications is the core table and 018
+   grants all of it to authenticated, so the one field a client may see is
+   mirrored into application_public instead. The embed must point there, not at
+   applications, or the fix silently reverts to a null and a fallback string. */
+await check("a client may read the name of the assistant placed with them", () => {
+  if (!existsSync("seats.html")) return "no seats page";
+  const html = read("seats.html").replace(/"\s*\+\s*\n?\s*"/g, "");
+  const q = html.match(/placements\?select=[^"'`]+/);
+  if (!q) return "the client portal no longer reads placements — nothing to guard";
+  if (/\bapplications\(/.test(q[0])) {
+    throw new Error("the client portal embeds applications( … ) — 018 grants that whole " +
+      "table to authenticated, so any policy that lets a client read it also hands over " +
+      "the email, phone, CV and skill ratings. Embed application_public instead.");
+  }
+  if (!/application_public\(/.test(q[0])) {
+    throw new Error("the client portal reads no name for the assistant — the card falls " +
+      'through to "your assistant"');
+  }
+  const policies = sql.split(";").filter((s) =>
+    /create\s+policy[\s\S]*on\s+public\.application_public\s+for\s+select/i.test(s));
+  if (!policies.some((p) => /is_application_client/i.test(p))) {
+    throw new Error("nothing lets the placed client read application_public, so the embed " +
+      "returns null exactly as applications( … ) did");
+  }
+  return "the client reads a name, and only a name";
+});
+
 /* The other half of 039: the name is readable because everything worth
    hiding left the table. If a private column comes back, the policy above
    hands it to her along with the name. */
@@ -962,7 +994,7 @@ await check("nothing private is left on clients", () => {
 });
 
 await check("anon holds nothing on the placement tables", () => {
-  for (const t of ["clients", "client_private", "placements", "placement_billing", "placement_pay", "swap_requests"]) {
+  for (const t of ["clients", "client_private", "application_public", "placements", "placement_billing", "placement_pay", "swap_requests"]) {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
       throw new Error("nothing revokes anon on " + t);
     }
@@ -970,7 +1002,7 @@ await check("anon holds nothing on the placement tables", () => {
       throw new Error("row-level security is never enabled on " + t);
     }
   }
-  return "six tables, all revoked and all RLS on";
+  return "seven tables, all revoked and all RLS on";
 });
 
 await check("anon holds nothing on the timesheet tables", () => {

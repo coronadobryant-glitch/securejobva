@@ -1563,8 +1563,13 @@ var C_DAY = ["M", "T", "W", "T", "F", "S", "S"];
 
 function loadClient(email, rows) {
   return Promise.all([
+    /* application_public, not applications. 018 grants the whole applications
+       table to authenticated, so a policy letting a client read that row would
+       hand them the email, the phone number, the CV and every skill rating
+       with it. 041 mirrors the one field they are entitled to into its own
+       table and leaves the rest where it is. */
     api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week," +
-        "trial_weeks,applications(name)&order=started_on.desc.nullslast"),
+        "trial_weeks,application_public(name)&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
         "trial_week,timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=26"),
@@ -1629,7 +1634,12 @@ function clientBlock() {
   }
   if (!live) return "";
 
-  var who = (live.applications && live.applications.name) || "your assistant";
+  /* Normalised the same way /admin normalises client_private: the embed is
+     one-to-one through a primary key, so PostgREST nests an object, but which
+     shape you get is a property of the constraint rather than of this code. */
+  var ap = live.application_public;
+  if (Array.isArray(ap)) ap = ap[0];
+  var who = (ap && ap.name) || "your assistant";
   var rate = C_RATE[live.id];
   var mine = C_WEEKS.filter(function (w) { return w.placement_id === live.id; });
   var waiting = mine.filter(function (w) { return w.status === "submitted"; });
