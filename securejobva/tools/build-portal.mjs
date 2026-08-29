@@ -757,37 +757,96 @@ function authError() {
 }
 
 /* An expired token reads as "not signed in" rather than failing mid-request. */
+/* What is in storage, expired or not. It used to throw the whole session away
+   the moment the access token went stale — which took the refresh token with
+   it, so an hour was a hard limit on staying signed in. It did not announce
+   itself either: it simply refused the next thing you did. Filling in the
+   match form in /admin took longer than that, and the first click reported
+   nothing at all while the second said "signed out".
+
+   The refresh token was in storage the whole time, written by two code paths
+   and read by none. */
 function session() {
   var s = loadSession();
   if (!s || !s.access_token) return null;
-  if (s.expires_at && Date.now() > s.expires_at - 30000) { clearSession(); return null; }
   return s;
 }
 
+/* Thirty seconds of margin, so a request that leaves now does not arrive
+   after the token it is carrying has died. */
+function tokenLive(s) {
+  return !!(s && s.access_token && (!s.expires_at || Date.now() < s.expires_at - 30000));
+}
+
+/* One renewal at a time. A page that fires four requests at once must not
+   spend four refresh tokens — Supabase rotates the token on every use, so the
+   second call would present one that had just been retired and the whole
+   session would be lost trying to save it. */
+var RENEWING = null;
+
+function refreshSession() {
+  if (RENEWING) return RENEWING;
+  var s = loadSession();
+  if (!s || !s.refresh_token) return Promise.resolve(null);
+  RENEWING = authPost("token?grant_type=refresh_token", { refresh_token: s.refresh_token })
+    .then(keepSession)
+    .then(
+      function () { RENEWING = null; return loadSession(); },
+      /* A refused refresh is a real sign-out — the token has been used,
+         revoked or has expired in its own right — so clear rather than keep
+         retrying with something the server has already rejected. */
+      function () { RENEWING = null; clearSession(); return null; }
+    );
+  return RENEWING;
+}
+
+/* An access token good to use right now, renewing first if the one in hand
+   has gone stale. Null means genuinely signed out. */
+function liveSession() {
+  var s = loadSession();
+  if (tokenLive(s)) return Promise.resolve(s);
+  return refreshSession();
+}
+
 function api(path, opts) {
-  var s = session();
-  if (!s) return Promise.reject(new Error("signed out"));
   opts = opts || {};
-  var h = {
-    apikey: ANON,
-    Authorization: "Bearer " + s.access_token,
-    "Content-Type": "application/json"
-  };
-  if (opts.headers) for (var k in opts.headers) h[k] = opts.headers[k];
-  return fetch(SB + "/rest/v1/" + path, {
-    method: opts.method || "GET",
-    headers: h,
-    body: opts.body ? JSON.stringify(opts.body) : undefined
-  }).then(function (r) {
-    if (r.status === 401) { clearSession(); throw new Error("signed out"); }
+  return liveSession().then(function (s) {
+    if (!s) throw new Error("signed out");
+    return send(s, false);
+  });
+
+  /* Renew once on a 401 and try again before giving up. The token can expire
+     between the check above and the request landing, and a clock that is a
+     little out is enough on its own — neither is a reason to throw somebody
+     out of a form they are halfway through. */
+  function send(s, retried) {
+    var h = {
+      apikey: ANON,
+      Authorization: "Bearer " + s.access_token,
+      "Content-Type": "application/json"
+    };
+    if (opts.headers) for (var k in opts.headers) h[k] = opts.headers[k];
+    return fetch(SB + "/rest/v1/" + path, {
+      method: opts.method || "GET",
+      headers: h,
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    }).then(function (r) {
+    if (r.status === 401) {
+      if (retried) { clearSession(); throw new Error("signed out"); }
+      return refreshSession().then(function (s2) {
+        if (!s2) { clearSession(); throw new Error("signed out"); }
+        return send(s2, true);
+      });
+    }
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
     /* Prefer: return=minimal answers a POST with 201 and an empty body, not
        204, so checking the status was not enough — adding a note reported
        "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
        in red under the box, after the note had already been saved. Read the
        body and decide on what is actually there. */
-    return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
-  });
+      return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
+    });
+  }
 }
 
 /* Storage lives beside PostgREST on the same project. */
@@ -797,7 +856,10 @@ function storageBase() {
 
 /* Returns a URL good for one minute. Opened immediately, never stored. */
 function signDoc(path) {
-  var sess = session();
+  /* liveSession rather than session: storage sits behind the same token, and
+     opening somebody's CV an hour into a shift should renew like everything
+     else rather than be the one thing that still throws you out. */
+  return liveSession().then(function (sess) {
   if (!sess) return Promise.reject(new Error("signed out"));
   return fetch(storageBase() + "/object/sign/" + path, {
     method: "POST",
@@ -813,6 +875,7 @@ function signDoc(path) {
   }).then(function (j) {
     if (!j || !j.signedURL) throw new Error("no link came back");
     return SB + j.signedURL;
+  });
   });
 }
 

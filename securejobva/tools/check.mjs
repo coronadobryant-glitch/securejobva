@@ -867,6 +867,40 @@ await check("email links come back to the page that sent them", () => {
   return "signup, recover and resend all carry a return address";
 });
 
+/* session() used to clear storage the moment the access token expired, which
+   threw the refresh token away with it. So an hour was a hard cap on being
+   signed in, and it never announced itself — it simply refused the next thing
+   you did. It cost a half-filled match form in /admin, where the first click
+   reported nothing at all and the second said "signed out".
+
+   The refresh token was written by two code paths and read by none. This is
+   the kind of bug that looks like an ordinary session timeout for as long as
+   nobody asks why the timeout is exactly an hour. */
+await check("an expired token is renewed, not thrown away", () => {
+  const src = read("tools/build-portal.mjs");
+  if (!/grant_type=refresh_token/.test(src)) {
+    throw new Error("nothing uses the refresh token — the session dies when the access " +
+      "token expires and drops whoever is signed in, mid-task, with their work on screen");
+  }
+
+  const sAt = src.indexOf("function session()");
+  const sEnd = src.indexOf("function tokenLive", sAt);
+  if (sAt < 0 || sEnd < 0) throw new Error("session()/tokenLive are gone — this needs rewriting");
+  if (/clearSession\(\)/.test(src.slice(sAt, sEnd))) {
+    throw new Error("session() clears storage when the token has merely aged, which throws the " +
+      "refresh token away with it — the exact bug that capped every sign-in at an hour");
+  }
+
+  const aAt = src.indexOf("function api(");
+  const aEnd = src.indexOf("function storageBase", aAt);
+  if (aAt < 0 || aEnd < 0) throw new Error("api() is gone — this needs rewriting");
+  if (!/refreshSession\(\)/.test(src.slice(aAt, aEnd))) {
+    throw new Error("api() never renews, so a 401 half way through a form ends the session " +
+      "rather than retrying once with a fresh token");
+  }
+  return "renews on expiry and once on a 401";
+});
+
 /* A day saves on the change event, which fires on blur — so the write lands
    while the person is already typing in the next box. saveDay() used to finish
    by calling paintHours(), which replaces the card's innerHTML: the half-typed
