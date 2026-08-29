@@ -159,7 +159,10 @@ const checks = [
      PostgREST hides columns the asking role holds no privilege on — so probing
      it reports "not run yet" forever, however well the migration ran. The
      function 033 adds is the honest signal: present and refusing anon. */
-  ["033 week to client",  () => fn("timesheet_is_clients", { ts: "00000000-0000-0000-0000-000000000000" }), ["locked"]]
+  ["033 week to client",  () => fn("timesheet_is_clients", { ts: "00000000-0000-0000-0000-000000000000" }), ["locked"]],
+  /* 039 splits the client in two. The new table is the honest signal that it
+     ran: before it, client_private does not exist at all. */
+  ["039 client details",  () => table("client_private"),        ["locked"]]
   /* 034 has no probe, deliberately. It adds one column, trial_week, granted to
      nobody — so the public key cannot see it, exactly as with placement_id.
      Probing the timesheets table instead would report "present" whether or not

@@ -766,8 +766,61 @@ await check("the notify trigger does not read fields across table shapes", () =>
   return "per-table IF blocks, no cross-shape CASE";
 });
 
+/* 039. The hub asks for the placement with the business nested in, and an
+   embed PostgREST is not allowed to read comes back null rather than as an
+   error — so the page renders, the card is headed with its own fallback
+   string, and nothing anywhere says no. It went out that way and was found by
+   clicking.
+
+   simulate.mjs cannot catch it: it hands the portal a PLACE with
+   clients: { name } already filled in, which is the answer RLS refused. So
+   the guard is here, against the policy itself. */
+await check("an assistant may read the business she is placed with", () => {
+  /* The query is built by concatenation and lands in hub.html split across
+     two lines, so the quotes and the + have to come out before the URL can be
+     read as one string. The first version of this check did not do that,
+     matched nothing, and reported "nothing to guard" — passing green over the
+     exact bug it was written for. */
+  const hub = existsSync("hub.html")
+    ? read("hub.html").replace(/"\s*\+\s*\n?\s*"/g, "")
+    : "";
+  if (!/placements\?select=[^"'`]*clients\(/.test(hub)) {
+    throw new Error("the hub no longer asks for clients( … ) inside its placements query — " +
+      "either the embed moved and this check needs rewriting, or it was dropped and " +
+      "the client card has no name to show");
+  }
+  const policies = sql.split(";").filter((s) =>
+    /create\s+policy[\s\S]*on\s+public\.clients\s+for\s+select/i.test(s));
+  if (!policies.length) throw new Error("no SELECT policy on public.clients at all");
+  const reaches = policies.some((p) => /is_client_assistant/i.test(p));
+  if (!reaches) {
+    throw new Error("the hub embeds clients(name) but no SELECT policy on public.clients " +
+      "lets the placed assistant read it — the embed returns null and the card " +
+      "falls through to \"your client\". Nothing errors, so only a person clicking finds it.");
+  }
+  /* Counting statements across every file, not live policies — 032 writes one
+     and 039 replaces it by name, so both are in the folder for good. */
+  return "the placed assistant is named in the policy";
+});
+
+/* The other half of 039: the name is readable because everything worth
+   hiding left the table. If a private column comes back, the policy above
+   hands it to her along with the name. */
+await check("nothing private is left on clients", () => {
+  const back = [];
+  for (const m of sql.matchAll(/alter\s+table\s+public\.clients\s+add\s+column[^;]*/gi)) {
+    const col = (m[0].match(/add\s+column\s+(?:if\s+not\s+exists\s+)?([a-z_]+)/i) || [])[1];
+    if (col && /contact|email|notes|billing|rate|phone|address/i.test(col)) back.push(col);
+  }
+  if (back.length) {
+    throw new Error("private columns added back to clients: " + back.join(", ") +
+      " — both sides of a placement read that table now. They belong in client_private.");
+  }
+  return "id and name only";
+});
+
 await check("anon holds nothing on the placement tables", () => {
-  for (const t of ["clients", "placements", "placement_billing", "placement_pay", "swap_requests"]) {
+  for (const t of ["clients", "client_private", "placements", "placement_billing", "placement_pay", "swap_requests"]) {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
       throw new Error("nothing revokes anon on " + t);
     }
@@ -775,7 +828,7 @@ await check("anon holds nothing on the placement tables", () => {
       throw new Error("row-level security is never enabled on " + t);
     }
   }
-  return "five tables, all revoked and all RLS on";
+  return "six tables, all revoked and all RLS on";
 });
 
 await check("anon holds nothing on the timesheet tables", () => {

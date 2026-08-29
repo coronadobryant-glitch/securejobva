@@ -2391,9 +2391,12 @@ function loadPlacements() {
   if (!box) return;
   box.innerHTML = '<span class="spin"></span>Loading placements&hellip;';
   Promise.all([
-    api("clients?select=id,name,contact_name,contact_email,billing_cycle&order=name.asc"),
+    /* Only the two columns the dropdown draws. 039 moved the rest into
+       client_private, and this list never showed them anyway — it was asking
+       for three columns it did not use. */
+    api("clients?select=id,name&order=name.asc"),
     api("placements?select=id,application_id,client_id,status,started_on,ended_on," +
-        "hours_per_week,trial_weeks,clients(name,contact_email,billing_cycle)" +
+        "hours_per_week,trial_weeks,clients(name,client_private(billing_cycle))" +
         "&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("placement_pay?select=placement_id,rate"),
@@ -2420,6 +2423,16 @@ function loadPlacements() {
 function money(n) {
   if (n === null || n === undefined || n === "") return "";
   return "$" + Number(n).toFixed(2);
+}
+
+/* client_private hangs off clients by a primary key that is also the foreign
+   key, so PostgREST reads it as one-to-one and nests an object. Normalised
+   anyway: the same embed described as one-to-many comes back as an array, and
+   which one you get is a property of the constraint rather than of this code.
+   Staff are the only role whose policy returns the row at all. */
+function priv(c) {
+  var p = c && c.client_private;
+  return (Array.isArray(p) ? p[0] : p) || {};
 }
 
 function drawPlacements(box, swaps) {
@@ -2523,7 +2536,7 @@ function drawPlacements(box, swaps) {
 
             '<div class="row__tags">' + esc(p.hours_per_week) + " h a week" +
               (p.trial_weeks ? " &middot; " + esc(p.trial_weeks) + "-week trial" : "") +
-              (p.clients && p.clients.billing_cycle ? " &middot; billed " + esc(p.clients.billing_cycle) : "") +
+              (priv(p.clients).billing_cycle ? " &middot; billed " + esc(priv(p.clients).billing_cycle) : "") +
             "</div>" +
 
             (mine.length
@@ -2596,16 +2609,27 @@ function wirePlacementForm() {
       ? api("clients", {
           method: "POST",
           headers: { Prefer: "return=representation" },
-          body: {
-            name: document.getElementById("pl-cname").value.trim(),
-            contact_name: document.getElementById("pl-cwho").value.trim() || null,
-            contact_email: document.getElementById("pl-cmail").value.trim() || null,
-            billing_cycle: document.getElementById("pl-cycle").value
-          }
+          body: { name: document.getElementById("pl-cname").value.trim() }
         }).then(function (rows) {
           var c = (rows || [])[0];
           if (!c) throw new Error("the client did not come back");
-          return c.id;
+          /* The details are a second row since 039, and the contact address
+             is the one field that must be right — it is how they sign in to
+             /seats. So a failure here is named rather than swallowed: the
+             business exists, and somebody has to go and finish it. */
+          return api("client_private", {
+            method: "POST",
+            headers: { Prefer: "return=minimal" },
+            body: {
+              client_id: c.id,
+              contact_name: document.getElementById("pl-cwho").value.trim() || null,
+              contact_email: document.getElementById("pl-cmail").value.trim() || null,
+              billing_cycle: document.getElementById("pl-cycle").value
+            }
+          }).then(function () { return c.id; }, function () {
+            throw new Error("The business was created, but their contact details did not save — " +
+              "so nobody there can sign in yet. Add them before matching anyone.");
+          });
         })
       : Promise.resolve(pick.value);
 

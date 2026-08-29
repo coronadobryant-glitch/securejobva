@@ -111,6 +111,15 @@ const to = (m) => (m.to || []).join(", ");
 const A = { id: "a1", name: "Maria Santos", email: "maria@example.com",
             tracks: ["Customer Service"], status: "applied" };
 const CLIENT = { id: "c1", name: "Rosehill Plumbing", contact_email: "ops@rosehill.com" };
+/* clients and applications are nested here the way PostgREST nests an embed.
+   Worth being honest about what that costs: this is a fake join, and a fake
+   join always succeeds. Between 032 and 039 the real one came back null for an
+   assistant — no policy on clients let her read it — so step 5 below asserted
+   that her portal names the client and was green the whole time it did not.
+   Nothing in a simulation can catch that, because the answer is decided by a
+   policy in the database and this file has no database. The guard for it is
+   static, in check.mjs: "an assistant may read the business she is placed
+   with". If this embed is ever changed, that check is the other half. */
 const PLACE = { id: "p1", application_id: A.id, client_id: CLIENT.id, status: "matched",
                 started_on: "2026-09-07", hours_per_week: 40, trial_weeks: 2,
                 clients: { name: CLIENT.name }, applications: { name: A.name } };
