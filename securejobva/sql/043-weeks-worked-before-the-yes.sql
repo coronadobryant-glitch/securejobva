@@ -124,28 +124,6 @@ update public.timesheets t
 -- Check it worked
 -- ==========================================================================
 --
--- Any week still without a placement, and whether that is right. A week before
--- its placement's start is correctly homeless; a week on or after it is not.
-
-select a.name,
-       t.week_starts_on,
-       t.status,
-       coalesce(c.name, '— no placement —') as billed_to,
-       case
-         when t.placement_id is not null then 'placed'
-         when not exists (
-           select 1 from public.placements pl
-           where pl.application_id = t.application_id
-             and pl.status in ('trial', 'ongoing', 'ended')
-         ) then 'nobody placed — correct'
-         else 'STRANDED — worked inside a placement and billed to nobody'
-       end as verdict
-from public.timesheets t
-join public.applications a on a.id = t.application_id
-left join public.placements pl on pl.id = t.placement_id
-left join public.clients c on c.id = pl.client_id
-order by a.name, t.week_starts_on desc;
-
 -- The trigger is on, and only on the way out of matched.
 
 select tgname, pg_get_triggerdef(oid) as definition
@@ -153,3 +131,45 @@ from pg_trigger
 where tgrelid = 'public.placements'::regclass
   and not tgisinternal
 order by tgname;
+
+-- Last on purpose: the SQL editor shows the final statement's result and
+-- discards the rest, so the query worth reading has to be the one at the
+-- bottom. The first draft of this file put the trigger listing here and hid
+-- the answer behind it.
+--
+-- Every week, and whether being unplaced is right. Three of the four verdicts
+-- are correct states, and that matters: an assistant is hired long before she
+-- is matched and records hours the whole time, so a check that called every
+-- one of those weeks a problem would cry wolf permanently and be ignored —
+-- which is the same failure as a check that cannot fail.
+--
+-- STRANDED is the only one that means anything is wrong: the week falls inside
+-- a live placement and still belongs to nobody. After 043 that should be empty.
+
+select a.name,
+       t.week_starts_on,
+       t.status,
+       t.trial_week,
+       case
+         when t.placement_id is not null then 'placed'
+         when not exists (
+           select 1 from public.placements pl
+           where pl.application_id = t.application_id
+             and pl.status in ('trial', 'ongoing', 'ended')
+         ) then 'nobody placed - correct'
+         -- The adoption's own window, asked as a question. A week before the
+         -- start, or after the end, is homeless because it should be.
+         when not exists (
+           select 1 from public.placements pl
+           where pl.application_id = t.application_id
+             and pl.status in ('trial', 'ongoing', 'ended')
+             and pl.started_on is not null
+             and pl.started_on <= t.week_starts_on + 6
+             and (pl.ended_on is null or pl.ended_on >= t.week_starts_on)
+         ) then 'outside every placement - correct'
+         else 'STRANDED - inside a placement and billed to nobody'
+       end as verdict
+from public.timesheets t
+join public.applications a on a.id = t.application_id
+order by a.name, t.week_starts_on desc
+limit 200;
