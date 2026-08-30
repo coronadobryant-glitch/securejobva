@@ -1171,11 +1171,19 @@ await check("anon holds nothing on the placement tables", () => {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
       throw new Error("nothing revokes anon on " + t);
     }
+    /* A revoke is only the state at that line. A later migration granting the
+       table straight back leaves the revoke sitting there and this check green,
+       which is how a check goes on passing over the thing it was written to
+       catch. The timesheet check below has always asked this; these eight are
+       the ones holding both rates, so they need it more. */
+    const granted = sql.replace(/--[^\n]*/g, " ").split(";").some((s) =>
+      new RegExp("grant[\\s\\S]*?on\\s+public\\." + t + "\\s+to\\s+[a-z_,\\s]*\\banon\\b", "i").test(s));
+    if (granted) throw new Error(t + " is granted to anon somewhere");
     if (!new RegExp("alter\\s+table\\s+public\\." + t + "\\s+enable\\s+row\\s+level\\s+security", "i").test(sql)) {
       throw new Error("row-level security is never enabled on " + t);
     }
   }
-  return "eight tables, all revoked and all RLS on";
+  return "eight tables, all revoked, none granted back, all RLS on";
 });
 
 await check("anon holds nothing on the timesheet tables", () => {
@@ -1475,27 +1483,45 @@ await check("anon can still only INSERT", () => {
        -- ANON MAY READ client_logos — public marketing, no personal data
 
      which means the next one cannot be waved through by whoever is reading the
-     diff in a hurry. A table holding a person's details should never carry that
-     line, and writing it is a decision somebody has to make on purpose. */
-  /* These hold people. No declaration opens them — the line above is for
-     marketing tables, not an override anyone can type over a table of names,
-     emails, phone numbers, CVs or tokens. If one of these ever genuinely has
-     to be readable by anon, that is a conversation, not a comment. */
-  const NEVER_PUBLIC = new Set([
-    "applications", "seat_requests", "contact_messages", "application_notes",
-    "application_note_log", "application_disc", "application_disc_read",
-    "application_tracking", "application_socials", "application_documents",
-    "application_queue", "social_tokens", "admins", "user_roles",
-    "role_requests", "roles", "permissions", "role_permissions"
-  ]);
+     diff in a hurry. The declaration is necessary and not sufficient: the table
+     has to be named in MAY_BE_PUBLIC below as well, so writing it is a decision
+     somebody has to make on purpose, in two places, one of them here. */
+  /* Which tables the declaration is allowed to open, named here rather than a
+     list of the ones it must not.
 
-  const declaredPublic = new Set(
-    [...sql.matchAll(/--\s*ANON MAY READ\s+(\w+)/gi)]
-      .map((m) => m[1].toLowerCase())
-      .filter((t) => !NEVER_PUBLIC.has(t))
-  );
+     It was the other way around until it nearly cost the pay rates. A list of
+     tables that may never be public is a list that has to be remembered every
+     time the schema grows, and it was not: it was written when 015 added the
+     first public table and still named only the applicant tables, while 026
+     through 043 added ten more holding leave reasons, client contacts,
+     assistant names, and both sides of the money. Every one of them was
+     waveable by typing one comment into a migration. Checked, and a
+     `grant select (assistant_rate) on placement_pay to anon` with a
+     declaration above it passed all ninety.
+
+     Named this way the default is the safe one. A new table is protected the
+     day it is created by nobody doing anything, and opening one costs a line
+     here as well as the declaration in the migration — which is what "that is
+     a conversation, not a comment" was always meant to mean. */
+  const MAY_BE_PUBLIC = new Set(["client_logos"]);
+
+  const declared = [...sql.matchAll(/--\s*ANON MAY READ\s+(\w+)/gi)]
+    .map((m) => m[1].toLowerCase());
+  const declaredPublic = new Set(declared.filter((t) => MAY_BE_PUBLIC.has(t)));
 
   const offenders = [];
+
+  /* Say so where it happens. Without this the declaration is simply ignored and
+     the grant below is reported as an ordinary stray one, which reads as though
+     the declaration were never written and sends whoever is fixing it looking
+     in the migration rather than here. */
+  for (const t of new Set(declared)) {
+    if (!MAY_BE_PUBLIC.has(t)) {
+      offenders.push("`-- ANON MAY READ " + t + "` declares a table that is not in " +
+        "MAY_BE_PUBLIC (tools/check.mjs) — a comment in a migration does not open a table");
+    }
+  }
+
   for (const s of stmts) {
     const to = (s.match(/\sto\s+([a-z_, ]+);/i) || [])[1] || "";
     const grantees = to.split(",").map((g) => g.trim().toLowerCase());
