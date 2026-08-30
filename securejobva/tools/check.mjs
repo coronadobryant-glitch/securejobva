@@ -867,6 +867,40 @@ await check("email links come back to the page that sent them", () => {
   return "signup, recover and resend all carry a return address";
 });
 
+/* 034 ties a week to a placement when the week is created and never again, and
+   its lookup skips placements still at `matched`. That was fine while matched
+   lasted seconds — staff matched somebody and moved them to trial in the same
+   sitting. 042 turned that window into days, because the placement now waits on
+   the client to confirm a start date, and meanwhile the assistant has been told
+   she has a client and her portal is open.
+
+   Every hour recorded in that wait belonged to nobody: never billed, never on a
+   statement, and no screen anywhere saying so. 043 adopts them when the
+   placement goes live. */
+await check("a week worked before the client says yes is not stranded", () => {
+  const fn = sql.match(/function\s+public\.adopt_orphan_weeks\(\)[\s\S]*?\$fn\$;/i);
+  if (!fn) {
+    throw new Error("nothing adopts weeks recorded while a placement is still matched — " +
+      "034 stamps only on insert and skips matched placements, so those weeks keep a null " +
+      "placement_id for good and can never be billed");
+  }
+  const trg = sql.split(";").find((s) =>
+    /create\s+trigger\s+placement_adopts_its_weeks/i.test(s));
+  if (!trg) throw new Error("adopt_orphan_weeks exists but no trigger ever runs it");
+  if (!/old\.status\s*=\s*'matched'/i.test(trg)) {
+    throw new Error("the adoption trigger does not restrict itself to the move out of matched, " +
+      "so it re-runs on every rate change and status nudge");
+  }
+  /* The half that keeps 034's promise: a week that already has a placement is
+     never touched, because moving one retroactively moves money already billed. */
+  if (!/placement_id\s+is\s+null/i.test(fn[0])) {
+    throw new Error("adoption does not limit itself to weeks with no placement — restamping one " +
+      "that already has a placement moves money that has already been billed, which is the " +
+      "whole reason 034 stamps once");
+  }
+  return "orphans adopted, stamped weeks left alone";
+});
+
 /* 042 lets a client say when work starts. The obvious build — a policy letting
    them update their own placement row — would also let them rewrite
    hours_per_week and trial_weeks, because a policy gates rows and the grant on
