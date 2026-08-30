@@ -245,6 +245,39 @@ await check("no two migrations share a number", () => {
 });
 const sql = sqlFiles.map((f) => read(SQL_DIR + "/" + f)).join("\n");
 
+/* 044 gave the database a place to record which migrations have landed, so
+   that tools/status.mjs stops being blind to the ones PostgREST cannot see —
+   a trigger function, a column granted to nobody. That only works if every
+   migration from 044 on actually writes its number, and forgetting the line is
+   both easy and silent: the file runs, the schema changes, and the one report
+   that says what has landed simply never mentions it. Silence there reads as
+   "no detector", which is exactly the answer that must stay true.
+
+   Only from 044. The files before it cannot stamp themselves — editing a
+   migration that has already been run is the one thing sql/README.md forbids —
+   and 044 backfills those by detection instead. */
+await check("every migration since 044 stamps its number", () => {
+  const missing = [];
+  let stamped = 0;
+  for (const f of sqlFiles) {
+    const n = Number((f.match(/^(\d+)/) || [])[1]);
+    if (!Number.isFinite(n) || n < 44) continue;
+    /* Comments out first: 044 quotes the line it is asking for in its own
+       header, and a check satisfied by the prose about it is not a check. */
+    const body = read(SQL_DIR + "/" + f).replace(/--[^\n]*/g, " ");
+    const stamp = new RegExp(
+      "insert\\s+into\\s+public\\.schema_migrations\\b[^;]*?\\bvalues\\s*\\(\\s*" + n + "\\s*\\)", "i");
+    if (stamp.test(body)) stamped++;
+    else missing.push(f);
+  }
+  if (missing.length) {
+    throw new Error(missing.join(", ") + " — add `insert into public.schema_migrations (n) " +
+      "values (<number>) on conflict (n) do nothing;` as the last statement, or nothing will " +
+      "ever report whether it ran");
+  }
+  return stamped ? stamped + " stamped, 001–043 by detection in 044" : "none since 044 yet";
+});
+
 for (const p of PAGES) {
   const cols = columns(sql, p.table);
   const keys = payload(read(p.file));
@@ -1503,7 +1536,16 @@ await check("anon can still only INSERT", () => {
      day it is created by nobody doing anything, and opening one costs a line
      here as well as the declaration in the migration — which is what "that is
      a conversation, not a comment" was always meant to mean. */
-  const MAY_BE_PUBLIC = new Set(["client_logos"]);
+  const MAY_BE_PUBLIC = new Set([
+    "client_logos",
+    /* 044. Migration numbers and nothing else — the column grant is `n` alone,
+       so the public key reads a set of integers and cannot reach the dates.
+       Opened so tools/status.mjs can keep answering "has it landed?" on the
+       publishable key, because no tool here touches the service role key and
+       the tool that tells you things are running must not be the one that
+       leaks them. */
+    "schema_migrations"
+  ]);
 
   const declared = [...sql.matchAll(/--\s*ANON MAY READ\s+(\w+)/gi)]
     .map((m) => m[1].toLowerCase());

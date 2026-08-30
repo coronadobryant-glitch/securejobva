@@ -161,6 +161,53 @@ for (const fn of RPCS) {
 }
 
 
+/* 044 opened one table to the public key on purpose — schema_migrations, so
+   tools/status.mjs can say which migrations landed without a service role key.
+   The grant is `select (n)` alone, and a column grant is the only thing holding
+   the rest of the row shut.
+
+   That distinction is invisible in the dashboard: the table reads as public
+   either way, and widening it to the whole row is one `grant select on` away.
+   Nothing else here would change. So the narrowness is checked, not the
+   openness — `n` must still answer and every other column must still refuse. */
+const OPEN_TABLE = "schema_migrations";
+
+try {
+  const r = await fetch(base + "/" + OPEN_TABLE + "?select=n&limit=1", { headers: headers(anonKey) });
+  if (r.ok) {
+    console.log("  ok      " + OPEN_TABLE + ": n is readable, as designed");
+  } else if (r.status === 404) {
+    console.log("  note    " + OPEN_TABLE + ": not created yet — paste sql/044-what-has-landed.sql");
+  } else {
+    fails.push(OPEN_TABLE + " (n unreadable)");
+    console.log("  FAIL    " + OPEN_TABLE + ": n is not readable (" + r.status + ") — status.mjs goes blind");
+  }
+} catch (e) {
+  fails.push(OPEN_TABLE);
+  console.log("  ERROR   " + OPEN_TABLE + ": " + e.message);
+}
+
+for (const col of ["*", "landed_at", "evidence"]) {
+  try {
+    const r = await fetch(base + "/" + OPEN_TABLE + "?select=" + encodeURIComponent(col) + "&limit=1",
+      { headers: headers(anonKey) });
+    if (r.status === 404) break;               /* 044 not pasted; already said so above */
+    if (r.ok) {
+      fails.push(OPEN_TABLE + "." + col);
+      console.log("  BREACH  " + OPEN_TABLE + ": the public key can read `" + col + "` — the column " +
+        "grant has been widened to the whole row");
+      console.log("          Fix:  revoke all on public." + OPEN_TABLE + " from anon; " +
+        "grant select (n) on public." + OPEN_TABLE + " to anon;");
+    } else {
+      console.log("  ok      " + OPEN_TABLE + ": `" + col + "` denied (" + r.status + ")");
+    }
+  } catch (e) {
+    fails.push(OPEN_TABLE);
+    console.log("  ERROR   " + OPEN_TABLE + " " + col + ": " + e.message);
+  }
+}
+
+
 const BUCKET = "applicant-docs";
 const storage = base.replace("/rest/v1", "/storage/v1");
 

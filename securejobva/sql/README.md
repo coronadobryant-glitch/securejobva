@@ -45,7 +45,10 @@ run it. That is always safer than guessing.
 | `029-no-staff-requests.sql` | Staff can no longer be asked for — it is granted under Accounts |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
-On a fresh database: 001 through 029 in order, then `verify.sql` to confirm.
+On a fresh database: 001 through the highest number in order, then `verify.sql`
+to confirm. The table above stops at 029 and the folder does not — for what has
+actually landed, ask the database rather than this list: `node tools/status.mjs`
+reads it out of `schema_migrations`.
 
 ## Adding one
 
@@ -73,6 +76,21 @@ remember what has been run on which database, and with these you do not have to.
 
 **Never edit a file that has already been run.** The database has no memory of
 what a file used to say. Add the next number instead.
+
+**Stamp it.** The last statement of every file from 044 on records its own
+number, so that something can answer whether it ran:
+
+```sql
+insert into public.schema_migrations (n) values (45) on conflict (n) do nothing;
+```
+
+`node tools/check.mjs` fails the build without it, because forgetting the line
+is silent in the worst way — the file runs, the schema changes, and the one
+report that says what has landed simply never mentions it. Before 044 nothing
+could see a migration that only added a trigger function or a column granted to
+nobody, which is why 034, 040 and 043 each had to say in as many words that they
+could not be checked. 044 backfills those by detecting what they built; from
+there on the file says so itself.
 
 ## The one rule
 

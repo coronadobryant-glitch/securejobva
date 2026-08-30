@@ -183,6 +183,52 @@ for (const [what, run, good] of checks) {
   else line("warn", what, got);
 }
 
+/* ── the same question, asked of the database instead of guessed ─────────── */
+//
+// The probes above can only see what PostgREST exposes to the publishable key,
+// so a migration adding a trigger function or a column granted to nobody is
+// invisible to them however well it ran — 034, 040 and 043 all are, and each
+// said so rather than faking a probe. 044 gave every migration a place to
+// record its own number, so this reads the answer instead of inferring it.
+//
+// A file with no row is reported by which side of 044 it falls on, because the
+// two silences mean opposite things: after 044 a missing stamp means the file
+// did not run, before it means only that 044 had no detector for that shape.
+
+head("migrations — what the database says");
+
+const onDisk = readdirSync("sql")
+  .filter((f) => /^\d+.*\.sql$/.test(f) && !f.endsWith(".local.sql"))
+  .map((f) => ({ n: Number(f.match(/^(\d+)/)[1]), file: f }))
+  .sort((a, b) => a.n - b.n);
+
+try {
+  const r = await fetch(B + "/schema_migrations?select=n", { headers: H });
+  if (r.status === 404) {
+    line("warn", "schema_migrations", "044 has not been pasted yet — paste sql/044-what-has-landed.sql");
+  } else if (!r.ok) {
+    line("fail", "schema_migrations", "exists but the public key cannot read n (" + r.status + ")");
+  } else {
+    const landed = new Set((await r.json()).map((row) => row.n));
+    const after = onDisk.filter((m) => m.n >= 44);
+    const before = onDisk.filter((m) => m.n < 44);
+
+    const missing = after.filter((m) => !landed.has(m.n));
+    line(missing.length ? "fail" : "ok", "since 044, all stamped",
+      missing.length ? missing.map((m) => m.file).join(", ") + " — not run yet"
+                     : after.length + " of " + after.length + " landed");
+
+    const quiet = before.filter((m) => !landed.has(m.n));
+    line("ok", "001–043, detected by 044",
+      (before.length - quiet.length) + " of " + before.length + " confirmed");
+    if (quiet.length) {
+      line("ok", "  no detector, so no signal",
+        quiet.map((m) => String(m.n).padStart(3, "0")).join(" ") +
+        " — grants, policies and constraints leave no artifact to find");
+    }
+  }
+} catch { line("warn", "schema_migrations", "unreachable"); }
+
 /* ── the public paths that must keep working ─────────────────────────────── */
 
 head("the forms still accept work");
