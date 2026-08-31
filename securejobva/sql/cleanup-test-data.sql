@@ -54,8 +54,13 @@ order by a.created_at desc;
 -- and switched back on immediately after, inside one transaction, so a
 -- failure cannot leave it off.
 --
--- Paste the id from step 1 in the two places marked.
+-- ARMING IT: this block is commented out. Fill in by_id or by_email below,
+-- then delete the `/*` line just under here and the `*/` line at the end of
+-- the block. Off by default because running a whole file at once is the
+-- natural thing to do in the SQL editor, and a file that deletes a person
+-- when you do that is a badly built file.
 
+/*
 do $do$
 declare
   -- Named ONCE, the same way Option B does it. It used to be four copies of
@@ -114,6 +119,7 @@ begin
     who.name, who.email, who.status;
 end
 $do$;
+*/
 
 -- Notes and the note log are deliberately left alone: they are what you
 -- wrote about the person, not a stage the system set, and a reset run is
@@ -147,7 +153,11 @@ $do$;
 -- address rather than the application, so an account that is also staff keeps
 -- its role. And nothing touches auth.users — signing in with the address
 -- again still works, which is exactly what re-applying needs.
+--
+-- ARMING IT: commented out, like Option A. Fill in by_id or by_email below,
+-- then delete the `/*` line under here and the `*/` after the block.
 
+/*
 do $do$
 declare
   -- Name the person ONCE, either way. Fill in exactly one and leave the other
@@ -198,6 +208,7 @@ begin
   raise notice 'Gone, along with everything that hung off it. % may now apply again.', who.email;
 end
 $do$;
+*/
 
 -- ==========================================================================
 -- 3. CONFIRM — read-only
