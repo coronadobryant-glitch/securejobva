@@ -1219,6 +1219,94 @@ await check("anon holds nothing on the placement tables", () => {
   return "eight tables, all revoked, none granted back, all RLS on";
 });
 
+/* The assessment decides whether somebody gets an interview, so the two ways
+   it can quietly stop measuring anything are both checked here.
+
+   Neither fails loudly on its own: a key that has drifted from the item bank
+   marks the wrong option correct and every applicant simply gets a wrong
+   score, and answers clustered in one column turn the whole thing into a
+   question about whether you noticed the pattern. */
+await check("the assessment key matches its item bank", async () => {
+  const { SCENARIOS } = await import("./assessment-items.mjs");
+  const at = sql.indexOf("as t(q, pts)");
+  if (at < 0) throw new Error("no scenario key found in sql/ — has 045 been renamed?");
+  const rows = [...sql.slice(Math.max(0, at - 1400), at)
+    .matchAll(/\(\s*(\d+),\s*array\[([\d,\s]+)\]\)/g)]
+    .map((m) => [Number(m[1]), m[2].split(",").map((n) => Number(n.trim()))]);
+
+  if (rows.length !== SCENARIOS.length) {
+    throw new Error(rows.length + " scenarios in the SQL key, " + SCENARIOS.length +
+      " in tools/assessment-items.mjs — re-generate 045 from the bank");
+  }
+  for (let i = 0; i < SCENARIOS.length; i++) {
+    const want = SCENARIOS[i][1].map((o) => o[1]);
+    const got = (rows.find((r) => r[0] === i) || [])[1];
+    if (!got || got.join() !== want.join()) {
+      throw new Error("scenario " + i + ": the SQL key says [" + (got || []).join() +
+        "] and the item bank says [" + want.join() + "] — every applicant is scored wrong");
+    }
+  }
+  return SCENARIOS.length + " scenarios, key identical";
+});
+
+await check("no column is a strategy on the assessment", async () => {
+  const { SCENARIOS } = await import("./assessment-items.mjs");
+  const spread = [0, 0, 0, 0];
+  for (const [, opts] of SCENARIOS) {
+    const at = opts.findIndex((o) => o[1] === 2);
+    if (at < 0) throw new Error("a scenario has no best answer");
+    spread[at]++;
+  }
+  /* Random guessing scores a quarter. A column that holds more than a third of
+     the best answers beats guessing for somebody who spots it, which is a
+     question about pattern-matching rather than judgement. */
+  const worst = Math.max(...spread);
+  if (worst > Math.ceil(SCENARIOS.length / 3)) {
+    throw new Error("the best answer sits in column " + (spread.indexOf(worst) + 1) + " for " +
+      worst + " of " + SCENARIOS.length + " scenarios — ticking it blindly scores " +
+      Math.round((worst * 2) / (SCENARIOS.length * 2) * 100) + "%. Shuffle the options.");
+  }
+  return "spread " + spread.join("/") + " — blind picking scores " +
+    Math.round((worst * 2) / (SCENARIOS.length * 2) * 100) + "%";
+});
+
+await check("anon holds nothing on the assessment", () => {
+  const t = "application_assessment";
+  if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {
+    throw new Error("nothing revokes anon on " + t);
+  }
+  const granted = sql.replace(/--[^\n]*/g, " ").split(";").some((s) =>
+    new RegExp("grant[\\s\\S]*?on\\s+public\\." + t + "\\s+to\\s+[a-z_,\\s]*\\banon\\b", "i").test(s));
+  if (granted) throw new Error(t + " is granted to anon somewhere");
+  if (!new RegExp("alter\\s+table\\s+public\\." + t + "\\s+enable\\s+row\\s+level\\s+security", "i").test(sql)) {
+    throw new Error("row-level security is never enabled on " + t);
+  }
+  /* The scores and the verdict decide an application. If a page could write
+     them, the assessment would be a form somebody fills in about themselves. */
+  for (const col of ["score_typing", "score_scenarios", "verdict", "submitted_at"]) {
+    if (new RegExp("grant\\s+update\\s*\\([^)]*\\b" + col + "\\b", "i").test(sql)) {
+      throw new Error(col + " is granted on UPDATE — a page could set its own score");
+    }
+  }
+  return "revoked, RLS on, and no page may write a score";
+});
+
+await check("a failed assessment declines nobody", () => {
+  const fn = sql.slice(sql.indexOf("function public.advance_on_assessment"));
+  const body = fn.slice(0, fn.indexOf("$fn$;") + 5);
+  if (!body) throw new Error("advance_on_assessment() not found");
+  if (/status\s*=\s*'declined'/i.test(body)) {
+    throw new Error("the advance trigger can set 'declined' — a dropped connection would " +
+      "look like a low score and lose a real person silently");
+  }
+  if (!/status\s*=\s*'interview'/i.test(body)) throw new Error("it never advances to interview");
+  if (!/and\s+status\s*=\s*'assessment'/i.test(body)) {
+    throw new Error("it does not check the applicant is still at assessment — a re-sit " +
+      "would walk somebody backwards from hired");
+  }
+  return "advances on a pass, declines on nothing";
+});
+
 await check("anon holds nothing on the timesheet tables", () => {
   for (const t of ["timesheets", "timesheet_days"]) {
     if (!new RegExp("revoke\\s+all\\s+on\\s+public\\." + t + "\\s+from\\s+[a-z_,\\s]*\\banon\\b", "i").test(sql)) {

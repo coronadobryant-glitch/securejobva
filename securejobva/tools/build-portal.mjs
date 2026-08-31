@@ -1,6 +1,7 @@
 /* Composes status.html and admin.html from the chrome the other two pages
    already use, so the portal cannot drift away from the site around it. */
 import { readFileSync, writeFileSync } from "node:fs";
+import { SCENARIOS, TYPING_TARGET_WPM, TYPING_MIN_ACCURACY } from "./assessment-items.mjs";
 
 import { chrome } from "./lib-chrome.mjs";
 
@@ -96,6 +97,33 @@ const PAGE_CSS = `
 }
 .stg li.is-done .stg__dot{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .stg li.is-now .stg__dot{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+/* The assessment. Reuses the stage ladder's shape on purpose — she has just
+   read one list of numbered rungs above it, and a second list that looked
+   different would read as a different kind of thing. */
+.apts{list-style:none;margin:0;padding:0;display:grid;gap:.6rem}
+.apt{display:grid;grid-template-columns:auto 1fr auto;gap:.9rem;align-items:center;
+  border:1px solid var(--line);border-radius:10px;padding:.85rem 1rem;background:var(--paper)}
+.apt.is-done{background:var(--accent-soft);border-color:var(--accent)}
+.apt__n{width:1.7rem;height:1.7rem;border-radius:50%;display:grid;place-items:center;
+  font-size:.85rem;font-weight:700;background:var(--accent-soft);color:var(--accent)}
+.apt.is-done .apt__n{background:var(--accent);color:var(--accent-ink)}
+.apt__t{font-weight:700;display:block}
+.apt__d{display:block;font-size:.88rem;color:var(--ink-2);margin-top:.15rem}
+.apt__s{font-size:.85rem;color:var(--accent);font-weight:700;white-space:nowrap}
+.apt__go{padding:.45rem .9rem;font-size:.88rem}
+.a-lbl{display:block;font-weight:700;font-size:.9rem;margin:1rem 0 .35rem}
+.a-src{margin:0;padding:1rem 1.1rem;border-left:3px solid var(--accent);background:var(--accent-soft);
+  border-radius:0 8px 8px 0;font-size:1rem;line-height:1.7}
+.a-qs{margin:1rem 0 0;padding:0 0 0 1.2rem;display:grid;gap:1.4rem}
+.a-q__p{font-weight:700;margin:0 0 .6rem}
+.a-opts{display:grid;gap:.4rem}
+/* The whole row is the target, not the 13px circle. Most people sitting this
+   are on a phone. */
+.a-opt{display:grid;grid-template-columns:auto 1fr;gap:.6rem;align-items:start;
+  border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;cursor:pointer;line-height:1.5}
+.a-opt:hover{border-color:var(--accent)}
+.a-opt:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.a-opt input{margin-top:.25rem}
 .stg__t{font-weight:700;display:block;margin-top:.3rem}
 .stg li:not(.is-done):not(.is-now) .stg__t{color:var(--muted);font-weight:600}
 .stg__d{display:block;font-size:.9rem;color:var(--ink-2);margin-top:.2rem;line-height:1.55}
@@ -1278,6 +1306,278 @@ function unconfirmed(email) {
    It is our own markup and goes in unescaped, which is what lets the client
    one carry a link. Nothing from a user reaches it. */
 
+/* ── the assessment ───────────────────────────────────────────────────────
+   Three parts, shown only while she is at the assessment stage. Note there is
+   not a backtick anywhere in this block: it is inside a template literal, and
+   one would end the whole page script here rather than at the bottom.
+
+   The scenarios below
+   are the prompts and the options and NOTHING ELSE — the points live in
+   sql/045's trigger, and this array is emitted from tools/assessment-items.mjs
+   with the scores stripped at build time rather than trusted to be left out.
+   She sends the positions she ticked; the database decides what they were
+   worth. Same rule 025 set for DISC, for the same reason: view-source. */
+var SCEN = ${JSON.stringify(SCENARIOS.map((s) => [s[0], s[1].map((o) => o[0])]))};
+var TYPE_TARGET = ${TYPING_TARGET_WPM};
+var TYPE_MIN_ACC = ${TYPING_MIN_ACCURACY};
+
+/* The passage she types. Support-email prose rather than random words, because
+   the thing being measured is typing the work, not typing. */
+var TYPE_TEXT = "Thank you for getting in touch about your order. I have checked " +
+  "the account and I can see the payment went through on Tuesday. The parcel " +
+  "left our warehouse the same evening and the tracking number is in the email " +
+  "below. If it has not arrived by Friday, reply to this message and I will " +
+  "open a case with the courier straight away.";
+
+function assessCard(a, s) {
+  /* Nothing to show unless she is actually at this stage. A finished
+     assessment stays visible so she can see it was received — an empty space
+     where her work was is the thing that generates the email asking whether
+     it arrived. */
+  if (a.status !== "assessment" && !(s && s.submitted_at)) return "";
+
+  if (s && s.submitted_at) {
+    return '<div class="card">' +
+      '<div class="row__top"><span><span class="row__n">Your assessment</span>' +
+      '<span class="row__meta"> &middot; sent ' + esc(when(s.submitted_at)) + "</span></span>" +
+      '<span class="pill pill--approved">Received</span></div>' +
+      '<p class="msg" style="margin-top:1rem">We have it. There is nothing more for you ' +
+      "to do on this part &mdash; you will hear from us either way.</p></div>";
+  }
+
+  var done = {
+    typing: s && s.typing_wpm !== null && s.typing_wpm !== undefined,
+    written: s && s.written_reply,
+    scen: s && s.scenario_answers
+  };
+  var left = (done.typing ? 0 : 1) + (done.written ? 0 : 1) + (done.scen ? 0 : 1);
+
+  function part(k, n, t, d, isDone, note) {
+    return '<li class="apt' + (isDone ? " is-done" : "") + '">' +
+      '<span class="apt__n">' + (isDone ? "&#10003;" : n) + "</span>" +
+      '<span><span class="apt__t">' + t + "</span>" +
+      '<span class="apt__d">' + d + "</span></span>" +
+      (isDone
+        ? '<span class="apt__s">' + esc(note || "done") + "</span>"
+        : '<button class="btn btn--solid apt__go" data-part="' + k + '" type="button">Start</button>') +
+      "</li>";
+  }
+
+  return '<div class="card">' +
+    '<div class="row__top"><span><span class="row__n">Your assessment</span>' +
+    '<span class="row__meta"> &middot; about 45 minutes</span></span>' +
+    '<span class="pill pill--assessment">' + (left ? left + " left" : "Ready to send") + "</span></div>" +
+    '<p class="msg" style="margin:1rem 0">Three parts. You can stop between them, but once a ' +
+    "part is open it is timed, so start each one when you have a quiet moment.</p>" +
+    '<ol class="apts">' +
+      part("typing", 1, "Typing and accuracy", "Five minutes, a real support email",
+        done.typing, done.typing ? s.typing_wpm + " wpm" : "") +
+      part("written", 2, "Written reply to a customer", "Twenty minutes, about 150 words",
+        done.written) +
+      part("scen", 3, "Judgement scenarios", SCEN.length + " questions, twenty minutes",
+        done.scen) +
+    "</ol>" +
+    (left === 0
+      ? '<button class="btn btn--solid" id="a-send" type="button" style="margin-top:1.2rem">Send my assessment</button>' +
+        '<p class="msg" style="margin-top:.7rem">Once it is sent you cannot change it.</p>'
+      : "") +
+    '<p class="msg msg--bad" id="a-card-err" style="display:none"></p>' +
+    "</div>";
+}
+
+/* ── running a part ───────────────────────────────────────────────────────
+   One at a time, full card, timed. The timer is a deadline rather than a
+   countdown of work done: she can leave the page and the part is still over
+   when it is over, because a clock that pauses when you close the tab is not
+   a clock. What it never does is throw the work away — expiry saves whatever
+   is there and closes the part, so a slow typist loses the rest of the time
+   and not the paragraph she wrote. */
+var SIT = null;          /* her row, once started */
+var APP_ID = null;
+var TICK = null;
+var ENDS = 0;
+
+function fmtLeft(ms) {
+  var s = Math.max(0, Math.round(ms / 1000));
+  return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
+}
+
+function startRow(a) {
+  if (SIT) return Promise.resolve(SIT);
+  return api("application_assessment", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: { application_id: a.id, track: (a.tracks && a.tracks[0]) || a.track || "Customer Service" }
+  }).then(function (r) { SIT = (r && r[0]) || {}; return SIT; });
+}
+
+/* Saves one part. Only the four columns a page is granted — a score or a
+   verdict sent from here is refused by the grant, not by good manners. */
+function savePart(patch) {
+  return api("application_assessment?application_id=eq." + APP_ID, {
+    method: "PATCH",
+    body: patch
+  });
+}
+
+function closePart(patch, err) {
+  if (TICK) { clearInterval(TICK); TICK = null; }
+  var e = document.getElementById("a-err");
+  return savePart(patch)
+    .then(function () { return loadApplications(); })
+    .catch(function () {
+      if (e) { e.style.display = ""; e.textContent =
+        "That did not save. Check your connection and try the part again."; }
+    });
+}
+
+/* The done button is rendered here rather than passed in by each part. Three
+   callers each emitting their own done-button id is three copies of one id in
+   the page source — never two at once on screen, but the audit reads the
+   source and is right to: an id that exists three times is one rename away
+   from the timer clicking the wrong one.
+
+   And the id is not written out in this comment, because comments ship inside
+   the inline script and the audit found the one in the prose too. */
+function partShell(title, mins, inner, doneLabel) {
+  ENDS = Date.now() + mins * 60000;
+  view('<div class="card">' +
+    '<div class="row__top"><span><span class="row__n">' + title + "</span></span>" +
+    '<span class="pill pill--assessment" id="a-clock">' + fmtLeft(mins * 60000) + "</span></div>" +
+    inner +
+    '<p class="msg msg--bad" id="a-err" style="display:none"></p>' +
+    '<button class="btn btn--solid" id="a-done" type="button" style="margin-top:1.1rem">' +
+    esc(doneLabel) + "</button></div>");
+  TICK = setInterval(function () {
+    var el = document.getElementById("a-clock");
+    if (!el) { clearInterval(TICK); TICK = null; return; }
+    el.textContent = fmtLeft(ENDS - Date.now());
+    if (Date.now() >= ENDS) {
+      clearInterval(TICK); TICK = null;
+      var done = document.getElementById("a-done");
+      if (done) done.click();
+    }
+  }, 500);
+}
+
+function typingPart() {
+  partShell("Typing and accuracy", 5,
+    '<p class="msg" style="margin:1rem 0">Type the passage below exactly as it is written. ' +
+    "Accuracy counts for more than speed &mdash; work you have to redo is slower than typing slowly.</p>" +
+    '<blockquote class="a-src" id="a-src">' + esc(TYPE_TEXT) + "</blockquote>" +
+    '<label class="a-lbl" for="a-type">Type the passage here</label>' +
+    '<textarea id="a-type" rows="7" placeholder="Start typing here" ' +
+    'style="width:100%;margin-top:1rem" autocomplete="off" spellcheck="false"></textarea>',
+    "Done typing");
+
+  var began = 0;
+  var box = document.getElementById("a-type");
+  box.addEventListener("input", function () { if (!began) began = Date.now(); });
+  box.focus();
+
+  document.getElementById("a-done").addEventListener("click", function () {
+    var typed = box.value;
+    var mins = Math.max(0.15, (Date.now() - (began || Date.now())) / 60000);
+    /* Words are five characters, which is the convention every typing test
+       uses — counting actual words would score short words as fast typing. */
+    var wpm = Math.round((typed.length / 5) / mins);
+    var right = 0;
+    for (var i = 0; i < typed.length; i++) if (typed[i] === TYPE_TEXT[i]) right++;
+    var acc = typed.length ? Math.round((right / typed.length) * 100) : 0;
+    closePart({ typing_wpm: Math.min(250, wpm), typing_accuracy: acc });
+  });
+}
+
+function writtenPart() {
+  partShell("Written reply to a customer", 20,
+    '<p class="msg" style="margin:1rem 0"><b>A customer writes:</b> &ldquo;I ordered two weeks ago ' +
+    "and nothing has arrived. Nobody has answered my last two emails. I want a refund and I want " +
+    "to know why this happened.&rdquo;</p>" +
+    '<p class="msg">Write the reply you would send. About 150 words. You do not have the order ' +
+    "in front of you &mdash; part of what is being read is what you do about that.</p>" +
+    '<label class="a-lbl" for="a-write">Your reply to the customer</label>' +
+    '<textarea id="a-write" rows="11" placeholder="Your reply" style="width:100%;margin-top:1rem"></textarea>' +
+    '<p class="msg" id="a-count" style="margin-top:.5rem">0 words</p>',
+    "Done writing");
+
+  var box = document.getElementById("a-write");
+  var count = document.getElementById("a-count");
+  box.addEventListener("input", function () {
+    var n = box.value.trim() ? box.value.trim().split(/\\s+/).length : 0;
+    count.textContent = n + " words";
+  });
+  box.focus();
+
+  document.getElementById("a-done").addEventListener("click", function () {
+    closePart({ written_reply: box.value.slice(0, 8000) });
+  });
+}
+
+function scenPart() {
+  var qs = SCEN.map(function (s, i) {
+    var opts = s[1].map(function (o, j) {
+      return '<label class="a-opt"><input type="radio" name="q' + i + '" value="' + j + '"> ' +
+        "<span>" + esc(o) + "</span></label>";
+    }).join("");
+    return '<li class="a-q"><p class="a-q__p">' + esc(s[0]) + "</p>" +
+      '<div class="a-opts">' + opts + "</div></li>";
+  }).join("");
+
+  partShell("Judgement scenarios", 20,
+    '<p class="msg" style="margin:1rem 0">' + SCEN.length + " situations. Pick what you would " +
+    "actually do. More than one answer is reasonable in some of them &mdash; pick the best one.</p>" +
+    '<ol class="a-qs">' + qs + "</ol>", "Done");
+
+  document.getElementById("a-done").addEventListener("click", function () {
+    /* Positions, never letters and never scores. The database holds the key
+       and decides what each position was worth. */
+    var out = [];
+    for (var i = 0; i < SCEN.length; i++) {
+      var hit = document.querySelector('input[name="q' + i + '"]:checked');
+      out.push({ p: hit ? Number(hit.value) : null });
+    }
+    closePart({ scenario_answers: out });
+  });
+}
+
+function wireAssess(a) {
+  APP_ID = a.id;
+  SIT = a.sit;
+  var go = document.querySelectorAll(".apt__go");
+  for (var i = 0; i < go.length; i++) {
+    go[i].addEventListener("click", function (ev) {
+      var which = ev.currentTarget.getAttribute("data-part");
+      startRow(a).then(function () {
+        if (which === "typing") typingPart();
+        else if (which === "written") writtenPart();
+        else scenPart();
+      }).catch(function () {
+        var e = document.getElementById("a-card-err");
+        if (e) { e.style.display = ""; e.textContent =
+          "We could not open that just now. Try again in a moment."; }
+      });
+    });
+  }
+
+  var send = document.getElementById("a-send");
+  if (send) send.addEventListener("click", function () {
+    send.disabled = true;
+    send.textContent = "Sending\\u2026";
+    /* submitted_at is not ours to write — the grant excludes it, and the
+       trigger stamps it. This asks the database to close the row by sending
+       the one thing a page may send that means "finished". */
+    api("rpc/submit_assessment", { method: "POST", body: {} })
+      .then(function () { loadApplications(); })
+      .catch(function () {
+        send.disabled = false;
+        send.textContent = "Send my assessment";
+        var e = document.getElementById("a-card-err");
+        if (e) { e.style.display = ""; e.textContent =
+          "That did not send. Try again in a moment."; }
+      });
+  });
+}
+
 function stages(app) {
   var at = stageIndex(app.status);
   var out = "";
@@ -1466,6 +1766,11 @@ function render(user, apps) {
         "</ul>" +
         docList(a.docs) +
       "</div>";
+
+    /* After the card rather than inside it: the assessment is a thing to do,
+       not a detail of the application, and burying a timed task under the
+       shift list is how it goes unnoticed for three days. */
+    html += assessCard(a, a.sit);
   }
 
   /* Only the first application is editable. Someone with two open
@@ -1475,6 +1780,10 @@ function render(user, apps) {
   html += '<p class="msg">Name and email are fixed here &mdash; they are on your ID check. ' +
           "Tell us in a reply if either needs changing.</p>";
   view(html);
+  /* After view(), because the buttons do not exist until the markup is in the
+     document. Wired for the first application only, which is the same one
+     editForm() takes and for the same reason. */
+  wireAssess(apps[0]);
   document.getElementById("out").addEventListener("click", signOut);
   root.addEventListener("click", function (e) {
     var d = e.target.closest("[data-doc]");
@@ -1624,6 +1933,15 @@ function loadApplications() {
   Promise.all([
     api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
     api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
+      .catch(function () { return []; }),
+    /* Caught rather than allowed to fail the page. Until sql/045 is pasted
+       this table does not exist and PostgREST answers 404 — and an applicant
+       being shown "we could not load your application" because a stage she is
+       not at has no table is the portal breaking over a feature she cannot
+       see. No row and no table both mean the same thing here: nothing to sit
+       yet. The same shape 030 needed on /hub, for the same reason. */
+    api("application_assessment?select=application_id,track,attempt,started_at,submitted_at," +
+        "typing_wpm,typing_accuracy,scenario_answers,written_reply,verdict")
       .catch(function () { return []; })
   ])
     .then(function (r) {
@@ -1632,7 +1950,9 @@ function loadApplications() {
       (r[1] || []).forEach(function (d) {
         (byId[d.application_id] = byId[d.application_id] || []).push(d);
       });
-      rows.forEach(function (a) { a.docs = byId[a.id] || []; });
+      var sits = {};
+      (r[2] || []).forEach(function (s) { sits[s.application_id] = s; });
+      rows.forEach(function (a) { a.docs = byId[a.id] || []; a.sit = sits[a.id] || null; });
       render(user, rows);
     })
     .catch(function (e) {
