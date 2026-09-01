@@ -89,7 +89,7 @@ console.log("\nstatic\n");
    status.html carry a sign-in flow and a stage editor; a stray brace there
    takes the portal down while the markup around it still renders fine. */
 const SHIPPED = [...PAGES.map((p) => p.file), "status.html", "admin.html", "hub.html",
-  "privacy.html", "terms.html", "refunds.html", "contact.html", "seats.html"]
+  "privacy.html", "terms.html", "refunds.html", "contact.html", "seats.html", "pay.html"]
   .filter((f) => existsSync(f));
 
 for (const p of SHIPPED.map((file) => ({ file }))) {
@@ -1332,7 +1332,7 @@ await check("the assessment key matches its item bank", async () => {
    which is exactly why it needs a check rather than another patch. */
 await check("hiding an element actually hides it", () => {
   const PAGES = ["index.html", "careers.html", "contact.html",
-                 "status.html", "admin.html", "hub.html", "seats.html"]
+                 "status.html", "admin.html", "hub.html", "seats.html", "pay.html"]
     .filter((f) => existsSync(f));
 
   const RULE = /\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*\}/;
@@ -1343,7 +1343,7 @@ await check("hiding an element actually hides it", () => {
       "Every one of these pages hides something with the attribute, and one " +
       "display rule anywhere in the stylesheet is enough to make that do nothing at all. " +
       "The rule lives in careers.html inside the block lib-chrome.mjs lifts, which is how " +
-      "the four generated pages get it.");
+      "the five generated pages get it.");
   }
   return PAGES.length + " pages, hidden beats every display rule on all of them";
 });
@@ -1796,8 +1796,8 @@ await check("the timesheet's weeks and totals hold up", async () => {
 });
 
 /* ── the generator that overwrites four of these pages ────────────────────
-   tools/build-portal.mjs WRITES status.html, admin.html, hub.html and
-   seats.html. It never reads them. So anything edited in those files by hand
+   tools/build-portal.mjs WRITES status.html, admin.html, hub.html, seats.html
+   and pay.html. It never reads them. So anything edited in those files by hand
    is one command away from being gone — silently, with no error, and with the
    build still green afterwards because every check here reads the file that
    was just overwritten.
@@ -1820,7 +1820,12 @@ await check("no generated page has lost a fix to its generator", () => {
     ["admin.html",  "function todayCentral", "dates stamped in Central"],
     ["admin.html",  "function downloadCvs", "the bulk CV download"],
     ["admin.html",  "DATE_RANGES",          "the date filter"],
-    ["admin.html",  "weekly_cents",         "the exact quote"]
+    ["admin.html",  "weekly_cents",         "the exact quote"],
+    ["admin.html",  "function drawPayments", "recording that a client paid"],
+    ["pay.html",    "function dueCard",     "the figure a client came to /pay for"],
+    ["pay.html",    "function receiptsCard", "the payments received panel"],
+    ["seats.html",  "function cBill",       "one definition of what a client owes"],
+    ["seats.html",  "Left to pay",          "the total that comes down when somebody pays"]
   ];
   const lost = [];
   for (const [file, marker, what] of MARKERS) {
@@ -1833,7 +1838,7 @@ await check("no generated page has lost a fix to its generator", () => {
       "regenerated from a generator that never had it. Recover the page from git and " +
       "port the change into the generator before running it again.");
   }
-  return MARKERS.length + " fixes still present in the four generated pages";
+  return MARKERS.length + " fixes still present in the five generated pages";
 });
 
 /* The bill a client reads before they pay us, driven with more than one
@@ -1848,6 +1853,21 @@ await check("the bill adds up across every assistant", async () => {
     return (out.match(/^ {2}ok/gm) || []).length + " behaviours";
   } catch (e) {
     throw new Error("tools/test-billing.mjs failed — run it directly for the detail");
+  }
+});
+
+/* The page a client opens with their bank details already on screen. It shares
+   its arithmetic with the panel above and deliberately not its markup, so the
+   harness drives the drawing on both and asserts they land on the same figure.
+   A client shown one total on /seats and another on /pay has no way of knowing
+   which one to send, and neither do we. */
+await check("/pay and /seats agree on what is owed", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-pay.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours";
+  } catch (e) {
+    throw new Error("tools/test-pay.mjs failed — run it directly for the detail");
   }
 });
 

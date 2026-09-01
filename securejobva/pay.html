@@ -1,4 +1,4 @@
-<title>Your application — SecureJobVA</title>
+<title>Pay — SecureJobVA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -820,6 +820,92 @@ body:has(.adm__wrap) main{padding:0}
 .pill--approved{background:var(--signal);color:var(--signal-ink)}
 .pill--declined{background:var(--surface-2);color:var(--muted)}
 
+/* The bill. Built to be read across a whole business rather than one seat:
+   a client may have several assistants, so a week is a heading and each
+   assistant is a line under it. Tabular figures, because a column of money
+   that does not line up is a column somebody has to check twice. */
+.bill{margin:1.3rem 0 0}
+.bill__wk{margin-top:1.1rem;border-top:1px solid var(--line);padding-top:.75rem}
+.bill__wk:first-child{border-top:0;padding-top:0;margin-top:0}
+.bill__wkh{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+.bill__wkn{font-weight:700;font-size:.95rem}
+.bill__wkt{font-variant-numeric:tabular-nums;font-weight:700;font-size:.95rem}
+.bill__ln{display:grid;grid-template-columns:1fr auto auto;gap:.4rem 1rem;align-items:baseline;
+  padding:.4rem 0;font-size:.9rem;color:var(--ink-2);border-bottom:1px solid var(--line-soft)}
+.bill__ln:last-child{border-bottom:0}
+.bill__who{min-width:0;overflow-wrap:anywhere}
+.bill__h,.bill__amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:.85rem;white-space:nowrap}
+.bill__amt{font-weight:600;color:var(--ink)}
+.bill__free{color:var(--muted);font-weight:500}
+.bill__tot{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap;
+  margin-top:1.2rem;padding-top:.95rem;border-top:2px solid var(--ink)}
+.bill__totl{font-weight:700;font-size:1.02rem}
+.bill__totv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-weight:700;font-size:1.35rem;color:var(--ink)}
+.bill__pay{margin-top:1.3rem;padding:1.1rem 1.2rem;border:1px dashed var(--line);border-radius:9px;
+  background:var(--surface-2)}
+.bill__payh{font-weight:700;margin:0 0 .35rem}
+.bill__payp{margin:0;font-size:.9rem;color:var(--muted);line-height:1.55}
+
+/* 055. The two lines above the total, and the receipts under it. Quieter than
+   the figure they explain — the number somebody came for is the one left to
+   pay, and the working out should not compete with it. */
+.bill__tot--sub{border-top:0;padding-top:.35rem;padding-bottom:0;font-weight:500}
+.bill__tot--sub .bill__totl{color:var(--muted);font-weight:500}
+.bill__tot--sub .bill__totv{font-size:1rem;font-weight:600;color:var(--ink-2)}
+/* #0B7A63 is what approved already wears on the timesheet pills and the hired
+   pill, so paid money reads as the same kind of good news rather than as a
+   sixth colour nobody has seen before. */
+.bill__totv--paid{color:#0B7A63}
+:root[data-theme="dark"] .bill__totv--paid{color:#63D69B}
+.bill__paid{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.09em;
+  text-transform:uppercase;padding:.16rem .4rem;border-radius:4px;margin-left:.55rem;
+  background:#0B7A63;color:#fff}
+.pays{margin-top:1.3rem;border-top:1px solid var(--line);padding-top:1rem}
+.pays__h{margin:0 0 .5rem;font-weight:700;font-size:.92rem}
+.pays__r{display:grid;grid-template-columns:6.5rem 1fr auto;gap:.3rem .8rem;align-items:baseline;
+  padding:.4rem 0;border-bottom:1px solid var(--line-soft);font-size:.88rem}
+.pays__r:last-child{border-bottom:0}
+.pays__d{color:var(--muted);font-variant-numeric:tabular-nums}
+.pays__m{color:var(--ink-2);overflow-wrap:anywhere}
+.pays__a{font-weight:700;font-variant-numeric:tabular-nums}
+@media(max-width:30rem){
+  .pays__r{grid-template-columns:1fr auto}
+  .pays__m{grid-column:1/-1;font-size:.84rem}
+}
+
+.due{display:flex;flex-wrap:wrap;gap:1.4rem 2.4rem;align-items:flex-end;justify-content:space-between;
+  margin-top:1.2rem;padding-bottom:1.2rem;border-bottom:1px solid var(--line)}
+.due__amt{font-family:"Bricolage Grotesque","Karla",system-ui,sans-serif;font-weight:800;
+  font-size:clamp(2.2rem,7vw,3.1rem);line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--ink)}
+.due__sub{margin-top:.5rem;color:var(--muted);font-size:.9rem}
+.due__meta{display:flex;flex-wrap:wrap;gap:.35rem 1.7rem}
+.due__k{display:block;font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:.15rem}
+.due__v{font-weight:700;font-size:.95rem;font-variant-numeric:tabular-nums}
+
+.pm{margin-top:1.2rem;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pm__row{display:grid;grid-template-columns:2.2rem 1fr auto;gap:.2rem .9rem;align-items:center;
+  padding:.9rem 1rem;border-bottom:1px solid var(--line-soft)}
+.pm__row:last-child{border-bottom:0}
+.pm__row--off{opacity:.62}
+.pm__mk{font-size:1.2rem;text-align:center}
+.pm__t{display:block;font-weight:700;font-size:.95rem}
+.pm__d{display:block;color:var(--muted);font-size:.87rem;line-height:1.5;margin-top:.15rem}
+.tag{font-family:"IBM Plex Mono",monospace;font-size:.61rem;letter-spacing:.09em;text-transform:uppercase;
+  padding:.24rem .5rem;border-radius:5px;white-space:nowrap;border:1px solid var(--line);color:var(--muted)}
+.tag--now{background:#0B7A63;border-color:#0B7A63;color:#fff}
+@media(max-width:33rem){
+  .pm__row{grid-template-columns:2.2rem 1fr}
+  .tag{grid-column:2;justify-self:start;margin-top:.4rem}
+}
+
+.gap{margin-top:1.3rem;padding:1.1rem 1.2rem;border:1px dashed var(--line);border-radius:9px;
+  background:var(--surface-2)}
+.gap__h{font-weight:700;margin:0 0 .35rem}
+.gap__p{margin:0;font-size:.9rem;color:var(--muted);line-height:1.55}
+
 </style>
 
 <script>
@@ -857,8 +943,8 @@ body:has(.adm__wrap) main{padding:0}
         <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
       </a>
       <nav class="nav__links">
-        <a href="/careers">Careers</a>
-        <a href="/">Hiring a VA?</a>
+        <a href="/seats">Your seats</a>
+        <a href="/contact">Contact</a>
       </nav>
       <div class="nav__tools">
         <button class="themetog" id="themetog" type="button" aria-label="Switch theme">
@@ -873,9 +959,9 @@ body:has(.adm__wrap) main{padding:0}
   <section class="pt">
     <div class="wrap" style="max-width:52rem">
       <div class="pt__head">
-        <span class="eyebrow">Your application</span>
-        <h1>Where you are in the process.</h1>
-        <p id="pt-lead">Sign in with the Google account whose address you applied with, and this page shows exactly which stage you have reached.</p>
+        <span class="eyebrow">Your account</span>
+        <h1>What you owe, and how to settle it.</h1>
+        <p id="pt-lead">Sign in with the address we hold for your business.</p>
       </div>
       <div id="pt-root"></div>
     </div>
@@ -1548,964 +1634,368 @@ function signedOut(msg, mode) {
   });
 }
 
+
 var root = document.getElementById("pt-root");
 var lead = document.getElementById("pt-lead");
 
 function view(html) { root.innerHTML = html; }
 
-/* "Email not confirmed" is Supabase's own wording and a dead end. It is shown
-   to somebody whose address and password are both correct, names what is
-   wrong, and offers nothing to do about it — while the one thing they need is
-   a link they may never have received. A red line is not an answer here. */
-function unconfirmed(email) {
-  view(
-    '<div class="card">' +
-      '<div class="note"><b>Almost there.</b> That password is right, but ' +
-      esc(email) + " has not been confirmed yet. We sent a link when the account " +
-      "was made &mdash; it is worth checking your spam folder.</div>" +
-      '<button class="btn btn--solid" id="again" type="button" style="margin-top:1.1rem">' +
-        "Send the link again</button>" +
-      '<p class="msg" id="againmsg"></p>' +
-      '<p class="msg"><button class="lnk" id="againback" type="button">Back to signing in</button></p>' +
-    "</div>"
-  );
+SIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your account. ' +
+  'It is the same sign-in as your <a href="/seats">seats page</a>. ' +
+  'No account yet? Create one with that address and it becomes how you sign in.';
 
-  document.getElementById("againback").addEventListener("click", function () { signedOut(""); });
+/* The same globals /seats fills, so the shared arithmetic below reads exactly
+   the same shape on both pages. */
+var C_PLACE = [];
+var C_RATE = {};
+var C_WEEKS = [];
+var C_NAMES = [];
+var C_PAID = [];
+var C_SETTLED = {};
+var C_WEEK_LIMIT = 260;
+var C_TRUNCATED = false;
+var C_COMPANY = "";
 
-  document.getElementById("again").addEventListener("click", function () {
-    var b = document.getElementById("again");
-    var m = document.getElementById("againmsg");
-    b.disabled = true;
-    b.textContent = "Sending\u2026";
-    resendConfirmation(email).then(function () {
-      b.textContent = "Sent";
-      m.textContent = "Open the link in that email and you are in.";
-    })["catch"](function (e) {
-      b.disabled = false;
-      b.textContent = "Send the link again";
-      m.textContent = (e && e.message) || "That did not work.";
-    });
-  });
+
+function cIso(d) {
+  var m = d.getMonth() + 1, day = d.getDate();
+  return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+}
+function cFrom(s) {
+  var p = String(s).split("-");
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+}
+function cHours(w) {
+  var ds = (w && w.timesheet_days) || [], t = 0;
+  for (var i = 0; i < ds.length; i++) t += Number(ds[i].hours || 0);
+  return t;
+}
+function cNum(n) {
+  return (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+function cMoney(n) {
+  return "$" + (Math.round(Number(n) * 100) / 100).toFixed(2);
+}
+/* Payments are stored as an integer number of cents, so they are divided here
+   and nowhere else. cMoney rounds, which is right for a product of hours and a
+   rate and would be a quiet lie about a figure that is already exact. */
+function cCents(cents) {
+  return "$" + (Number(cents || 0) / 100).toFixed(2);
+}
+function cWeekLabel(iso) {
+  var a = cFrom(iso), b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 6);
+  var f = { month: "short", day: "numeric" };
+  return a.toLocaleDateString(undefined, f) + " to " + b.toLocaleDateString(undefined, f);
 }
 
-/* The line under the sign-in card, which is the only part of it that differs
-   between portals. Each page overwrites this before start() runs. Held as a
-   variable rather than an argument because signedOut() is called from a dozen
-   places that have no business knowing which portal they are in.
+/* The bill, computed once and read by both pages.
 
-   It is our own markup and goes in unescaped, which is what lets the client
-   one carry a link. Nothing from a user reaches it. */
+   Returns the weeks newest first, what each came to, the grand total, and the
+   hours that could not be priced. A week with no rate on its placement is
+   deliberately left OUT of the money and counted separately — quoting a total
+   that silently omits somebody's hours is a bug this page has already been
+   through once. */
+function cBill() {
+  var nameOf = {};
+  C_NAMES.forEach(function (n) { if (n.name) nameOf[n.application_id] = n.name; });
 
-/* ── the assessment ───────────────────────────────────────────────────────
-   Three parts, shown only while she is at the assessment stage. Note there is
-   not a backtick anywhere in this block: it is inside a template literal, and
-   one would end the whole page script here rather than at the bottom.
+  var placeById = {};
+  C_PLACE.forEach(function (p) { placeById[p.id] = p; });
 
-   The scenarios below
-   are the prompts and the options and NOTHING ELSE — the points live in
-   sql/045's trigger, and this array is emitted from tools/assessment-items.mjs
-   with the scores stripped at build time rather than trusted to be left out.
-   She sends the positions she ticked; the database decides what they were
-   worth. Same rule 025 set for DISC, for the same reason: view-source. */
-var QBANK = {"scenarios":[["A customer emails angry that they were charged twice. You can see only one charge in the system.",["Apologise for the worry, say you can see one charge, and ask for the bank line showing the second.","Tell them there is only one charge and close the ticket.","Refund one charge straight away so they stop being angry.","Forward it to your client and wait."]],["Your client asks for a report by 5pm. At 3pm you realise the data you need is not available.",["Send what you have at 5pm without mentioning the gap.","Work late and send it at 9pm complete.","Wait until 5pm, then explain why it is not coming.","Tell them at 3pm what is missing, what you can deliver, and by when the rest can follow."]],["A customer asks a question you do not know the answer to.",["Give your best guess so you seem competent.","Pass it to your client immediately without trying to find out.","Say you will find out, give a time you will come back, and come back then.","Tell them nobody can answer that."]],["You notice a mistake you made last week that nobody has spotted.",["Fix it quietly and say nothing.","Tell your client what happened, what it affected, and what you have done about it.","Leave it — it is done and nobody noticed.","Mention it at your next monthly check-in."]],["Your internet goes down thirty minutes before your shift.",["Wait to see if it comes back before saying anything.","Move to your backup connection and mention it afterwards.","Say nothing and make the hours up later.","Message your client as soon as you know, with when you expect to be back."]],["A customer is rude to you in a chat.",["Stay level, keep answering the actual question, and flag it to your client if it continues.","Match their tone so they know it is not acceptable.","Apologise repeatedly to calm them down.","End the chat."]],["Your client gives you an instruction that contradicts what they said yesterday.",["Do the newest one, since it is the newest.","Ask which one they want, quoting both, before doing either.","Do yesterday's, since it was agreed first.","Do both and let them pick."]],["You are asked to send a file that contains other customers' details.",["Send it — your client asked for it.","Refuse without explaining.","Check who it is going to and why before sending anything with other people's details in it.","Remove the other customers' rows and send the rest, saying what you removed."]],["You finish your assigned work with two hours of your shift left.",["Log off early and note the shorter day.","Start on next week's tasks without asking.","Tell your client you are free and ask what would help most.","Find something plausible to look busy with."]],["A customer asks for a discount you are not authorised to give.",["Give it — it keeps the customer.","Tell them no discounts are ever given.","Ignore that part of the message and answer the rest.","Say you cannot approve it yourself, that you will ask, and when you will reply."]],["Two urgent tasks land at once and you cannot do both by the deadline.",["Ask your client which comes first, saying what each will cost the other.","Pick the one that looks harder and start.","Do half of each.","Do the one that arrived first."]],["Your client has not replied to a question that is blocking you, and it is the end of the day.",["Stop and wait — you are blocked.","Say what you are blocked on, what you assumed to keep moving, and move on to other work.","Guess and carry on without saying so.","Message them repeatedly until they answer."]]],"english":[["You have just sent a customer their refund. Which line do you send?",["Your refund has been sent and should reach your account within three working days.","Your refund was sent and should reach to your account within three working days.","We have send your refund, it will arrive in three working days.","Your refund is sent, arriving to you within three working days."]],["A customer asks when their order will arrive. It ships tomorrow. Which do you send?",["It will be shipped since tomorrow and arrives on Friday.","Your order leaves us tomorrow and should be with you on Friday.","Your order is leaving tomorrow and will be with you since Friday.","Your order ships tomorrow, arriving Friday."]],["You need a customer to send a document before you can go further.",["Send the document.","I would be extremely grateful if you could possibly find the time to send the form.","You must send the form or I cannot do anything.","Could you send the signed form when you have a moment? I can finish this as soon as it arrives."]],["A customer has complained about a delay that was your client's fault.",["Sorry for the delay, it was not our fault but we apologise anyway.","I am sorry this has taken so long. Here is where your order is now, and what happens next.","Apologies for any inconvenience caused.","The delay is happened because of a problem in the warehouse."]],["Which of these says most clearly that you will follow up on Monday?",["I will come back to you on Monday with an answer.","I will be reverting back to you by Monday regarding this matter.","I will try to update you sometime early next week hopefully.","I will let you know on Monday."]],["A customer asks for something your client does not offer.",["We are not doing this.","Unfortunately that is impossible for us.","That is not something we offer, but here is what we can do instead.","We cannot to do that, sorry."]],["You are writing to a customer for the first time on your client's behalf.",["Hey! Just checking in about your order :)","To whom it may concern, I am writing in reference to the aforementioned order.","Hi Sarah, I am writing from Rosehill about the order you placed last week.","Dear Sarah, I hope this email finds you well. I am writing to you today about your order."]],["Which sentence is correct?",["The team have finished the report and they sent it yesterday.","The team has finish the report and sent it yesterday.","The team have finished the report and has sent it yesterday.","The team has finished the report and sent it yesterday."]]],"detail":[["An invoice reads: 3 x $40.00 = $120.00, 2 x $15.00 = $30.00, 1 x $22.50 = $22.50, total $182.50. What is wrong?",["The total should be $172.50.","Nothing is wrong.","The second line should be $35.00.","The third line cannot have a half dollar."]],["A booking says: arrives Tuesday 14 March, departs Sunday 12 March, 3 nights. What is wrong?",["Three nights is too short for that trip.","The departure is before the arrival.","March 14 is not a Tuesday.","Nothing is wrong."]],["A customer record reads: Maria Santos, maria.santos@rosehil.com, phone +63 917 555 0142, company Rosehill Plumbing. What should you check?",["The phone number has too many digits.","Nothing is wrong.","The email domain is missing an l — rosehil, not rosehill.","The country code does not match the company."]],["A timesheet reads: Mon 8, Tue 8, Wed 8, Thu 8, Fri 8, total 42. What is wrong?",["Friday should be 10.","Nothing is wrong — 42 includes a break.","The total should be 40.","The week is missing the weekend."]],["An order list has: #1041 Ana Reyes, #1042 Joy Delgado, #1042 Ana Reyes, #1043 Mark Cruz. What is wrong?",["Ana Reyes should not have two orders.","The numbers should be in order of name.","Nothing is wrong.","Two different orders share the number 1042."]],["A meeting invite says: Thursday 10:00 AM Manila time, which is 9:00 PM Wednesday in Houston. What is wrong?",["Manila is 13 hours ahead in March, so it is 9:00 PM Wednesday — this is correct.","Houston should be Thursday, not Wednesday.","10:00 AM is too early for a meeting.","The invite is missing the meeting link."]],["A quote reads: 40 hours a week at $7.75 an hour, $320.00 a week. What is wrong?",["The hourly rate should be $8.00.","Nothing is wrong.","40 hours is too many for one week.","40 x $7.75 is $310.00, not $320.00."]],["A form has: Date of birth 03/14/1995, Age 31, filled in today in 2026. What is wrong?",["The date format is ambiguous.","Somebody born in March 1995 is 30 or 31 depending on the month — check today's date before flagging it.","The age should be 30.","March 14 1995 was not a valid date."]]],"sales":[["A lead replies to your quote with: \"That is more than we wanted to spend.\"",["Offer a discount straight away to keep them.","Ask what they were expecting and what the budget has to cover, before talking about price.","Explain again why the price is fair.","Tell them to come back when they have the budget."]],["A lead was keen on a call, then went quiet for a week.",["Send a short note with one useful thing and a question they can answer in a line.","Call them repeatedly until they pick up.","Mark them dead and move on.","Send the same email again."]],["A lead asks whether you do something your client does not offer.",["Say yes and work out the details later.","Say no and end the conversation.","Say that is not something we do, ask what they were trying to solve, and see if the thing we do solves it.","Avoid the question and keep selling what you have."]],["A good lead says: \"This is right, but not until the new budget year in six months.\"",["Agree a date to speak again, note what changes by then, and keep in light touch until it.","Try to persuade them to start now.","Close the lead — six months is too far out.","Send them a monthly newsletter and hope."]],["A lead says a competitor quoted them less.",["Match the price.","Say the competitor is not as good.","Ask them to send you the competitor's quote.","Ask what is included in their quote, and say plainly what is included in yours."]],["A client you already work for mentions they are struggling to cover the afternoons.",["Say nothing — you are not on the sales team today.","Send them a price list.","Tell them a second seat could cover the afternoons, and offer to have someone explain how it would work.","Offer to work extra hours yourself."]],["A lead offers to sign today for a bigger discount than you can give.",["Give it — a signature today is worth it.","Say you cannot approve that, say what you can do, and ask if that works.","Say you will check and then never come back to them.","Tell them the price is the price and leave it there."]],["A lead wants something your client could technically do but would do badly.",["Sell it — they asked for it.","Say no without explaining.","Sell it and warn them afterwards.","Say it is not what we are best at, say what we are best at, and let them decide."]]]};
-var SCEN = QBANK.scenarios;
-/* Which measures gate which track. The page uses this for one thing only —
-   whether to show the sales part — and the database decides the verdict from
-   its own copy, so a browser that lies about its track gets asked different
-   questions and scored on the same rules either way. */
-var TRACK_AXES = {"Customer Service":["english","customer"],"Admin Tasks":["english","detail"],"Sales & Marketing":["english","sales","customer"]};
-var TYPE_TARGET = 40;
-var TYPE_MIN_ACC = 95;
+  var byWeek = {}, unpriced = 0, missingRate = false;
+  var hours = 0, freeHours = 0, people = {};
 
-/* The passage she types. Support-email prose rather than random words, because
-   the thing being measured is typing the work, not typing. */
-var TYPE_TEXT = "Thank you for getting in touch about your order. I have checked " +
-  "the account and I can see the payment went through on Tuesday. The parcel " +
-  "left our warehouse the same evening and the tracking number is in the email " +
-  "below. If it has not arrived by Friday, reply to this message and I will " +
-  "open a case with the courier straight away.";
-
-function assessCard(a, s) {
-  /* Nothing to show unless she is actually at this stage. A finished
-     assessment stays visible so she can see it was received — an empty space
-     where her work was is the thing that generates the email asking whether
-     it arrived. */
-  if (a.status !== "assessment" && !(s && s.submitted_at)) return "";
-
-  if (s && s.submitted_at) {
-    return '<div class="card">' +
-      '<div class="row__top"><span><span class="row__n">Your assessment</span>' +
-      '<span class="row__meta"> &middot; sent ' + esc(when(s.submitted_at)) + "</span></span>" +
-      '<span class="pill pill--approved">Received</span></div>' +
-      '<p class="msg" style="margin-top:1rem">We have it. There is nothing more for you ' +
-      "to do on this part &mdash; you will hear from us either way.</p></div>";
-  }
-
-  /* Sales is only asked of the track it gates. Nobody else answers eight
-     questions that cannot affect their result — and the database agrees,
-     because sales is in no other track's axes, so an empty bank scores zero
-     and gates nothing. */
-  var wantsSales = (TRACK_AXES[a.track] || []).indexOf("sales") > -1;
-
-  /* Finished, not merely started. Read from part_done, which only closePart
-     writes — answers appearing in a column mean she has begun, and 051 made
-     that happen two and a half seconds after her first click. */
-  var fin = (s && s.part_done) || {};
-  var done = {
-    english: !!fin.english,
-    scen:    !!fin.scenarios,
-    detail:  !!fin.detail,
-    sales:   !!fin.sales,
-    written: !!fin.written,
-    typing:  !!fin.typing
-  };
-
-  var left = 0;
-  ["english", "scen", "detail", "written", "typing"].forEach(function (k) {
-    if (!done[k]) left++;
+  C_WEEKS.forEach(function (w) {
+    if (w.status !== "approved") return;
+    var p = placeById[w.placement_id];
+    if (!p) return;
+    var h = cHours(w);
+    if (!h) return;
+    var rate = C_RATE[p.id];
+    if (rate === undefined && !w.trial_week) { missingRate = true; unpriced += h; return; }
+    people[p.application_id] = true;
+    if (w.trial_week) { freeHours += h; } else { hours += h; }
+    byWeek[w.week_starts_on] = byWeek[w.week_starts_on] || [];
+    byWeek[w.week_starts_on].push({
+      id: w.id,
+      who: nameOf[p.application_id] || "your assistant",
+      hours: h,
+      rate: rate,
+      free: !!w.trial_week,
+      settled: !!C_SETTLED[w.id]
+    });
   });
-  if (wantsSales && !done.sales) left++;
 
-  function part(k, n, t, d, isDone, note) {
-    return '<li class="apt' + (isDone ? " is-done" : "") + '">' +
-      '<span class="apt__n">' + (isDone ? "&#10003;" : n) + "</span>" +
-      '<span><span class="apt__t">' + t + "</span>" +
-      '<span class="apt__d">' + d + "</span></span>" +
-      (isDone
-        ? '<span class="apt__s">' + esc(note || "done") + "</span>"
-        : '<button class="btn btn--solid apt__go" data-part="' + k + '" type="button">Start</button>') +
-      "</li>";
-  }
+  /* Sorted as strings, which for an ISO date is the same as sorting by date
+     and does not build 260 Date objects to find out. Newest first, because the
+     week somebody is about to pay for is the one they came to look at. */
+  var order = Object.keys(byWeek).sort().reverse();
+  var grand = 0;
+  var weeks = order.map(function (wk) {
+    var lines = byWeek[wk], total = 0, settled = lines.length > 0;
+    lines.forEach(function (l) {
+      if (!l.free) total += l.hours * l.rate;
+      if (!l.free && !l.settled) settled = false;
+    });
+    grand += total;
+    return { week: wk, lines: lines, total: total, settled: settled };
+  });
+
+  return {
+    weeks: weeks,
+    grand: grand,
+    hours: hours,
+    freeHours: freeHours,
+    people: Object.keys(people).length,
+    oldest: order.length ? order[order.length - 1] : null,
+    unpriced: unpriced,
+    missingRate: missingRate
+  };
+}
+
+/* What has actually been paid, and therefore what is actually left.
+
+   Before sql/055 there was nothing to subtract, so the bill's heading —
+   "Total approved, not yet paid" — was half a guess: the first half was
+   counted and the second half was assumed. A client who paid was told, on
+   their own page, that they still owed it. */
+function cPaidCents() {
+  var t = 0;
+  for (var i = 0; i < C_PAID.length; i++) t += Number(C_PAID[i].amount_cents || 0);
+  return t;
+}
+
+/* In cents throughout, and only converted for display. The approved side is a
+   product of numeric hours and a numeric rate, so it is rounded to the cent
+   once, here, rather than drifting a fraction at a time through a subtraction. */
+function cOwedCents(grand) {
+  return Math.round(Number(grand) * 100) - cPaidCents();
+}
+
+var C_PAY_METHOD = {
+  bank_transfer: "Bank transfer", wise: "Wise", paypal: "PayPal",
+  card: "Card", cheque: "Cheque", cash: "Cash", other: "Other"
+};
+
+
+/* ── the amount ──
+   The one number somebody came here for, and the only place on the site it is
+   rendered large. Everything under it is the working. */
+function dueCard(bill) {
+  var owed = cOwedCents(bill.grand);
+  var paid = cPaidCents();
 
   return '<div class="card">' +
-    '<div class="row__top"><span><span class="row__n">Your assessment</span>' +
-    '<span class="row__meta"> &middot; about an hour, in parts</span></span>' +
-    '<span class="pill pill--assessment">' + (left ? left + " left" : "Ready to send") + "</span></div>" +
-    /* Ordered by what each one costs her, cheapest first, and that is not a
-       tidiness choice. Almost all drop-off happens at the first thing asked —
-       once somebody finishes one part they overwhelmingly finish the rest. So
-       the first part is eight quick questions with nothing to install and
-       nowhere to go, and the one that sends her to another website is last. */
-    '<p class="msg" style="margin:1rem 0">' + (wantsSales ? "Six" : "Five") + " parts, shortest " +
-    "first. You can stop between them and nothing is lost, but once a part is open it is timed &mdash; " +
-    "so start each one when you have a quiet moment.</p>" +
-    '<ol class="apts">' +
-      part("english", 1, "English", QBANK.english.length + " short questions, eight minutes",
-        done.english) +
-      part("scen", 2, "Judgement", SCEN.length + " situations, twenty minutes",
-        done.scen) +
-      part("detail", 3, "Detail", QBANK.detail.length + " things to check, ten minutes",
-        done.detail) +
-      (wantsSales
-        ? part("sales", 4, "Sales", QBANK.sales.length + " questions, eight minutes", done.sales)
-        : "") +
-      part("written", wantsSales ? 5 : 4, "Written reply to a customer",
-        "Twenty minutes, about 150 words", done.written) +
-      part("typing", wantsSales ? 6 : 5, "Typing and your setup",
-        "A test on another site, and a connection check",
-        done.typing, done.typing ? s.typing_wpm + " wpm, we check it" : "") +
-    "</ol>" +
-    (left === 0
-      ? '<button class="btn btn--solid" id="a-send" type="button" style="margin-top:1.2rem">Send my assessment</button>' +
-        '<p class="msg" style="margin-top:.7rem">Once it is sent you cannot change it.</p>'
-      : "") +
-    '<p class="msg msg--bad" id="a-card-err" style="display:none"></p>' +
-    "</div>";
-}
-
-/* ── running a part ───────────────────────────────────────────────────────
-   One at a time, full card, timed. The timer is a deadline rather than a
-   countdown of work done: she can leave the page and the part is still over
-   when it is over, because a clock that pauses when you close the tab is not
-   a clock. What it never does is throw the work away — expiry saves whatever
-   is there and closes the part, so a slow typist loses the rest of the time
-   and not the paragraph she wrote. */
-var SIT = null;          /* her row, once started */
-var APP_ID = null;
-var TICK = null;
-var ENDS = 0;
-
-function fmtLeft(ms) {
-  var s = Math.max(0, Math.round(ms / 1000));
-  return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
-}
-
-function startRow(a) {
-  if (SIT) return Promise.resolve(SIT);
-  return api("application_assessment", {
-    method: "POST",
-    headers: { Prefer: "return=representation" },
-    body: { application_id: a.id, track: (a.tracks && a.tracks[0]) || a.track || "Customer Service" }
-  }).then(function (r) { SIT = (r && r[0]) || {}; return SIT; });
-}
-
-/* Saves one part. Only the four columns a page is granted — a score or a
-   verdict sent from here is refused by the grant, not by good manners. */
-function savePart(patch) {
-  return api("application_assessment?application_id=eq." + APP_ID, {
-    method: "PATCH",
-    body: patch
-  });
-}
-
-/* The second argument is which part is being finished, and it is not
-
-   The list of parts used to decide a part was done by looking at whether its
-   answers column held anything. That was true while answers were only written
-   on this button — and stopped being true the moment 051 started saving them
-   as she goes, because the first answer she picked then marked the whole part
-   finished and took the Start button away. One question of eight, and no way
-   back in.
-
-   So finishing is recorded rather than inferred. sql/054 holds the moment, the
-   same way 051 holds the moment a part was opened, and neither is a guess
-   about the other. */
-function closePart(patch, part, err) {
-  if (TICK) { clearInterval(TICK); TICK = null; }
-  var e = document.getElementById("a-err");
-  return savePart(patch)
-    .then(function () {
-      /* After the answers, not before: a part marked finished whose answers
-         failed to save is the one order that loses her work. */
-      return part ? api("rpc/close_part", { method: "POST", body: { part: part } }) : null;
-    })
-    .then(function () { return loadApplications(); })
-    .catch(function () {
-      if (e) { e.style.display = ""; e.textContent =
-        "That did not save. Check your connection and try the part again."; }
-    });
-}
-
-/* The done button is rendered here rather than passed in by each part. Three
-   callers each emitting their own done-button id is three copies of one id in
-   the page source — never two at once on screen, but the audit reads the
-   source and is right to: an id that exists three times is one rename away
-   from the timer clicking the wrong one.
-
-   And the id is not written out in this comment, because comments ship inside
-   the inline script and the audit found the one in the prose too. */
-/* mins of 0 means there is no clock on this one.
-
-   The typing part used to run here and was timed, because the typing happened
-   here. It happens on another site now, and this part is a form for reporting
-   what it said — putting a five-minute countdown on typing three numbers would
-   be theatre. It still goes through this shell rather than rendering its own
-   card, because the alternative was a second copy of #a-err and #a-done in the
-   source, and the comment below already explains why that is a bad trade. */
-/* ── the deadline, and what happens when it passes ────────────────────────
-
-   Three things were wrong with the clock and they compounded.
-
-   The deadline was set in the browser when a part opened — ENDS = now + mins —
-   so it was fresh every time. Twenty minutes long, right up until somebody
-   closed the tab at nineteen and opened it again, at which point twenty
-   minutes again. The comment above it claimed the opposite.
-
-   The auto-submit at zero only ran while the page was open. Close the tab and
-   the interval died with it, so a part that ran out was not submitted, it was
-   simply never finished — and stayed open forever.
-
-   And answers lived in memory until the Done button, so anything typed before
-   a closed tab was gone regardless.
-
-   sql/051 moved the deadline into the database: open_part() records the moment
-   a part is first opened and refuses to move it afterwards. These three
-   functions are the other half. */
-
-/* Where this part's clock actually started. Asked once, on opening; the answer
-   is the same on the tenth reopen as on the first.
-
-   Fails toward letting her sit the part. If the call does not come back we run
-   the clock from now rather than refusing to open anything — a generous
-   deadline costs a few minutes, a blocked applicant costs the applicant. */
-function openPart(part, mins) {
-  return api("rpc/open_part", { method: "POST", body: { part: part } })
-    .then(function (at) {
-      var t = Date.parse(at);
-      return isNaN(t) ? Date.now() + mins * 60000 : t + mins * 60000;
-    }, function () {
-      return Date.now() + mins * 60000;
-    });
-}
-
-/* Saving as she goes, so an auto-submit is not automatically empty.
-
-   Debounced, because a radio button fires on every pick and eight questions
-   answered quickly is eight writes nobody needs. Flushed immediately when the
-   page is hidden, which is the case this exists for: closing a tab, switching
-   apps on a phone, the screen locking. visibilitychange is the one that
-   actually fires on mobile — pagehide and beforeunload are unreliable there,
-   so both are wired and whichever arrives first wins. */
-var SAVE_T = null;
-var SAVE_PENDING = null;
-
-function saveProgress(column, collect) {
-  SAVE_PENDING = function () {
-    var patch = {};
-    patch[column] = collect();
-    return savePart(patch)["catch"](function () { return null; });
-  };
-  if (SAVE_T) clearTimeout(SAVE_T);
-  SAVE_T = setTimeout(function () {
-    SAVE_T = null;
-    var run = SAVE_PENDING;
-    SAVE_PENDING = null;
-    if (run) run();
-  }, 2500);
-}
-
-function flushProgress() {
-  if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; }
-  var run = SAVE_PENDING;
-  SAVE_PENDING = null;
-  if (run) run();
-}
-
-/* Wired once, not per part, so nothing accumulates listeners as she moves
-   between them. */
-(function () {
-  var go = function () { if (document.visibilityState === "hidden") flushProgress(); };
-  document.addEventListener("visibilitychange", go);
-  window.addEventListener("pagehide", flushProgress);
-})();
-
-/* The second argument is a moment, not a length. It comes from openPart(), which asks the
-   database when this part actually started — so reopening a part does not
-   restart it, which is what "mins" allowed for as long as it was computed
-   here. Pass 0 for a part with no clock. */
-function partShell(title, ends, inner, doneLabel, pill) {
-  ENDS = ends || 0;
-  var mins = ends ? Math.max(0, ends - Date.now()) / 60000 : 0;
-  view('<div class="card">' +
-    '<div class="row__top"><span><span class="row__n">' + title + "</span></span>" +
-    '<span class="pill pill--assessment" id="a-clock">' +
-      (mins ? fmtLeft(mins * 60000) : esc(pill || "no time limit")) + "</span></div>" +
-    inner +
-    '<p class="msg msg--bad" id="a-err" style="display:none"></p>' +
-    '<button class="btn btn--solid" id="a-done" type="button" style="margin-top:1.1rem">' +
-    esc(doneLabel) + "</button></div>");
-  if (!mins) return;
-  TICK = setInterval(function () {
-    var el = document.getElementById("a-clock");
-    if (!el) { clearInterval(TICK); TICK = null; return; }
-    el.textContent = fmtLeft(ENDS - Date.now());
-    if (Date.now() >= ENDS) {
-      clearInterval(TICK); TICK = null;
-      var done = document.getElementById("a-done");
-      if (done) done.click();
-    }
-  }, 500);
-}
-
-/* Where the typing test now happens. It is a link rather than a page of ours,
-   and that is the point: the score arrives with something behind it instead of
-   being whatever a browser said. Change this to whichever test you settle on —
-   pick one whose result has its own address, because the whole value here is
-   that somebody at this end can open the proof and read it. */
-var TYPING_TEST_URL = "https://10fastfingers.com/typing-test/english";
-var TYPING_TEST_NAME = "10FastFingers";
-
-function typingPart() {
-  partShell("Typing and accuracy", 0,
-    '<p class="msg" style="margin:1rem 0">Take the test at ' +
-      '<a href="' + esc(TYPING_TEST_URL) + '" target="_blank" rel="noopener">' +
-      esc(TYPING_TEST_NAME) + "</a>, then come back and tell us what you scored. " +
-      "Accuracy counts for more than speed &mdash; work somebody has to redo is slower " +
-      "than typing slowly.</p>" +
-
-    '<div class="note" style="margin-bottom:1.1rem"><b>We check every one.</b> ' +
-      "Paste a link to your result page, or to a screenshot of it. A score nobody " +
-      "can check is not counted, so this part matters as much as the number.</div>" +
-
-    '<label class="a-lbl" for="a-wpm">Words per minute</label>' +
-    '<input id="a-wpm" type="number" min="0" max="250" step="1" inputmode="numeric" ' +
-      'style="width:100%;margin:.4rem 0 1rem" placeholder="e.g. 58">' +
-
-    '<label class="a-lbl" for="a-acc">Accuracy, as a percentage</label>' +
-    '<input id="a-acc" type="number" min="0" max="100" step="1" inputmode="numeric" ' +
-      'style="width:100%;margin:.4rem 0 1rem" placeholder="e.g. 97">' +
-
-    '<label class="a-lbl" for="a-proof">Link to your result, or to a screenshot of it</label>' +
-    '<input id="a-proof" type="url" maxlength="500" ' +
-      'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://">' +
-    '<p class="msg" style="margin-top:.3rem">Most tests give the result its own address. ' +
-      "If yours does not, put a screenshot in Google Drive or Dropbox and paste a link " +
-      "anyone can open.</p>" +
-
-    /* The connection check. The application form has asked about equipment and
-       internet since 005 as a yes-or-no that nobody could verify, which made
-       it a question rather than a check. This is the one thing the better
-       agencies genuinely do that this process did not. It rides along here
-       because she is already off on another website for the typing test, so it
-       costs one more link rather than one more part. */
-    '<label class="a-lbl" for="a-conn">Link to a speed test of your connection</label>' +
-    '<input id="a-conn" type="url" maxlength="500" ' +
-      'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://">' +
-    '<p class="msg" style="margin-top:.3rem">Run one at speedtest.net and paste the result link. ' +
-      "It takes a minute, and it is what stops somebody starting a client on a connection that " +
-      "cannot hold a call.</p>",
-    "Save this part", "no time limit");
-
-  document.getElementById("a-done").addEventListener("click", function () {
-    var err = document.getElementById("a-err");
-    var wpm = document.getElementById("a-wpm");
-    var acc = document.getElementById("a-acc");
-    var proof = document.getElementById("a-proof");
-    var conn = document.getElementById("a-conn");
-    var fail = function (m, el) {
-      err.style.display = "";
-      err.textContent = m;
-      if (el) el.focus();
-    };
-    err.style.display = "none";
-
-    var w = Number(wpm.value);
-    var a = Number(acc.value);
-    var p = String(proof.value || "").trim();
-    var c = String(conn.value || "").trim();
-
-    if (!wpm.value || !(w >= 0 && w <= 250)) {
-      return fail("Enter your words per minute — the number the test gave you.", wpm);
-    }
-    if (!acc.value || !(a >= 0 && a <= 100)) {
-      return fail("Enter your accuracy as a percentage, between 0 and 100.", acc);
-    }
-    /* Checked before the score saves, so nobody is told to go and find a link
-       after the numbers have already gone. Checked loosely on purpose — what
-       matters is that a person at this end can open it, not that it matches
-       some pattern. */
-    if (!/^https?:\/\/\S+\.\S+/i.test(p)) {
-      return fail("Paste a link we can open — it should start with http.", proof);
-    }
-    if (p.length > 500) {
-      return fail("That link is too long. Use a shorter one.", proof);
-    }
-    if (!/^https?:\/\/\S+\.\S+/i.test(c)) {
-      return fail("Paste a link to your speed test too — speedtest.net gives you one.", conn);
-    }
-    if (c.length > 500) {
-      return fail("That speed test link is too long. Use a shorter one.", conn);
-    }
-
-    closePart({
-      typing_wpm: Math.round(w),
-      typing_accuracy: Math.round(a),
-      typing_proof: p,
-      connection_proof: c
-    }, "typing");
-  });
-}
-
-/* How close what was typed is to the passage, allowing for the typist being a
-   human being.
-
-   This used to compare position against position — typed[i] against
-   TYPE_TEXT[i] — which is only correct while the two strings stay in step, and
-   one dropped or doubled character early on puts them out of step for good.
-   Miss a letter at position fifty and the remaining two hundred and eighty
-   comparisons all fail: accuracy came out around fifteen per cent, and
-   anything under ninety-five drops the score into a branch that caps it at
-   four, which is below the pass mark on every track. So the arithmetic
-   rejected good typists for one typo, silently, and told them they were slow.
-   The denominator was wrong too — typed.length, so three correct characters
-   and nothing else scored a hundred per cent.
-
-   An edit distance against the best-matching PREFIX of the passage answers the
-   question actually being asked: of what she typed, how much is right, whether
-   or not she finished. One missed letter in three hundred and thirty now costs
-   what one missed letter should. */
-function typingAccuracy(typed) {
-  var n = typed.length;
-  if (!n) return 0;
-  var m = TYPE_TEXT.length;
-
-  /* One row at a time: the passage is short, but there is no reason to hold a
-     330 x 330 grid to read back a single number. */
-  var prev = new Array(m + 1);
-  var cur = new Array(m + 1);
-  for (var j = 0; j <= m; j++) prev[j] = j;
-
-  for (var i = 1; i <= n; i++) {
-    cur[0] = i;
-    for (var k = 1; k <= m; k++) {
-      var cost = typed.charAt(i - 1) === TYPE_TEXT.charAt(k - 1) ? 0 : 1;
-      cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + cost);
-    }
-    for (var c = 0; c <= m; c++) prev[c] = cur[c];
-  }
-
-  /* The best prefix, not the whole passage: stopping early is a matter for the
-     speed, not for whether the words are right. */
-  var best = prev[0];
-  for (var q = 1; q <= m; q++) if (prev[q] < best) best = prev[q];
-
-  var acc = Math.round(((n - best) / n) * 100);
-  return Math.max(0, Math.min(100, acc));
-}
-
-function writtenPart() {
-  openPart("written", 20).then(function (ends) {
-    /* Same rule as the question banks: the clock started when she first opened
-       this, not when she last opened it, and a part whose time has gone is
-       closed with what she had rather than handed back for another twenty
-       minutes. */
-    if (Date.now() >= ends) {
-      var e = document.getElementById("a-card-err");
-      if (e) {
-        e.style.display = "";
-        e.textContent = "That part's time had run out, so it has been closed with what you had written.";
-      }
-      closePart({ written_reply: (SIT && SIT.written_reply) || "" }, "written");
-      return;
-    }
-    drawWritten(ends);
-  });
-
-  function drawWritten(ends) {
-  partShell("Written reply to a customer", ends,
-    '<p class="msg" style="margin:1rem 0"><b>A customer writes:</b> &ldquo;I ordered two weeks ago ' +
-    "and nothing has arrived. Nobody has answered my last two emails. I want a refund and I want " +
-    "to know why this happened.&rdquo;</p>" +
-    '<p class="msg">Write the reply you would send. About 150 words. You do not have the order ' +
-    "in front of you &mdash; part of what is being read is what you do about that.</p>" +
-    '<div class="note" style="margin:1rem 0"><b>Write it yourself.</b> Pasting is turned off ' +
-    "on this part. We ask about your answers in the interview.</div>" +
-    '<label class="a-lbl" for="a-write">Your reply to the customer</label>' +
-    '<textarea id="a-write" rows="11" placeholder="Your reply" style="width:100%;margin-top:1rem"></textarea>' +
-    '<p class="msg" id="a-count" style="margin-top:.5rem">0 words</p>',
-    "Done writing");
-
-  var box = document.getElementById("a-write");
-  var count = document.getElementById("a-count");
-
-  /* Same as the question banks: what she has already written is put back, or
-     reopening the part and finishing it would save an empty reply over twenty
-     minutes of work. */
-  if (SIT && SIT.written_reply) {
-    box.value = SIT.written_reply;
-    var w0 = box.value.trim() ? box.value.trim().split(/\s+/).length : 0;
-    count.textContent = w0 + " words";
-  }
-  box.addEventListener("input", function () {
-    var n = box.value.trim() ? box.value.trim().split(/\s+/).length : 0;
-    count.textContent = n + " words";
-    /* Saved as she writes, on the same debounce as the question banks. This is
-       the part where losing the work would hurt most — twenty minutes of
-       writing against a tab that closed. */
-    saveProgress("written_reply", function () { return box.value.slice(0, 8000); });
-  });
-  /* Pasting is off here, and this is the part where it matters most.
-
-     The written reply is a work sample — a piece of the real job, marked by a
-     person — and since 049 it decides half of the english axis. It is also the
-     one part of this assessment a chatbot can simply write.
-
-     A guard like this existed once, on the typing test that used to run on
-     this page, and went with it when the typing moved to another site. The
-     written reply never had one at all, which was the wrong way round: nobody
-     needs to paste into a typing test to cheat it, and pasting is the whole
-     method here.
-
-     Worth being honest about what this is: a speed bump, not a wall. Somebody
-     can read an answer off a second screen and type it. That is why the real
-     defence is the interviewer asking her about two of her own answers, and
-     why this is only the cheap half of it. */
-  ["paste", "drop"].forEach(function (ev) {
-    box.addEventListener(ev, function (e) {
-      e.preventDefault();
-      var w = document.getElementById("a-err");
-      if (w) {
-        w.style.display = "";
-        w.textContent = "Write this one yourself — pasting is turned off.";
-      }
-    });
-  });
-
-  box.focus();
-
-  document.getElementById("a-done").addEventListener("click", function () {
-    if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; SAVE_PENDING = null; }
-    closePart({ written_reply: box.value.slice(0, 8000) }, "written");
-  });
-  }
-}
-
-/* One renderer, four banks.
-
-   This was scenPart(), and it was the only bank there was. English, detail and
-   sales are the same shape down to the last detail — a prompt, four options,
-   pick one — so they are the same function rather than three copies that drift
-   apart the first time somebody fixes a bug in one of them.
-
-   Everything specific to a bank is an argument: which questions, what the card
-   is called, how long it runs, which column the answers land in, and the line
-   of explanation above them. */
-function bankPart(key, title, mins, column, intro) {
-  var bank = QBANK[key] || [];
-
-  /* What she has picked so far, as positions. Read out of the page rather than
-     kept in a variable, so the autosave and the Done button can never disagree
-     about what is on screen. */
-  var collect = function () {
-    var out = [];
-    for (var i = 0; i < bank.length; i++) {
-      var hit = document.querySelector('input[name="q' + i + '"]:checked');
-      out.push({ p: hit ? Number(hit.value) : null });
-    }
-    return out;
-  };
-
-  openPart(key, mins).then(function (ends) {
-    /* The clock ran out while she was away. Nothing to show her and nothing to
-       decide — whatever was saved as she went is what the part is worth, and
-       the part is over. Closing it rather than reopening it is the difference
-       between a deadline and a suggestion. */
-    if (Date.now() >= ends) {
-      var e = document.getElementById("a-card-err");
-      if (e) {
-        e.style.display = "";
-        e.textContent = "That part's time had run out, so it has been closed with the answers you had.";
-      }
-      var patch = {};
-      patch[column] = (SIT && SIT[column]) || [];
-      /* Through closePart so the part is recorded as finished. Saving alone
-         would leave it open, and a part whose time has gone would offer its
-         Start button again every time she came back to the page. */
-      closePart(patch, key);
-      return;
-    }
-    drawBank(ends);
-  });
-
-  function drawBank(ends) {
-  var qs = bank.map(function (s, i) {
-    var opts = s[1].map(function (o, j) {
-      return '<label class="a-opt"><input type="radio" name="q' + i + '" value="' + j + '"> ' +
-        "<span>" + esc(o) + "</span></label>";
-    }).join("");
-    return '<li class="a-q"><p class="a-q__p">' + esc(s[0]) + "</p>" +
-      '<div class="a-opts">' + opts + "</div></li>";
-  }).join("");
-
-  partShell(title, ends,
-    '<p class="msg" style="margin:1rem 0">' + intro + "</p>" +
-    '<ol class="a-qs">' + qs + "</ol>", "Done");
-
-  /* Put back what she already answered.
-
-     Since 051 the answers save as she goes, so a part she opened, answered
-     three of and walked away from has three answers stored. The questions were
-     redrawn blank, and collect() reads the screen — so finishing the part
-     wrote nulls over every one of them. She would have had to answer them
-     twice and would never have been told why.
-
-     Found by reopening a part and counting: four answered, three saved. */
-  var prior = (SIT && SIT[column]) || [];
-  for (var pi = 0; pi < prior.length; pi++) {
-    var was = prior[pi] && prior[pi].p;
-    if (was === null || was === undefined) continue;
-    var hit = document.querySelector('input[name="q' + pi + '"][value="' + was + '"]');
-    if (hit) hit.checked = true;
-  }
-
-  /* Every pick is saved, quietly, a couple of seconds later. So the clock
-     running out while the tab is shut costs her the questions she had not
-     reached rather than all of them. */
-  var card = document.querySelector(".card");
-  if (card) {
-    card.addEventListener("change", function (ev) {
-      if (!ev.target || ev.target.type !== "radio") return;
-      saveProgress(column, collect);
-    });
-  }
-
-  document.getElementById("a-done").addEventListener("click", function () {
-    /* Positions, never letters and never scores. The database holds the key
-       and decides what each position was worth. */
-    if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; SAVE_PENDING = null; }
-    var patch = {};
-    patch[column] = collect();
-    closePart(patch, key);
-  });
-  }
-}
-
-function scenPart() {
-  bankPart("scenarios", "Judgement scenarios", 20, "scenario_answers",
-    QBANK.scenarios.length + " situations. Pick what you would actually do. More than one " +
-    "answer is reasonable in some of them &mdash; pick the best one.");
-}
-
-function englishPart() {
-  bankPart("english", "English", 8, "english_answers",
-    "Eight short ones. Each is a line you might really send a customer &mdash; pick the version " +
-    "you would send.");
-}
-
-function detailPart() {
-  bankPart("detail", "Detail", 10, "detail_answers",
-    "Eight small records, each with one thing wrong in it. Some of them are odd but perfectly " +
-    "fine, so read before you flag.");
-}
-
-function salesPart() {
-  bankPart("sales", "Sales", 8, "sales_answers",
-    "Eight people who have not bought anything yet. Pick what you would actually do next.");
-}
-
-function wireAssess(a) {
-  APP_ID = a.id;
-  SIT = a.sit;
-  var go = document.querySelectorAll(".apt__go");
-  for (var i = 0; i < go.length; i++) {
-    go[i].addEventListener("click", function (ev) {
-      var which = ev.currentTarget.getAttribute("data-part");
-      startRow(a).then(function () {
-        if (which === "typing") typingPart();
-        else if (which === "written") writtenPart();
-        else if (which === "english") englishPart();
-        else if (which === "detail") detailPart();
-        else if (which === "sales") salesPart();
-        else scenPart();
-      }).catch(function () {
-        var e = document.getElementById("a-card-err");
-        if (e) { e.style.display = ""; e.textContent =
-          "We could not open that just now. Try again in a moment."; }
-      });
-    });
-  }
-
-  var send = document.getElementById("a-send");
-  if (send) send.addEventListener("click", function () {
-    send.disabled = true;
-    send.textContent = "Sending\u2026";
-    /* submitted_at is not ours to write — the grant excludes it, and the
-       trigger stamps it. This asks the database to close the row by sending
-       the one thing a page may send that means "finished". */
-    api("rpc/submit_assessment", { method: "POST", body: {} })
-      .then(function () { loadApplications(); })
-      .catch(function () {
-        send.disabled = false;
-        send.textContent = "Send my assessment";
-        var e = document.getElementById("a-card-err");
-        if (e) { e.style.display = ""; e.textContent =
-          "That did not send. Try again in a moment."; }
-      });
-  });
-}
-
-function stages(app) {
-  var at = stageIndex(app.status);
-  var out = "";
-  for (var i = 0; i < STAGES.length; i++) {
-    var s = STAGES[i];
-    var done = at > i || app.status === "approved" && i <= at;
-    var now  = at === i;
-    var cls  = done && !now ? "is-done" : now ? "is-now is-done" : "";
-    out +=
-      '<li class="' + cls + '">' +
-        '<span class="stg__dot">' + (done && !now ? "&#10003;" : String(i + 1)) + "</span>" +
-        "<span>" +
-          '<span class="stg__t">' + s[1] + "</span>" +
-          '<span class="stg__d">' + s[2] + "</span>" +
-          (now ? '<span class="stg__badge">You are here</span>' : "") +
-        "</span>" +
-      "</li>";
-  }
-  return '<ol class="stg">' + out + "</ol>";
-}
-
-var EDIT_FIELDS = [
-  ["phone",        "WhatsApp or phone", "tel"],
-  ["cv",           "Link to your CV",   "url"],
-  ["region",       "State or region",   "text"],
-  ["availability", "Hours you can work", "text"]
-];
-
-function editForm(a) {
-  var skills = SKILLS.map(function (k) {
-    var opts = SKILL_LEVELS.map(function (l) {
-      if (l === "fluent" && k[0] !== "skill_english") return "";
-      return '<option value="' + l + '"' + (a[k[0]] === l ? " selected" : "") + ">" +
-             SKILL_LEVEL_LABEL[l] + "</option>";
-    }).filter(Boolean).join("");
-    return '<div class="fld"><label for="e-' + k[0] + '">' + esc(k[1]) + "</label>" +
-           '<select id="e-' + k[0] + '"><option value="">Not answered</option>' + opts + "</select></div>";
-  }).join("");
-
-  /* Eleven controls in one flat column, with the equipment tick and the button
-     sharing a line and overlapping each other on a narrow window — the tick's
-     label ran underneath "Save changes" and could not be read.
-
-     Grouped instead, in the order somebody thinks about their own application:
-     how we reach them, when they can work, then how they rate themselves. The
-     five ratings sit two to a row on anything wide enough, which takes the
-     page from eleven stacked fields to something a person can see the end of.
-
-     Every id is unchanged. wireEdit() reads them by id, and quietly renaming
-     one here would stop that field saving with nothing to show for it. */
-  var reach = EDIT_FIELDS.filter(function (f) { return f[0] === "phone" || f[0] === "cv"; });
-  var when = EDIT_FIELDS.filter(function (f) { return f[0] !== "phone" && f[0] !== "cv"; });
-  var field = function (f) {
-    return '<div class="fld"><label for="e-' + f[0] + '">' + esc(f[1]) + "</label>" +
-           '<input id="e-' + f[0] + '" type="' + f[2] + '" value="' + esc(a[f[0]] || "") + '"></div>';
-  };
-
-  return (
-    '<div class="card">' +
-      '<h2 class="edit__h">Keep this up to date</h2>' +
-      '<p class="msg" style="margin-top:0">A better phone number or a newer CV helps us reach you. Changes save straight away.</p>' +
-
-      '<p class="edit__sec">How we reach you</p>' +
-      '<div class="edit__grid">' + reach.map(field).join("") + "</div>" +
-
-      '<p class="edit__sec">Where and when you work</p>' +
-      '<div class="edit__grid">' + when.map(field).join("") + "</div>" +
-      '<div class="fld"><label for="e-note">Anything we should know?</label>' +
-        '<textarea id="e-note" rows="3">' + esc(a.note || "") + "</textarea></div>" +
-
-      '<p class="edit__sec">How you rate yourself</p>' +
-      '<div class="edit__grid">' + skills + "</div>" +
-
-      '<div class="edit__foot">' +
-        '<label class="chk"><input type="checkbox" id="e-kit"' +
-          (a.has_equipment ? " checked" : "") + "> I have my own computer and internet</label>" +
-        '<span class="edit__act">' +
-          '<span class="row__ok" id="e-ok">Saved</span>' +
-          '<button class="btn btn--solid" id="e-save" type="button">Save changes</button>' +
-        "</span>" +
+    "<h2>Due now</h2>" +
+    '<p class="msg" style="margin-top:0">Hours you have approved that we have not been paid for.</p>' +
+    '<div class="due">' +
+      "<div>" +
+        '<div class="due__amt">' + esc(cCents(owed < 0 ? 0 : owed)) + "</div>" +
+        '<div class="due__sub">' +
+          (bill.weeks.length
+            ? esc(String(bill.people)) + (bill.people === 1 ? " assistant" : " assistants") +
+              " &middot; " + esc(String(bill.weeks.length)) +
+              (bill.weeks.length === 1 ? " week approved" : " weeks approved")
+            : "Nothing approved yet") +
+        "</div>" +
       "</div>" +
-    "</div>"
-  );
+      '<div class="due__meta">' +
+        (bill.oldest
+          ? "<div>" +
+              '<span class="due__k">Oldest week</span>' +
+              '<span class="due__v">' + esc(cWeekLabel(bill.oldest).split(" to ")[0]) + "</span>" +
+            "</div>"
+          : "") +
+        "<div>" +
+          '<span class="due__k">Hours</span>' +
+          '<span class="due__v">' + esc(cNum(bill.hours)) + "</span>" +
+        "</div>" +
+        (bill.freeHours
+          ? "<div>" +
+              '<span class="due__k">Covered by us</span>' +
+              '<span class="due__v">' + esc(cNum(bill.freeHours)) + " h</span>" +
+            "</div>"
+          : "") +
+        (paid
+          ? "<div>" +
+              '<span class="due__k">Paid so far</span>' +
+              '<span class="due__v">' + esc(cCents(paid)) + "</span>" +
+            "</div>"
+          : "") +
+      "</div>" +
+    "</div>" +
+    (bill.missingRate
+      ? '<div class="note note--warn"><b>' + esc(cNum(bill.unpriced)) +
+        " hours are not priced yet.</b> They are approved and recorded, and they are not in the " +
+        "figure above. We are finishing your rate &mdash; write to " +
+        '<a href="mailto:support@securejobva.com">support@securejobva.com</a> if it is not sorted within a day.</div>'
+      : "") +
+    (owed < 0
+      ? '<div class="note"><b>You are ' + esc(cCents(-owed)) + " ahead.</b> " +
+        "That sits against the weeks still to come, so there is nothing to pay right now.</div>"
+      : "") +
+  "</div>";
 }
 
-function wireEdit(a) {
-  var btn = document.getElementById("e-save");
-  if (!btn) return;
-  btn.addEventListener("click", function () {
-    var ok = document.getElementById("e-ok");
-    var body = {};
-    EDIT_FIELDS.forEach(function (f) {
-      body[f[0]] = document.getElementById("e-" + f[0]).value.trim() || null;
-    });
-    body.note = document.getElementById("e-note").value.trim() || null;
-    body.has_equipment = document.getElementById("e-kit").checked;
-    SKILLS.forEach(function (k) {
-      body[k[0]] = document.getElementById("e-" + k[0]).value || null;
-    });
-
-    btn.disabled = true;
-    api("applications?id=eq." + encodeURIComponent(a.id), {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: body
-    }).then(function () {
-      Object.keys(body).forEach(function (k) { a[k] = body[k]; });
-      ok.textContent = "Saved";
-      ok.classList.add("is-on");
-      setTimeout(function () { ok.classList.remove("is-on"); }, 1800);
-    }).catch(function (e) {
-      ok.textContent = String(e.message) === "signed out" ? "Signed out" : "Did not save";
-      ok.classList.add("is-on");
-    }).then(function () { btn.disabled = false; });
-  });
+/* ── how to pay ──
+   Two of these three do not work yet and say so in as many words. Listing them
+   greyed out rather than leaving them off is the honest version: a client
+   asking "can I put this on a card" gets an answer here instead of an email. */
+function payCard() {
+  return '<div class="card">' +
+    "<h2>How to pay</h2>" +
+    '<p class="msg" style="margin-top:0">Weekly, against the hours you have already approved.</p>' +
+    '<div class="pm">' +
+      '<div class="pm__row">' +
+        '<span class="pm__mk">&#127974;</span>' +
+        "<span>" +
+          '<span class="pm__t">Bank transfer</span>' +
+          '<span class="pm__d">The way you agreed on your call. We send the details with each ' +
+            "week&rsquo;s summary, and a transfer shows up here once we have seen it land.</span>" +
+        "</span>" +
+        '<span class="tag tag--now">How it works today</span>' +
+      "</div>" +
+      '<div class="pm__row pm__row--off">' +
+        '<span class="pm__mk">&#128179;</span>' +
+        "<span>" +
+          '<span class="pm__t">Card</span>' +
+          '<span class="pm__d">Pay the figure above in one press, or leave a card on file and ' +
+            "let each approved week charge itself.</span>" +
+        "</span>" +
+        '<span class="tag">Not switched on</span>' +
+      "</div>" +
+      '<div class="pm__row pm__row--off">' +
+        '<span class="pm__mk">&#127974;</span>' +
+        "<span>" +
+          '<span class="pm__t">Direct debit</span>' +
+          '<span class="pm__d">Lower fees than a card on a weekly bill this size, and worth ' +
+            "having for a client who stays.</span>" +
+        "</span>" +
+        '<span class="tag">Not switched on</span>' +
+      "</div>" +
+    "</div>" +
+    '<div class="gap">' +
+      '<p class="gap__h">Why there is no Pay button here</p>' +
+      '<p class="gap__p">A button that says <b>Pay</b> and does nothing is worse than no button: ' +
+        "somebody presses it, believes the money moved, and stops chasing the invoice. The shape " +
+        "of this panel is the payment provider&rsquo;s decision too &mdash; a hosted page redirects " +
+        "away, an embedded form wants its own container &mdash; so the button arrives with the " +
+        "provider rather than before it. Everything around it is ready for the day it does.</p>" +
+    "</div>" +
+  "</div>";
 }
 
-function render(user, apps) {
-  var initial = (user.email || "?").charAt(0).toUpperCase();
+/* ── the breakdown ──
+   The same rows /seats itemises, drawn the same way. A client who reads both
+   pages must not have to work out whether they are looking at the same money. */
+function weeksCard(bill) {
+  if (!bill.weeks.length) {
+    return '<div class="card"><h2>What you are paying for</h2>' +
+      '<div class="note"><b>Nothing approved yet.</b> A week appears here once you have ' +
+      "approved it on your seats page. Until then there is nothing to pay.</div></div>";
+  }
+
+  var rows = bill.weeks.map(function (wk) {
+    var body = wk.lines.map(function (l) {
+      return '<div class="bill__ln">' +
+        '<span class="bill__who">' + esc(l.who) + "</span>" +
+        '<span class="bill__h">' + esc(cNum(l.hours)) + " h" +
+          (l.free ? "" : " &times; " + esc(cMoney(l.rate))) + "</span>" +
+        '<span class="bill__amt' + (l.free ? " bill__free" : "") + '">' +
+          (l.free ? "free &mdash; trial" : esc(cMoney(l.hours * l.rate))) + "</span>" +
+      "</div>";
+    }).join("");
+    return '<div class="bill__wk">' +
+      '<div class="bill__wkh"><span class="bill__wkn">Week of ' + esc(cWeekLabel(wk.week)) + "</span>" +
+      (wk.settled && wk.total ? '<span class="bill__paid">paid</span>' : "") +
+      '<span class="bill__wkt">' + esc(cMoney(wk.total)) + "</span></div>" +
+      body +
+    "</div>";
+  }).join("");
+
+  var paid = cPaidCents();
+
+  return '<div class="card">' +
+    "<h2>What you are paying for</h2>" +
+    '<p class="msg" style="margin-top:0">Every assistant, week by week. Trial weeks are ours to cover.</p>' +
+    '<div class="bill">' + rows + "</div>" +
+    (paid
+      ? '<div class="bill__tot bill__tot--sub"><span class="bill__totl">Total approved</span>' +
+        '<span class="bill__totv">' + esc(cMoney(bill.grand)) + "</span></div>" +
+        '<div class="bill__tot bill__tot--sub"><span class="bill__totl">Paid</span>' +
+        '<span class="bill__totv bill__totv--paid">&minus;&nbsp;' + esc(cCents(paid)) + "</span></div>"
+      : "") +
+    '<div class="bill__tot"><span class="bill__totl">' +
+      (paid ? "Left to pay" : "Total approved, not yet paid") + "</span>" +
+    '<span class="bill__totv">' + esc(cCents(cOwedCents(bill.grand))) + "</span></div>" +
+    (C_TRUNCATED
+      ? '<p class="msg">This covers the most recent ' + C_WEEK_LIMIT +
+        " weeks on file. Write to support for anything older.</p>"
+      : "") +
+  "</div>";
+}
+
+/* ── the receipts ──
+   Empty is a real answer here and is worded as one. Before sql/055 this panel
+   could not exist at all: there was nowhere to write a payment down, so a
+   client who had paid saw the same page as one who had not. */
+function receiptsCard() {
+  return '<div class="card">' +
+    "<h2>Payments received</h2>" +
+    '<p class="msg" style="margin-top:0">Every payment we have recorded against your account.</p>' +
+    (C_PAID.length
+      ? '<div class="pays" style="border-top:0;padding-top:.4rem">' +
+          C_PAID.map(function (p) {
+            return '<div class="pays__r">' +
+              '<span class="pays__d">' + esc(when(p.paid_on)) + "</span>" +
+              '<span class="pays__m">' + esc(C_PAY_METHOD[p.method] || p.method) +
+                (p.reference ? " &middot; " + esc(p.reference) : "") + "</span>" +
+              '<span class="pays__a">' + esc(cCents(p.amount_cents)) + "</span>" +
+            "</div>";
+          }).join("") +
+        "</div>"
+      : '<div class="note"><b>Nothing recorded yet.</b> A transfer appears here once we have ' +
+        "seen it land &mdash; usually the same day, occasionally the next. If you have paid and " +
+        "it is still not here after two working days, write to " +
+        '<a href="mailto:support@securejobva.com">support@securejobva.com</a> and we will find it.</div>') +
+  "</div>";
+}
+
+function render(email) {
+  var initial = (email || "?").charAt(0).toUpperCase();
+  lead.textContent = "Signed in as " + email + ".";
+
   var who =
     '<div class="who">' +
-      '<div class="who__id">' +
-        '<span class="who__av">' + esc(initial) + "</span>" +
-        '<span class="who__t">' +
-          '<span class="who__n">' + esc(user.name || "Signed in") + "</span>" +
-          '<span class="who__e">' + esc(user.email) + "</span>" +
-        "</span>" +
-      "</div>" +
-      '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
+      '<div class="who__id"><span class="who__av">' + esc(initial) + "</span>" +
+      '<span class="who__t"><span class="who__n">' + esc(C_COMPANY || "Your account") + "</span>" +
+      '<span class="who__e">' + esc(email) + "</span></span></div>" +
+      '<span style="display:flex;gap:.5rem">' +
+        '<a class="btn btn--ghost" href="/seats" style="padding:.5rem .9rem;font-size:.88rem">Back to your seats</a>' +
+        '<button class="btn btn--ghost" id="out" type="button" style="padding:.5rem .9rem;font-size:.88rem">Sign out</button>' +
+      "</span>" +
     "</div>";
 
-  if (!apps.length && !STAFF && !BUSINESS) {
-    /* No role, no application: they are new. Ask before showing them an
-       empty page that explains nothing. */
-    lead.textContent = "Signed in as " + user.email + ".";
-    view(who + typeChooser());
-    document.getElementById("out").addEventListener("click", signOut);
-    return;
-  }
-
-  if (!apps.length && BUSINESS) {
-    location.replace("/seats");
-    return;
-  }
-
-  if (!apps.length) {
-    lead.textContent = "Signed in as " + user.email + ".";
-    view(who + staffBanner() +
+  /* No placement means no bill, and saying so plainly beats four empty cards.
+     A business that has asked for a seat but has nobody working yet is an
+     ordinary state, not a fault. */
+  if (!C_PLACE.length) {
+    view(who +
       '<div class="card">' +
-        (STAFF
-          ? '<div class="note"><b>Nothing here under your address.</b> ' +
-            "This page shows your own application, and staff usually do not have one.</div>"
-          : '<div class="note note--warn"><b>No application found for this address.</b> ' +
-            "If you applied with a different email, sign out and use that one. " +
-            "If you have not applied yet, the form is on the careers page.</div>" +
-            '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/careers">Go to the careers page</a></p>') +
+        '<div class="note"><b>Nothing to pay yet.</b> This page fills in once somebody is ' +
+        "working for you and you have approved their first week. Until then there is no bill " +
+        "and nothing here to settle.</div>" +
+        '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/seats">See where your seat has got to</a></p>' +
       "</div>");
     document.getElementById("out").addEventListener("click", signOut);
     return;
   }
 
-  lead.textContent = "Signed in as " + user.email + ".";
-  var html = who + staffBanner();
-
-  for (var i = 0; i < apps.length; i++) {
-    var a = apps[i];
-    var declined = a.status === "declined";
-    html +=
-      '<div class="card">' +
-        '<div class="row__top">' +
-          "<span>" +
-            '<span class="row__n">' + esc((a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "Application") + "</span>" +
-            '<span class="row__meta"> &middot; sent ' + esc(when(a.created_at)) + "</span>" +
-          "</span>" +
-          '<span class="pill pill--' + esc(a.status) + '">' + esc(LABEL[a.status] || a.status) + "</span>" +
-        "</div>" +
-        (declined
-          ? '<div class="note note--warn" style="margin-top:1.2rem"><b>This application was not taken forward.</b> ' +
-            "You are welcome to apply again — tell us what has changed since.</div>"
-          : stages(a)) +
-        '<ul class="meta">' +
-          "<li><b>Shifts you offered</b><span>" + esc((a.shifts || []).join(", ") || "—") + "</span></li>" +
-          "<li><b>Experience</b><span>" + esc(a.experience || "—") + "</span></li>" +
-          "<li><b>Based in</b><span>" + esc(a.country || "—") + "</span></li>" +
-          "<li><b>Last updated</b><span>" + esc(when(a.status_changed_at) || when(a.created_at)) + "</span></li>" +
-        "</ul>" +
-        docList(a.docs) +
-      "</div>";
-
-    /* After the card rather than inside it: the assessment is a thing to do,
-       not a detail of the application, and burying a timed task under the
-       shift list is how it goes unnoticed for three days. */
-    html += assessCard(a, a.sit);
-  }
-
-  /* Only the first application is editable. Someone with two open
-     applications is rare enough that quietly editing the wrong one would be
-     worse than making them ask. */
-  html += editForm(apps[0]);
-  html += '<p class="msg">Name and email are fixed here &mdash; they are on your ID check. ' +
-          "Tell us in a reply if either needs changing.</p>";
-  view(html);
-  /* After view(), because the buttons do not exist until the markup is in the
-     document. Wired for the first application only, which is the same one
-     editForm() takes and for the same reason. */
-  wireAssess(apps[0]);
+  var bill = cBill();
+  view(who + dueCard(bill) + payCard() + weeksCard(bill) + receiptsCard() +
+    '<p class="msg" style="text-align:center">A figure here look wrong? Reply to the email we ' +
+    'sent you, or write to <a href="mailto:support@securejobva.com">support@securejobva.com</a>.</p>');
   document.getElementById("out").addEventListener("click", signOut);
-  root.addEventListener("click", function (e) {
-    var d = e.target.closest("[data-doc]");
-    if (d) openDoc(d);
-  });
-  wireEdit(apps[0]);
 }
 
 function start() {
@@ -2515,173 +2005,54 @@ function start() {
   if (!session()) { signedOut(err); return; }
 
   var claims = readToken(session().access_token);
-  if (!claims || !claims.email) { clearSession(); signedOut("That sign-in did not carry an email address."); return; }
-  view('<div class="card"><span class="spin"></span>Looking up your application&hellip;</div>');
+  if (!claims || !claims.email) {
+    clearSession();
+    signedOut("That sign-in did not carry an email address.");
+    return;
+  }
 
-  /* Everyone signs in through the same link, so a staff member lands here
-     first. Rather than showing them an empty applicant view, ask what they
-     can do and point them at the right page. They may also be an applicant,
-     so this offers rather than redirects. */
+  view('<div class="card"><span class="spin"></span>Working out what you owe&hellip;</div>');
+
   Promise.all([
-    api("rpc/my_permissions", { method: "POST", body: {} }).catch(function () { return []; }),
-    api("rpc/my_account_requests", { method: "POST", body: {} }).catch(function () { return []; })
+    api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week," +
+        "trial_weeks&order=started_on.desc.nullslast"),
+    api("placement_billing?select=placement_id,rate"),
+    api("timesheets?select=id,placement_id,week_starts_on,status,trial_week," +
+        "timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=" + C_WEEK_LIMIT),
+    api("application_public?select=application_id,name"),
+    /* Both wrapped, because a database without 055 pasted should show this
+       page with an empty receipts panel rather than an error. The figure above
+       it is then the old one, which is exactly what it was before. */
+    api("client_payments?select=id,amount_cents,paid_on,method,reference&order=paid_on.desc")
+      .catch(function () { return []; }),
+    api("client_payment_weeks?select=timesheet_id")
+      .catch(function () { return []; }),
+    /* Only for the name in the corner. A client matched by hand has no seat
+       request at all, so this coming back empty is ordinary. */
+    api("seat_requests?select=company&order=created_at.desc&limit=1")
+      .catch(function () { return []; })
   ]).then(function (r) {
-    var perms = r[0] || [];
-    STAFF = perms.indexOf("applications.view_all") > -1;
-    BUSINESS = perms.indexOf("seats.view") > -1;
-    REQUESTS = r[1] || [];
-    loadApplications();
+    C_PLACE = r[0] || [];
+    C_RATE = {};
+    (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
+    C_WEEKS = r[2] || [];
+    C_TRUNCATED = C_WEEKS.length >= C_WEEK_LIMIT;
+    C_NAMES = r[3] || [];
+    C_PAID = r[4] || [];
+    C_SETTLED = {};
+    (r[5] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
+    C_COMPANY = (r[6] && r[6][0] && r[6][0].company) || "";
+    render(claims.email);
+  }).catch(function (e) {
+    if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
+    view('<div class="card"><p class="msg msg--bad">We could not work out your bill just now. ' +
+         "Refresh, or try again in a minute.</p>" +
+         '<button class="btn btn--ghost" id="out-error" type="button" style="margin-top:1.1rem">Sign out</button></div>');
+    document.getElementById("out-error").addEventListener("click", signOut);
   });
 }
 
-var STAFF = false;
-var BUSINESS = false;
-var REQUESTS = [];
-
-/* Somebody who has just signed up holds nothing, so every page is empty and
-   none of them says why. Ask them once.
-
-   What they pick is a request, not a grant: choosing "Business" from a menu
-   cannot be the only thing standing between a stranger and other people's
-   data. A person approves it. */
-function typeChooser() {
-  var pending = REQUESTS.filter(function (r) { return r.state === "pending"; })[0];
-  if (pending) {
-    return (
-      '<div class="card">' +
-        '<div class="note"><b>Waiting on us.</b> You asked for a ' +
-        esc(pending.requested_role) + " account. Somebody reviews these by hand, " +
-        "usually within a working day, and you will get an email either way.</div>" +
-      "</div>"
-    );
-  }
-
-  var declined = REQUESTS.filter(function (r) { return r.state === "declined"; })[0];
-
-  /* Two, not three. "I work at SecureJobVA" used to sit here and it should not
-     have: staff is not a thing anybody asks for, it is a thing an administrator
-     grants under Accounts. Offering it invited every applicant who saw the page
-     to tick it, and every one of those is a request somebody then has to read
-     and refuse.
-
-     Nothing is lost by taking it away. It never granted anything — it only ever
-     created a request — and the granting path in /admin is untouched. */
-  var TYPES = [
-    ["applicant", "I am looking for work",
-     "An employee seat. See your application and how far along it is."],
-    ["business", "I am hiring",
-     "An employer account. See the seats you have asked us for."]
-  ];
-
-  var tick = '<span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" ' +
-    'fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" ' +
-    'stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>';
-
-  return (
-    '<div class="card">' +
-      '<h2 class="edit__h">What brings you here?</h2>' +
-      '<p class="msg" style="margin-top:0">There is nothing under this address yet. ' +
-      "Whichever of these you are, the next step is a form &mdash; it is the form that " +
-      "creates your place here." +
-      (declined ? " Your last request was not approved &mdash; you are welcome to apply again." : "") +
-      "</p>" +
-
-      /* This used to file a request for an account and stop there: "Waiting on
-         us", and no way forward. Nothing was waiting on us. Both pages find
-         your row by the address you are signed in with — the policies match on
-         email, not on a role — so an account was never the thing standing
-         between somebody and their own page. The form was.
-
-         So each choice goes to the form it means. Applying is what creates an
-         application; asking for a seat is what creates a seat. The account
-         follows from the row, which is how it already worked. */
-      '<div class="opts opts--stack" style="margin-top:1rem">' +
-        '<a class="opt" href="/careers#apply">' + tick +
-          "<span>" +
-            '<span class="opt__t">I am looking for work</span>' +
-            '<span class="opt__d">Fill in the application &mdash; five short steps. ' +
-            "It appears on this page the moment you send it.</span>" +
-          "</span></a>" +
-        '<a class="opt" href="/#book">' + tick +
-          "<span>" +
-            '<span class="opt__t">I am hiring</span>' +
-            '<span class="opt__d">Tell us the seat you need. ' +
-            "It appears on your seats page as soon as it reaches us.</span>" +
-          "</span></a>" +
-      "</div>" +
-
-      '<p class="msg">Signed in with the wrong address? Sign out above and use the one ' +
-      "you applied or booked with &mdash; that is how we find you.</p>" +
-    "</div>"
-  );
-}
-
-/* wireChooser() lived here. It read the radio, called request_account_type and
-   printed "Waiting on us". Both choices are links to the forms now, so there is
-   nothing to wire — and the audit said so plainly: the JS wanted acct-go,
-   acct-msg and acct-note, none of which the page renders any more. */
-
-var STAFF = false;
-
-function staffBanner() {
-  var out = "";
-  if (STAFF) {
-    out +=
-      '<div class="note" style="margin-bottom:1.2rem">' +
-        "<b>You have staff access.</b> Applications, stages and interview scores are on the " +
-        '<a href="/admin">admin page</a>.' +
-      "</div>";
-  }
-  if (BUSINESS) {
-    out +=
-      '<div class="note" style="margin-bottom:1.2rem">' +
-        "<b>You are set up as a business.</b> The seats you have asked us for are on " +
-        'your <a href="/seats">seats page</a>.' +
-      "</div>";
-  }
-  return out;
-}
-
-function loadApplications() {
-  var claims = readToken(session().access_token);
-  var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
-
-  Promise.all([
-    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
-    api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
-      .catch(function () { return []; }),
-    /* Caught rather than allowed to fail the page. Until sql/045 is pasted
-       this table does not exist and PostgREST answers 404 — and an applicant
-       being shown "we could not load your application" because a stage she is
-       not at has no table is the portal breaking over a feature she cannot
-       see. No row and no table both mean the same thing here: nothing to sit
-       yet. The same shape 030 needed on /hub, for the same reason. */
-    api("application_assessment?select=application_id,track,attempt,started_at,submitted_at," +
-        "typing_wpm,typing_accuracy,typing_proof,connection_proof,scenario_answers,english_answers,detail_answers,sales_answers,written_reply,verdict,part_done")
-      .catch(function () { return []; })
-  ])
-    .then(function (r) {
-      var rows = r[0] || [];
-      var byId = {};
-      (r[1] || []).forEach(function (d) {
-        (byId[d.application_id] = byId[d.application_id] || []).push(d);
-      });
-      var sits = {};
-      (r[2] || []).forEach(function (s) { sits[s.application_id] = s; });
-      rows.forEach(function (a) { a.docs = byId[a.id] || []; a.sit = sits[a.id] || null; });
-      render(user, rows);
-    })
-    .catch(function (e) {
-      if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
-      /* Keep a way out. Without this the page is a dead end: signed in, unable
-         to load, and unable to sign out or try another address. */
-      view('<div class="card"><p class="msg msg--bad">We could not load your application just now. ' +
-           "Refresh, or try again in a minute.</p>" +
-           '<button class="btn btn--ghost" id="out-error" type="button" style="margin-top:1.1rem">Sign out</button></div>');
-      document.getElementById("out-error").addEventListener("click", signOut);
-    });
-}
-
 start();
+
 })();
 </script>

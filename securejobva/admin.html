@@ -450,6 +450,19 @@ img{max-width:100%}
 .scr__k{color:var(--ink-2)}
 .scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
 .scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+/* 055. The weeks a payment can be ticked against. Deliberately quiet: it is
+   the optional half of the form, and it sits under six required fields. */
+.payw{margin-top:1.2rem;padding:1rem 1.1rem;background:var(--surface-2);border-radius:10px}
+.payw__h{margin:0;font-weight:700;font-size:.92rem}
+.payw__h em{font-style:normal;font-weight:400;color:var(--muted);font-size:.85rem}
+.payw__d{margin:.3rem 0 0;font-size:.85rem;color:var(--muted);line-height:1.5}
+.payw__list{margin-top:.8rem;display:grid;gap:.4rem;max-height:19rem;overflow-y:auto}
+.payw__i{display:grid;grid-template-columns:auto 1fr;gap:.6rem;align-items:start;
+  padding:.5rem .65rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.payw__i.is-off{opacity:.55;cursor:default}
+.payw__i input{margin-top:.15rem}
+.payw__n{display:block;font-weight:600;font-size:.88rem}
+.payw__m{display:block;color:var(--muted);font-size:.8rem;margin-top:.1rem}
 .cl__add{display:grid;gap:0;padding:1.1rem 1.2rem;background:var(--surface-2);border-radius:10px;margin:1rem 0 1.4rem}
 @media(min-width:720px){.cl__add{grid-template-columns:1fr 1fr;gap:0 1rem}
   .cl__add .fld:nth-child(3),.cl__add #cl-add,.cl__add #cl-msg{grid-column:1/-1}}
@@ -2919,6 +2932,7 @@ function loadPlacements() {
       RATES[p.placement_id].pay = p.rate;
     });
     drawPlacements(box, r[4] || []);
+    loadPayments();
   }).catch(function (e) {
     box.innerHTML = '<p class="msg msg--bad">Could not load placements: ' + esc(why(e)) + "</p>";
   });
@@ -3514,6 +3528,383 @@ function drawSeats(box, rows) {
    010 stored contact messages and gave staff a policy to read them, and there
    was nowhere to do it. A form that writes to a table nobody opens is a form
    that loses messages politely. */
+
+/* ── money in ──────────────────────────────────────────────────────────────
+
+   sql/055. Nothing in this product has ever recorded that a client paid, so
+   the bill on /seats and the figure on /pay could only ever go up. This is the
+   panel where a transfer somebody watched land gets written down.
+
+   It is a ledger, not a payment provider: no card, no fee, no webhook. Staff
+   type what arrived. The client's pages subtract it.
+
+   Allocating the payment to specific weeks is optional and stays optional. A
+   client wires a round number against three weeks and a bit; making somebody
+   split that before the payment can be saved means the payment does not get
+   saved, and an unrecorded payment is the whole bug this file exists to fix.
+   The balance is right either way — the ticks only add the finer answer of
+   WHICH weeks are settled. */
+var PAY_METHODS = [
+  ["bank_transfer", "Bank transfer"], ["wise", "Wise"], ["paypal", "PayPal"],
+  ["card", "Card"], ["cheque", "Cheque"], ["cash", "Cash"], ["other", "Other"]
+];
+var PAY_METHOD_LABEL = {};
+PAY_METHODS.forEach(function (m) { PAY_METHOD_LABEL[m[0]] = m[1]; });
+
+var PAYMENTS = [];
+var PAY_ALLOC = {};
+var PAY_WEEKS = [];
+var PAY_OFF = false;
+
+function loadPayments() {
+  var box = document.getElementById("pay-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading payments&hellip;';
+
+  Promise.all([
+    api("client_payments?select=id,client_id,amount_cents,paid_on,method,reference,note," +
+        "recorded_at,recorded_by&order=paid_on.desc,recorded_at.desc"),
+    api("client_payment_weeks?select=payment_id,timesheet_id"),
+    /* Every chargeable week, so the allocation ticks can be drawn without a
+       second round trip per client. Approved and not a trial week: a trial
+       week costs nothing, so there is nothing for a payment to settle. */
+    api("timesheets?select=id,placement_id,application_id,week_starts_on,status,trial_week," +
+        "timesheet_days(hours)&status=eq.approved&trial_week=is.false&order=week_starts_on.desc")
+  ]).then(function (r) {
+    PAYMENTS = r[0] || [];
+    PAY_ALLOC = {};
+    (r[1] || []).forEach(function (a) { PAY_ALLOC[a.timesheet_id] = a.payment_id; });
+    PAY_WEEKS = r[2] || [];
+    PAY_OFF = false;
+    drawPayments(box);
+  }).catch(function () {
+    /* Until 055 is pasted these tables do not exist and PostgREST answers 404.
+       An admin page that will not load because a new panel is not switched on
+       yet is worse than one without the panel. */
+    PAY_OFF = true;
+    box.innerHTML =
+      "<h2>Money in</h2>" +
+      '<div class="note"><b>Not switched on yet.</b> Paste <code>sql/055</code> and this ' +
+      "becomes the place you write down a transfer when it lands. Until then the bill on a " +
+      "client&rsquo;s page only ever goes up, because nothing can record that they paid.</div>";
+  });
+}
+
+/* What a client owes us, from the same rows /seats and /pay read. Staff see
+   every client, so this is computed per client rather than for the one signed
+   in — otherwise the figure here and the figure the client sees are two
+   different calculations, and the day they disagree is the day somebody is
+   chased for money they have already sent. */
+function payOwed(clientId) {
+  var mine = {};
+  PLACEMENTS.forEach(function (p) { if (p.client_id === clientId) mine[p.id] = p; });
+
+  var cents = 0, weeks = [];
+  PAY_WEEKS.forEach(function (w) {
+    if (!mine[w.placement_id]) return;
+    var rate = RATES[w.placement_id] && RATES[w.placement_id].bill;
+    var hours = 0;
+    (w.timesheet_days || []).forEach(function (d) { hours += Number(d.hours || 0); });
+    if (!hours) return;
+    weeks.push({
+      id: w.id,
+      week: w.week_starts_on,
+      hours: hours,
+      /* An unpriced week is listed and worth nothing, rather than left out.
+         Silence about somebody's hours is how a client is quoted less than
+         they owe — the same rule the client's own bill follows. */
+      cents: rate === undefined || rate === null ? null : Math.round(hours * Number(rate) * 100),
+      settledBy: PAY_ALLOC[w.id] || null,
+      who: (byAppName(w.application_id) || "an assistant")
+    });
+    if (rate !== undefined && rate !== null) cents += Math.round(hours * Number(rate) * 100);
+  });
+
+  var paid = 0;
+  PAYMENTS.forEach(function (p) { if (p.client_id === clientId) paid += Number(p.amount_cents || 0); });
+
+  weeks.sort(function (a, b) { return a.week < b.week ? 1 : a.week > b.week ? -1 : 0; });
+  return { approved: cents, paid: paid, owed: cents - paid, weeks: weeks };
+}
+
+function byAppName(id) {
+  for (var i = 0; i < ALL.length; i++) if (ALL[i].id === id) return ALL[i].name;
+  return "";
+}
+
+function payMoney(cents) {
+  return "$" + (Number(cents || 0) / 100).toFixed(2);
+}
+
+/* Typed dollars to stored cents, and the one place the conversion happens.
+   Number("12.345") * 100 is 1234.4999999999998, so it is rounded rather than
+   truncated — sql/046 is the migration that exists because a money figure was
+   quietly rounded once and nothing said so. */
+function payCents(text) {
+  var t = String(text || "").replace(/[$,s]/g, "");
+  if (!t || !/^d+(.d{1,2})?$/.test(t)) return null;
+  return Math.round(Number(t) * 100);
+}
+
+function drawPayments(box) {
+  var opts = CLIENTS.map(function (c) {
+    return '<option value="' + esc(c.id) + '">' + esc(c.name) + "</option>";
+  }).join("");
+
+  /* Every client with money outstanding, worst first. This is the list that
+     answers "who owes us", which is the question somebody opens this panel
+     with — the form underneath is what they do about it. */
+  var owing = CLIENTS.map(function (c) {
+    var o = payOwed(c.id);
+    return { c: c, o: o };
+  }).filter(function (x) { return x.o.approved > 0 || x.o.paid > 0; });
+  owing.sort(function (a, b) { return b.o.owed - a.o.owed; });
+
+  var outstanding = 0;
+  owing.forEach(function (x) { if (x.o.owed > 0) outstanding += x.o.owed; });
+
+  box.innerHTML =
+    "<h2>Money in</h2>" +
+    '<p class="msg" style="margin-top:0">A transfer, written down when it lands. There is no card ' +
+      "processing here and nothing is charged &mdash; this is the record that makes a client&rsquo;s " +
+      "bill go down. Until a payment is here, their page tells them they still owe it.</p>" +
+
+    (owing.length
+      ? '<div class="kpis" style="margin-top:1.1rem">' +
+          '<div class="kpi' + (outstanding > 0 ? " kpi--warn" : " kpi--good") + '">' +
+            "<b>" + esc(payMoney(outstanding)) + "</b><span>outstanding across " +
+            esc(String(owing.length)) + (owing.length === 1 ? " client" : " clients") + "</span></div>" +
+        "</div>" +
+        '<div class="rows" style="margin-top:1rem">' +
+          owing.map(function (x) {
+            return '<div class="row">' +
+              '<div class="row__top"><span>' +
+                '<span class="row__n">' + esc(x.c.name) + "</span>" +
+                '<span class="row__meta"> &middot; ' + esc(payMoney(x.o.approved)) + " approved" +
+                  (x.o.paid ? " &middot; " + esc(payMoney(x.o.paid)) + " paid" : "") + "</span>" +
+              "</span>" +
+              '<span class="row__tot' + (x.o.owed > 0 ? "" : " sit__ok") + '">' +
+                esc(payMoney(x.o.owed)) + (x.o.owed < 0 ? " in credit" : " owed") + "</span></div>" +
+            "</div>";
+          }).join("") +
+        "</div>"
+      : '<div class="note" style="margin-top:1.1rem"><b>No client has been billed yet.</b> ' +
+        "A client appears here once one of their weeks has been approved.</div>") +
+
+    /* ── the form ── */
+    '<div class="edit" style="margin-top:1.4rem">' +
+      '<h3 class="edit__h">Record a payment</h3>' +
+      '<div class="edit__grid">' +
+        '<div class="fld"><label for="pay-client">Client</label>' +
+          '<select id="pay-client"><option value="">Choose a client</option>' + opts + "</select></div>" +
+        '<div class="fld"><label for="pay-amount">Amount</label>' +
+          '<input id="pay-amount" type="text" inputmode="decimal" placeholder="620.00"></div>' +
+        '<div class="fld"><label for="pay-on">Date it arrived</label>' +
+          '<input id="pay-on" type="date" value="' + esc(todayCentral()) + '"></div>' +
+        '<div class="fld"><label for="pay-method">How</label>' +
+          '<select id="pay-method">' +
+            PAY_METHODS.map(function (m) {
+              return '<option value="' + esc(m[0]) + '">' + esc(m[1]) + "</option>";
+            }).join("") +
+          "</select></div>" +
+        '<div class="fld"><label for="pay-ref">Their reference <em>&mdash; optional</em></label>' +
+          '<input id="pay-ref" type="text" placeholder="What is on the bank statement" maxlength="200"></div>' +
+        '<div class="fld"><label for="pay-note">Note <em>&mdash; optional</em></label>' +
+          '<input id="pay-note" type="text" placeholder="Anything worth remembering" maxlength="2000"></div>' +
+      "</div>" +
+      '<div id="pay-weeks" class="payw" hidden></div>' +
+      '<div class="edit__foot">' +
+        '<span class="hint" id="pay-hint">Pick a client and the weeks they owe for appear here.</span>' +
+        '<span class="edit__act"><span class="row__ok" id="pay-ok"></span>' +
+        '<button class="btn btn--solid" id="pay-go" type="button">Record it</button></span>' +
+      "</div>" +
+    "</div>" +
+
+    /* ── what has been recorded ── */
+    (PAYMENTS.length
+      ? '<h3 class="edit__h" style="margin-top:1.6rem">Recorded so far</h3>' +
+        '<div class="rows">' + PAYMENTS.map(function (p) {
+          var c = null;
+          for (var i = 0; i < CLIENTS.length; i++) if (CLIENTS[i].id === p.client_id) c = CLIENTS[i];
+          var n = 0;
+          for (var k in PAY_ALLOC) if (PAY_ALLOC[k] === p.id) n++;
+          return '<div class="row" data-pay="' + esc(p.id) + '">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(c ? c.name : "Unknown client") + "</span>" +
+              '<span class="row__meta"> &middot; ' + esc(when(p.paid_on)) + " &middot; " +
+                esc(PAY_METHOD_LABEL[p.method] || p.method) +
+                (p.reference ? " &middot; " + esc(p.reference) : "") +
+                (n ? " &middot; settles " + esc(String(n)) + (n === 1 ? " week" : " weeks") : "") +
+              "</span>" +
+            "</span>" +
+            '<span class="row__tot">' + esc(payMoney(p.amount_cents)) + "</span>" +
+            '<button class="btn btn--ghost" data-pay-del type="button" ' +
+              'style="padding:.35rem .7rem;font-size:.82rem">Remove</button></div>' +
+            (p.note ? '<p class="msg" style="margin:.4rem 0 0">' + esc(p.note) + "</p>" : "") +
+            '<p class="hint" style="margin:.35rem 0 0">Written down by ' +
+              esc(p.recorded_by || "somebody") + " on " + esc(when(p.recorded_at)) + "</p>" +
+          "</div>";
+        }).join("") + "</div>"
+      : "");
+
+  wirePayments(box);
+}
+
+/* The weeks a payment can be ticked against, redrawn whenever the client
+   changes. A week already settled by another payment is shown and disabled
+   rather than hidden — "why is that week not in the list" is a worse question
+   to be left with than "that one is already covered". */
+function drawPayWeeks() {
+  var wrap = document.getElementById("pay-weeks");
+  var sel = document.getElementById("pay-client");
+  var hint = document.getElementById("pay-hint");
+  if (!wrap || !sel) return;
+
+  if (!sel.value) {
+    wrap.hidden = true;
+    wrap.innerHTML = "";
+    hint.textContent = "Pick a client and the weeks they owe for appear here.";
+    return;
+  }
+
+  var o = payOwed(sel.value);
+  var open = o.weeks.filter(function (w) { return !w.settledBy; });
+
+  wrap.hidden = false;
+  wrap.innerHTML =
+    '<p class="payw__h">Which weeks does this settle? <em>Optional</em></p>' +
+    '<p class="payw__d">Leave every box empty and the payment still counts against their ' +
+      "balance. Ticking weeks only records which ones it covered.</p>" +
+    (o.weeks.length
+      ? '<div class="payw__list">' + o.weeks.map(function (w) {
+          var done = !!w.settledBy;
+          return '<label class="payw__i' + (done ? " is-off" : "") + '">' +
+            '<input type="checkbox" data-pay-week="' + esc(w.id) + '"' + (done ? " disabled" : "") + ">" +
+            "<span>" +
+              '<span class="payw__n">Week of ' + esc(when(w.week)) + "</span>" +
+              '<span class="payw__m">' + esc(w.who) + " &middot; " +
+                esc(String(Math.round(w.hours * 100) / 100)) + " h &middot; " +
+                (w.cents === null ? "no rate set yet" : esc(payMoney(w.cents))) +
+                (done ? " &middot; already settled" : "") + "</span>" +
+            "</span></label>";
+        }).join("") + "</div>"
+      : '<p class="payw__d">No approved chargeable weeks for this client yet.</p>');
+
+  hint.textContent = open.length
+    ? payMoney(o.owed) + " outstanding across " + open.length +
+      (open.length === 1 ? " unsettled week" : " unsettled weeks") + "."
+    : o.owed > 0
+      ? payMoney(o.owed) + " outstanding, with every week already ticked against a payment."
+      : "Nothing outstanding for this client.";
+}
+
+function wirePayments(box) {
+  var sel = document.getElementById("pay-client");
+  if (sel) sel.addEventListener("change", drawPayWeeks);
+
+  var go = document.getElementById("pay-go");
+  if (go) go.addEventListener("click", function () { savePayment(go); });
+
+  box.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-pay-del]");
+    if (!btn) return;
+    var row = btn.closest("[data-pay]");
+    if (!row) return;
+    removePayment(row.getAttribute("data-pay"), btn);
+  });
+}
+
+function savePayment(go) {
+  var ok = document.getElementById("pay-ok");
+  var client = document.getElementById("pay-client").value;
+  var cents = payCents(document.getElementById("pay-amount").value);
+  var on = document.getElementById("pay-on").value;
+  var method = document.getElementById("pay-method").value;
+  var ref = document.getElementById("pay-ref").value.trim();
+  var note = document.getElementById("pay-note").value.trim();
+
+  if (!client) { flash(ok, "Choose a client", true); return; }
+  if (cents === null || cents <= 0) {
+    flash(ok, "Amount should look like 620 or 620.50", true);
+    return;
+  }
+  if (!on) { flash(ok, "When did it arrive?", true); return; }
+
+  /* The weeks ticked, read before the insert so that a payment that saves and
+     an allocation that does not is still a payment with the right total on it.
+     The balance is what matters; the ticks are the finer answer. */
+  var weeks = [];
+  Array.prototype.forEach.call(
+    document.querySelectorAll("[data-pay-week]:checked"),
+    function (cb) { weeks.push(cb.getAttribute("data-pay-week")); }
+  );
+
+  go.disabled = true;
+  flash(ok, "Saving…");
+
+  /* recorded_by is not sent and is not grantable — sql/055 stamps it from the
+     token, because a field the browser fills is a field the browser can lie
+     about, and this is the record of who wrote down that money arrived. */
+  api("client_payments", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: {
+      client_id: client,
+      amount_cents: cents,
+      paid_on: on,
+      method: method,
+      reference: ref || null,
+      note: note || null
+    }
+  }).then(function (rows) {
+    var id = rows && rows[0] && rows[0].id;
+    if (!id || !weeks.length) return null;
+    return api("client_payment_weeks", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: weeks.map(function (w) { return { payment_id: id, timesheet_id: w }; })
+    }).catch(function (e) {
+      /* Said out loud rather than swallowed. The money is recorded and the
+         balance is already right; what failed is only the record of which
+         weeks it covered, and somebody should know that rather than wonder
+         later why the ticks did not stick. */
+      throw new Error("The payment saved, but the weeks did not tick: " + why(e));
+    });
+  }).then(function () {
+    flash(ok, "Recorded");
+    document.getElementById("pay-amount").value = "";
+    document.getElementById("pay-ref").value = "";
+    document.getElementById("pay-note").value = "";
+    go.disabled = false;
+    loadPayments();
+  }).catch(function (e) {
+    go.disabled = false;
+    flash(ok, why(e), true);
+    /* Reloaded even on a failure, because the half that succeeded — if any —
+       is now on screen as it actually is rather than as it was typed. */
+    loadPayments();
+  });
+}
+
+function removePayment(id, btn) {
+  if (!window.confirm(
+        "Remove this payment?\n\nThe client's balance goes back up by the amount, and any " +
+        "weeks it settled become unsettled. Do this to correct a mistake, not to record a refund.")) {
+    return;
+  }
+  btn.disabled = true;
+  /* The allocation rows go with it: sql/055 makes client_payment_weeks cascade
+     on delete, so there is nothing to clear up here by hand. */
+  api("client_payments?id=eq." + encodeURIComponent(id), {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" }
+  }).then(function () { loadPayments(); })
+    .catch(function (e) {
+      btn.disabled = false;
+      window.alert("Could not remove it: " + why(e));
+    });
+}
+
 /* ── files with nobody left to belong to ──────────────────────────────────
 
    Deleting an application takes the row recording its CV and leaves the CV.
@@ -4315,7 +4706,8 @@ function render(email, apps, notes, socials, docs, disc, sits) {
     '<div data-pane="team" hidden><div class="card" id="leave-card"></div>' +
       '<div class="card" id="notice-card"></div></div>' +
     '<div data-pane="hours" hidden><div class="card" id="ts-card"></div></div>' +
-    '<div data-pane="place" hidden><div class="card" id="place-card"></div></div>' +
+    '<div data-pane="place" hidden><div class="card" id="place-card"></div>' +
+      '<div class="card" id="pay-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
       : "") +

@@ -450,6 +450,19 @@ img{max-width:100%}
 .scr__k{color:var(--ink-2)}
 .scr__claim{font-size:.72rem;color:var(--muted);text-align:right}
 .scr select{font-family:inherit;font-size:.82rem;padding:.25rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+/* 055. The weeks a payment can be ticked against. Deliberately quiet: it is
+   the optional half of the form, and it sits under six required fields. */
+.payw{margin-top:1.2rem;padding:1rem 1.1rem;background:var(--surface-2);border-radius:10px}
+.payw__h{margin:0;font-weight:700;font-size:.92rem}
+.payw__h em{font-style:normal;font-weight:400;color:var(--muted);font-size:.85rem}
+.payw__d{margin:.3rem 0 0;font-size:.85rem;color:var(--muted);line-height:1.5}
+.payw__list{margin-top:.8rem;display:grid;gap:.4rem;max-height:19rem;overflow-y:auto}
+.payw__i{display:grid;grid-template-columns:auto 1fr;gap:.6rem;align-items:start;
+  padding:.5rem .65rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.payw__i.is-off{opacity:.55;cursor:default}
+.payw__i input{margin-top:.15rem}
+.payw__n{display:block;font-weight:600;font-size:.88rem}
+.payw__m{display:block;color:var(--muted);font-size:.8rem;margin-top:.1rem}
 .cl__add{display:grid;gap:0;padding:1.1rem 1.2rem;background:var(--surface-2);border-radius:10px;margin:1rem 0 1.4rem}
 @media(min-width:720px){.cl__add{grid-template-columns:1fr 1fr;gap:0 1rem}
   .cl__add .fld:nth-child(3),.cl__add #cl-add,.cl__add #cl-msg{grid-column:1/-1}}
@@ -833,6 +846,33 @@ body:has(.adm__wrap) main{padding:0}
   background:var(--surface-2)}
 .bill__payh{font-weight:700;margin:0 0 .35rem}
 .bill__payp{margin:0;font-size:.9rem;color:var(--muted);line-height:1.55}
+
+/* 055. The two lines above the total, and the receipts under it. Quieter than
+   the figure they explain — the number somebody came for is the one left to
+   pay, and the working out should not compete with it. */
+.bill__tot--sub{border-top:0;padding-top:.35rem;padding-bottom:0;font-weight:500}
+.bill__tot--sub .bill__totl{color:var(--muted);font-weight:500}
+.bill__tot--sub .bill__totv{font-size:1rem;font-weight:600;color:var(--ink-2)}
+/* #0B7A63 is what approved already wears on the timesheet pills and the hired
+   pill, so paid money reads as the same kind of good news rather than as a
+   sixth colour nobody has seen before. */
+.bill__totv--paid{color:#0B7A63}
+:root[data-theme="dark"] .bill__totv--paid{color:#63D69B}
+.bill__paid{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.09em;
+  text-transform:uppercase;padding:.16rem .4rem;border-radius:4px;margin-left:.55rem;
+  background:#0B7A63;color:#fff}
+.pays{margin-top:1.3rem;border-top:1px solid var(--line);padding-top:1rem}
+.pays__h{margin:0 0 .5rem;font-weight:700;font-size:.92rem}
+.pays__r{display:grid;grid-template-columns:6.5rem 1fr auto;gap:.3rem .8rem;align-items:baseline;
+  padding:.4rem 0;border-bottom:1px solid var(--line-soft);font-size:.88rem}
+.pays__r:last-child{border-bottom:0}
+.pays__d{color:var(--muted);font-variant-numeric:tabular-nums}
+.pays__m{color:var(--ink-2);overflow-wrap:anywhere}
+.pays__a{font-weight:700;font-variant-numeric:tabular-nums}
+@media(max-width:30rem){
+  .pays__r{grid-template-columns:1fr auto}
+  .pays__m{grid-column:1/-1;font-size:.84rem}
+}
 
 </style>
 
@@ -1790,6 +1830,11 @@ var C_WEEKS = [];
 var C_SWAPS = [];
 var C_STARTS = [];
 var C_NAMES = [];
+/* 055. What has been paid, and which weeks somebody said it settled. Both
+   empty until that file is pasted, and an empty ledger is honest: it says
+   nothing has been recorded, which is exactly what is true. */
+var C_PAID = [];
+var C_SETTLED = {};
 var C_OFF = false;
 
 /* The statement adds up approved weeks, and the weeks are read with a limit,
@@ -1828,14 +1873,27 @@ function loadClient(email, rows) {
        under this address yet" while a live placement sat behind it.
        The policy on this table already returns only the people this client is
        actually placed with, so asking for it plainly is enough. */
-    api("application_public?select=application_id,name")
+    api("application_public?select=application_id,name"),
+    /* 055, and both of these are read separately from everything above for
+       the same reason the names are: they are their own tables, their policies
+       already return only this client's rows, and asking plainly is enough.
+
+       Wrapped so that a database without 055 pasted yet answers with nothing
+       rather than taking the client's whole portal down with it. loadClient's
+       own catch hides the entire client block on any failure, which for a
+       missing table would mean a live placement vanishing behind "nothing here
+       under this address yet" — the exact failure 041 already cost us once. */
+    api("client_payments?select=id,amount_cents,paid_on,method,reference&order=paid_on.desc")
+      .catch(function () { return []; }),
+    api("client_payment_weeks?select=timesheet_id")
+      .catch(function () { return []; })
   ]).catch(function (e) {
     if (String(e.message) === "signed out") throw e;
     /* 032 is pasted by hand some time after this ships, and a client who has
        no placement is an ordinary thing rather than a fault. Either way the
        seats half of the page is unaffected. */
     C_OFF = true;
-    return [[], [], [], [], [], []];
+    return [[], [], [], [], [], [], [], []];
   }).then(function (r) {
     C_PLACE = r[0] || [];
     C_RATE = {};
@@ -1849,9 +1907,13 @@ function loadClient(email, rows) {
     C_SWAPS = r[3] || [];
     C_STARTS = r[4] || [];
     C_NAMES = r[5] || [];
+    C_PAID = r[6] || [];
+    C_SETTLED = {};
+    (r[7] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
     render(email, rows);
   });
 }
+
 
 function cIso(d) {
   var m = d.getMonth() + 1, day = d.getDate();
@@ -1872,11 +1934,108 @@ function cNum(n) {
 function cMoney(n) {
   return "$" + (Math.round(Number(n) * 100) / 100).toFixed(2);
 }
+/* Payments are stored as an integer number of cents, so they are divided here
+   and nowhere else. cMoney rounds, which is right for a product of hours and a
+   rate and would be a quiet lie about a figure that is already exact. */
+function cCents(cents) {
+  return "$" + (Number(cents || 0) / 100).toFixed(2);
+}
 function cWeekLabel(iso) {
   var a = cFrom(iso), b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 6);
   var f = { month: "short", day: "numeric" };
   return a.toLocaleDateString(undefined, f) + " to " + b.toLocaleDateString(undefined, f);
 }
+
+/* The bill, computed once and read by both pages.
+
+   Returns the weeks newest first, what each came to, the grand total, and the
+   hours that could not be priced. A week with no rate on its placement is
+   deliberately left OUT of the money and counted separately — quoting a total
+   that silently omits somebody's hours is a bug this page has already been
+   through once. */
+function cBill() {
+  var nameOf = {};
+  C_NAMES.forEach(function (n) { if (n.name) nameOf[n.application_id] = n.name; });
+
+  var placeById = {};
+  C_PLACE.forEach(function (p) { placeById[p.id] = p; });
+
+  var byWeek = {}, unpriced = 0, missingRate = false;
+  var hours = 0, freeHours = 0, people = {};
+
+  C_WEEKS.forEach(function (w) {
+    if (w.status !== "approved") return;
+    var p = placeById[w.placement_id];
+    if (!p) return;
+    var h = cHours(w);
+    if (!h) return;
+    var rate = C_RATE[p.id];
+    if (rate === undefined && !w.trial_week) { missingRate = true; unpriced += h; return; }
+    people[p.application_id] = true;
+    if (w.trial_week) { freeHours += h; } else { hours += h; }
+    byWeek[w.week_starts_on] = byWeek[w.week_starts_on] || [];
+    byWeek[w.week_starts_on].push({
+      id: w.id,
+      who: nameOf[p.application_id] || "your assistant",
+      hours: h,
+      rate: rate,
+      free: !!w.trial_week,
+      settled: !!C_SETTLED[w.id]
+    });
+  });
+
+  /* Sorted as strings, which for an ISO date is the same as sorting by date
+     and does not build 260 Date objects to find out. Newest first, because the
+     week somebody is about to pay for is the one they came to look at. */
+  var order = Object.keys(byWeek).sort().reverse();
+  var grand = 0;
+  var weeks = order.map(function (wk) {
+    var lines = byWeek[wk], total = 0, settled = lines.length > 0;
+    lines.forEach(function (l) {
+      if (!l.free) total += l.hours * l.rate;
+      if (!l.free && !l.settled) settled = false;
+    });
+    grand += total;
+    return { week: wk, lines: lines, total: total, settled: settled };
+  });
+
+  return {
+    weeks: weeks,
+    grand: grand,
+    hours: hours,
+    freeHours: freeHours,
+    people: Object.keys(people).length,
+    oldest: order.length ? order[order.length - 1] : null,
+    unpriced: unpriced,
+    missingRate: missingRate
+  };
+}
+
+/* What has actually been paid, and therefore what is actually left.
+
+   Before sql/055 there was nothing to subtract, so the bill's heading —
+   "Total approved, not yet paid" — was half a guess: the first half was
+   counted and the second half was assumed. A client who paid was told, on
+   their own page, that they still owed it. */
+function cPaidCents() {
+  var t = 0;
+  for (var i = 0; i < C_PAID.length; i++) t += Number(C_PAID[i].amount_cents || 0);
+  return t;
+}
+
+/* In cents throughout, and only converted for display. The approved side is a
+   product of numeric hours and a numeric rate, so it is rounded to the cent
+   once, here, rather than drifting a fraction at a time through a subtraction. */
+function cOwedCents(grand) {
+  return Math.round(Number(grand) * 100) - cPaidCents();
+}
+
+var C_PAY_METHOD = {
+  bank_transfer: "Bank transfer", wise: "Wise", paypal: "PayPal",
+  card: "Card", cheque: "Cheque", cash: "Cash", other: "Other"
+};
+
+
 function cDays(w) {
   var by = {};
   (w.timesheet_days || []).forEach(function (d) { by[d.worked_on] = Number(d.hours || 0); });
@@ -1930,70 +2089,39 @@ function billingBlock() {
   var live = C_PLACE.filter(function (p) { return p.status !== "ended"; });
   if (!live.length && !C_PLACE.length) return "";
 
-  /* Name lookup once rather than inside the loop. */
-  var nameOf = {};
-  C_NAMES.forEach(function (n) { if (n.name) nameOf[n.application_id] = n.name; });
-
-  var placeById = {};
-  C_PLACE.forEach(function (p) { placeById[p.id] = p; });
-
-  /* Weeks this client has agreed, grouped by the week they were worked. A week
-     with no rate on its placement is deliberately left out of the money and
-     counted separately — quoting a total that silently omits somebody's hours
-     is the bug this whole page has just been through. */
-  var byWeek = {};
-  var unpriced = 0;
-  var missingRate = false;
-
-  C_WEEKS.forEach(function (w) {
-    if (w.status !== "approved") return;
-    var p = placeById[w.placement_id];
-    if (!p) return;
-    var hours = cHours(w);
-    if (!hours) return;
-    var rate = C_RATE[p.id];
-    if (rate === undefined && !w.trial_week) { missingRate = true; unpriced += hours; return; }
-    byWeek[w.week_starts_on] = byWeek[w.week_starts_on] || [];
-    byWeek[w.week_starts_on].push({
-      who: nameOf[p.application_id] || "your assistant",
-      hours: hours,
-      rate: rate,
-      free: !!w.trial_week
-    });
-  });
-
-  /* Sorted as strings, which for an ISO date is the same as sorting by date
-     and does not build 260 Date objects to find out. Newest first, because the
-     week somebody is about to pay for is the one they came to look at. */
-  var weeks = Object.keys(byWeek).sort().reverse();
+  /* The arithmetic moved to cBill in CLIENT_MONEY when /pay was built, so the
+     two pages cannot drift into quoting the same business two totals. This
+     function is now only the drawing. */
+  var bill = cBill();
+  var missingRate = bill.missingRate;
+  var unpriced = bill.unpriced;
+  var grand = bill.grand;
 
   /* No early return for an empty bill. A client with a placement and nothing
      approved yet still gets the card, saying so — otherwise the place their
      money will appear simply does not exist until the first week lands, and
      "there is no bill on my page" reads as something being broken rather than
      as nothing being owed. */
-  var grand = 0;
-  var rows = weeks.map(function (wk) {
-    var lines = byWeek[wk];
-    var wkTotal = 0;
-    var body = lines.map(function (l) {
-      var amt = l.free ? 0 : l.hours * l.rate;
-      wkTotal += amt;
+  var rows = bill.weeks.map(function (wk) {
+    var body = wk.lines.map(function (l) {
       return '<div class="bill__ln">' +
         '<span class="bill__who">' + esc(l.who) + "</span>" +
         '<span class="bill__h">' + esc(cNum(l.hours)) + " h" +
           (l.free ? "" : " &times; " + esc(cMoney(l.rate))) + "</span>" +
         '<span class="bill__amt' + (l.free ? " bill__free" : "") + '">' +
-          (l.free ? "free &mdash; trial" : esc(cMoney(amt))) + "</span>" +
+          (l.free ? "free &mdash; trial" : esc(cMoney(l.hours * l.rate))) + "</span>" +
       "</div>";
     }).join("");
-    grand += wkTotal;
     return '<div class="bill__wk">' +
-      '<div class="bill__wkh"><span class="bill__wkn">Week of ' + esc(cWeekLabel(wk)) + "</span>" +
-      '<span class="bill__wkt">' + esc(cMoney(wkTotal)) + "</span></div>" +
+      '<div class="bill__wkh"><span class="bill__wkn">Week of ' + esc(cWeekLabel(wk.week)) + "</span>" +
+      (wk.settled && wk.total ? '<span class="bill__paid">paid</span>' : "") +
+      '<span class="bill__wkt">' + esc(cMoney(wk.total)) + "</span></div>" +
       body +
     "</div>";
   }).join("");
+
+  var paid = cPaidCents();
+  var owed = cOwedCents(grand);
 
   return '<div class="card" id="billing">' +
     "<h2>Your bill</h2>" +
@@ -2007,12 +2135,47 @@ function billingBlock() {
       : "") +
     (rows
       ? '<div class="bill">' + rows + "</div>" +
-        '<div class="bill__tot"><span class="bill__totl">Total approved, not yet paid</span>' +
-        '<span class="bill__totv">' + esc(cMoney(grand)) + "</span></div>" +
+        /* Three lines rather than one, and only when there is something to
+           subtract. Before 055 this said "Total approved, not yet paid" over a
+           number that counted the first half and assumed the second — so the
+           first client to pay was told on their own page that they still owed
+           it. The heading below now means what it says, because the line above
+           it is a figure somebody wrote down. */
+        (paid
+          ? '<div class="bill__tot bill__tot--sub"><span class="bill__totl">Total approved</span>' +
+            '<span class="bill__totv">' + esc(cMoney(grand)) + "</span></div>" +
+            '<div class="bill__tot bill__tot--sub"><span class="bill__totl">Paid</span>' +
+            '<span class="bill__totv bill__totv--paid">&minus;&nbsp;' + esc(cCents(paid)) + "</span></div>"
+          : "") +
+        '<div class="bill__tot"><span class="bill__totl">' +
+          (paid ? "Left to pay" : "Total approved, not yet paid") + "</span>" +
+        '<span class="bill__totv">' + esc(cCents(owed)) + "</span></div>" +
+        /* A credit is not an error. A client who pays a round number against a
+           part week is ahead, and a page that shows that as a negative amount
+           owed reads as a bug in the bill rather than as money in hand. */
+        (owed < 0
+          ? '<div class="note" style="margin-top:1rem"><b>You are ' + esc(cCents(-owed)) +
+            " ahead.</b> That sits against the weeks still to come &mdash; there is nothing to pay " +
+            "right now.</div>"
+          : "") +
         (C_TRUNCATED
           ? '<p class="msg">This covers the most recent ' + C_WEEK_LIMIT +
             " weeks on file. Write to support for anything older.</p>"
             : "") +
+        /* Every payment we have a record of, so the subtraction above is not
+           something the client has to take on trust. */
+        (C_PAID.length
+          ? '<div class="pays"><p class="pays__h">Payments received</p>' +
+            C_PAID.map(function (p) {
+              return '<div class="pays__r">' +
+                '<span class="pays__d">' + esc(when(p.paid_on)) + "</span>" +
+                '<span class="pays__m">' + esc(C_PAY_METHOD[p.method] || p.method) +
+                  (p.reference ? " &middot; " + esc(p.reference) : "") + "</span>" +
+                '<span class="pays__a">' + esc(cCents(p.amount_cents)) + "</span>" +
+              "</div>";
+            }).join("") +
+            "</div>"
+          : "") +
         /* Deliberately a marked gap rather than a button that looks live.
            A control that says "Pay" and does nothing is worse than no control:
            somebody presses it, believes the money moved, and stops chasing the
@@ -2024,7 +2187,8 @@ function billingBlock() {
           '<p class="bill__payh">Paying this</p>' +
           '<p class="bill__payp">Card payment is not switched on yet. For now we invoice you ' +
             "separately and you pay us the way we agreed on the call. When card payment is " +
-            "live it appears here, and this total is the number it will charge.</p>" +
+            "live it appears here, and this total is the number it will charge. " +
+            'Your <a href="/pay">payment page</a> has the same figure with the details on it.</p>' +
         "</div>"
       : '<p class="msg">Nothing to pay yet. Approved hours appear here as they come in.</p>') +
   "</div>";

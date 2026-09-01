@@ -102,6 +102,16 @@ const PAGES = [
     description: "Sign in to see the seats you have asked SecureJobVA for and where each one has got to.",
     ogTitle: "Your seats",
     noindex: true
+  },
+  {
+    src: "pay.html",
+    path: "/pay",
+    title: "Pay — SecureJobVA",
+    description: "Sign in to see what you owe for the hours you have approved, and how to settle it.",
+    ogTitle: "Pay",
+    /* The address that goes in the weekly email. Signed in, and about one
+       business's money, so it is no more for search than /seats is. */
+    noindex: true
   }
 ];
 
