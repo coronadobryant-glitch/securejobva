@@ -195,7 +195,16 @@ create trigger "notify-interview"
 -- secret into the copy, run the copy, and throw it away.
 --
 --   cp sql/058-telling-both-sides.sql sql/058-PASTE-THIS.local.sql
---   # replace __WEBHOOK_SECRET__ with the value of WEBHOOK_SECRET on Vercel
+--   # in the copy, replace the QUOTED placeholder on the x-webhook-secret
+--   # line — that one and no other:
+--   #
+--   #     'x-webhook-secret', '__WEBHOOK_SECRET__'
+--
+-- Replace every occurrence instead and you also rewrite the LIKE pattern in
+-- the check at the bottom, which then looks for the secret rather than for the
+-- placeholder — and reports "nothing will be emailed" on a copy that emails
+-- perfectly well. The older webhook files have no such check, so a blanket
+-- find-and-replace was harmless for them and is not harmless here.
 --
 -- .gitignore already keeps *.local.sql out of the repo — the same arrangement
 -- 019, 028, 031, 035, 036 and 037 use, and for the same reason.
