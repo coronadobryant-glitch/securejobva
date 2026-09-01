@@ -701,6 +701,9 @@ body:has(.adm__wrap) main{padding:0}
 .pill--ts_draft{background:var(--surface-2);color:var(--muted)}
 .pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
 .pill--ts_approved{background:#0B7A63;color:#fff}
+.pill--iv_go{background:#0B7A63;color:#fff}
+.pill--iv_wait{background:var(--signal);color:var(--signal-ink)}
+.pill--iv_none{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .pill--ts_returned{background:#B3261E;color:#fff}
 .pill--pl_matched{background:var(--surface-2);color:var(--ink-2)}
 .pill--pl_trial{background:var(--signal);color:var(--signal-ink)}
@@ -1648,6 +1651,107 @@ function wireTz() {
       tzFlash(ok, tzWhy(e), true);
     });
   });
+}
+
+/* ── an interview time, in two clocks ──────────────────────────────────────
+
+   sql/057. A slot is a timestamptz and is the one thing in this product that
+   genuinely means the same moment to two people in different places. Both of
+   them have to be able to read it as their own without doing arithmetic.
+
+   The second clock is Central, and always Central, rather than "the other
+   person's". That is not laziness — it is the only zone either side can
+   actually be shown. sql/056 makes a person's chosen zone readable by nobody
+   but themselves, deliberately, and neither can read the other's: an assistant
+   cannot read the client's seat request, and a client has no way to reach an
+   applicant's settings. Guessing at the other end and labelling the guess with
+   their name would be worse than naming a zone that is simply true.
+
+   Central is the business's own clock. It is what /admin already stamps a date
+   in, it is what the client is almost always on, and it is a thing both people
+   can name in a sentence to each other — which is the actual job here. */
+var CENTRAL = "America/Chicago";
+
+function slotDay(iso, zone) {
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  try {
+    return d.toLocaleString(undefined, {
+      timeZone: zone || undefined,
+      weekday: "short", day: "numeric", month: "short"
+    });
+  } catch (e) {
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }
+}
+
+function slotClock(iso, zone) {
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  try {
+    return d.toLocaleString(undefined, {
+      timeZone: zone || undefined, hour: "numeric", minute: "2-digit"
+    });
+  } catch (e) {
+    return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+}
+
+/* "Tue 8 Sep · 9:00 AM", in whatever the reader has chosen or their browser
+   believes. */
+function slotLabel(iso) {
+  return slotDay(iso, MY_TZ) + " \u00b7 " + slotClock(iso, MY_TZ);
+}
+
+/* The line underneath. Left empty when the reader is already on Central,
+   because "9:00 AM · 9:00 AM Central" is noise rather than help.
+
+   The day is repeated only when it differs — which is exactly the case worth
+   spelling out, since 10:00 PM Manila on Tuesday is 9:00 AM Central on that
+   same Tuesday, and an assistant who reads only the clock can book herself
+   into the wrong night. */
+function slotAlso(iso, minutes) {
+  var mine = MY_TZ || browserTz();
+  var out = minutes ? String(minutes) + " minutes" : "";
+
+  if (mine && mine !== CENTRAL) {
+    var here = slotDay(iso, mine), there = slotDay(iso, CENTRAL);
+    out += (out ? " \u00b7 " : "") +
+      (here === there
+        ? slotClock(iso, CENTRAL) + " Central"
+        : there + " " + slotClock(iso, CENTRAL) + " Central");
+  } else if (mine) {
+    out += (out ? " \u00b7 " : "") + "Central";
+  }
+  return out;
+}
+
+/* Which of the two people the interview is sitting on, from the slots alone.
+   There is no status column in 057 — the state is derived, so that there is
+   one place it can be read and no second place to disagree with it. This is
+   the same derivation as the interview_state view, in the language of a page
+   that already has the rows in hand. */
+function slotState(slots) {
+  var live = [], picked = null, done = null, declined = false;
+  for (var i = 0; i < slots.length; i++) {
+    var s = slots[i];
+    if (s.confirmed_at) done = s;
+    if (s.chosen_at && !s.declined_at) picked = s;
+    if (s.declined_at) declined = true;
+    else live.push(s);
+  }
+  live.sort(function (a, b) { return new Date(a.starts_at) - new Date(b.starts_at); });
+  return {
+    slots: live,
+    picked: picked,
+    confirmed: done,
+    declined: declined && !live.length,
+    state: done ? "confirmed"
+         : picked ? "waiting_on_client"
+         : declined && !live.length ? "declined"
+         : live.length ? "waiting_on_assistant"
+         : "not_started"
+  };
 }
 
 function when(iso) {

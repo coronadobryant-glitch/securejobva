@@ -449,6 +449,9 @@ body:has(.adm__wrap) main{padding:0}
 .pill--ts_draft{background:var(--surface-2);color:var(--muted)}
 .pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
 .pill--ts_approved{background:#0B7A63;color:#fff}
+.pill--iv_go{background:#0B7A63;color:#fff}
+.pill--iv_wait{background:var(--signal);color:var(--signal-ink)}
+.pill--iv_none{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .pill--ts_returned{background:#B3261E;color:#fff}
 .pill--pl_matched{background:var(--surface-2);color:var(--ink-2)}
 .pill--pl_trial{background:var(--signal);color:var(--signal-ink)}
@@ -1304,6 +1307,107 @@ function wireTz() {
       tzFlash(ok, tzWhy(e), true);
     });
   });
+}
+
+/* ── an interview time, in two clocks ──────────────────────────────────────
+
+   sql/057. A slot is a timestamptz and is the one thing in this product that
+   genuinely means the same moment to two people in different places. Both of
+   them have to be able to read it as their own without doing arithmetic.
+
+   The second clock is Central, and always Central, rather than "the other
+   person's". That is not laziness — it is the only zone either side can
+   actually be shown. sql/056 makes a person's chosen zone readable by nobody
+   but themselves, deliberately, and neither can read the other's: an assistant
+   cannot read the client's seat request, and a client has no way to reach an
+   applicant's settings. Guessing at the other end and labelling the guess with
+   their name would be worse than naming a zone that is simply true.
+
+   Central is the business's own clock. It is what /admin already stamps a date
+   in, it is what the client is almost always on, and it is a thing both people
+   can name in a sentence to each other — which is the actual job here. */
+var CENTRAL = "America/Chicago";
+
+function slotDay(iso, zone) {
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  try {
+    return d.toLocaleString(undefined, {
+      timeZone: zone || undefined,
+      weekday: "short", day: "numeric", month: "short"
+    });
+  } catch (e) {
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }
+}
+
+function slotClock(iso, zone) {
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  try {
+    return d.toLocaleString(undefined, {
+      timeZone: zone || undefined, hour: "numeric", minute: "2-digit"
+    });
+  } catch (e) {
+    return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+}
+
+/* "Tue 8 Sep · 9:00 AM", in whatever the reader has chosen or their browser
+   believes. */
+function slotLabel(iso) {
+  return slotDay(iso, MY_TZ) + " \\u00b7 " + slotClock(iso, MY_TZ);
+}
+
+/* The line underneath. Left empty when the reader is already on Central,
+   because "9:00 AM · 9:00 AM Central" is noise rather than help.
+
+   The day is repeated only when it differs — which is exactly the case worth
+   spelling out, since 10:00 PM Manila on Tuesday is 9:00 AM Central on that
+   same Tuesday, and an assistant who reads only the clock can book herself
+   into the wrong night. */
+function slotAlso(iso, minutes) {
+  var mine = MY_TZ || browserTz();
+  var out = minutes ? String(minutes) + " minutes" : "";
+
+  if (mine && mine !== CENTRAL) {
+    var here = slotDay(iso, mine), there = slotDay(iso, CENTRAL);
+    out += (out ? " \\u00b7 " : "") +
+      (here === there
+        ? slotClock(iso, CENTRAL) + " Central"
+        : there + " " + slotClock(iso, CENTRAL) + " Central");
+  } else if (mine) {
+    out += (out ? " \\u00b7 " : "") + "Central";
+  }
+  return out;
+}
+
+/* Which of the two people the interview is sitting on, from the slots alone.
+   There is no status column in 057 — the state is derived, so that there is
+   one place it can be read and no second place to disagree with it. This is
+   the same derivation as the interview_state view, in the language of a page
+   that already has the rows in hand. */
+function slotState(slots) {
+  var live = [], picked = null, done = null, declined = false;
+  for (var i = 0; i < slots.length; i++) {
+    var s = slots[i];
+    if (s.confirmed_at) done = s;
+    if (s.chosen_at && !s.declined_at) picked = s;
+    if (s.declined_at) declined = true;
+    else live.push(s);
+  }
+  live.sort(function (a, b) { return new Date(a.starts_at) - new Date(b.starts_at); });
+  return {
+    slots: live,
+    picked: picked,
+    confirmed: done,
+    declined: declined && !live.length,
+    state: done ? "confirmed"
+         : picked ? "waiting_on_client"
+         : declined && !live.length ? "declined"
+         : live.length ? "waiting_on_assistant"
+         : "not_started"
+  };
 }
 
 function when(iso) {
@@ -2873,6 +2977,8 @@ var C_NAMES = [];
    nothing has been recorded, which is exactly what is true. */
 var C_PAID = [];
 var C_SETTLED = {};
+/* 057. Every interview time offered on this client's placements. */
+var C_SLOTS = [];
 var C_OFF = false;
 
 /* The statement adds up approved weeks, and the weeks are read with a limit,
@@ -2924,6 +3030,11 @@ function loadClient(email, rows) {
     api("client_payments?select=id,amount_cents,paid_on,method,reference&order=paid_on.desc")
       .catch(function () { return []; }),
     api("client_payment_weeks?select=timesheet_id")
+      .catch(function () { return []; }),
+    /* 057. Every time offered on any of this client's placements. The policy
+       returns only their own, so there is no filter here to get wrong. */
+    api("interview_slots?select=id,placement_id,starts_at,minutes,chosen_at," +
+        "confirmed_at,declined_at,meeting_url&order=starts_at.asc")
       .catch(function () { return []; })
   ]).catch(function (e) {
     if (String(e.message) === "signed out") throw e;
@@ -2931,7 +3042,7 @@ function loadClient(email, rows) {
        no placement is an ordinary thing rather than a fault. Either way the
        seats half of the page is unaffected. */
     C_OFF = true;
-    return [[], [], [], [], [], [], [], []];
+    return [[], [], [], [], [], [], [], [], []];
   }).then(function (r) {
     C_PLACE = r[0] || [];
     C_RATE = {};
@@ -2948,6 +3059,7 @@ function loadClient(email, rows) {
     C_PAID = r[6] || [];
     C_SETTLED = {};
     (r[7] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
+    C_SLOTS = r[8] || [];
     render(email, rows);
   });
 }
@@ -3112,6 +3224,248 @@ function billingBlock() {
   "</div>";
 }
 
+/* ── arranging the interview: the client's half ────────────────────────────
+
+   sql/057. Shown only while a placement is 'matched' — picked, and nobody has
+   met yet. Once it is confirmed the card becomes the details; once the
+   placement moves to 'trial' it goes entirely, because by then they have met.
+
+   The card is one function with four states rather than four cards, because
+   they are the same card at four moments and a client should watch it change
+   rather than watch cards appear and disappear underneath each other. */
+function interviewBlock(live) {
+  var mine = C_SLOTS.filter(function (s) { return s.placement_id === live.id; });
+  var st = slotState(mine);
+  var who = "your assistant";
+  for (var n = 0; n < C_NAMES.length; n++) {
+    if (C_NAMES[n].application_id === live.application_id && C_NAMES[n].name) {
+      who = C_NAMES[n].name;
+    }
+  }
+
+  var head = '<div class="card" data-iv="' + esc(live.id) + '"><h2>' +
+    (st.state === "confirmed" ? "Your interview" : "Arrange the interview") + "</h2>";
+
+  /* ── it is on ── */
+  if (st.confirmed) {
+    var c = st.confirmed;
+    return head +
+      '<p class="msg" style="margin-top:0">This is set. We have told ' + esc(who) + " it is on.</p>" +
+      '<div class="iv__meet">' +
+        '<span class="iv__k">When</span><span class="iv__v">' + esc(slotLabel(c.starts_at)) +
+          "</span>" +
+        (slotAlso(c.starts_at, c.minutes)
+          ? '<span class="iv__k">Also</span><span class="iv__v">' +
+            esc(slotAlso(c.starts_at, c.minutes)) + "</span>"
+          : "") +
+        '<span class="iv__k">Who</span><span class="iv__v">' + esc(who) + "</span>" +
+        '<span class="iv__k">Where</span><span class="iv__v">' +
+          (c.meeting_url
+            ? '<a href="' + esc(c.meeting_url) + '" rel="noopener noreferrer" target="_blank">' +
+              esc(c.meeting_url) + "</a>"
+            : "She will write to you at the address on this account.") +
+        "</span>" +
+      "</div>" +
+      '<div class="edit__foot"><span class="hint">Something come up? Take this time back and ' +
+        "offer others.</span>" +
+        '<span class="edit__act"><span class="row__ok" data-iv-ok></span>' +
+        '<button class="btn btn--ghost" data-iv-undo="' + esc(c.id) + '" type="button">' +
+        "Change the time</button></span></div>" +
+    "</div>";
+  }
+
+  var body = "";
+
+  /* ── she has picked one ── */
+  if (st.picked) {
+    body +=
+      '<p class="msg" style="margin-top:0">' + esc(who) + " has picked a time. Confirm it and we " +
+        "will tell her it is on.</p>" +
+      '<div class="iv__slots">' + slotRow(st.picked, "picked", "She picked this") + "</div>" +
+      '<div class="iv__add" style="grid-template-columns:1fr auto">' +
+        '<div class="fld"><label for="iv-link">Where you will meet ' +
+          '<em>&mdash; optional</em></label>' +
+          '<input id="iv-link" type="url" placeholder="https://meet.google.com/..." maxlength="500"></div>' +
+        '<button class="btn btn--solid" data-iv-confirm="' + esc(st.picked.id) + '" type="button">' +
+        "Confirm this time</button>" +
+      "</div>" +
+      '<p class="hint" style="margin-top:.7rem">Leave the link empty and we will give her the ' +
+        "email address on this account instead, so she has a way to reach you either way.</p>" +
+      '<div class="edit__foot"><span class="hint">Does that time not work after all?</span>' +
+        '<span class="edit__act"><span class="row__ok" data-iv-ok></span>' +
+        '<button class="btn btn--ghost" data-iv-drop="' + esc(st.picked.id) + '" type="button">' +
+        "Take it back</button></span></div>";
+    return head + body + "</div>";
+  }
+
+  /* ── none of them worked ── */
+  if (st.state === "declined") {
+    body += '<div class="note note--warn" style="margin-top:0"><b>None of those times worked for ' +
+      esc(who) + ".</b> Offer some others and she will pick one. She is on American hours, so " +
+      "your morning is usually her evening.</div>";
+  } else if (st.slots.length) {
+    body += '<p class="msg" style="margin-top:0">Offered to ' + esc(who) +
+      ". She will pick one, then you confirm it.</p>" +
+      '<div class="iv__slots">' +
+        st.slots.map(function (s) { return slotRow(s, "", "Offered"); }).join("") +
+      "</div>";
+  } else {
+    body += '<p class="msg" style="margin-top:0">' + esc(who) + " is matched to your seat. Offer " +
+      "a few times that suit you and she will pick one. Twenty to thirty minutes is usually " +
+      "plenty.</p>";
+  }
+
+  /* The proposer. Two offered times is the smallest number that is actually a
+     choice, so the hint says so rather than letting somebody offer one and
+     wonder why it reads as an instruction. */
+  body +=
+    '<div class="iv__add">' +
+      '<div class="fld"><label for="iv-day">Another time</label>' +
+        '<input id="iv-day" type="date" min="' + esc(todayLocal()) + '"></div>' +
+      '<div class="fld"><label for="iv-at">Starting at</label>' +
+        '<input id="iv-at" type="time" value="09:00"></div>' +
+      '<div class="fld"><label for="iv-mins">For</label>' +
+        '<select id="iv-mins">' +
+          '<option value="20">20 minutes</option>' +
+          '<option value="30" selected>30 minutes</option>' +
+          '<option value="45">45 minutes</option>' +
+          '<option value="60">an hour</option>' +
+        "</select></div>" +
+      '<button class="btn btn--ghost" data-iv-offer="' + esc(live.id) + '" type="button">Offer it</button>' +
+    "</div>" +
+    '<div class="edit__foot"><span class="hint">' +
+      (st.slots.length < 2
+        ? "Two or three times gives her a real choice. One is an instruction."
+        : "She sees these in her own time zone, with yours beside them.") +
+    '</span><span class="edit__act"><span class="row__ok" data-iv-ok></span></span></div>';
+
+  return head + body + "</div>";
+}
+
+/* One row, shared by every state of the card above. */
+function slotRow(s, cls, tag) {
+  var also = slotAlso(s.starts_at, s.minutes);
+  return '<div class="iv__slot' + (cls ? " iv__slot--" + cls : "") + '">' +
+    '<span class="iv__mk"></span>' +
+    "<span>" +
+      '<span class="iv__d">' + esc(slotLabel(s.starts_at)) + "</span>" +
+      (also ? '<span class="iv__z">' + esc(also) + "</span>" : "") +
+    "</span>" +
+    '<span class="iv__tag' + (cls === "picked" ? " iv__tag--go" : "") + '">' + esc(tag) + "</span>" +
+    (cls === "" ? '<button class="lnk" data-iv-drop="' + esc(s.id) + '" type="button">Take back</button>' : "") +
+  "</div>";
+}
+
+/* The date input's floor. Not todayCentral() — this one is about what the
+   person in front of the browser may pick from their own calendar, and a
+   client in California should not be told that this morning is in the past
+   because Houston is two hours ahead of them. */
+function todayLocal() {
+  var d = new Date();
+  var p = function (n) { return String(n).padStart(2, "0"); };
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+function wireInterview() {
+  var root = document.getElementById("pt-root");
+  if (!root) return;
+
+  root.addEventListener("click", function (e) {
+    var card = e.target.closest("[data-iv]");
+    if (!card) return;
+    var ok = card.querySelector("[data-iv-ok]");
+
+    var offer = e.target.closest("[data-iv-offer]");
+    if (offer) { offerSlot(offer, card, ok); return; }
+
+    var drop = e.target.closest("[data-iv-drop], [data-iv-undo]");
+    if (drop) {
+      var id = drop.getAttribute("data-iv-drop") || drop.getAttribute("data-iv-undo");
+      var undo = !!drop.getAttribute("data-iv-undo");
+      if (undo && !window.confirm(
+            "Take this interview back?\\n\\nThe time stops being confirmed and you can offer " +
+            "others. We will tell her it has changed.")) {
+        return;
+      }
+      ivCall("rpc/withdraw_interview_slot", { slot: id }, drop, ok);
+      return;
+    }
+
+    var conf = e.target.closest("[data-iv-confirm]");
+    if (conf) {
+      var link = document.getElementById("iv-link");
+      var url = link ? link.value.trim() : "";
+      if (url && !/^https?:\\/\\//i.test(url)) {
+        ivFlash(ok, "A meeting link should start with https://", true);
+        link.focus();
+        return;
+      }
+      ivCall("rpc/confirm_interview", { slot: conf.getAttribute("data-iv-confirm"), url: url || null },
+             conf, ok);
+    }
+  });
+}
+
+function offerSlot(btn, card, ok) {
+  var day = document.getElementById("iv-day");
+  var at = document.getElementById("iv-at");
+  var mins = document.getElementById("iv-mins");
+  if (!day || !at) return;
+
+  if (!day.value) { ivFlash(ok, "Pick a day", true); day.focus(); return; }
+  if (!at.value) { ivFlash(ok, "Pick a time", true); at.focus(); return; }
+
+  /* Built from the parts in the reader's own browser and sent as an instant.
+     new Date("2026-09-08T09:00") is local, which is what somebody typing into
+     a date and a time field means — and toISOString then turns it into the
+     moment that is, which is what the column holds. */
+  var when_ = new Date(day.value + "T" + at.value);
+  if (isNaN(when_)) { ivFlash(ok, "That is not a time we can read", true); return; }
+  if (when_ < new Date()) { ivFlash(ok, "That time has already passed", true); return; }
+
+  ivCall("rpc/offer_interview", {
+    placement: btn.getAttribute("data-iv-offer"),
+    at_time: when_.toISOString(),
+    mins: Number(mins && mins.value) || 30
+  }, btn, ok);
+}
+
+/* One path for all five, because they fail the same way and every one of them
+   ends with the page being redrawn from what the database now says rather than
+   from what this browser thinks it just did. */
+function ivCall(fn, body, btn, ok) {
+  btn.disabled = true;
+  ivFlash(ok, "Saving…");
+  api(fn, { method: "POST", body: body })
+    .then(function () { location.reload(); })
+    .catch(function (e) {
+      btn.disabled = false;
+      ivFlash(ok, ivWhy(e), true);
+    });
+}
+
+function ivFlash(el, text, bad) {
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
+  el.classList.add("is-on");
+  clearTimeout(el._t);
+  if (!bad) el._t = setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+}
+
+/* The messages these functions raise are written to be read by the person who
+   caused them — "she has not picked that time", "that time has already
+   passed" — so they are shown rather than swallowed behind "did not save". */
+function ivWhy(e) {
+  var t = String((e && e.message) || e || "");
+  if (t === "signed out") return "Signed out — reload and sign in again";
+  try {
+    var j = JSON.parse(t);
+    return (j.message || t).replace(/^ERROR:\\s*/i, "").slice(0, 180);
+  } catch (x) {}
+  return t.slice(0, 180) || "That did not save";
+}
+
 function placeBlock(live, k) {
   /* Every id below carries this, because there are now several of these on the
      page and an id that appears twice is a control that operates on somebody
@@ -3156,6 +3510,16 @@ function placeBlock(live, k) {
   for (var j = 0; j < C_STARTS.length; j++) {
     if (C_STARTS[j].placement_id === live.id) { said = C_STARTS[j]; break; }
   }
+  /* Also drawn on trial, as details rather than as a form: the meeting is
+     often still ahead of the day they said yes, and a card that vanishes the
+     moment a client presses Accept takes the joining link with it. */
+  if (live.status === "matched" ||
+      (live.status === "trial" && C_SLOTS.some(function (x) {
+        return x.placement_id === live.id && x.confirmed_at;
+      }))) {
+    html += interviewBlock(live);
+  }
+
   if (live.status === "matched") {
     html +=
       '<div class="card">' +
@@ -3311,6 +3675,7 @@ function placeBlock(live, k) {
    So the section is found first and every control is looked up inside it.
    Nothing here reaches out to the document. */
 function wireClient() {
+  wireInterview();
   var blocks = document.querySelectorAll("[data-place-block]");
   Array.prototype.forEach.call(blocks, function (sec) {
     wireWeeks(sec);
@@ -4871,6 +5236,7 @@ function loadPlacements() {
       RATES[p.placement_id].pay = p.rate;
     });
     drawPlacements(box, r[4] || []);
+    loadInterviews();
     loadPayments();
   }).catch(function (e) {
     box.innerHTML = '<p class="msg msg--bad">Could not load placements: ' + esc(why(e)) + "</p>";
@@ -4906,7 +5272,8 @@ function drawPlacements(box, swaps) {
   var free = hired.filter(function (a) { return !placedNow[a.id]; });
 
   var open = swaps.filter(function (s) { return s.status === "open"; });
-  badge("tab-place", open.length);
+  SWAPS_OPEN = open.length;
+  placeBadge();
 
   var clientOpts = CLIENTS.map(function (c) {
     return '<option value="' + esc(c.id) + '">' + esc(c.name) + "</option>";
@@ -5467,6 +5834,129 @@ function drawSeats(box, rows) {
    010 stored contact messages and gave staff a policy to read them, and there
    was nowhere to do it. A form that writes to a table nobody opens is a form
    that loses messages politely. */
+
+/* ── interviews being arranged ─────────────────────────────────────────────
+
+   sql/057. Not a fourth screen. Staff do not arrange these — the client and
+   the assistant settle it between themselves, which is the whole decision
+   behind that file. What staff need is the one thing neither of those two can
+   see: that something has been sitting for a week.
+
+   So this is a list ordered by who is stuck, worst first, and nothing on it is
+   a control. Reading it and picking up the phone is the intervention. */
+var IV_STATE = [];
+
+/* The two things behind the Placements tab that are worth a number on it: swap
+   requests somebody has to resolve, and interviews that have stalled. Kept as
+   two counts and one setter, because both panels redraw independently and each
+   calling badge() with only its own half made the tab flicker between two
+   different truths. */
+var IV_STUCK = 0;
+var SWAPS_OPEN = 0;
+function placeBadge() { badge("tab-place", SWAPS_OPEN + IV_STUCK); }
+
+var IV_LABEL = {
+  confirmed:            ["On", "go"],
+  waiting_on_client:    ["Client", "wait"],
+  waiting_on_assistant: ["Assistant", "wait"],
+  declined:             ["Offer more", "wait"],
+  not_started:          ["Not started", "none"]
+};
+
+/* The order somebody works down. Confirmed is last because it is the one row
+   that needs nothing — it is here so the list is the whole picture rather than
+   only the bad news. */
+var IV_ORDER = ["waiting_on_client", "waiting_on_assistant", "declined", "not_started", "confirmed"];
+
+function loadInterviews() {
+  var box = document.getElementById("iv-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading interviews&hellip;';
+  api("interview_state?select=placement_id,client_id,application_id,offered,earliest," +
+      "chosen_at,confirmed_at,state,days_waiting")
+    .then(function (rows) { IV_STATE = rows || []; drawInterviews(box); })
+    .catch(function () {
+      box.innerHTML =
+        "<h2>Interviews being arranged</h2>" +
+        '<div class="note"><b>Not switched on yet.</b> Paste <code>sql/057</code> and this ' +
+        "shows every match waiting on an interview, and which of the two people it is waiting " +
+        "on.</div>";
+    });
+}
+
+function drawInterviews(box) {
+  var byId = {};
+  ALL.forEach(function (a) { byId[a.id] = a; });
+  var clientName = {};
+  CLIENTS.forEach(function (c) { clientName[c.id] = c.name; });
+
+  var rows = IV_STATE.slice().sort(function (a, b) {
+    var d = IV_ORDER.indexOf(a.state) - IV_ORDER.indexOf(b.state);
+    return d !== 0 ? d : (b.days_waiting || 0) - (a.days_waiting || 0);
+  });
+
+  /* Anything sitting for a week is worth interrupting for. Not a rule the
+     database enforces — nothing here blocks — just the line at which a list
+     stops being information and starts being a job. */
+  var stuck = rows.filter(function (r) {
+    return r.state !== "confirmed" && (r.days_waiting || 0) >= 7;
+  });
+  /* Not badge() directly. Two panels live behind this tab now — open swap
+     requests and stalled interviews — and each calling badge() with its own
+     count means whichever draws last erases the other's. */
+  IV_STUCK = stuck.length;
+  placeBadge();
+
+  box.innerHTML =
+    "<h2>Interviews being arranged</h2>" +
+    '<p class="msg" style="margin-top:0">Every matched placement where the two of them have not ' +
+      "met yet. Nobody here is waiting on us &mdash; they arrange it themselves &mdash; so this " +
+      "is only for spotting the ones that have stopped moving.</p>" +
+
+    (stuck.length
+      ? '<div class="note note--warn" style="margin-top:1.1rem"><b>' + esc(String(stuck.length)) +
+        (stuck.length === 1 ? " has" : " have") + " been sitting for a week or more.</b> " +
+        "Worth a message to whichever side it is waiting on.</div>"
+      : "") +
+
+    (rows.length
+      ? '<div class="rows" style="margin-top:1rem">' + rows.map(function (r) {
+          var a = byId[r.application_id];
+          var lab = IV_LABEL[r.state] || ["&mdash;", "none"];
+          return '<div class="row">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(a ? a.name : "Unknown assistant") +
+                " &middot; " + esc(clientName[r.client_id] || "unknown client") + "</span>" +
+              '<span class="row__meta"> &middot; ' + esc(ivSays(r)) + "</span>" +
+            "</span>" +
+            '<span class="pill pill--iv_' + esc(lab[1]) + '">' + lab[0] + "</span></div>" +
+          "</div>";
+        }).join("") + "</div>"
+      : '<div class="note" style="margin-top:1.1rem"><b>Nothing being arranged.</b> ' +
+        "This fills in when a placement is set to matched.</div>");
+}
+
+/* One sentence per row, and it has to carry the two things somebody reads:
+   where it has got to, and how long it has been there. */
+function ivSays(r) {
+  var days = Number(r.days_waiting || 0);
+  var age = days === 0 ? "today" : days === 1 ? "1 day" : days + " days";
+
+  if (r.state === "confirmed") {
+    return "confirmed for " + whenTime(r.earliest);
+  }
+  if (r.state === "waiting_on_client") {
+    return "she picked a time — waiting on the client for " + age;
+  }
+  if (r.state === "waiting_on_assistant") {
+    return r.offered + (r.offered === 1 ? " time" : " times") +
+      " offered — waiting on her for " + age;
+  }
+  if (r.state === "declined") {
+    return "none of the times worked — the client needs to offer more, " + age + " ago";
+  }
+  return "matched " + age + " ago — no times offered yet";
+}
 
 /* ── money in ──────────────────────────────────────────────────────────────
 
@@ -6646,6 +7136,7 @@ function render(email, apps, notes, socials, docs, disc, sits) {
       '<div class="card" id="notice-card"></div></div>' +
     '<div data-pane="hours" hidden><div class="card" id="ts-card"></div></div>' +
     '<div data-pane="place" hidden><div class="card" id="place-card"></div>' +
+      '<div class="card" id="iv-card"></div>' +
       '<div class="card" id="pay-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
@@ -7649,7 +8140,11 @@ function render(a, leaves, notices) {
         "</div>" +
 
         '<div class="hub__body">' +
-          '<div data-hpane="home">' + overviewCard(leaves, notices) + "</div>" +
+          /* 057. Above the overview and only while there is one to arrange.
+             An interview she has not answered is the most urgent thing on this
+             page by some distance — it is the conversation that decides the
+             seat, and it is sitting on her. */
+          '<div data-hpane="home">' + interviewCard(PLACE) + overviewCard(leaves, notices) + "</div>" +
           '<div data-hpane="hours" hidden><div class="card" id="hours">' + hoursCard() + "</div></div>" +
           '<div data-hpane="client" hidden>' + clientCard() + "</div>" +
           '<div data-hpane="leave" hidden>' +
@@ -7715,6 +8210,7 @@ function render(a, leaves, notices) {
 
   document.getElementById("out").addEventListener("click", signOut);
   wireHubTabs();
+  wireInterviewHub();
   wireTz();
   wireSettings(a);
   wireLeave();
@@ -7724,6 +8220,174 @@ function render(a, leaves, notices) {
 
 /* Press a thing on the left, the right changes. An anchor scrolled the page to
    a card further down, which is not what a rail is for. */
+/* ── the interview: her half ───────────────────────────────────────────────
+
+   sql/057. The client offers times; she picks one. This is the whole of her
+   side of it, and the reason 056 was worth building: the times arrive as
+   instants and she reads them on her own clock, with Central underneath.
+
+   Two of the three times a Houston client offers will land in her night. They
+   are shown anyway. Hiding a 3:00 AM would be the page deciding for her what
+   she can work, and she is the one who knows. Naming it in her own clock is
+   what lets her decide rather than discover. */
+var H_SLOTS = [];
+
+function interviewCard(pl) {
+  if (!pl) return "";
+  var mine = H_SLOTS.filter(function (s) { return s.placement_id === pl.id; });
+  var st = slotState(mine);
+  if (st.state === "not_started") return "";
+
+  var firm = (pl.clients && pl.clients.name) || "the client";
+
+  if (st.confirmed) {
+    var c = st.confirmed;
+    return '<div class="card" id="iv-card"><h2>Your interview with ' + esc(firm) + "</h2>" +
+      '<p class="msg" style="margin-top:0">This is set. Put it in your calendar now &mdash; ' +
+        "it is the conversation that decides the seat.</p>" +
+      '<div class="iv__meet">' +
+        '<span class="iv__k">When</span><span class="iv__v">' + esc(slotLabel(c.starts_at)) + "</span>" +
+        (slotAlso(c.starts_at, c.minutes)
+          ? '<span class="iv__k">Also</span><span class="iv__v">' +
+            esc(slotAlso(c.starts_at, c.minutes)) + "</span>"
+          : "") +
+        '<span class="iv__k">Where</span><span class="iv__v">' +
+          (c.meeting_url
+            ? '<a href="' + esc(c.meeting_url) + '" rel="noopener noreferrer" target="_blank">' +
+              esc(c.meeting_url) + "</a>"
+            : "They will write to you at the address on your application.") +
+        "</span>" +
+      "</div>" +
+      '<p class="hint" style="margin-top:.9rem">If something goes wrong on the day, write to ' +
+        '<a href="/contact?about=work">us</a> rather than leaving them waiting.</p>' +
+    "</div>";
+  }
+
+  if (st.state === "declined") {
+    return '<div class="card" id="iv-card"><h2>Your interview with ' + esc(firm) + "</h2>" +
+      '<div class="note" style="margin-top:0"><b>You said none of those times worked.</b> ' +
+      "They have been told, and they will offer some others. Nothing else is needed from you " +
+      "right now.</div></div>";
+  }
+
+  if (st.picked) {
+    return '<div class="card" id="iv-card"><h2>Your interview with ' + esc(firm) + "</h2>" +
+      '<p class="msg" style="margin-top:0">You picked this one. They confirm it next, and you ' +
+        "will see the joining details here once they do.</p>" +
+      '<div class="iv__slots">' + hubSlot(st.picked, true) + "</div>" +
+      '<div class="edit__foot"><span class="hint">Changed your mind? Pick another time and this ' +
+        "one goes back.</span></div>" +
+      '<div class="iv__slots">' +
+        st.slots.filter(function (s) { return s.id !== st.picked.id; })
+          .map(function (s) { return hubSlot(s, false); }).join("") +
+      "</div>" +
+      '<span class="row__ok" id="iv-ok"></span>' +
+    "</div>";
+  }
+
+  return '<div class="card" id="iv-card"><h2>Your interview with ' + esc(firm) + "</h2>" +
+    '<p class="msg" style="margin-top:0">They have offered ' + esc(String(st.slots.length)) +
+      (st.slots.length === 1 ? " time" : " times") + ". Pick the one that works and they will " +
+      "confirm it. Times are shown on your clock, with theirs underneath.</p>" +
+    '<div class="iv__slots">' +
+      st.slots.map(function (s) { return hubSlot(s, false); }).join("") +
+    "</div>" +
+    '<div class="edit__foot">' +
+      '<span class="hint">None of them any good? Say so and they will offer others &mdash; that ' +
+        "is a normal thing to do, not a problem.</span>" +
+      '<span class="edit__act"><span class="row__ok" id="iv-ok"></span>' +
+      '<button class="btn btn--ghost" id="iv-none" data-iv-place="' + esc(pl.id) + '" type="button">' +
+      "None of these work</button></span>" +
+    "</div>" +
+  "</div>";
+}
+
+function hubSlot(s, picked) {
+  var also = slotAlso(s.starts_at, s.minutes);
+  return '<div class="iv__slot iv__slot--pick' + (picked ? " iv__slot--picked" : "") +
+      '" data-iv-pick="' + esc(s.id) + '" role="button" tabindex="0">' +
+    '<span class="iv__mk"></span>' +
+    "<span>" +
+      '<span class="iv__d">' + esc(slotLabel(s.starts_at)) + "</span>" +
+      (also ? '<span class="iv__z">' + esc(also) + "</span>" : "") +
+    "</span>" +
+    '<span class="iv__tag' + (picked ? " iv__tag--go" : "") + '">' +
+      (picked ? "Your pick" : "Choose") + "</span>" +
+  "</div>";
+}
+
+function wireInterviewHub() {
+  var card = document.getElementById("iv-card");
+  if (!card) return;
+
+  function ok() { return document.getElementById("iv-ok"); }
+
+  function pick(el) {
+    var id = el.getAttribute("data-iv-pick");
+    if (!id) return;
+    el.style.pointerEvents = "none";
+    ivhFlash(ok(), "Saving…");
+    api("rpc/choose_interview", { method: "POST", body: { slot: id } })
+      .then(function () { location.reload(); })
+      .catch(function (e) {
+        el.style.pointerEvents = "";
+        ivhFlash(ok(), ivhWhy(e), true);
+      });
+  }
+
+  card.addEventListener("click", function (e) {
+    var slot = e.target.closest("[data-iv-pick]");
+    if (slot) { pick(slot); return; }
+
+    var none = e.target.closest("#iv-none");
+    if (none) {
+      if (!window.confirm(
+            "Tell them none of these times work?\\n\\nThey will be asked to offer others. " +
+            "This is a normal thing to do.")) {
+        return;
+      }
+      none.disabled = true;
+      ivhFlash(ok(), "Saving…");
+      api("rpc/decline_interviews", { method: "POST", body: { placement: none.getAttribute("data-iv-place") } })
+        .then(function () { location.reload(); })
+        .catch(function (e) {
+          none.disabled = false;
+          ivhFlash(ok(), ivhWhy(e), true);
+        });
+    }
+  });
+
+  /* A row that behaves like a button has to answer the keyboard like one.
+     Choosing an interview time with the keyboard is not an edge case — it is
+     how somebody who does not use a mouse uses this page at all. */
+  card.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var slot = e.target.closest("[data-iv-pick]");
+    if (!slot) return;
+    e.preventDefault();
+    pick(slot);
+  });
+}
+
+function ivhFlash(el, text, bad) {
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
+  el.classList.add("is-on");
+  clearTimeout(el._t);
+  if (!bad) el._t = setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+}
+
+function ivhWhy(e) {
+  var t = String((e && e.message) || e || "");
+  if (t === "signed out") return "Signed out — reload and sign in again";
+  try {
+    var j = JSON.parse(t);
+    return (j.message || t).replace(/^ERROR:\\s*/i, "").slice(0, 180);
+  } catch (x) {}
+  return t.slice(0, 180) || "That did not save";
+}
+
 function wireHubTabs() {
   var rail = document.querySelector(".rail");
   if (!rail) return;
@@ -7864,6 +8528,14 @@ function load() {
             if (String(e.message) === "signed out") throw e;
             PLACE_OFF = true;
             return [];
+          }),
+        /* 057. Every time a client has offered her. The policy returns only
+           the placements she is on, so there is no filter here to get wrong. */
+        api("interview_slots?select=id,placement_id,starts_at,minutes,chosen_at," +
+            "confirmed_at,declined_at,meeting_url&order=starts_at.asc")
+          .catch(function (e) {
+            if (String(e.message) === "signed out") throw e;
+            return [];
           })
       ]).then(function (r) {
         /* The live one, if there is one. A placement that has ended is history
@@ -7876,6 +8548,7 @@ function load() {
         (r[2] || []).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
         /* Opens on the week in progress. Anything older is a click away in the
            list underneath, which is where a week you have to fix will be. */
+        H_SLOTS = r[4] || [];
         VIEW = isoDay(mondayOf(new Date()));
         render(a, r[0] || [], r[1] || []);
       });
@@ -7949,6 +8622,35 @@ const SEATS_CSS = `
 .bill__totl{font-weight:700;font-size:1.02rem}
 .bill__totv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-weight:700;font-size:1.35rem;color:var(--ink)}
+/* 057. The interview card, shared by /seats and /hub. Both pages carry these
+   rules because both draw the same rows; the two scripts differ, the markup
+   does not. */
+.iv__slots{display:grid;gap:.45rem;margin-top:1rem}
+.iv__slot{display:grid;grid-template-columns:auto 1fr auto auto;gap:.2rem .8rem;align-items:center;
+  padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.iv__slot--picked{border-color:var(--accent);background:var(--accent-soft)}
+.iv__slot--pick{cursor:pointer}
+.iv__slot--pick:hover{border-color:var(--accent)}
+.iv__mk{width:1.05rem;height:1.05rem;border-radius:50%;border:2px solid var(--line)}
+.iv__slot--picked .iv__mk{border-color:var(--accent);background:var(--accent);
+  box-shadow:inset 0 0 0 3px var(--surface)}
+.iv__d{display:block;font-weight:700;font-size:.92rem;font-variant-numeric:tabular-nums}
+.iv__z{display:block;font-size:.79rem;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:.1rem}
+.iv__tag{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.09em;
+  text-transform:uppercase;padding:.2rem .45rem;border-radius:5px;white-space:nowrap;
+  border:1px solid var(--line);color:var(--muted)}
+.iv__tag--go{background:#0B7A63;border-color:#0B7A63;color:#fff}
+.iv__add{display:grid;gap:.5rem;margin-top:1.1rem}
+@media(min-width:38rem){.iv__add{grid-template-columns:1fr 1fr 1fr auto;align-items:end}}
+.iv__meet{margin-top:1rem;display:grid;gap:.2rem .9rem;grid-template-columns:auto 1fr;
+  padding:.95rem 1.05rem;border:1px solid #0B7A63;border-radius:9px;background:var(--surface-2)}
+.iv__k{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);align-self:center}
+.iv__v{font-weight:700;font-size:.93rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+@media(max-width:32rem){
+  .iv__slot{grid-template-columns:auto 1fr}
+  .iv__tag{grid-column:2}
+}
 .bill__pay{margin-top:1.3rem;padding:1.1rem 1.2rem;border:1px dashed var(--line);border-radius:9px;
   background:var(--surface-2)}
 .bill__payh{font-weight:700;margin:0 0 .35rem}

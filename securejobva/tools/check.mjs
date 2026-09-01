@@ -1828,7 +1828,10 @@ await check("no generated page has lost a fix to its generator", () => {
     ["seats.html",  "Left to pay",          "the total that comes down when somebody pays"],
     ["status.html", "function tzCard",      "the applicant's time zone setting"],
     ["hub.html",    "function tzCard",      "the assistant's time zone setting"],
-    ["seats.html",  "function tzCard",      "the client's time zone setting"]
+    ["seats.html",  "function tzCard",      "the client's time zone setting"],
+    ["seats.html",  "function interviewBlock", "the client's half of the interview"],
+    ["hub.html",    "function interviewCard",  "the assistant's half of the interview"],
+    ["admin.html",  "function drawInterviews", "which interviews have stalled"]
   ];
   const lost = [];
   for (const [file, marker, what] of MARKERS) {
@@ -1886,6 +1889,20 @@ await check("a chosen time zone moves instants and never dates", async () => {
     return (out.match(/^ {2}ok/gm) || []).length + " behaviours across three portals";
   } catch (e) {
     throw new Error("tools/test-timezone.mjs failed — run it directly for the detail");
+  }
+});
+
+/* The interview handshake from sql/057, rendered from both sides of the same
+   rows in the same tick. The failure worth catching is not a broken page: it
+   is a client who believes they are waiting on her while she believes she is
+   waiting on them. Neither screen looks wrong, and the match quietly dies. */
+await check("both sides of an interview are told the same thing", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-interview.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, client and assistant";
+  } catch (e) {
+    throw new Error("tools/test-interview.mjs failed — run it directly for the detail");
   }
 });
 

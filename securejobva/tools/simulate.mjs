@@ -79,15 +79,24 @@ const hub = new Function("esc",
    learned to draw more than one of them. clientBlock is now the loop around
    it, so pulling only the loop into the sandbox gets a ReferenceError rather
    than a walk — which is what happened, and is the harness doing its job. */
-const seatFns = ["when", "cIso", "cFrom", "cHours", "cNum", "cMoney", "cWeekLabel", "cDays",
+/* The interview card arrived with sql/057 and placeBlock draws it, so the
+   sandbox needs its helpers as well as its rows. C_SLOTS stays empty through
+   this walk — the person it follows is placed and long past the interview —
+   which is precisely the state that card is supposed to render as nothing at
+   all, and worth having the walk assert by not tripping over it. */
+const seatFns = ["when", "tzOpts", "browserTz", "slotDay", "slotClock", "slotLabel",
+                 "slotAlso", "slotState", "cIso", "cFrom", "cHours", "cNum", "cMoney",
+                 "cWeekLabel", "cDays", "todayLocal", "slotRow", "interviewBlock",
                  "clientBlock", "placeBlock"];
 const seats = new Function("esc",
   varOf(SEATS, "C_LABEL") + "\n" + 'var C_DAY = ["M","T","W","T","F","S","S"];\n' +
   "var C_PLACE = [], C_RATE = {}, C_WEEKS = [], C_SWAPS = [], C_STARTS = [], C_NAMES = [], C_OFF = false;\n" +
+  "var C_SLOTS = [], MY_TZ = null, CENTRAL = 'America/Chicago';\n" +
   "var C_WEEK_LIMIT = 260, C_TRUNCATED = false;\n" +
   seatFns.map((n) => grab(SEATS, n)).join("\n") +
   "\nreturn { set: function (s) { C_PLACE = s.C_PLACE; C_RATE = s.C_RATE; C_WEEKS = s.C_WEEKS;" +
-  " C_SWAPS = s.C_SWAPS; C_STARTS = s.C_STARTS || []; C_NAMES = s.C_NAMES || []; }, " + seatFns.map((n) => n + ": " + n).join(", ") + " };"
+  " C_SWAPS = s.C_SWAPS; C_STARTS = s.C_STARTS || []; C_NAMES = s.C_NAMES || [];" +
+  " C_SLOTS = s.C_SLOTS || []; }, " + seatFns.map((n) => n + ": " + n).join(", ") + " };"
 )(esc);
 
 /* ── the mail, through the real endpoint ────────────────────────────────── */

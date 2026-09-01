@@ -470,6 +470,78 @@ resendStatus = 500;
 is("a failed swap email is retried", (await call(SWAP)).code, 502);
 resendStatus = 200;
 
+/* ── the interview handshake ─────────────────────────────────────────────
+   sql/057 and 058. Four moments, and the thing worth checking about all of
+   them is who they reach: this is the one exchange in the product staff are
+   not part of, and an email to you here would quietly undo that decision. */
+
+/* 9:00 AM Central on Tuesday 8 September 2026. */
+const IV_AT = "2026-09-08T14:00:00.000Z";
+const iv = (event, over) => ({
+  type: "STATUS", event, table: "interview_slots",
+  person: over && over.person ? over.person : { name: "Maricel Ordoñez", email: "maricel@example.com" },
+  record: Object.assign({
+    id: "iv1", side: "assistant", other: "Rosehill Plumbing",
+    starts_at: IV_AT, minutes: 30, meeting_url: null
+  }, (over && over.record) || {})
+});
+
+all = [];
+const offered = await call(iv("offered"));
+is("times offered reach the assistant", offered.code, 200);
+is("and only her", sent.body.to, ["maricel@example.com"]);
+is("staff are not copied", JSON.stringify(sent.body.to).includes("david@example.com"), false);
+is("she is pointed at her own portal", sent.body.text.includes("/hub"), true);
+is("and told she may refuse them", sent.body.text.includes("none of them work"), true);
+is("exactly one email", all.length, 1);
+
+all = [];
+const picked = await call(iv("picked", {
+  person: { name: "Dana Whitfield", email: "dana@rosehill.example" },
+  record: { side: "client", other: "Maricel Ordoñez" }
+}));
+is("a pick reaches the client", picked.code, 200);
+is("and only them", sent.body.to, ["dana@rosehill.example"]);
+is("the time is named in Central",
+  sent.body.subject.includes("picked") && sent.body.text.includes("Central"), true);
+is("the time itself is the client's morning", sent.body.text.includes("9:00"), true,
+  "the email cannot know the reader's zone, so it names one and says which");
+is("they are sent to confirm it", sent.body.text.includes("/seats"), true);
+
+all = [];
+await call(iv("declined", {
+  person: { name: "Dana Whitfield", email: "dana@rosehill.example" },
+  record: { side: "client", other: "Maricel Ordoñez" }
+}));
+is("a refusal reaches the client", sent.body.to, ["dana@rosehill.example"]);
+is("and asks for other times", sent.body.text.includes("Offer a few others"), true,
+  "silence and a refusal must not look the same to the person waiting");
+
+all = [];
+await call(iv("confirmed", { record: { side: "assistant", meeting_url: "https://meet.example/abc" } }));
+is("a confirmation reaches her", sent.body.to, ["maricel@example.com"]);
+is("with the joining link", sent.body.text.includes("https://meet.example/abc"), true);
+is("and is told the time is in the client's clock", sent.body.text.includes("Central"), true);
+
+all = [];
+await call(iv("confirmed", {
+  person: { name: "Dana Whitfield", email: "dana@rosehill.example" },
+  record: { side: "client", other: "Maricel Ordoñez" }
+}));
+is("the client's copy goes to them", sent.body.to, ["dana@rosehill.example"]);
+is("and says she has been told", sent.body.text.includes("She has been told"), true);
+is("with no link, she is still reachable",
+  sent.body.text.includes("write to you at the address"), true);
+
+/* No `arrived` shape exists for this table, which is what keeps staff out of
+   it. Asking for one must send nothing rather than falling through to the
+   branch that mails you and Bryant. */
+all = [];
+const ivStaff = await call(iv("arrived"));
+is("there is no staff copy of an interview", all.length, 0);
+is("and asking for one is skipped", ivStaff.code, 200);
+is("by name", ivStaff.body.skipped, "interview_slots/arrived");
+
 /* ── the retry rule, which is the whole point of splitting them ── */
 resendStatus = 500;
 is("a failed email to you is retried", (await call(WEEK)).code, 502);

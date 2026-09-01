@@ -180,6 +180,34 @@ function firstName(s) {
   return String(s || "").trim().split(/\s+/)[0] || "there";
 }
 
+/* An interview time, for an email.
+
+   Every other date in these messages is a plain date and means the same day to
+   everybody. This one is a timestamptz and genuinely does not: 9:00 AM in
+   Houston is 10:00 PM in Manila. The pages render it in whichever clock the
+   reader has chosen, and an email cannot know that — so it names Central, in
+   as many words, and lets them convert once rather than wonder for ever.
+
+   Central by name rather than by offset, because the offset changes twice a
+   year and nobody reading this email will be checking which side of March it
+   is on. */
+function slotText(r) {
+  const d = new Date(r && r.starts_at);
+  if (isNaN(d)) return "the time you agreed";
+  let when;
+  try {
+    when = d.toLocaleString("en-US", {
+      timeZone: "America/Chicago",
+      weekday: "long", day: "numeric", month: "long",
+      hour: "numeric", minute: "2-digit"
+    });
+  } catch (e) {
+    when = d.toUTCString();
+  }
+  const mins = Number(r.minutes || 0);
+  return when + " Central" + (mins ? ", " + mins + " minutes" : "");
+}
+
 function fullDate(iso) {
   const p = String(iso || "").split("-");
   if (p.length !== 3) return "";
@@ -244,6 +272,104 @@ const STAGE_MAIL = {
 };
 
 const DECIDE = {
+  /* ── an interview being arranged ────────────────────────────────────────
+     sql/057 and sql/058. Four moments, each addressed to the one person who
+     now has to do something. None of them goes to staff: this is the one
+     exchange in the product a client and an assistant settle between
+     themselves, and mailing us every offered time would quietly undo that.
+
+     There is no `arrived` half, which is what keeps that true — the branch in
+     decision() that mails you and Bryant cannot be reached from here. */
+  interview_slots: {
+    offered: (r, p, site) => ({
+      subject: r.other + " have suggested interview times",
+      text: [
+        "Hi " + firstName(p.name) + ",", "",
+        r.other + " want to meet you and have suggested some times.",
+        "", "Open " + site + "/hub and pick the one that works. They are shown on your own " +
+        "clock, with the client's underneath.",
+        "", "If none of them work, say so on that page and they will offer others. That is a " +
+        "normal thing to do.",
+        "", "SecureJobVA"].join("\n"),
+      html: wrap([
+        "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+        "<p><b>" + esc(r.other) + "</b> want to meet you and have suggested some times.</p>",
+        "<p>They are shown on your own clock, with the client&rsquo;s underneath. If none of " +
+        "them work, say so on that page and they will offer others &mdash; that is a normal " +
+        "thing to do.</p>"
+      ], site, "/hub", "Pick a time")
+    }),
+
+    picked: (r, p, site) => ({
+      subject: r.other + " picked an interview time",
+      text: [
+        "Hi " + firstName(p.name) + ",", "",
+        r.other + " has picked " + slotText(r) + ".",
+        "", "Confirm it at " + site + "/seats and we will tell her it is on. You can add a " +
+        "meeting link at the same time.",
+        "", "SecureJobVA"].join("\n"),
+      html: wrap([
+        "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+        "<p><b>" + esc(r.other) + "</b> has picked <b>" + esc(slotText(r)) + "</b>.</p>",
+        "<p>Confirm it and we will tell her it is on. You can add a meeting link at the same " +
+        "time; leave it empty and she gets the email address on your account instead.</p>"
+      ], site, "/seats", "Confirm the time")
+    }),
+
+    declined: (r, p, site) => ({
+      subject: r.other + " could not make any of those times",
+      text: [
+        "Hi " + firstName(p.name) + ",", "",
+        r.other + " could not make any of the times you offered.",
+        "", "Offer a few others at " + site + "/seats and she will pick one. She is on American " +
+        "hours, so your morning is usually her evening.",
+        "", "SecureJobVA"].join("\n"),
+      html: wrap([
+        "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+        "<p><b>" + esc(r.other) + "</b> could not make any of the times you offered.</p>",
+        "<p>Offer a few others and she will pick one. She is on American hours, so your " +
+        "morning is usually her evening.</p>"
+      ], site, "/seats", "Offer other times")
+    }),
+
+    /* The only one that goes to two people, posted twice by 058 rather than
+       sent once to a list — they are told different things. `side` is which
+       of them this copy is for. */
+    confirmed: (r, p, site) => {
+      const mine = r.side === "assistant";
+      const where = mine ? "/hub" : "/seats";
+      const link = r.meeting_url
+        ? "Where: " + r.meeting_url
+        : mine
+          ? "They will write to you at the address on your application."
+          : "She will write to you at the address on this account.";
+      return {
+        subject: "Your interview is set — " + slotText(r),
+        text: [
+          "Hi " + firstName(p.name) + ",", "",
+          "Your interview with " + r.other + " is confirmed for " + slotText(r) + ".",
+          "", link,
+          "", (mine
+            ? "That time is in Central, which is the client's clock. Open " + site +
+              "/hub to see it on yours."
+            : "She has been told, and sees the time on her own clock."),
+          "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+          "<p>Your interview with <b>" + esc(r.other) + "</b> is confirmed for <b>" +
+            esc(slotText(r)) + "</b>.</p>",
+          "<p>" + (r.meeting_url
+            ? "Where: <a href=\"" + esc(r.meeting_url) + "\">" + esc(r.meeting_url) + "</a>"
+            : esc(link)) + "</p>",
+          "<p>" + esc(mine
+            ? "That time is in Central, which is the client's clock. Open your portal to see " +
+              "it on yours."
+            : "She has been told, and sees the time on her own clock.") + "</p>"
+        ], site, where, mine ? "See your interview" : "See the details")
+      };
+    }
+  },
+
   applications: {
     decided: (r, p, site) => {
       const hi = "Hi " + firstName(p.name || r.name) + ",";

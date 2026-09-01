@@ -701,6 +701,9 @@ body:has(.adm__wrap) main{padding:0}
 .pill--ts_draft{background:var(--surface-2);color:var(--muted)}
 .pill--ts_submitted{background:var(--signal);color:var(--signal-ink)}
 .pill--ts_approved{background:#0B7A63;color:#fff}
+.pill--iv_go{background:#0B7A63;color:#fff}
+.pill--iv_wait{background:var(--signal);color:var(--signal-ink)}
+.pill--iv_none{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .pill--ts_returned{background:#B3261E;color:#fff}
 .pill--pl_matched{background:var(--surface-2);color:var(--ink-2)}
 .pill--pl_trial{background:var(--signal);color:var(--signal-ink)}
@@ -1602,6 +1605,107 @@ function wireTz() {
       tzFlash(ok, tzWhy(e), true);
     });
   });
+}
+
+/* ── an interview time, in two clocks ──────────────────────────────────────
+
+   sql/057. A slot is a timestamptz and is the one thing in this product that
+   genuinely means the same moment to two people in different places. Both of
+   them have to be able to read it as their own without doing arithmetic.
+
+   The second clock is Central, and always Central, rather than "the other
+   person's". That is not laziness — it is the only zone either side can
+   actually be shown. sql/056 makes a person's chosen zone readable by nobody
+   but themselves, deliberately, and neither can read the other's: an assistant
+   cannot read the client's seat request, and a client has no way to reach an
+   applicant's settings. Guessing at the other end and labelling the guess with
+   their name would be worse than naming a zone that is simply true.
+
+   Central is the business's own clock. It is what /admin already stamps a date
+   in, it is what the client is almost always on, and it is a thing both people
+   can name in a sentence to each other — which is the actual job here. */
+var CENTRAL = "America/Chicago";
+
+function slotDay(iso, zone) {
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  try {
+    return d.toLocaleString(undefined, {
+      timeZone: zone || undefined,
+      weekday: "short", day: "numeric", month: "short"
+    });
+  } catch (e) {
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }
+}
+
+function slotClock(iso, zone) {
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
+  try {
+    return d.toLocaleString(undefined, {
+      timeZone: zone || undefined, hour: "numeric", minute: "2-digit"
+    });
+  } catch (e) {
+    return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+}
+
+/* "Tue 8 Sep · 9:00 AM", in whatever the reader has chosen or their browser
+   believes. */
+function slotLabel(iso) {
+  return slotDay(iso, MY_TZ) + " \u00b7 " + slotClock(iso, MY_TZ);
+}
+
+/* The line underneath. Left empty when the reader is already on Central,
+   because "9:00 AM · 9:00 AM Central" is noise rather than help.
+
+   The day is repeated only when it differs — which is exactly the case worth
+   spelling out, since 10:00 PM Manila on Tuesday is 9:00 AM Central on that
+   same Tuesday, and an assistant who reads only the clock can book herself
+   into the wrong night. */
+function slotAlso(iso, minutes) {
+  var mine = MY_TZ || browserTz();
+  var out = minutes ? String(minutes) + " minutes" : "";
+
+  if (mine && mine !== CENTRAL) {
+    var here = slotDay(iso, mine), there = slotDay(iso, CENTRAL);
+    out += (out ? " \u00b7 " : "") +
+      (here === there
+        ? slotClock(iso, CENTRAL) + " Central"
+        : there + " " + slotClock(iso, CENTRAL) + " Central");
+  } else if (mine) {
+    out += (out ? " \u00b7 " : "") + "Central";
+  }
+  return out;
+}
+
+/* Which of the two people the interview is sitting on, from the slots alone.
+   There is no status column in 057 — the state is derived, so that there is
+   one place it can be read and no second place to disagree with it. This is
+   the same derivation as the interview_state view, in the language of a page
+   that already has the rows in hand. */
+function slotState(slots) {
+  var live = [], picked = null, done = null, declined = false;
+  for (var i = 0; i < slots.length; i++) {
+    var s = slots[i];
+    if (s.confirmed_at) done = s;
+    if (s.chosen_at && !s.declined_at) picked = s;
+    if (s.declined_at) declined = true;
+    else live.push(s);
+  }
+  live.sort(function (a, b) { return new Date(a.starts_at) - new Date(b.starts_at); });
+  return {
+    slots: live,
+    picked: picked,
+    confirmed: done,
+    declined: declined && !live.length,
+    state: done ? "confirmed"
+         : picked ? "waiting_on_client"
+         : declined && !live.length ? "declined"
+         : live.length ? "waiting_on_assistant"
+         : "not_started"
+  };
 }
 
 function when(iso) {
@@ -3179,6 +3283,7 @@ function loadPlacements() {
       RATES[p.placement_id].pay = p.rate;
     });
     drawPlacements(box, r[4] || []);
+    loadInterviews();
     loadPayments();
   }).catch(function (e) {
     box.innerHTML = '<p class="msg msg--bad">Could not load placements: ' + esc(why(e)) + "</p>";
@@ -3214,7 +3319,8 @@ function drawPlacements(box, swaps) {
   var free = hired.filter(function (a) { return !placedNow[a.id]; });
 
   var open = swaps.filter(function (s) { return s.status === "open"; });
-  badge("tab-place", open.length);
+  SWAPS_OPEN = open.length;
+  placeBadge();
 
   var clientOpts = CLIENTS.map(function (c) {
     return '<option value="' + esc(c.id) + '">' + esc(c.name) + "</option>";
@@ -3775,6 +3881,129 @@ function drawSeats(box, rows) {
    010 stored contact messages and gave staff a policy to read them, and there
    was nowhere to do it. A form that writes to a table nobody opens is a form
    that loses messages politely. */
+
+/* ── interviews being arranged ─────────────────────────────────────────────
+
+   sql/057. Not a fourth screen. Staff do not arrange these — the client and
+   the assistant settle it between themselves, which is the whole decision
+   behind that file. What staff need is the one thing neither of those two can
+   see: that something has been sitting for a week.
+
+   So this is a list ordered by who is stuck, worst first, and nothing on it is
+   a control. Reading it and picking up the phone is the intervention. */
+var IV_STATE = [];
+
+/* The two things behind the Placements tab that are worth a number on it: swap
+   requests somebody has to resolve, and interviews that have stalled. Kept as
+   two counts and one setter, because both panels redraw independently and each
+   calling badge() with only its own half made the tab flicker between two
+   different truths. */
+var IV_STUCK = 0;
+var SWAPS_OPEN = 0;
+function placeBadge() { badge("tab-place", SWAPS_OPEN + IV_STUCK); }
+
+var IV_LABEL = {
+  confirmed:            ["On", "go"],
+  waiting_on_client:    ["Client", "wait"],
+  waiting_on_assistant: ["Assistant", "wait"],
+  declined:             ["Offer more", "wait"],
+  not_started:          ["Not started", "none"]
+};
+
+/* The order somebody works down. Confirmed is last because it is the one row
+   that needs nothing — it is here so the list is the whole picture rather than
+   only the bad news. */
+var IV_ORDER = ["waiting_on_client", "waiting_on_assistant", "declined", "not_started", "confirmed"];
+
+function loadInterviews() {
+  var box = document.getElementById("iv-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Loading interviews&hellip;';
+  api("interview_state?select=placement_id,client_id,application_id,offered,earliest," +
+      "chosen_at,confirmed_at,state,days_waiting")
+    .then(function (rows) { IV_STATE = rows || []; drawInterviews(box); })
+    .catch(function () {
+      box.innerHTML =
+        "<h2>Interviews being arranged</h2>" +
+        '<div class="note"><b>Not switched on yet.</b> Paste <code>sql/057</code> and this ' +
+        "shows every match waiting on an interview, and which of the two people it is waiting " +
+        "on.</div>";
+    });
+}
+
+function drawInterviews(box) {
+  var byId = {};
+  ALL.forEach(function (a) { byId[a.id] = a; });
+  var clientName = {};
+  CLIENTS.forEach(function (c) { clientName[c.id] = c.name; });
+
+  var rows = IV_STATE.slice().sort(function (a, b) {
+    var d = IV_ORDER.indexOf(a.state) - IV_ORDER.indexOf(b.state);
+    return d !== 0 ? d : (b.days_waiting || 0) - (a.days_waiting || 0);
+  });
+
+  /* Anything sitting for a week is worth interrupting for. Not a rule the
+     database enforces — nothing here blocks — just the line at which a list
+     stops being information and starts being a job. */
+  var stuck = rows.filter(function (r) {
+    return r.state !== "confirmed" && (r.days_waiting || 0) >= 7;
+  });
+  /* Not badge() directly. Two panels live behind this tab now — open swap
+     requests and stalled interviews — and each calling badge() with its own
+     count means whichever draws last erases the other's. */
+  IV_STUCK = stuck.length;
+  placeBadge();
+
+  box.innerHTML =
+    "<h2>Interviews being arranged</h2>" +
+    '<p class="msg" style="margin-top:0">Every matched placement where the two of them have not ' +
+      "met yet. Nobody here is waiting on us &mdash; they arrange it themselves &mdash; so this " +
+      "is only for spotting the ones that have stopped moving.</p>" +
+
+    (stuck.length
+      ? '<div class="note note--warn" style="margin-top:1.1rem"><b>' + esc(String(stuck.length)) +
+        (stuck.length === 1 ? " has" : " have") + " been sitting for a week or more.</b> " +
+        "Worth a message to whichever side it is waiting on.</div>"
+      : "") +
+
+    (rows.length
+      ? '<div class="rows" style="margin-top:1rem">' + rows.map(function (r) {
+          var a = byId[r.application_id];
+          var lab = IV_LABEL[r.state] || ["&mdash;", "none"];
+          return '<div class="row">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(a ? a.name : "Unknown assistant") +
+                " &middot; " + esc(clientName[r.client_id] || "unknown client") + "</span>" +
+              '<span class="row__meta"> &middot; ' + esc(ivSays(r)) + "</span>" +
+            "</span>" +
+            '<span class="pill pill--iv_' + esc(lab[1]) + '">' + lab[0] + "</span></div>" +
+          "</div>";
+        }).join("") + "</div>"
+      : '<div class="note" style="margin-top:1.1rem"><b>Nothing being arranged.</b> ' +
+        "This fills in when a placement is set to matched.</div>");
+}
+
+/* One sentence per row, and it has to carry the two things somebody reads:
+   where it has got to, and how long it has been there. */
+function ivSays(r) {
+  var days = Number(r.days_waiting || 0);
+  var age = days === 0 ? "today" : days === 1 ? "1 day" : days + " days";
+
+  if (r.state === "confirmed") {
+    return "confirmed for " + whenTime(r.earliest);
+  }
+  if (r.state === "waiting_on_client") {
+    return "she picked a time — waiting on the client for " + age;
+  }
+  if (r.state === "waiting_on_assistant") {
+    return r.offered + (r.offered === 1 ? " time" : " times") +
+      " offered — waiting on her for " + age;
+  }
+  if (r.state === "declined") {
+    return "none of the times worked — the client needs to offer more, " + age + " ago";
+  }
+  return "matched " + age + " ago — no times offered yet";
+}
 
 /* ── money in ──────────────────────────────────────────────────────────────
 
@@ -4954,6 +5183,7 @@ function render(email, apps, notes, socials, docs, disc, sits) {
       '<div class="card" id="notice-card"></div></div>' +
     '<div data-pane="hours" hidden><div class="card" id="ts-card"></div></div>' +
     '<div data-pane="place" hidden><div class="card" id="place-card"></div>' +
+      '<div class="card" id="iv-card"></div>' +
       '<div class="card" id="pay-card"></div></div>' +
     (can("accounts.manage")
       ? '<div data-pane="accts" hidden><div class="card" id="roles-card"></div></div>'
