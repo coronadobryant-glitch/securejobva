@@ -2055,6 +2055,8 @@ function writtenPart() {
     "to know why this happened.&rdquo;</p>" +
     '<p class="msg">Write the reply you would send. About 150 words. You do not have the order ' +
     "in front of you &mdash; part of what is being read is what you do about that.</p>" +
+    '<div class="note" style="margin:1rem 0"><b>Write it yourself.</b> Pasting is turned off ' +
+    "on this part. We ask about your answers in the interview.</div>" +
     '<label class="a-lbl" for="a-write">Your reply to the customer</label>' +
     '<textarea id="a-write" rows="11" placeholder="Your reply" style="width:100%;margin-top:1rem"></textarea>' +
     '<p class="msg" id="a-count" style="margin-top:.5rem">0 words</p>',
@@ -2079,6 +2081,33 @@ function writtenPart() {
        writing against a tab that closed. */
     saveProgress("written_reply", function () { return box.value.slice(0, 8000); });
   });
+  /* Pasting is off here, and this is the part where it matters most.
+
+     The written reply is a work sample — a piece of the real job, marked by a
+     person — and since 049 it decides half of the english axis. It is also the
+     one part of this assessment a chatbot can simply write.
+
+     A guard like this existed once, on the typing test that used to run on
+     this page, and went with it when the typing moved to another site. The
+     written reply never had one at all, which was the wrong way round: nobody
+     needs to paste into a typing test to cheat it, and pasting is the whole
+     method here.
+
+     Worth being honest about what this is: a speed bump, not a wall. Somebody
+     can read an answer off a second screen and type it. That is why the real
+     defence is the interviewer asking her about two of her own answers, and
+     why this is only the cheap half of it. */
+  ["paste", "drop"].forEach(function (ev) {
+    box.addEventListener(ev, function (e) {
+      e.preventDefault();
+      var w = document.getElementById("a-err");
+      if (w) {
+        w.style.display = "";
+        w.textContent = "Write this one yourself — pasting is turned off.";
+      }
+    });
+  });
+
   box.focus();
 
   document.getElementById("a-done").addEventListener("click", function () {
