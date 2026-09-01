@@ -1401,13 +1401,17 @@ function assessCard(a, s) {
      and gates nothing. */
   var wantsSales = (TRACK_AXES[a.track] || []).indexOf("sales") > -1;
 
+  /* Finished, not merely started. Read from part_done, which only closePart
+     writes — answers appearing in a column mean she has begun, and 051 made
+     that happen two and a half seconds after her first click. */
+  var fin = (s && s.part_done) || {};
   var done = {
-    english: s && s.english_answers,
-    scen:    s && s.scenario_answers,
-    detail:  s && s.detail_answers,
-    sales:   s && s.sales_answers,
-    written: s && s.written_reply,
-    typing:  s && s.typing_wpm !== null && s.typing_wpm !== undefined
+    english: !!fin.english,
+    scen:    !!fin.scenarios,
+    detail:  !!fin.detail,
+    sales:   !!fin.sales,
+    written: !!fin.written,
+    typing:  !!fin.typing
   };
 
   var left = 0;
@@ -1498,10 +1502,27 @@ function savePart(patch) {
   });
 }
 
-function closePart(patch, err) {
+/* The second argument is which part is being finished, and it is not
+
+   The list of parts used to decide a part was done by looking at whether its
+   answers column held anything. That was true while answers were only written
+   on this button — and stopped being true the moment 051 started saving them
+   as she goes, because the first answer she picked then marked the whole part
+   finished and took the Start button away. One question of eight, and no way
+   back in.
+
+   So finishing is recorded rather than inferred. sql/054 holds the moment, the
+   same way 051 holds the moment a part was opened, and neither is a guess
+   about the other. */
+function closePart(patch, part, err) {
   if (TICK) { clearInterval(TICK); TICK = null; }
   var e = document.getElementById("a-err");
   return savePart(patch)
+    .then(function () {
+      /* After the answers, not before: a part marked finished whose answers
+         failed to save is the one order that loses her work. */
+      return part ? api("rpc/close_part", { method: "POST", body: { part: part } }) : null;
+    })
     .then(function () { return loadApplications(); })
     .catch(function () {
       if (e) { e.style.display = ""; e.textContent =
@@ -1725,7 +1746,7 @@ function typingPart() {
       typing_accuracy: Math.round(a),
       typing_proof: p,
       connection_proof: c
-    });
+    }, "typing");
   });
 }
 
@@ -1788,8 +1809,7 @@ function writtenPart() {
         e.style.display = "";
         e.textContent = "That part's time had run out, so it has been closed with what you had written.";
       }
-      savePart({ written_reply: (SIT && SIT.written_reply) || "" })
-        .then(function () { return loadApplications(); });
+      closePart({ written_reply: (SIT && SIT.written_reply) || "" }, "written");
       return;
     }
     drawWritten(ends);
@@ -1809,6 +1829,15 @@ function writtenPart() {
 
   var box = document.getElementById("a-write");
   var count = document.getElementById("a-count");
+
+  /* Same as the question banks: what she has already written is put back, or
+     reopening the part and finishing it would save an empty reply over twenty
+     minutes of work. */
+  if (SIT && SIT.written_reply) {
+    box.value = SIT.written_reply;
+    var w0 = box.value.trim() ? box.value.trim().split(/\\s+/).length : 0;
+    count.textContent = w0 + " words";
+  }
   box.addEventListener("input", function () {
     var n = box.value.trim() ? box.value.trim().split(/\\s+/).length : 0;
     count.textContent = n + " words";
@@ -1821,7 +1850,7 @@ function writtenPart() {
 
   document.getElementById("a-done").addEventListener("click", function () {
     if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; SAVE_PENDING = null; }
-    closePart({ written_reply: box.value.slice(0, 8000) });
+    closePart({ written_reply: box.value.slice(0, 8000) }, "written");
   });
   }
 }
@@ -1864,7 +1893,10 @@ function bankPart(key, title, mins, column, intro) {
       }
       var patch = {};
       patch[column] = (SIT && SIT[column]) || [];
-      savePart(patch).then(function () { return loadApplications(); });
+      /* Through closePart so the part is recorded as finished. Saving alone
+         would leave it open, and a part whose time has gone would offer its
+         Start button again every time she came back to the page. */
+      closePart(patch, key);
       return;
     }
     drawBank(ends);
@@ -1884,6 +1916,23 @@ function bankPart(key, title, mins, column, intro) {
     '<p class="msg" style="margin:1rem 0">' + intro + "</p>" +
     '<ol class="a-qs">' + qs + "</ol>", "Done");
 
+  /* Put back what she already answered.
+
+     Since 051 the answers save as she goes, so a part she opened, answered
+     three of and walked away from has three answers stored. The questions were
+     redrawn blank, and collect() reads the screen — so finishing the part
+     wrote nulls over every one of them. She would have had to answer them
+     twice and would never have been told why.
+
+     Found by reopening a part and counting: four answered, three saved. */
+  var prior = (SIT && SIT[column]) || [];
+  for (var pi = 0; pi < prior.length; pi++) {
+    var was = prior[pi] && prior[pi].p;
+    if (was === null || was === undefined) continue;
+    var hit = document.querySelector('input[name="q' + pi + '"][value="' + was + '"]');
+    if (hit) hit.checked = true;
+  }
+
   /* Every pick is saved, quietly, a couple of seconds later. So the clock
      running out while the tab is shut costs her the questions she had not
      reached rather than all of them. */
@@ -1901,7 +1950,7 @@ function bankPart(key, title, mins, column, intro) {
     if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; SAVE_PENDING = null; }
     var patch = {};
     patch[column] = collect();
-    closePart(patch);
+    closePart(patch, key);
   });
   }
 }
@@ -2333,7 +2382,7 @@ function loadApplications() {
        see. No row and no table both mean the same thing here: nothing to sit
        yet. The same shape 030 needed on /hub, for the same reason. */
     api("application_assessment?select=application_id,track,attempt,started_at,submitted_at," +
-        "typing_wpm,typing_accuracy,typing_proof,connection_proof,scenario_answers,english_answers,detail_answers,sales_answers,written_reply,verdict")
+        "typing_wpm,typing_accuracy,typing_proof,connection_proof,scenario_answers,english_answers,detail_answers,sales_answers,written_reply,verdict,part_done")
       .catch(function () { return []; })
   ])
     .then(function (r) {
