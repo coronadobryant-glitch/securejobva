@@ -3514,6 +3514,109 @@ function drawSeats(box, rows) {
    010 stored contact messages and gave staff a policy to read them, and there
    was nowhere to do it. A form that writes to a table nobody opens is a form
    that loses messages politely. */
+/* ── files with nobody left to belong to ──────────────────────────────────
+
+   Deleting an application takes the row recording its CV and leaves the CV.
+   sql/053 explains why that cannot be fixed with a trigger: storage.objects is
+   the metadata, and deleting the row from SQL strands the bytes AND throws
+   away the only handle on them.
+
+   So the removing happens here, through the storage API, with the session of
+   whoever is looking at this page. 013 already grants staff DELETE on this
+   bucket, so nothing new is trusted with anything.
+
+   Not on a timer and not on page load — this is a person deciding to clear up,
+   and a page that quietly deletes files while somebody reads it is a page
+   nobody should trust with a bucket of CVs. */
+function loadOrphans() {
+  var box = document.getElementById("orphan-card");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Looking for files with no application&hellip;';
+  api("rpc/orphan_document_paths", { method: "POST", body: {} })
+    .then(function (rows) { drawOrphans(box, rows || []); })
+    .catch(function (e) {
+      /* Until 053 is pasted this function does not exist and PostgREST answers
+         404. An admin page that will not load because a cleanup tool is not
+         switched on yet is worse than one without the tool. */
+      box.innerHTML =
+        "<h2>Files with no application</h2>" +
+        '<div class="note"><b>Not switched on yet.</b> Paste sql/053 and this ' +
+        "will show anything left in the bucket that nobody can reach.</div>";
+    });
+}
+
+function drawOrphans(box, rows) {
+  var total = 0;
+  rows.forEach(function (r) { total += Number(r.bytes || 0); });
+
+  box.innerHTML =
+    "<h2>Files with no application</h2>" +
+    '<p class="msg" style="margin-top:0">A CV stays in storage when its application is ' +
+      "deleted &mdash; the row goes and the file does not. Anything here is unreachable from " +
+      "every screen, and still on disk. Somebody who asked us to delete their information " +
+      "is only really deleted once this list is empty.</p>" +
+
+    (rows.length
+      ? '<div class="note note--warn" style="margin-top:1.1rem"><b>' + rows.length +
+          (rows.length === 1 ? " file" : " files") + ", " + kb(total) + ".</b> " +
+          "Removing them cannot be undone, and nothing else in the product can reach them.</div>" +
+        '<div class="rows" style="margin-top:1rem">' +
+          rows.map(function (r) {
+            return '<div class="row" data-orphan="' + esc(r.path) + '">' +
+              '<div class="row__top"><span class="row__n" style="font-family:\'IBM Plex Mono\',monospace;' +
+                'font-size:.82rem;overflow-wrap:anywhere">' + esc(r.path) + "</span>" +
+                '<span class="row__meta">' + esc(kb(Number(r.bytes || 0))) +
+                (r.uploaded ? " &middot; " + esc(when(r.uploaded)) : "") + "</span></div></div>";
+          }).join("") +
+        "</div>" +
+        '<div class="edit__foot" style="margin-top:1.2rem"><span class="hint">' +
+          "This deletes the files themselves, not just the record of them.</span>" +
+          '<span class="edit__act"><span class="row__ok" id="orphan-ok"></span>' +
+          '<button class="btn btn--solid" id="orphan-go" type="button">Delete ' +
+            rows.length + (rows.length === 1 ? " file" : " files") + "</button></span></div>"
+      : '<div class="note" style="margin-top:1.1rem"><b>Nothing to clear.</b> ' +
+        "Every file in the bucket belongs to an application that still exists.</div>");
+
+  var go = document.getElementById("orphan-go");
+  if (go) go.addEventListener("click", function () { removeOrphans(rows, go); });
+}
+
+/* One at a time, and the count only goes up on a delete that actually
+   returned. A sweep that reports success for files it could not remove is how
+   somebody ends up believing a deletion request was honoured. */
+function removeOrphans(rows, go) {
+  if (!window.confirm(
+        "Delete " + rows.length + (rows.length === 1 ? " file" : " files") + " for good?\n\n" +
+        "These belong to applications that no longer exist. This cannot be undone.")) {
+    return;
+  }
+  var ok = document.getElementById("orphan-ok");
+  go.disabled = true;
+  var done = 0, failed = 0;
+
+  (function step(i) {
+    if (i >= rows.length) {
+      flash(ok, failed ? done + " deleted, " + failed + " could not be" : done + " deleted",
+            failed > 0);
+      loadOrphans();
+      return;
+    }
+    flash(ok, "Deleting " + (i + 1) + " of " + rows.length + "…");
+    liveSession().then(function (sess) {
+      if (!sess) throw new Error("signed out");
+      /* Through the storage API, not through SQL — this is the call that takes
+         the bytes as well as the record of them. */
+      return fetch(storageBase() + "/object/applicant-docs/" + rows[i].path.split("/").map(encodeURIComponent).join("/"), {
+        method: "DELETE",
+        headers: { apikey: ANON, Authorization: "Bearer " + sess.access_token }
+      });
+    }).then(function (r) {
+      if (r.ok) { done++; } else { failed++; }
+    })["catch"](function () { failed++; })
+      .then(function () { setTimeout(function () { step(i + 1); }, 200); });
+  })(0);
+}
+
 function loadInbox() {
   var box = document.getElementById("inbox-card");
   if (!box) return;
@@ -4205,7 +4308,8 @@ function render(email, apps, notes, socials, docs, disc, sits) {
     '<div class="rows" id="rows"></div>' +
     "</div>" +
     '<div data-pane="seats" hidden><div class="card" id="seats-card"></div></div>' +
-    '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div></div>' +
+    '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div>' +
+      '<div class="card" id="orphan-card"></div></div>' +
     '<div data-pane="clients" hidden><div class="card" id="clients-card"></div></div>' +
     '<div data-pane="cal" hidden><div class="card" id="cal-card"></div></div>' +
     '<div data-pane="team" hidden><div class="card" id="leave-card"></div>' +
@@ -4228,6 +4332,7 @@ function render(email, apps, notes, socials, docs, disc, sits) {
   loadPlacements();
   loadNotices();
   loadInbox();
+  loadOrphans();
   loadClients();
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
