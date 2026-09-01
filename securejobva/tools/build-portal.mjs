@@ -211,6 +211,10 @@ const PAGE_CSS = `
 .payw__i input{margin-top:.15rem}
 .payw__n{display:block;font-weight:600;font-size:.88rem}
 .payw__m{display:block;color:var(--muted);font-size:.8rem;margin-top:.1rem}
+/* 056. The time zone card, shared by /status, /hub and /seats. */
+.tz{display:grid;gap:.5rem;margin-top:1.1rem}
+@media(min-width:34rem){.tz{grid-template-columns:minmax(0,22rem) 1fr;align-items:end;gap:1rem}}
+.tz__now{margin:0;font-size:.88rem;color:var(--muted);padding-bottom:.5rem}
 .cl__add{display:grid;gap:0;padding:1.1rem 1.2rem;background:var(--surface-2);border-radius:10px;margin:1rem 0 1.4rem}
 @media(min-width:720px){.cl__add{grid-template-columns:1fr 1fr;gap:0 1rem}
   .cl__add .fld:nth-child(3),.cl__add #cl-add,.cl__add #cl-msg{grid-column:1/-1}}
@@ -1068,6 +1072,240 @@ function stageIndex(s) {
   for (var i = 0; i < STAGES.length; i++) if (STAGES[i][0] === s) return i;
   return -1;
 }
+/* ── the clock somebody reads ──────────────────────────────────────────────
+
+   sql/056. Every timestamp on these portals has always been rendered with the
+   browser's own zone, which is a good default and a bad decision: an assistant
+   in Manila working American hours does not think in Manila time, and an
+   applicant who has just got off a flight is reading their interview time in
+   whatever zone their laptop still believes in.
+
+   So the browser's guess stands until somebody says otherwise, and this is the
+   otherwise. Null means "keep guessing", which is deliberately the default —
+   freezing the guess into a stored decision at first sign-in would make
+   everybody responsible for a setting almost nobody needs to touch.
+
+   A plain date is untouched by any of this. A date is a day, not an instant;
+   sql/030's week starts on its Monday everywhere in the world. Only a
+   timestamptz moves. */
+var MY_TZ = null;
+
+/* Whether the chosen zone actually works in this browser. Intl throws on a
+   name it does not know — an old browser, or a zone added to the database
+   after it shipped — and one throw here would take out every date on the page
+   rather than one. Checked once, then trusted. */
+function tzOk(name) {
+  if (!name) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: name }).format(new Date());
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* Passed to toLocale*, where an undefined timeZone means "this browser's" —
+   which is exactly the behaviour every one of these calls had before 056. */
+function tzOpts(o) {
+  var out = {};
+  for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) out[k] = o[k];
+  if (MY_TZ) out.timeZone = MY_TZ;
+  return out;
+}
+
+/* What the browser thinks, used only as the label on the "use my browser"
+   option. Never stored. */
+function browserTz() {
+  try {
+    return new Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+/* Read before the page draws anything with a date on it. A missing table, a
+   missing row and a zone this browser cannot use all land in the same place:
+   MY_TZ stays null and every date renders exactly as it did before this file
+   existed. A settings row is not worth a broken portal. */
+function loadMyTz() {
+  var s = session();
+  if (!s) return Promise.resolve();
+  var claims = readToken(s.access_token);
+  if (!claims || !claims.sub) return Promise.resolve();
+  MY_USER = claims.sub;
+  return api("user_settings?select=time_zone&limit=1")
+    .then(function (rows) {
+      var tz = rows && rows[0] && rows[0].time_zone;
+      MY_TZ = tzOk(tz) ? tz : null;
+    })
+    .catch(function () { MY_TZ = null; });
+}
+
+var MY_USER = "";
+var TZ_LIST = [];
+
+/* Its own two, rather than the page's. /admin and /hub each define a flash()
+   and a why() and they are not the same function — hub's why() answers "Did
+   not save" to everything, admin's unpacks the PostgREST body. This card is
+   rendered on three portals and must say the same thing on all of them, so it
+   carries the pair it needs instead of picking up whichever happens to be in
+   scope. Unifying those two is worth doing and is not this file's job. */
+function tzFlash(el, text, bad) {
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
+  el.classList.add("is-on");
+  clearTimeout(el._t);
+  if (!bad) el._t = setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+}
+
+function tzWhy(e) {
+  var t = String((e && e.message) || e || "");
+  if (t === "signed out") return "Signed out — reload and sign in again";
+  try {
+    var j = JSON.parse(t);
+    return [j.message, j.hint].filter(Boolean).join(" — ").slice(0, 180) || t.slice(0, 180);
+  } catch (x) {}
+  return t.slice(0, 180) || "That did not save";
+}
+
+/* The card itself, rendered by each portal wherever its own settings live.
+   One definition, because three copies of a preference form is three places
+   for it to drift and this one writes to a table with a trigger that will
+   refuse a value the other two might still offer. */
+function tzCard() {
+  return '<div class="card" id="tz-card">' +
+    "<h2>Your time zone</h2>" +
+    '<p class="msg" style="margin-top:0">Times on your pages are shown in this zone. ' +
+      "Dates are not affected &mdash; a week that starts on a Monday starts on that Monday " +
+      "wherever you are.</p>" +
+    '<div class="tz">' +
+      '<div class="fld"><label for="tz-pick">Show times in</label>' +
+        '<select id="tz-pick"><option value="">Loading&hellip;</option></select></div>' +
+      '<p class="tz__now" id="tz-now"></p>' +
+    "</div>" +
+    '<div class="edit__foot">' +
+      '<span class="hint">We use Central time for anything about the business itself &mdash; ' +
+        "the week a timesheet covers, the day a placement ended. This changes what you read, " +
+        "not what is recorded.</span>" +
+      '<span class="edit__act"><span class="row__ok" id="tz-ok"></span>' +
+      '<button class="btn btn--solid" id="tz-go" type="button">Save</button></span>' +
+    "</div>" +
+  "</div>";
+}
+
+/* Called after tzCard() is in the DOM. Fills the dropdown from the database's
+   own list of zones, so the options cannot include one the trigger would then
+   refuse — and falls back to a short hand-written list if that function is not
+   there yet, because a settings card that cannot be used is worse than one
+   with fewer choices. */
+function wireTz() {
+  var sel = document.getElementById("tz-pick");
+  var go = document.getElementById("tz-go");
+  var ok = document.getElementById("tz-ok");
+  if (!sel || !go) return;
+
+  var mine = browserTz();
+
+  function fill(rows) {
+    TZ_LIST = rows;
+    var opts = '<option value="">Use this device&rsquo;s zone' +
+      (mine ? " &mdash; " + esc(mine) : "") + "</option>";
+    opts += rows.map(function (z) {
+      return '<option value="' + esc(z.name) + '"' +
+        (z.name === MY_TZ ? " selected" : "") + ">" + esc(z.name) +
+        (z.label ? " &mdash; " + esc(z.label) : "") + "</option>";
+    }).join("");
+    sel.innerHTML = opts;
+    if (!MY_TZ) sel.value = "";
+    showNow();
+  }
+
+  /* "UTC+08:00" out of the interval Postgres hands back, so somebody can find
+     their zone by offset when they do not know its name. */
+  function label(off) {
+    var s = String(off || "");
+    var m = s.match(/^(-?)(\\d{1,2}):(\\d{2})/);
+    if (!m) return "";
+    return "UTC" + (m[1] === "-" ? "-" : "+") + (m[2].length < 2 ? "0" : "") + m[2] + ":" + m[3];
+  }
+
+  api("rpc/time_zones", { method: "POST", body: {} })
+    .then(function (rows) {
+      fill((rows || []).map(function (z) {
+        return { name: z.name, label: label(z.utc_offset) };
+      }));
+    })
+    .catch(function () {
+      /* sql/056 not pasted yet, or the function is not readable. The zones
+         below cover where this product's people actually are. */
+      fill([
+        { name: "America/Chicago", label: "Central" },
+        { name: "America/New_York", label: "Eastern" },
+        { name: "America/Denver", label: "Mountain" },
+        { name: "America/Los_Angeles", label: "Pacific" },
+        { name: "Asia/Manila", label: "UTC+08:00" },
+        { name: "Asia/Kolkata", label: "UTC+05:30" },
+        { name: "Africa/Nairobi", label: "UTC+03:00" },
+        { name: "Africa/Lagos", label: "UTC+01:00" },
+        { name: "Europe/London", label: "UTC+00:00" },
+        { name: "UTC", label: "UTC" }
+      ]);
+    });
+
+  /* The clock, right now, in whatever is selected. A zone name means nothing
+     to most people and a time does — this is how somebody knows they picked
+     the right one without saving and reloading to find out. */
+  function showNow() {
+    var box = document.getElementById("tz-now");
+    if (!box) return;
+    var pick = sel.value || null;
+    try {
+      var t = new Date().toLocaleString(undefined, {
+        timeZone: pick || undefined,
+        weekday: "short", hour: "numeric", minute: "2-digit"
+      });
+      box.textContent = "It is " + t + " there right now.";
+    } catch (e) {
+      box.textContent = "";
+    }
+  }
+  sel.addEventListener("change", showNow);
+
+  go.addEventListener("click", function () {
+    var pick = sel.value || null;
+    if (pick && !tzOk(pick)) {
+      tzFlash(ok, "This browser does not know that zone", true);
+      return;
+    }
+    go.disabled = true;
+    tzFlash(ok, "Saving…");
+
+    /* Upsert by hand: one row per user, and whether it exists yet depends on
+       whether they have ever opened this card. Prefer resolution=merge-duplicates
+       makes the first save and the tenth the same request. */
+    api("user_settings", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal",
+        "Content-Profile": "public"
+      },
+      body: { user_id: MY_USER, time_zone: pick }
+    }).then(function () {
+      MY_TZ = pick;
+      tzFlash(ok, "Saved");
+      go.disabled = false;
+      /* Reloaded rather than repainted. Every date already on screen was
+         formatted in the old zone, and a page showing two zones at once is
+         worse than a page that takes a second to come back. */
+      setTimeout(function () { location.reload(); }, 500);
+    }).catch(function (e) {
+      go.disabled = false;
+      tzFlash(ok, tzWhy(e), true);
+    });
+  });
+}
+
 function when(iso) {
   if (!iso) return "";
   /* A plain date is a day, not an instant. new Date("2026-09-07") is midnight
@@ -1086,7 +1324,16 @@ function when(iso) {
     d = new Date(iso);
   }
   if (isNaN(d)) return "";
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  /* tzOpts only adds timeZone when somebody has chosen one, and a date-only
+     string took the branch above — it was built from its own parts and carries
+     no instant to convert. Passing a zone here would push the 7th back to the
+     6th for a reader in a zone behind it, which is the exact bug the comment
+     above this function exists about. */
+  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(String(iso))) {
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  return d.toLocaleDateString(undefined,
+    tzOpts({ year: "numeric", month: "short", day: "numeric" }));
 }
 var SIGNIN_HINT = "Use the same address you applied with &mdash; that is how we find your application.";
 
@@ -2262,7 +2509,9 @@ function render(user, apps) {
   html += editForm(apps[0]);
   html += '<p class="msg">Name and email are fixed here &mdash; they are on your ID check. ' +
           "Tell us in a reply if either needs changing.</p>";
+  html += tzCard();
   view(html);
+  wireTz();
   /* After view(), because the buttons do not exist until the markup is in the
      document. Wired for the first application only, which is the same one
      editForm() takes and for the same reason. */
@@ -2291,7 +2540,12 @@ function start() {
      so this offers rather than redirects. */
   Promise.all([
     api("rpc/my_permissions", { method: "POST", body: {} }).catch(function () { return []; }),
-    api("rpc/my_account_requests", { method: "POST", body: {} }).catch(function () { return []; })
+    api("rpc/my_account_requests", { method: "POST", body: {} }).catch(function () { return []; }),
+    /* In here rather than beside it, so the chosen zone is known before the
+       first date is drawn. It never rejects — a missing table, a missing row
+       and a zone this browser cannot use all leave MY_TZ null — so it cannot
+       be the thing that stops the portal loading. */
+    loadMyTz()
   ]).then(function (r) {
     var perms = r[0] || [];
     STAFF = perms.indexOf("applications.view_all") > -1;
@@ -2597,7 +2851,7 @@ var C_PAY_METHOD = {
 };
 `;
 
-const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\n/* No signedOut() of its own — the shared one carries Google, email and\n   password, create-an-account and reset. This page used to shadow it with the\n   Google button alone, which left a client contact on a company address with\n   no way in at all: they never apply, never set a password, and nothing ever\n   invited them. Creating an account is the path they actually need, so the\n   line below points at it. */\nSIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your seats. ' +\n  'No account yet? Create one with that address and it becomes how you sign in. ' +\n  'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.';\n\n/* Whole dollars only, which is what a seat request's rounded `weekly` column\n   can express. Kept for the rows written before sql/046 added the exact one. */\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\n/* The quote, to the cent, exactly as the visitor was shown it on the home\n   page. 30 hours at $7.75 is $232.50 there; the integer `weekly` column holds\n   233, and this page used to print that back to the same person under the word\n   \"Quoted\". Fifty cents is not much money and it is the whole argument the\n   site makes, so it is worth a column and a formatter.\n\n   Falls back to the rounded figure for rows taken before 046 ran — those never\n   carried the cents and guessing them back would be inventing a number rather\n   than reporting one. */\nfunction quoted(r) {\n  if (r.weekly_cents !== null && r.weekly_cents !== undefined) {\n    return \"$\" + (r.weekly_cents / 100).toLocaleString(\"en-US\", {\n      minimumFractionDigits: 2, maximumFractionDigits: 2\n    });\n  }\n  return money(r.weekly);\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<span style=\"display:flex;gap:.5rem\">' +\n      /* A client who arrived by link has no password at all. Offering one here\n         is the difference between signing in and waiting for an email every\n         time; declining it is perfectly reasonable, so it is a quiet button\n         rather than a prompt. */\n      '<button class=\"btn btn--ghost\" id=\"setpw\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Set a password</button>' +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n      \"</span>\" +\n    \"</div>\";\n\n  /* Arriving by a link is not the same as being able to come back. On a\n     phone the link opens inside the mail app\u2019s own browser, so the session\n     lands in that webview\u2019s storage and is simply not there when they open\n     Safari or Chrome. It looks like the link failed. It did not \u2014 it worked\n     somewhere they cannot get back to. A password is what survives that, so\n     this offers one at the only moment they are certain to see it. */\n  if (CAME_FROM_LINK) {\n    who += '<div class=\"note\" style=\"margin-bottom:1.2rem\"><b>You came in by a link.</b> ' +\n      'A link signs you in wherever you clicked it \u2014 on a phone that is usually the mail ' +\n      'app rather than your browser, so you may find yourself signed out again there. ' +\n      'Set a password and you can sign in anywhere. ' +\n      '<button class=\"lnk\" id=\"nudgepw\" type=\"button\">Set one now</button></div>';\n  }\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  /* A client made in /admin has no seat_requests row \u2014 that table is the\n     enquiry form on the home page, and a business we matched by hand never\n     filled it in. This branch used to return here, so the placement, the week\n     waiting to be approved and the statement were all unreachable for every\n     client who arrived the way clients actually arrive. The note below is\n     about seat requests, so it now only stands in when there is genuinely\n     nothing else to show. */\n  if (!rows.length) {\n    var only = clientBlock();\n    view(who + (only ||\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\"));\n    if (only) wireClient();\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly || r.weekly_cents ? \"<li><b>Quoted</b><span>\" + esc(quoted(r)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  html += billingBlock();\n  view(html);\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n}\n\nstart();" + `
+const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\n/* No signedOut() of its own — the shared one carries Google, email and\n   password, create-an-account and reset. This page used to shadow it with the\n   Google button alone, which left a client contact on a company address with\n   no way in at all: they never apply, never set a password, and nothing ever\n   invited them. Creating an account is the path they actually need, so the\n   line below points at it. */\nSIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your seats. ' +\n  'No account yet? Create one with that address and it becomes how you sign in. ' +\n  'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.';\n\n/* Whole dollars only, which is what a seat request's rounded `weekly` column\n   can express. Kept for the rows written before sql/046 added the exact one. */\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\n/* The quote, to the cent, exactly as the visitor was shown it on the home\n   page. 30 hours at $7.75 is $232.50 there; the integer `weekly` column holds\n   233, and this page used to print that back to the same person under the word\n   \"Quoted\". Fifty cents is not much money and it is the whole argument the\n   site makes, so it is worth a column and a formatter.\n\n   Falls back to the rounded figure for rows taken before 046 ran — those never\n   carried the cents and guessing them back would be inventing a number rather\n   than reporting one. */\nfunction quoted(r) {\n  if (r.weekly_cents !== null && r.weekly_cents !== undefined) {\n    return \"$\" + (r.weekly_cents / 100).toLocaleString(\"en-US\", {\n      minimumFractionDigits: 2, maximumFractionDigits: 2\n    });\n  }\n  return money(r.weekly);\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<span style=\"display:flex;gap:.5rem\">' +\n      /* A client who arrived by link has no password at all. Offering one here\n         is the difference between signing in and waiting for an email every\n         time; declining it is perfectly reasonable, so it is a quiet button\n         rather than a prompt. */\n      '<button class=\"btn btn--ghost\" id=\"setpw\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Set a password</button>' +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n      \"</span>\" +\n    \"</div>\";\n\n  /* Arriving by a link is not the same as being able to come back. On a\n     phone the link opens inside the mail app\u2019s own browser, so the session\n     lands in that webview\u2019s storage and is simply not there when they open\n     Safari or Chrome. It looks like the link failed. It did not \u2014 it worked\n     somewhere they cannot get back to. A password is what survives that, so\n     this offers one at the only moment they are certain to see it. */\n  if (CAME_FROM_LINK) {\n    who += '<div class=\"note\" style=\"margin-bottom:1.2rem\"><b>You came in by a link.</b> ' +\n      'A link signs you in wherever you clicked it \u2014 on a phone that is usually the mail ' +\n      'app rather than your browser, so you may find yourself signed out again there. ' +\n      'Set a password and you can sign in anywhere. ' +\n      '<button class=\"lnk\" id=\"nudgepw\" type=\"button\">Set one now</button></div>';\n  }\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  /* A client made in /admin has no seat_requests row \u2014 that table is the\n     enquiry form on the home page, and a business we matched by hand never\n     filled it in. This branch used to return here, so the placement, the week\n     waiting to be approved and the statement were all unreachable for every\n     client who arrived the way clients actually arrive. The note below is\n     about seat requests, so it now only stands in when there is genuinely\n     nothing else to show. */\n  if (!rows.length) {\n    var only = clientBlock();\n    view(who + (only ||\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\") + tzCard());\n    if (only) wireClient();\n    wireTz();\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly || r.weekly_cents ? \"<li><b>Quoted</b><span>\" + esc(quoted(r)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  html += billingBlock();\n  html += tzCard();\n  view(html);\n  wireTz();\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  loadMyTz().then(function () {\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n  });\n}\n\nstart();" + `
 
 /* ── the client's own portal ──
    Everything above this line is about seats somebody once asked us for.
@@ -4174,10 +4428,10 @@ function whenTime(iso) {
   if (!iso) return "";
   var d = new Date(iso);
   if (isNaN(d)) return "";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(undefined, tzOpts({
     weekday: "short", day: "numeric", month: "short",
     hour: "numeric", minute: "2-digit"
-  });
+  }));
 }
 
 /* ── Interviews ──
@@ -7449,7 +7703,11 @@ function render(a, leaves, notices) {
     "</div>" +
         "</div>" +
 
-        '<div data-hpane="settings" hidden>' + settingsCard(a) + "</div>" +
+        /* 056. Under her own settings, which is where somebody looks for it.
+           An assistant on American hours from Manila is the person this exists
+           for: the browser's guess is right about where she is and wrong about
+           the clock she works to. */
+        '<div data-hpane="settings" hidden>' + settingsCard(a) + tzCard() + "</div>" +
       "</div>" +
     "</div>" +
   "</div>"
@@ -7457,6 +7715,7 @@ function render(a, leaves, notices) {
 
   document.getElementById("out").addEventListener("click", signOut);
   wireHubTabs();
+  wireTz();
   wireSettings(a);
   wireLeave();
   wirePay();
@@ -7638,7 +7897,10 @@ function start() {
   ME = claims.email;
 
   view('<div class="card"><span class="spin"></span>Opening your portal&hellip;</div>');
-  load().catch(function (e) {
+
+  /* Before load(), so the chosen zone is known by the time the first date is
+     drawn. It never rejects, so it cannot be what stops the portal opening. */
+  loadMyTz().then(load).catch(function (e) {
     if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
     view('<div class="card"><p class="msg msg--bad">We could not open your portal just now. ' +
          "Refresh, or try again in a minute.</p></div>");

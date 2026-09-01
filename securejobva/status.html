@@ -463,6 +463,10 @@ img{max-width:100%}
 .payw__i input{margin-top:.15rem}
 .payw__n{display:block;font-weight:600;font-size:.88rem}
 .payw__m{display:block;color:var(--muted);font-size:.8rem;margin-top:.1rem}
+/* 056. The time zone card, shared by /status, /hub and /seats. */
+.tz{display:grid;gap:.5rem;margin-top:1.1rem}
+@media(min-width:34rem){.tz{grid-template-columns:minmax(0,22rem) 1fr;align-items:end;gap:1rem}}
+.tz__now{margin:0;font-size:.88rem;color:var(--muted);padding-bottom:.5rem}
 .cl__add{display:grid;gap:0;padding:1.1rem 1.2rem;background:var(--surface-2);border-radius:10px;margin:1rem 0 1.4rem}
 @media(min-width:720px){.cl__add{grid-template-columns:1fr 1fr;gap:0 1rem}
   .cl__add .fld:nth-child(3),.cl__add #cl-add,.cl__add #cl-msg{grid-column:1/-1}}
@@ -1412,6 +1416,240 @@ function stageIndex(s) {
   for (var i = 0; i < STAGES.length; i++) if (STAGES[i][0] === s) return i;
   return -1;
 }
+/* ── the clock somebody reads ──────────────────────────────────────────────
+
+   sql/056. Every timestamp on these portals has always been rendered with the
+   browser's own zone, which is a good default and a bad decision: an assistant
+   in Manila working American hours does not think in Manila time, and an
+   applicant who has just got off a flight is reading their interview time in
+   whatever zone their laptop still believes in.
+
+   So the browser's guess stands until somebody says otherwise, and this is the
+   otherwise. Null means "keep guessing", which is deliberately the default —
+   freezing the guess into a stored decision at first sign-in would make
+   everybody responsible for a setting almost nobody needs to touch.
+
+   A plain date is untouched by any of this. A date is a day, not an instant;
+   sql/030's week starts on its Monday everywhere in the world. Only a
+   timestamptz moves. */
+var MY_TZ = null;
+
+/* Whether the chosen zone actually works in this browser. Intl throws on a
+   name it does not know — an old browser, or a zone added to the database
+   after it shipped — and one throw here would take out every date on the page
+   rather than one. Checked once, then trusted. */
+function tzOk(name) {
+  if (!name) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: name }).format(new Date());
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* Passed to toLocale*, where an undefined timeZone means "this browser's" —
+   which is exactly the behaviour every one of these calls had before 056. */
+function tzOpts(o) {
+  var out = {};
+  for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) out[k] = o[k];
+  if (MY_TZ) out.timeZone = MY_TZ;
+  return out;
+}
+
+/* What the browser thinks, used only as the label on the "use my browser"
+   option. Never stored. */
+function browserTz() {
+  try {
+    return new Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+/* Read before the page draws anything with a date on it. A missing table, a
+   missing row and a zone this browser cannot use all land in the same place:
+   MY_TZ stays null and every date renders exactly as it did before this file
+   existed. A settings row is not worth a broken portal. */
+function loadMyTz() {
+  var s = session();
+  if (!s) return Promise.resolve();
+  var claims = readToken(s.access_token);
+  if (!claims || !claims.sub) return Promise.resolve();
+  MY_USER = claims.sub;
+  return api("user_settings?select=time_zone&limit=1")
+    .then(function (rows) {
+      var tz = rows && rows[0] && rows[0].time_zone;
+      MY_TZ = tzOk(tz) ? tz : null;
+    })
+    .catch(function () { MY_TZ = null; });
+}
+
+var MY_USER = "";
+var TZ_LIST = [];
+
+/* Its own two, rather than the page's. /admin and /hub each define a flash()
+   and a why() and they are not the same function — hub's why() answers "Did
+   not save" to everything, admin's unpacks the PostgREST body. This card is
+   rendered on three portals and must say the same thing on all of them, so it
+   carries the pair it needs instead of picking up whichever happens to be in
+   scope. Unifying those two is worth doing and is not this file's job. */
+function tzFlash(el, text, bad) {
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
+  el.classList.add("is-on");
+  clearTimeout(el._t);
+  if (!bad) el._t = setTimeout(function () { el.classList.remove("is-on"); }, 1600);
+}
+
+function tzWhy(e) {
+  var t = String((e && e.message) || e || "");
+  if (t === "signed out") return "Signed out — reload and sign in again";
+  try {
+    var j = JSON.parse(t);
+    return [j.message, j.hint].filter(Boolean).join(" — ").slice(0, 180) || t.slice(0, 180);
+  } catch (x) {}
+  return t.slice(0, 180) || "That did not save";
+}
+
+/* The card itself, rendered by each portal wherever its own settings live.
+   One definition, because three copies of a preference form is three places
+   for it to drift and this one writes to a table with a trigger that will
+   refuse a value the other two might still offer. */
+function tzCard() {
+  return '<div class="card" id="tz-card">' +
+    "<h2>Your time zone</h2>" +
+    '<p class="msg" style="margin-top:0">Times on your pages are shown in this zone. ' +
+      "Dates are not affected &mdash; a week that starts on a Monday starts on that Monday " +
+      "wherever you are.</p>" +
+    '<div class="tz">' +
+      '<div class="fld"><label for="tz-pick">Show times in</label>' +
+        '<select id="tz-pick"><option value="">Loading&hellip;</option></select></div>' +
+      '<p class="tz__now" id="tz-now"></p>' +
+    "</div>" +
+    '<div class="edit__foot">' +
+      '<span class="hint">We use Central time for anything about the business itself &mdash; ' +
+        "the week a timesheet covers, the day a placement ended. This changes what you read, " +
+        "not what is recorded.</span>" +
+      '<span class="edit__act"><span class="row__ok" id="tz-ok"></span>' +
+      '<button class="btn btn--solid" id="tz-go" type="button">Save</button></span>' +
+    "</div>" +
+  "</div>";
+}
+
+/* Called after tzCard() is in the DOM. Fills the dropdown from the database's
+   own list of zones, so the options cannot include one the trigger would then
+   refuse — and falls back to a short hand-written list if that function is not
+   there yet, because a settings card that cannot be used is worse than one
+   with fewer choices. */
+function wireTz() {
+  var sel = document.getElementById("tz-pick");
+  var go = document.getElementById("tz-go");
+  var ok = document.getElementById("tz-ok");
+  if (!sel || !go) return;
+
+  var mine = browserTz();
+
+  function fill(rows) {
+    TZ_LIST = rows;
+    var opts = '<option value="">Use this device&rsquo;s zone' +
+      (mine ? " &mdash; " + esc(mine) : "") + "</option>";
+    opts += rows.map(function (z) {
+      return '<option value="' + esc(z.name) + '"' +
+        (z.name === MY_TZ ? " selected" : "") + ">" + esc(z.name) +
+        (z.label ? " &mdash; " + esc(z.label) : "") + "</option>";
+    }).join("");
+    sel.innerHTML = opts;
+    if (!MY_TZ) sel.value = "";
+    showNow();
+  }
+
+  /* "UTC+08:00" out of the interval Postgres hands back, so somebody can find
+     their zone by offset when they do not know its name. */
+  function label(off) {
+    var s = String(off || "");
+    var m = s.match(/^(-?)(\d{1,2}):(\d{2})/);
+    if (!m) return "";
+    return "UTC" + (m[1] === "-" ? "-" : "+") + (m[2].length < 2 ? "0" : "") + m[2] + ":" + m[3];
+  }
+
+  api("rpc/time_zones", { method: "POST", body: {} })
+    .then(function (rows) {
+      fill((rows || []).map(function (z) {
+        return { name: z.name, label: label(z.utc_offset) };
+      }));
+    })
+    .catch(function () {
+      /* sql/056 not pasted yet, or the function is not readable. The zones
+         below cover where this product's people actually are. */
+      fill([
+        { name: "America/Chicago", label: "Central" },
+        { name: "America/New_York", label: "Eastern" },
+        { name: "America/Denver", label: "Mountain" },
+        { name: "America/Los_Angeles", label: "Pacific" },
+        { name: "Asia/Manila", label: "UTC+08:00" },
+        { name: "Asia/Kolkata", label: "UTC+05:30" },
+        { name: "Africa/Nairobi", label: "UTC+03:00" },
+        { name: "Africa/Lagos", label: "UTC+01:00" },
+        { name: "Europe/London", label: "UTC+00:00" },
+        { name: "UTC", label: "UTC" }
+      ]);
+    });
+
+  /* The clock, right now, in whatever is selected. A zone name means nothing
+     to most people and a time does — this is how somebody knows they picked
+     the right one without saving and reloading to find out. */
+  function showNow() {
+    var box = document.getElementById("tz-now");
+    if (!box) return;
+    var pick = sel.value || null;
+    try {
+      var t = new Date().toLocaleString(undefined, {
+        timeZone: pick || undefined,
+        weekday: "short", hour: "numeric", minute: "2-digit"
+      });
+      box.textContent = "It is " + t + " there right now.";
+    } catch (e) {
+      box.textContent = "";
+    }
+  }
+  sel.addEventListener("change", showNow);
+
+  go.addEventListener("click", function () {
+    var pick = sel.value || null;
+    if (pick && !tzOk(pick)) {
+      tzFlash(ok, "This browser does not know that zone", true);
+      return;
+    }
+    go.disabled = true;
+    tzFlash(ok, "Saving…");
+
+    /* Upsert by hand: one row per user, and whether it exists yet depends on
+       whether they have ever opened this card. Prefer resolution=merge-duplicates
+       makes the first save and the tenth the same request. */
+    api("user_settings", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal",
+        "Content-Profile": "public"
+      },
+      body: { user_id: MY_USER, time_zone: pick }
+    }).then(function () {
+      MY_TZ = pick;
+      tzFlash(ok, "Saved");
+      go.disabled = false;
+      /* Reloaded rather than repainted. Every date already on screen was
+         formatted in the old zone, and a page showing two zones at once is
+         worse than a page that takes a second to come back. */
+      setTimeout(function () { location.reload(); }, 500);
+    }).catch(function (e) {
+      go.disabled = false;
+      tzFlash(ok, tzWhy(e), true);
+    });
+  });
+}
+
 function when(iso) {
   if (!iso) return "";
   /* A plain date is a day, not an instant. new Date("2026-09-07") is midnight
@@ -1430,7 +1668,16 @@ function when(iso) {
     d = new Date(iso);
   }
   if (isNaN(d)) return "";
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  /* tzOpts only adds timeZone when somebody has chosen one, and a date-only
+     string took the branch above — it was built from its own parts and carries
+     no instant to convert. Passing a zone here would push the 7th back to the
+     6th for a reader in a zone behind it, which is the exact bug the comment
+     above this function exists about. */
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) {
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  return d.toLocaleDateString(undefined,
+    tzOpts({ year: "numeric", month: "short", day: "numeric" }));
 }
 var SIGNIN_HINT = "Use the same address you applied with &mdash; that is how we find your application.";
 
@@ -2495,7 +2742,9 @@ function render(user, apps) {
   html += editForm(apps[0]);
   html += '<p class="msg">Name and email are fixed here &mdash; they are on your ID check. ' +
           "Tell us in a reply if either needs changing.</p>";
+  html += tzCard();
   view(html);
+  wireTz();
   /* After view(), because the buttons do not exist until the markup is in the
      document. Wired for the first application only, which is the same one
      editForm() takes and for the same reason. */
@@ -2524,7 +2773,12 @@ function start() {
      so this offers rather than redirects. */
   Promise.all([
     api("rpc/my_permissions", { method: "POST", body: {} }).catch(function () { return []; }),
-    api("rpc/my_account_requests", { method: "POST", body: {} }).catch(function () { return []; })
+    api("rpc/my_account_requests", { method: "POST", body: {} }).catch(function () { return []; }),
+    /* In here rather than beside it, so the chosen zone is known before the
+       first date is drawn. It never rejects — a missing table, a missing row
+       and a zone this browser cannot use all leave MY_TZ null — so it cannot
+       be the thing that stops the portal loading. */
+    loadMyTz()
   ]).then(function (r) {
     var perms = r[0] || [];
     STAFF = perms.indexOf("applications.view_all") > -1;

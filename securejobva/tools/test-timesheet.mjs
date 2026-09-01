@@ -23,8 +23,15 @@ function grab(name) {
   throw new Error("unbalanced " + name);
 }
 
-const NAMES = ["isoDay", "fromIso", "addDays", "mondayOf", "showHours", "dayIn", "totalOf", "when"];
+/* tzOpts comes along because sql/056 made when() ask it whether the reader has
+   overruled their browser's zone. MY_TZ is left null here, which is the state
+   almost everybody is in and the one these assertions are about: a plain date
+   must render as that very day whatever the reader has chosen, because a date
+   is a day and not an instant. */
+const NAMES = ["isoDay", "fromIso", "addDays", "mondayOf", "showHours", "dayIn", "totalOf",
+               "tzOpts", "when"];
 const F = new Function(
+  "var MY_TZ = null;\n" +
   NAMES.map(grab).join("\n") + "\nreturn {" + NAMES.join(",") + "};"
 )();
 

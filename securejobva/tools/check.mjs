@@ -1825,7 +1825,10 @@ await check("no generated page has lost a fix to its generator", () => {
     ["pay.html",    "function dueCard",     "the figure a client came to /pay for"],
     ["pay.html",    "function receiptsCard", "the payments received panel"],
     ["seats.html",  "function cBill",       "one definition of what a client owes"],
-    ["seats.html",  "Left to pay",          "the total that comes down when somebody pays"]
+    ["seats.html",  "Left to pay",          "the total that comes down when somebody pays"],
+    ["status.html", "function tzCard",      "the applicant's time zone setting"],
+    ["hub.html",    "function tzCard",      "the assistant's time zone setting"],
+    ["seats.html",  "function tzCard",      "the client's time zone setting"]
   ];
   const lost = [];
   for (const [file, marker, what] of MARKERS) {
@@ -1868,6 +1871,21 @@ await check("/pay and /seats agree on what is owed", async () => {
     return (out.match(/^ {2}ok/gm) || []).length + " behaviours";
   } catch (e) {
     throw new Error("tools/test-pay.mjs failed — run it directly for the detail");
+  }
+});
+
+/* The setting from sql/056, and mostly the things it must not change. A date
+   is a day and a timestamp is an instant; letting a preference blur those two
+   would put back the bug when() was rewritten to fix, with a setting to blame
+   it on. Driven on all three portals, because the card is shared and the
+   wiring is not. */
+await check("a chosen time zone moves instants and never dates", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-timezone.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours across three portals";
+  } catch (e) {
+    throw new Error("tools/test-timezone.mjs failed — run it directly for the detail");
   }
 });
 
