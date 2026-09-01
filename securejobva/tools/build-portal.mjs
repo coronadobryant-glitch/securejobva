@@ -334,6 +334,11 @@ const PAGE_CSS = `
 @media(min-width:560px){.edit__grid{grid-template-columns:1fr 1fr}}
 .edit__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid var(--line)}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
+/* class="hint" has been used on all four portals since 007 and never had a
+   rule, so every one of them rendered at full body size — the same weight as
+   the sentence it was meant to sit quietly underneath. Found by looking at a
+   page rather than by reading it. */
+.hint{font-size:.85rem;color:var(--muted);line-height:1.5}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
 .adm__wrap{display:grid;grid-template-columns:1fr;gap:0;align-items:stretch;min-height:100vh}
 @media(min-width:900px){
@@ -8583,6 +8588,40 @@ function start() {
 start();
 `.trim();
 
+/* 057. The interview card is drawn by two different scripts from the same
+   markup, so its rules belong to neither page and are given to both. This sat
+   inside SEATS_CSS for exactly one build, and /hub rendered the times, the
+   durations and the word Choose as one run of unstyled text — every harness
+   passed, because every harness reads markup and the markup was right. */
+const INTERVIEW_CSS = `
+.iv__slots{display:grid;gap:.45rem;margin-top:1rem}
+.iv__slot{display:grid;grid-template-columns:auto 1fr auto auto;gap:.2rem .8rem;align-items:center;
+  padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.iv__slot--picked{border-color:var(--accent);background:var(--accent-soft)}
+.iv__slot--pick{cursor:pointer}
+.iv__slot--pick:hover{border-color:var(--accent)}
+.iv__mk{width:1.05rem;height:1.05rem;border-radius:50%;border:2px solid var(--line)}
+.iv__slot--picked .iv__mk{border-color:var(--accent);background:var(--accent);
+  box-shadow:inset 0 0 0 3px var(--surface)}
+.iv__d{display:block;font-weight:700;font-size:.92rem;font-variant-numeric:tabular-nums}
+.iv__z{display:block;font-size:.79rem;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:.1rem}
+.iv__tag{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.09em;
+  text-transform:uppercase;padding:.2rem .45rem;border-radius:5px;white-space:nowrap;
+  border:1px solid var(--line);color:var(--muted)}
+.iv__tag--go{background:#0B7A63;border-color:#0B7A63;color:#fff}
+.iv__add{display:grid;gap:.5rem;margin-top:1.1rem}
+@media(min-width:38rem){.iv__add{grid-template-columns:1fr 1fr 1fr auto;align-items:end}}
+.iv__meet{margin-top:1rem;display:grid;gap:.2rem .9rem;grid-template-columns:auto 1fr;
+  padding:.95rem 1.05rem;border:1px solid #0B7A63;border-radius:9px;background:var(--surface-2)}
+.iv__k{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);align-self:center}
+.iv__v{font-weight:700;font-size:.93rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+@media(max-width:32rem){
+  .iv__slot{grid-template-columns:auto 1fr}
+  .iv__tag{grid-column:2}
+}
+`;
+
 writeFileSync("hub.html", shell({
   app: true,
   title: "Your portal — SecureJobVA",
@@ -8591,7 +8630,8 @@ writeFileSync("hub.html", shell({
     '        <a href="/careers">Careers</a>'
   ].join(nl),
   body: HUB_BODY,
-  script: HUB_SCRIPT
+  script: HUB_SCRIPT,
+  css: INTERVIEW_CSS
 }));
 
 console.log("hub.html written");
@@ -8622,35 +8662,6 @@ const SEATS_CSS = `
 .bill__totl{font-weight:700;font-size:1.02rem}
 .bill__totv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-weight:700;font-size:1.35rem;color:var(--ink)}
-/* 057. The interview card, shared by /seats and /hub. Both pages carry these
-   rules because both draw the same rows; the two scripts differ, the markup
-   does not. */
-.iv__slots{display:grid;gap:.45rem;margin-top:1rem}
-.iv__slot{display:grid;grid-template-columns:auto 1fr auto auto;gap:.2rem .8rem;align-items:center;
-  padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
-.iv__slot--picked{border-color:var(--accent);background:var(--accent-soft)}
-.iv__slot--pick{cursor:pointer}
-.iv__slot--pick:hover{border-color:var(--accent)}
-.iv__mk{width:1.05rem;height:1.05rem;border-radius:50%;border:2px solid var(--line)}
-.iv__slot--picked .iv__mk{border-color:var(--accent);background:var(--accent);
-  box-shadow:inset 0 0 0 3px var(--surface)}
-.iv__d{display:block;font-weight:700;font-size:.92rem;font-variant-numeric:tabular-nums}
-.iv__z{display:block;font-size:.79rem;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:.1rem}
-.iv__tag{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.09em;
-  text-transform:uppercase;padding:.2rem .45rem;border-radius:5px;white-space:nowrap;
-  border:1px solid var(--line);color:var(--muted)}
-.iv__tag--go{background:#0B7A63;border-color:#0B7A63;color:#fff}
-.iv__add{display:grid;gap:.5rem;margin-top:1.1rem}
-@media(min-width:38rem){.iv__add{grid-template-columns:1fr 1fr 1fr auto;align-items:end}}
-.iv__meet{margin-top:1rem;display:grid;gap:.2rem .9rem;grid-template-columns:auto 1fr;
-  padding:.95rem 1.05rem;border:1px solid #0B7A63;border-radius:9px;background:var(--surface-2)}
-.iv__k{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--muted);align-self:center}
-.iv__v{font-weight:700;font-size:.93rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-@media(max-width:32rem){
-  .iv__slot{grid-template-columns:auto 1fr}
-  .iv__tag{grid-column:2}
-}
 .bill__pay{margin-top:1.3rem;padding:1.1rem 1.2rem;border:1px dashed var(--line);border-radius:9px;
   background:var(--surface-2)}
 .bill__payh{font-weight:700;margin:0 0 .35rem}
@@ -8692,7 +8703,7 @@ writeFileSync("seats.html", shell({
   ].join(nl),
   body: "  <section class=\"pt\">" + nl + "    <div class=\"wrap\" style=\"max-width:52rem\">" + nl + "      <div class=\"pt__head\">" + nl + "        <span class=\"eyebrow\">Your account</span>" + nl + "        <h1>The seats you have asked us for.</h1>" + nl + "        <p id=\"pt-lead\">Sign in with the address you used when you booked the call.</p>" + nl + "      </div>" + nl + "      <div id=\"pt-root\"></div>" + nl + "    </div>" + nl + "  </section>",
   script: SEATS_SCRIPT,
-  css: SEATS_CSS
+  css: SEATS_CSS + INTERVIEW_CSS
 }));
 
 console.log("seats.html written");

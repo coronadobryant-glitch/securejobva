@@ -1847,6 +1847,59 @@ await check("no generated page has lost a fix to its generator", () => {
   return MARKERS.length + " fixes still present in the five generated pages";
 });
 
+/* ── a class the page writes and the stylesheet has never heard of ────────
+   /hub drew the interview card as a run of unstyled text — the times, the
+   durations and the word Choose all butted together on one line — because the
+   rules for it had been written into SEATS_CSS, which /hub does not get. The
+   markup was correct, so every harness passed. It was found by opening the
+   page, which is not a thing to rely on twice.
+
+   The shared chrome is one stylesheet and a per-page one is deliberate, so a
+   component whose markup is shared and whose rules are not is a mistake the
+   arrangement actively invites. This looks for it: every class a page's script
+   writes into a static class="..." must have a rule in that page's own style
+   block.
+
+   The list below is what has no rule today and is not a bug — hooks that
+   exist to be found by JavaScript, and one class the site simply never styled.
+   Anything NEW joining them fails the build. */
+await check("every class a portal writes has a rule on that page", () => {
+  /* Hooks, not looks. `field`, `err` and `bars` are queried by script;
+     `fileinfo`, `a-q`, `edit` and `ts__nav` are containers whose children
+     carry the styling. None of them renders text of its own. */
+  const HOOKS = new Set(["field", "err", "bars", "fileinfo", "a-q", "edit", "ts__nav"]);
+
+  const PAGES = ["status.html", "admin.html", "hub.html", "seats.html", "pay.html"]
+    .filter((f) => existsSync(f));
+
+  const lost = [];
+  for (const f of PAGES) {
+    const h = read(f);
+    const css = (h.match(/<style>[\s\S]*?<\/style>/g) || []).join("\n");
+    const js = (h.match(/<script>[\s\S]*?<\/script>/g) || []).join("\n");
+
+    const used = new Set();
+    /* Only static class="..." literals. A class assembled by concatenation is
+       not something this can resolve, and guessing at it would be the kind of
+       false alarm that gets a check switched off. */
+    for (const m of js.matchAll(/class="([a-zA-Z0-9 _-]+)"/g)) {
+      m[1].trim().split(/\s+/).filter(Boolean).forEach((c) => used.add(c));
+    }
+    for (const c of used) {
+      if (HOOKS.has(c)) continue;
+      if (!new RegExp("\\." + c + "(?![a-zA-Z0-9_-])").test(css)) lost.push(f + ": ." + c);
+    }
+  }
+
+  if (lost.length) {
+    throw new Error(lost.join(", ") + " — this page writes that class and its own " +
+      "stylesheet has no rule for it, so it renders as bare text. Either the rule belongs " +
+      "in the shared chrome rather than in one page's block, or the class is a hook with no " +
+      "look and belongs in HOOKS above. Say which.");
+  }
+  return PAGES.length + " pages, every class they write is styled";
+});
+
 /* The bill a client reads before they pay us, driven with more than one
    assistant — which is the case simulate.mjs cannot reach, because that walk
    follows one person. It is also the case /seats got wrong for its whole life:

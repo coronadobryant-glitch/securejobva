@@ -586,6 +586,11 @@ img{max-width:100%}
 @media(min-width:560px){.edit__grid{grid-template-columns:1fr 1fr}}
 .edit__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid var(--line)}
 .edit__foot .chk{flex:1 1 15rem;min-width:0}
+/* class="hint" has been used on all four portals since 007 and never had a
+   rule, so every one of them rendered at full body size — the same weight as
+   the sentence it was meant to sit quietly underneath. Found by looking at a
+   page rather than by reading it. */
+.hint{font-size:.85rem;color:var(--muted);line-height:1.5}
 .edit__act{display:inline-flex;align-items:center;gap:.7rem;flex:0 0 auto}
 .adm__wrap{display:grid;grid-template-columns:1fr;gap:0;align-items:stretch;min-height:100vh}
 @media(min-width:900px){
