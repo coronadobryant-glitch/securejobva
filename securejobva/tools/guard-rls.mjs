@@ -264,10 +264,66 @@ try {
   console.log("  ERROR   " + BUCKET + " sign: " + e.message);
 }
 
+/* ── the assumption every policy in this database rests on ────────────────
+ *
+ * Identity here is an email address. has_permission() resolves a role from
+ * `auth.jwt() ->> 'email'`; owns_application() and is_client_contact() do the
+ * same for applicants and for clients. That is a sound design, and all of it
+ * rests on one thing being true: that a session carrying an address can only
+ * be had by somebody who can read mail at it.
+ *
+ * Google sign-in guarantees that. A magic link guarantees it. Email and
+ * password guarantees it ONLY IF the project requires confirmation before it
+ * issues a session — and that is a checkbox in a dashboard, not a line in this
+ * repo. /status and /seats both offer "Create one" to anybody, and the
+ * administrator's own address is written down in sql/014.
+ *
+ * So with that checkbox off, the whole of this file is beside the point:
+ * nobody needs to get past RLS as `anon` when they can sign up as the admin
+ * and be `authenticated` as him. The pages share one origin and one stored
+ * session, so /admin offering only a Google button changes nothing about it.
+ *
+ * Probed the only way it can be from outside: ask for a session on an address
+ * that cannot receive mail, and see whether one comes back. Nothing is left
+ * behind that a person could sign in with — the address is not real and the
+ * password is thrown away — but an unconfirmed row may be created in
+ * auth.users, which is the cost of asking. It is worth it.
+ */
+const probeEmail = "guard-rls-probe-" + Date.now() + "@securejobva-guard.invalid";
+
+try {
+  const r = await fetch(base.replace("/rest/v1", "/auth/v1") + "/signup", {
+    method: "POST",
+    headers: { apikey: anonKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: probeEmail,
+      password: "guard-" + Math.random().toString(36).slice(2) + "-Aa1!"
+    })
+  });
+  const j = await r.json().catch(() => ({}));
+
+  if (j && j.access_token) {
+    fails.push("email confirmation");
+    console.log("  BREACH  sign-up returns a session without confirming the address — " +
+      "anyone may sign up as " + "the address in sql/014" + " and hold every permission it has. " +
+      "Supabase -> Authentication -> Providers -> Email -> Confirm email must be ON.");
+  } else if (r.ok) {
+    console.log("  ok      sign-up issues no session until the address is confirmed");
+  } else {
+    /* Sign-ups disabled outright is also a pass: no session, no forged claim.
+       Anything else is reported rather than guessed at. */
+    console.log("  ok      sign-up refused outright (" + r.status +
+      " " + (j.error_code || j.msg || "") + ") — no session to forge a claim with");
+  }
+} catch (e) {
+  console.log("  warn    could not probe the sign-up path — " + e.message);
+}
+
 if (fails.length) {
   console.log("FAILED: " + fails.join(", "));
   console.log("");
   process.exit(1);
 }
 console.log("Both tables: insert-only, as designed. No rows written.");
+console.log("An email claim still has to be earned. No session was issued to the probe.");
 console.log("");

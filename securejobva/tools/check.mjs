@@ -310,6 +310,42 @@ for (const p of PAGES) {
     const ints = Object.keys(cols).filter((c) => cols[c] === "integer");
     return ints.length ? ints.join(", ") + " guarded" : "no integer columns";
   });
+
+  /* The sibling of the check above, and it cost a lead in exactly the same
+     shape. A CHECK constraint that a form can exceed is not a validation, it
+     is a refusal — PostgREST answers 400, post() reads any 4xx as the
+     payload's own fault, and the visitor is handed the write-it-yourself email
+     over a quote the page had already shown them.
+
+     index.html clamped custom hours to 200 while seat_requests_sane permitted
+     168, so anybody staffing four or five seats fell into it. Nothing caught
+     that: every field had a column, the arithmetic was rounded, and the number
+     was simply larger than the database would take. */
+  await check(p.file + ": a number the form allows is a number the table takes", () => {
+    const html = read(p.file);
+    const bounds = [];
+    /* `coalesce(hours, 0) between 0 and 168` — the constraint's own words. */
+    for (const m of sql.matchAll(
+      /coalesce\(\s*([a-z_]+)\s*,\s*\d+\s*\)\s+between\s+(-?\d+)\s+and\s+(\d+)/gi)) {
+      if (m[1] in keys) bounds.push({ col: m[1], lo: Number(m[2]), hi: Number(m[3]) });
+    }
+    const bad = [];
+    for (const b of bounds) {
+      /* Math.min(n, 200) is how a form says "no larger than this". */
+      for (const m of html.matchAll(/Math\.min\(\s*[A-Za-z_$][\w$]*\s*,\s*(\d+)\s*\)/g)) {
+        if (Number(m[1]) > b.hi) {
+          bad.push(b.col + ": the page clamps at " + m[1] + ", the table stops at " + b.hi);
+        }
+      }
+    }
+    if (bad.length) {
+      throw new Error(bad.join("; ") + " — a value between the two is quoted on screen and " +
+        "then refused by the constraint, and the lead goes to the email fallback");
+    }
+    return bounds.length
+      ? bounds.map((b) => b.col + " <= " + b.hi).join(", ") + " agreed with the form"
+      : "no bounded numeric columns on this form";
+  });
 }
 
 /* Every column on applications must be granted, not just the named ones.
@@ -1226,48 +1262,343 @@ await check("anon holds nothing on the placement tables", () => {
    marks the wrong option correct and every applicant simply gets a wrong
    score, and answers clustered in one column turn the whole thing into a
    question about whether you noticed the pattern. */
-await check("the assessment key matches its item bank", async () => {
-  const { SCENARIOS } = await import("./assessment-items.mjs");
-  const at = sql.indexOf("as t(q, pts)");
-  if (at < 0) throw new Error("no scenario key found in sql/ — has 045 been renamed?");
-  const rows = [...sql.slice(Math.max(0, at - 1400), at)
-    .matchAll(/\(\s*(\d+),\s*array\[([\d,\s]+)\]\)/g)]
-    .map((m) => [Number(m[1]), m[2].split(",").map((n) => Number(n.trim()))]);
+/* All four keys, and only the newest copy of each.
 
-  if (rows.length !== SCENARIOS.length) {
-    throw new Error(rows.length + " scenarios in the SQL key, " + SCENARIOS.length +
-      " in tools/assessment-items.mjs — re-generate 045 from the bank");
-  }
-  for (let i = 0; i < SCENARIOS.length; i++) {
-    const want = SCENARIOS[i][1].map((o) => o[1]);
-    const got = (rows.find((r) => r[0] === i) || [])[1];
-    if (!got || got.join() !== want.join()) {
-      throw new Error("scenario " + i + ": the SQL key says [" + (got || []).join() +
-        "] and the item bank says [" + want.join() + "] — every applicant is scored wrong");
+   This read the first key it found in the whole sql/ folder, which worked
+   while there was one bank in one file. There are now four banks, and the
+   scenario key alone appears in three files — 045 wrote it, 048 carried it
+   forward, 049 carries it again — because a migration is never edited after it
+   has run, so each replacement of the scoring function repeats what it needs.
+   Only the last copy is the one Postgres is running. */
+await check("the assessment key matches its item bank", async () => {
+  const { BANKS } = await import("./assessment-items.mjs");
+
+  /* Each key sits under a comment naming its bank, in the file that most
+     recently replaced score_assessment(). Read the file, not the folder. */
+  const newest = sqlFiles
+    .filter((f) => read(SQL_DIR + "/" + f).includes("create or replace function public.score_assessment"))
+    .sort()
+    .pop();
+  if (!newest) throw new Error("nothing in sql/ defines score_assessment()");
+  const body = read(SQL_DIR + "/" + newest);
+
+  const HEADING = {
+    scenarios: "the judgement scenarios",
+    english:   "english",
+    detail:    "detail",
+    sales:     "sales"
+  };
+
+  const said = [];
+  for (const [name, bank] of Object.entries(BANKS)) {
+    const mark = "── " + HEADING[name];
+    const at = body.indexOf(mark);
+    if (at < 0) {
+      throw new Error(name + ": no key in " + newest + " — the page will collect answers that " +
+        "nothing scores, and everybody sitting it gets a zero on " + name);
     }
+    const stop = body.indexOf("as t(q, pts)", at);
+    const rows = [...body.slice(at, stop).matchAll(/\(\s*(\d+),\s*array\[([\d,\s]+)\]\)/g)]
+      .map((m) => [Number(m[1]), m[2].split(",").map((n) => Number(n.trim()))]);
+
+    if (rows.length !== bank.length) {
+      throw new Error(name + ": " + rows.length + " items in the SQL key, " + bank.length +
+        " in tools/assessment-items.mjs — re-generate the key in " + newest);
+    }
+    for (let i = 0; i < bank.length; i++) {
+      const want = bank[i][1].map((o) => o[1]);
+      const got = (rows.find((r) => r[0] === i) || [])[1];
+      if (!got || got.join() !== want.join()) {
+        throw new Error(name + " item " + i + ": the SQL key says [" + (got || []).join() +
+          "] and the item bank says [" + want.join() + "] — every applicant is scored wrong");
+      }
+    }
+    said.push(name + " " + bank.length);
   }
-  return SCENARIOS.length + " scenarios, key identical";
+  return said.join(", ") + " — every key identical to its bank, in " + newest;
 });
 
+/* A migration that has been superseded has to say so.
+
+   Every file in sql/ says "Safe to re-run: yes", and every one of them is —
+   on its own. What none of them said is that running an OLD file after a newer
+   one puts its own versions of any function they share straight back, because
+   `create or replace` does exactly what it says.
+
+   That is not theoretical. 045 was re-run after 048, 049 and 051 and took all
+   three with it: the send button went back to the version that matches nobody,
+   and the scoring went back to English meaning typing speed. Columns are added
+   with `if not exists` so they survived — only the logic went backwards, which
+   is why the schema looked perfect throughout.
+
+   So each superseded file carries a block naming what it would take back and
+   which file restores it, and this keeps that block honest. Add a new file
+   that replaces an old function and the build fails until the old file says
+   so. */
+await check("a superseded migration says which file undoes it", () => {
+  const MARK = "-- DO NOT RE-RUN THIS FILE ON ITS OWN";
+
+  /* Which file most recently defines each function. */
+  const latest = new Map();
+  const defs = new Map();
+  for (const f of sqlFiles) {
+    const body = read(SQL_DIR + "/" + f);
+    const names = [...body.matchAll(
+      /create\s+or\s+replace\s+function\s+public\.([a-z_]+)\s*\(/gi)].map((m) => m[1]);
+    defs.set(f, [...new Set(names)]);
+    for (const n of names) latest.set(n, f);
+  }
+
+  const problems = [];
+  let marked = 0;
+  for (const f of sqlFiles) {
+    const superseded = (defs.get(f) || []).filter((n) => latest.get(n) !== f);
+    const body = read(SQL_DIR + "/" + f);
+    const has = body.includes(MARK);
+
+    if (!superseded.length) {
+      if (has) problems.push(f + " carries the warning but supersedes nothing any more");
+      continue;
+    }
+    if (!has) {
+      problems.push(f + " defines " + superseded.join(", ") +
+        " which " + [...new Set(superseded.map((n) => latest.get(n)))].join(", ") +
+        " has since replaced, and carries no warning");
+      continue;
+    }
+    marked++;
+    /* The block has to name the file that actually restores each one, or it is
+       a warning that sends somebody to the wrong place. */
+    for (const n of superseded) {
+      const to = latest.get(n);
+      if (!body.includes(to)) {
+        problems.push(f + ": its warning does not name " + to + ", which is what restores " + n);
+      }
+    }
+  }
+
+  if (problems.length) throw new Error(problems.join("; "));
+  return marked + " superseded file(s), each naming what restores it";
+});
+
+/* The generator has to parse, and nothing was checking that.
+
+   tools/build-portal.mjs writes four of these pages. Every check in this file
+   reads the pages — so a generator that will not even parse leaves all of them
+   green, against output from the last run that worked. That is precisely how
+   it went unnoticed that a backtick inside a comment had closed the template
+   literal it was sitting in: the build passed, the pages were stale, and the
+   change simply was not there.
+
+   Parsing it is not the same as running it, and running it would overwrite the
+   pages as a side effect of a check, which no check should do. So: parse. */
+await check("the generator that writes four of these pages parses", async () => {
+  const src = read("tools/build-portal.mjs");
+  try {
+    /* As a module, because it is one — top-level import and await are both
+       syntax errors to `new Function`. */
+    new (await import("node:vm")).SourceTextModule(src, { identifier: "build-portal.mjs" });
+  } catch (e) {
+    if (/SourceTextModule|experimental|not a constructor/i.test(String(e && e.message))) {
+      /* Older node without --experimental-vm-modules. Fall back to asking node
+         itself, which is slower but always available. */
+      const { execFileSync } = await import("node:child_process");
+      try {
+        execFileSync(process.execPath, ["--check", "tools/build-portal.mjs"], { stdio: "pipe" });
+      } catch (e2) {
+        throw new Error("tools/build-portal.mjs does not parse — the four pages it writes are " +
+          "whatever the last working run left behind, and every other check here is reading " +
+          "those. Run `node tools/build-portal.mjs` to see the error.");
+      }
+      return "parses (node --check), " + (src.length / 1024).toFixed(0) + " KB";
+    }
+    throw new Error("tools/build-portal.mjs does not parse: " + e.message);
+  }
+  return "parses, " + (src.length / 1024).toFixed(0) + " KB";
+});
+
+/* Nothing asks "is this hers" with only half the question.
+
+   applications.user_id has never been filled in. 004 added it and added
+   claim_my_applications() to populate it, and no page has ever called that —
+   so the column is null on every row in the table. Every place that asks
+   whether an application belongs to the caller therefore carries two arms:
+   the user id, and the email on the verified token.
+
+   submit_assessment() in 045 carried one. It matched nobody, for everybody,
+   always, and the Send button on the assessment could never have worked. It
+   went unseen because 045 was written months before it was run.
+
+   One arm is not a smaller version of two. It is zero. */
+await check("no ownership test matches on user_id alone", () => {
+  const bad = [];
+  /* Each function body, from its name to its terminator. */
+  for (const m of sql.matchAll(
+    /create\s+or\s+replace\s+function\s+public\.([a-z_]+)\s*\(([^)]*)\)([\s\S]*?)\$fn\$;/gi)) {
+    const [, name, , body] = m;
+    if (!/user_id\s*=\s*auth\.uid\(\)/i.test(body)) continue;
+    /* The email arm, or a helper that already carries both. */
+    const paired = /lower\s*\(\s*a?\.?email\s*\)/i.test(body) ||
+                   /owns_application|is_client_contact|is_hired/i.test(body);
+    if (!paired) bad.push(name);
+  }
+
+  /* A later definition settles it — 051 is exactly that. Only the last copy of
+     a function is the one Postgres runs. */
+  const still = bad.filter((name) => {
+    const all = [...sql.matchAll(new RegExp(
+      "create\\s+or\\s+replace\\s+function\\s+public\\." + name + "\\s*\\([\\s\\S]*?\\$fn\\$;", "gi"))];
+    const last = all[all.length - 1][0];
+    return !(/lower\s*\(\s*a?\.?email\s*\)/i.test(last) ||
+             /owns_application|is_client_contact|is_hired/i.test(last));
+  });
+
+  if (still.length) {
+    throw new Error([...new Set(still)].join(", ") + " — matches on user_id alone, and " +
+      "applications.user_id is null on every row because nothing has ever called " +
+      "claim_my_applications(). This does not narrow the match, it empties it. Use " +
+      "owns_application(), which carries both arms.");
+  }
+  return "every ownership test carries the email arm too";
+});
+
+/* "Who did this" is never a claim the browser makes.
+
+   Every record of who agreed something in this project is stamped from the
+   verified session: decided_by on a timesheet, confirmed_by on a start date, a
+   note's author, scored_by on an interview score, resolved_by on a swap,
+   contacted_by on an application, typing_verified_by, written_scored_by. That
+   is a rule, and it has now been broken three separate times — 046 found two
+   and 050 found two more, each because a column was added in a grant that
+   nobody thought of as being about identity.
+
+   So it is asserted rather than remembered. Any column ending _by or _at that
+   a signed-in user may write has to be named below, deliberately, with a
+   reason — which turns "somebody forgot" into "somebody decided". */
+await check("no record of who did something is writable by a page", () => {
+  /* The two the pages genuinely send, and why they are allowed to.
+     status_changed_at is a clock rather than an identity: /admin sets it in
+     the same request that moves the stage, and no policy reads it. It is on
+     this list rather than absent from it so the next person has to argue with
+     a sentence instead of a silence. */
+  const ALLOWED = new Set([
+    /* A clock, not an identity. /admin sets it in the same request that moves
+       the stage, and no policy reads it. */
+    "status_changed_at",
+    /* Also a clock, and one the page has to be able to set both ways: the
+       publish control on the notice board toggles it to now and back to null. */
+    "published_at",
+    /* Granted, and then overwritten anyway — sql/006 stamps this in a trigger
+       when the consent flag changes, so what the page sends never survives.
+       The grant is redundant rather than dangerous, and removing it would mean
+       editing a migration that has already run. */
+    "posting_consent_at"
+  ]);
+
+  const offenders = new Map();
+  /* grant update (a, b, c) on public.t to authenticated */
+  const re = /grant\s+update\s*\(([^)]*)\)\s*on\s+public\.([a-z_]+)\s+to\s+([a-z_,\s]+);/gi;
+  for (const m of sql.replace(/--[^\n]*/g, " ").matchAll(re)) {
+    if (!/authenticated|anon/i.test(m[3])) continue;
+    for (const raw of m[1].split(",")) {
+      const col = raw.trim().toLowerCase();
+      if (!/_by$|_at$/.test(col)) continue;
+      if (ALLOWED.has(col)) continue;
+      offenders.set(m[2] + "." + col, true);
+    }
+  }
+
+  /* A later revoke settles it — that is exactly how 046 and 050 fixed theirs. */
+  const still = [...offenders.keys()].filter((k) => {
+    const [table, col] = k.split(".");
+    return !new RegExp(
+      "revoke\\s+update\\s*\\([^)]*\\b" + col + "\\b[^)]*\\)\\s*on\\s+public\\." + table,
+      "i").test(sql);
+  });
+
+  if (still.length) {
+    throw new Error(still.join(", ") + " — a signed-in page may write these, and every one of " +
+      "them is a record of who did something or when. Stamp it from auth.jwt() in a trigger and " +
+      "revoke the column, the way 046 and 050 do, or add it to ALLOWED here with a reason.");
+  }
+  return offenders.size
+    ? offenders.size + " granted then revoked, " + ALLOWED.size + " allowed on purpose"
+    : "none granted, " + ALLOWED.size + " allowed on purpose";
+});
+
+/* The rule the whole assessment rests on, checked rather than believed.
+
+   The page has to be sent the questions and the wording of every option, and
+   must never be sent what any of them is worth. view-source is one keystroke,
+   and an assessment whose key ships in page source is not an assessment.
+
+   It held while there was one bank emitted by one line. There are now four,
+   built by a loop, and the difference between shipping [text] and shipping
+   [text, points] is one character in that loop. So it is asserted against the
+   built page rather than against the intention. */
+await check("the answer key never reaches the browser", async () => {
+  if (!existsSync("status.html")) return "no status.html to check";
+  const html = read("status.html");
+  const m = html.match(/var QBANK = (\{[\s\S]*?\});\n/);
+  if (!m) throw new Error("no QBANK in status.html — has the assessment been renamed?");
+
+  let bank;
+  try { bank = JSON.parse(m[1]); }
+  catch (e) { throw new Error("QBANK in status.html is not valid JSON: " + e.message); }
+
+  let items = 0;
+  for (const [name, list] of Object.entries(bank)) {
+    for (const it of list) {
+      items++;
+      if (!Array.isArray(it) || it.length !== 2 || !Array.isArray(it[1])) {
+        throw new Error(name + ": an item in the page is not [prompt, [option, ...]] — " +
+          "if the points went with it, the key is in the page source");
+      }
+      for (const o of it[1]) {
+        if (typeof o !== "string") {
+          throw new Error(name + ": an option in the page is " + typeof o + " rather than text — " +
+            "the score is being shipped with it, and anybody can read it");
+        }
+      }
+    }
+  }
+  return items + " items in the page, prompts and wording only — no score reaches it";
+});
+
+/* Every bank, not only the first one.
+
+   This checked SCENARIOS alone, which was the whole assessment when it was
+   written. English, detail and sales are three more banks of exactly the same
+   shape and exactly the same failure — and two of them shipped with the best
+   answer never once in the fourth column, which somebody would have noticed
+   before we did. */
 await check("no column is a strategy on the assessment", async () => {
-  const { SCENARIOS } = await import("./assessment-items.mjs");
-  const spread = [0, 0, 0, 0];
-  for (const [, opts] of SCENARIOS) {
-    const at = opts.findIndex((o) => o[1] === 2);
-    if (at < 0) throw new Error("a scenario has no best answer");
-    spread[at]++;
+  const { BANKS } = await import("./assessment-items.mjs");
+  const said = [];
+  for (const [name, bank] of Object.entries(BANKS)) {
+    if (!bank.length) throw new Error(name + " is empty");
+    const spread = [0, 0, 0, 0];
+    for (const [prompt, opts] of bank) {
+      if (opts.length !== 4) {
+        throw new Error(name + ': "' + String(prompt).slice(0, 50) + '" has ' + opts.length +
+          " options — every item is four, or the shuffling and the spread below both stop meaning anything");
+      }
+      const best = Math.max(...opts.map((o) => o[1]));
+      if (best !== 2) throw new Error(name + " has an item whose best answer is not worth 2");
+      spread[opts.findIndex((o) => o[1] === best)]++;
+    }
+    /* Random guessing scores a quarter. A column that holds more than a third
+       of the best answers beats guessing for somebody who spots it, which is a
+       question about pattern-matching rather than judgement. */
+    const worst = Math.max(...spread);
+    if (worst > Math.ceil(bank.length / 3)) {
+      throw new Error(name + ": the best answer sits in column " + (spread.indexOf(worst) + 1) +
+        " for " + worst + " of " + bank.length + " items — ticking it blindly scores " +
+        Math.round((worst / bank.length) * 100) + "%. Reorder the options.");
+    }
+    said.push(name + " " + spread.join("/"));
   }
-  /* Random guessing scores a quarter. A column that holds more than a third of
-     the best answers beats guessing for somebody who spots it, which is a
-     question about pattern-matching rather than judgement. */
-  const worst = Math.max(...spread);
-  if (worst > Math.ceil(SCENARIOS.length / 3)) {
-    throw new Error("the best answer sits in column " + (spread.indexOf(worst) + 1) + " for " +
-      worst + " of " + SCENARIOS.length + " scenarios — ticking it blindly scores " +
-      Math.round((worst * 2) / (SCENARIOS.length * 2) * 100) + "%. Shuffle the options.");
-  }
-  return "spread " + spread.join("/") + " — blind picking scores " +
-    Math.round((worst * 2) / (SCENARIOS.length * 2) * 100) + "%";
+  return said.join(", ");
 });
 
 await check("anon holds nothing on the assessment", () => {
@@ -1431,6 +1762,62 @@ await check("the timesheet's weeks and totals hold up", async () => {
     return (out.match(/^ {2}ok/gm) || []).length + " behaviours";
   } catch (e) {
     throw new Error("tools/test-timesheet.mjs failed — run it directly for the detail");
+  }
+});
+
+/* ── the generator that overwrites four of these pages ────────────────────
+   tools/build-portal.mjs WRITES status.html, admin.html, hub.html and
+   seats.html. It never reads them. So anything edited in those files by hand
+   is one command away from being gone — silently, with no error, and with the
+   build still green afterwards because every check here reads the file that
+   was just overwritten.
+
+   That is exactly what happened: a round of fixes went into those files
+   directly and none of it reached the generator. Nothing caught it, because
+   nothing was looking.
+
+   This looks. Each marker below is a fix that lives in a generated page; if a
+   page comes back without one, that page has been regenerated from a
+   generator that does not know about it, and the fix is gone. */
+await check("no generated page has lost a fix to its generator", () => {
+  const MARKERS = [
+    ["seats.html",  "function placeBlock",  "every assistant is drawn, not only the first"],
+    ["seats.html",  "function billingBlock", "the bill"],
+    ["seats.html",  "function quoted",      "the quote shown to the cent"],
+    ["seats.html",  "C_WEEK_LIMIT",         "the statement's week limit"],
+    ["status.html", "TYPING_TEST_URL",      "the typing test moved off this site"],
+    ["status.html", "typing_proof",         "proof of the typing score"],
+    ["admin.html",  "function todayCentral", "dates stamped in Central"],
+    ["admin.html",  "function downloadCvs", "the bulk CV download"],
+    ["admin.html",  "DATE_RANGES",          "the date filter"],
+    ["admin.html",  "weekly_cents",         "the exact quote"]
+  ];
+  const lost = [];
+  for (const [file, marker, what] of MARKERS) {
+    if (!existsSync(file)) continue;
+    if (!read(file).includes(marker)) lost.push(file + ": " + what);
+  }
+  if (lost.length) {
+    throw new Error(lost.join("; ") + " — these pages are written by " +
+      "tools/build-portal.mjs, so a page that has lost a fix has almost certainly been " +
+      "regenerated from a generator that never had it. Recover the page from git and " +
+      "port the change into the generator before running it again.");
+  }
+  return MARKERS.length + " fixes still present in the four generated pages";
+});
+
+/* The bill a client reads before they pay us, driven with more than one
+   assistant — which is the case simulate.mjs cannot reach, because that walk
+   follows one person. It is also the case /seats got wrong for its whole life:
+   it drew the first placement and returned, so a business with three
+   assistants was shown a third of what it owed and nothing said so. */
+await check("the bill adds up across every assistant", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-billing.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours";
+  } catch (e) {
+    throw new Error("tools/test-billing.mjs failed — run it directly for the detail");
   }
 });
 

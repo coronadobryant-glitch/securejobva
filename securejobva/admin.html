@@ -726,6 +726,38 @@ body:has(.adm__wrap) main{padding:0}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
+/* The assessment panel in /admin. Two of the controls on it are the only
+   things a person decides; everything else came from the trigger. */
+.sit{margin-top:.6rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface-2)}
+.sit__hd{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:baseline;margin-bottom:.55rem}
+.sit__meta{color:var(--muted);font-size:.84rem}
+.sit__wait{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;
+  border-radius:4px;background:var(--signal);color:var(--signal-ink)}
+.sit__v{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;border-radius:4px}
+.sit__v--passed{background:#0B7A63;color:#fff}
+.sit__v--below_line{background:#FAE6EB;color:#B5123A}
+.sit__v--in_progress{background:var(--line);color:var(--muted)}
+.sit__row{display:flex;flex-wrap:wrap;gap:.45rem .7rem;align-items:center;
+  padding:.4rem 0;border-top:1px dashed var(--line)}
+.sit__row:first-of-type{border-top:0;padding-top:0}
+.sit__lab{font-size:.82rem;color:var(--muted);min-width:5rem}
+.sit__s{font-size:.84rem;padding:.16rem .45rem;border-radius:4px;background:var(--surface)}
+.sit__s b{font-variant-numeric:tabular-nums}
+.sit__ok{color:#0B7A63}
+.sit__low{color:#B5123A}
+.sit__off,.sit__s.sit__off{color:var(--muted);font-size:.82rem}
+.sit__claim{font-family:"IBM Plex Mono",monospace;font-size:.84rem}
+.sit__lnk{font-size:.84rem;color:var(--accent);text-decoration:underline}
+.sit__in{font-family:"IBM Plex Mono",monospace;font-size:.84rem;width:4.6rem;
+  padding:.3rem .45rem;border:1.5px solid var(--accent);border-radius:6px;
+  background:var(--paper);color:var(--ink)}
+.sit__btn{padding:.35rem .75rem;font-size:.84rem}
+.sit__reply{margin-top:.5rem;padding:.7rem .85rem;background:var(--paper);border-radius:8px;
+  border:1px solid var(--line);white-space:pre-wrap;font-size:.9rem;line-height:1.6}
+.sit__ask{margin:.55rem 0 0;font-size:.84rem;color:var(--ink-2)}
 .docs{margin-top:.6rem;padding-top:.55rem;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
 .docs__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:.2rem}
 .doclink{
@@ -754,6 +786,7 @@ body:has(.adm__wrap) main{padding:0}
 .pill--interview{background:var(--accent);color:var(--accent-ink)}
 .pill--approved{background:var(--signal);color:var(--signal-ink)}
 .pill--declined{background:var(--surface-2);color:var(--muted)}
+
 </style>
 
 <script>
@@ -1795,6 +1828,7 @@ function rowHtml(a) {
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
       skillLine(a) +
       discLine(a) +
+      sitLine(a) +
       docList(a.docs) +
       contactLine(a) +
       scoreLine(a) +
@@ -1802,6 +1836,173 @@ function rowHtml(a) {
       ctl +
     "</div>"
   );
+}
+
+/* ── the assessment, which nothing in here used to show ──────────────────
+   045 built an assessment that scores itself, reaches a verdict and moves
+   somebody to Interview, and no screen in /admin ever showed the result. You
+   saw a stage change and nothing about why. This is that screen.
+
+   Two boxes on it matter, and neither is decoration: until somebody types what
+   the typing proof actually says, and what the writing was worth, sql/049
+   holds the verdict at 'in_progress'. That is not a failure — it is the row
+   saying it is waiting on us rather than on her. */
+function sitLine(a) {
+  var s = a.sit;
+  if (!s || !s.submitted_at) return "";
+
+  var need = [];
+  if (s.typing_verified_wpm === null || s.typing_verified_wpm === undefined) need.push("the typing checked");
+  if (s.written_score === null || s.written_score === undefined) need.push("the writing marked");
+
+  /* Which measures decide this track. A Customer Service applicant is not held
+     back by a sales score she was never asked to earn, so the ones that do not
+     gate her are shown greyed rather than hidden — the number is still worth
+     seeing, it just is not deciding anything. */
+  var axes = (s.track === "Admin Tasks") ? ["english", "detail"]
+           : (s.track === "Sales & Marketing") ? ["english", "sales", "customer"]
+           : ["english", "customer"];
+  var gates = function (k) { return axes.indexOf(k) > -1; };
+
+  var score = function (label, v, on) {
+    if (v === null || v === undefined) return "";
+    var cls = on ? (v >= 7 ? "sit__ok" : "sit__low") : "sit__off";
+    return '<span class="sit__s ' + cls + '">' + label + " <b>" + esc(v) + "</b>/10" +
+      (on ? "" : " &middot; not gating") + "</span>";
+  };
+
+  var claimed = (s.typing_wpm === null || s.typing_wpm === undefined)
+    ? "nothing yet"
+    : esc(s.typing_wpm) + " wpm at " + esc(s.typing_accuracy) + "%";
+
+  var num = function (v) {
+    return (v === null || v === undefined) ? "" : esc(v);
+  };
+
+  return '<div class="sit" data-sit="' + esc(a.id) + '">' +
+    '<div class="sit__hd"><b>Assessment</b>' +
+      '<span class="sit__meta">' + esc(s.track || "") + " &middot; sent " + esc(when(s.submitted_at)) + "</span>" +
+      (need.length
+        ? '<span class="sit__wait">waiting on ' + esc(need.join(" and ")) + "</span>"
+        : '<span class="sit__v sit__v--' + esc(s.verdict) + '">' +
+          esc(s.verdict === "passed" ? "passed"
+            : s.verdict === "below_line" ? "below the line" : "in progress") + "</span>") +
+    "</div>" +
+
+    '<div class="sit__row">' +
+      score("English", s.score_english, gates("english")) +
+      score("Judgement", s.score_scenarios, gates("customer")) +
+      score("Detail", s.score_detail, gates("detail")) +
+      score("Sales", s.score_sales, gates("sales")) +
+    "</div>" +
+
+    '<div class="sit__row">' +
+      '<span class="sit__lab">She says</span>' +
+      '<span class="sit__claim">' + claimed + "</span>" +
+      (s.typing_proof
+        ? '<a class="sit__lnk" href="' + esc(s.typing_proof) +
+          '" target="_blank" rel="noopener noreferrer">open her proof</a>'
+        : '<span class="sit__off">no proof sent</span>') +
+      (s.connection_proof
+        ? '<a class="sit__lnk" href="' + esc(s.connection_proof) +
+          '" target="_blank" rel="noopener noreferrer">speed test</a>'
+        : '<span class="sit__off">no speed test</span>') +
+    "</div>" +
+
+    '<div class="sit__row">' +
+      '<span class="sit__lab">You read</span>' +
+      '<input class="sit__in" data-vw type="number" min="0" max="250" placeholder="wpm" ' +
+        'aria-label="Words per minute you read off the proof" value="' + num(s.typing_verified_wpm) + '">' +
+      '<input class="sit__in" data-va type="number" min="0" max="100" placeholder="%" ' +
+        'aria-label="Accuracy you read off the proof" value="' + num(s.typing_verified_accuracy) + '">' +
+      (s.typing_verified_by
+        ? '<span class="sit__off">checked by ' + esc(s.typing_verified_by) + "</span>"
+        : "") +
+    "</div>" +
+
+    '<div class="sit__row">' +
+      '<span class="sit__lab">Her writing</span>' +
+      (s.written_reply
+        ? '<button class="btn btn--ghost sit__btn" data-read type="button">Read her reply</button>'
+        : '<span class="sit__off">nothing written</span>') +
+      '<input class="sit__in" data-ws type="number" min="0" max="10" placeholder="/10" ' +
+        'aria-label="Mark for the written reply, out of ten" value="' + num(s.written_score) + '">' +
+      '<button class="btn btn--solid sit__btn" data-sit-save type="button">Save</button>' +
+      '<span class="row__ok" data-sit-ok></span>' +
+    "</div>" +
+
+    (s.written_reply
+      ? '<div class="sit__reply" hidden>' + esc(s.written_reply) + "</div>"
+      : "") +
+
+    /* Two of her own answers, named for whoever runs the interview. Somebody
+       who chose an answer can say why she chose it. Somebody handed it by a
+       chatbot cannot, and this is the only defence against that which the
+       research says actually works. */
+    (s.scenario_answers
+      ? '<p class="sit__ask">In the interview, ask her about <b>judgement 8</b> ' +
+        "(the file with other customers&rsquo; details) and <b>judgement 12</b> " +
+        "(blocked at the end of the day).</p>"
+      : "") +
+  "</div>";
+}
+
+/* Saving the two things a person decides. Nothing else on this panel is
+   writable: every score came from the trigger, and the two stamps recording
+   who checked the typing are not granted to anybody. */
+function wireSit(box) {
+  box.querySelectorAll("[data-read]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var wrap = b.closest("[data-sit]");
+      var reply = wrap.querySelector(".sit__reply");
+      if (!reply) return;
+      reply.hidden = !reply.hidden;
+      b.textContent = reply.hidden ? "Read her reply" : "Hide her reply";
+    });
+  });
+
+  box.querySelectorAll("[data-sit-save]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var wrap = b.closest("[data-sit]");
+      var id = wrap.getAttribute("data-sit");
+      var ok = wrap.querySelector("[data-sit-ok]");
+      var vw = wrap.querySelector("[data-vw]").value;
+      var va = wrap.querySelector("[data-va]").value;
+      var ws = wrap.querySelector("[data-ws]").value;
+
+      /* An empty box means "not checked yet" rather than zero, which is the
+         difference between a verdict that waits and a verdict that fails
+         somebody on a number nobody typed. */
+      var body = {
+        typing_verified_wpm: vw === "" ? null : Number(vw),
+        typing_verified_accuracy: va === "" ? null : Number(va),
+        written_score: ws === "" ? null : Number(ws)
+      };
+      if (body.written_score !== null && !(body.written_score >= 0 && body.written_score <= 10)) {
+        flash(ok, "The written mark is out of 10", true);
+        return;
+      }
+      if (body.typing_verified_wpm !== null &&
+          !(body.typing_verified_wpm >= 0 && body.typing_verified_wpm <= 250)) {
+        flash(ok, "That is not a words-per-minute figure", true);
+        return;
+      }
+
+      b.disabled = true;
+      flash(ok, "Saving…");
+      api("application_assessment?application_id=eq." + encodeURIComponent(id), {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: body
+      }).then(function () {
+        /* Reloaded rather than patched in place: writing these re-runs the
+           scoring, so the verdict and every axis on screen may have just
+           changed and the page should not be showing the old ones. */
+        location.reload();
+      }).catch(function (e) {
+        b.disabled = false;
+        flash(ok, why(e), true);
+      });
+    });
+  });
 }
 
 /* ── who may do what ─────────────────────────────────────────────────────
@@ -2220,6 +2421,37 @@ function fromLocalDateTime(v) {
   var d = new Date(v);
   return isNaN(d) ? null : d.toISOString();
 }
+/* Today, in the company's own time, which is Central.
+
+   Two bugs in one line, and the second only showed up once the first was
+   fixed. ended_on was being written with toISOString().slice(0, 10) — the same
+   trap the two functions above exist to avoid — so from Houston any save after
+   about six in the evening recorded tomorrow's date. That matters because
+   ended_on decides which weeks a placement covers, in timesheet_placement()
+   and again in adopt_orphan_weeks().
+
+   Reading the browser's own clock fixed that for you and quietly broke it for
+   anybody else: an assistant or a contractor opening /admin from Manila is
+   most of a day ahead, and would stamp a placement with a date the business
+   had not reached yet. The business runs on Central, so this asks for Central
+   by name and gets the same answer wherever the person is sitting.
+
+   en-CA because it formats as YYYY-MM-DD, which is the shape a date column
+   wants. Falls back to the local clock if the runtime has no timezone data,
+   which is strictly better than the UTC it replaced. */
+var COMPANY_TZ = "America/Chicago";
+
+function todayCentral() {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: COMPANY_TZ, year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date());
+  } catch (e) {
+    var d = new Date();
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+}
 function whenTime(iso) {
   if (!iso) return "";
   var d = new Date(iso);
@@ -2493,11 +2725,12 @@ function drawLeave(box, rows) {
       api("leave_requests?id=eq." + encodeURIComponent(row.getAttribute("data-leave")), {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
-        body: {
-          status: yes ? "approved" : "declined",
-          decided_at: new Date().toISOString(),
-          decided_by: ME
-        }
+        /* Status alone. sql/050 revoked decided_at and decided_by and stamps
+           them from the verified session instead, so sending either would now
+           be refused — and that is the point: a timesheet has always recorded
+           who approved it that way, and leave was the same shape with a
+           different answer. */
+        body: { status: yes ? "approved" : "declined" }
       }).then(loadLeave)
         .catch(function (e) { flash(ok, why(e), true); });
     });
@@ -2747,7 +2980,15 @@ function drawPlacements(box, swaps) {
           '<div class="fld"><label for="pl-hours">Hours a week</label><input id="pl-hours" type="number" min="1" max="168" value="40"></div>' +
         "</div>" +
         '<div class="edit__grid">' +
-          '<div class="fld"><label for="pl-trial">Trial, in weeks</label><input id="pl-trial" type="number" min="1" max="52" value="2"></div>' +
+          /* One, because that is what the site sells. index.html asks "Is the
+             first week really free?", its section is headed "How the free week
+             works", and refunds.html section 1 is "The free first week". This
+             box defaulted to two, and a trial week never reaches the client's
+             statement — so every placement matched without changing this gave
+             away a second week nobody had promised and nobody had decided to
+             give. Change it per placement whenever a longer trial is actually
+             agreed; the default should be the published offer. */
+          '<div class="fld"><label for="pl-trial">Trial, in weeks</label><input id="pl-trial" type="number" min="1" max="52" value="1"></div>' +
           '<div class="fld"></div>' +
         "</div>" +
 
@@ -2852,10 +3093,22 @@ function wirePlacementForm() {
     go.disabled = true;
     flash(ok, "Saving\u2026");
 
+    /* Checked before the request, which is where a check belongs. This used to
+       sit twenty lines below, AFTER clientStep had been built — and building
+       it fires the POST, so an empty name sent a row the constraint refused
+       and then returned early, leaving a rejected promise nobody was holding.
+       The database caught it, which is why nothing ever went wrong; it was
+       still a request made and abandoned on every mistyped form. */
+    var wantNew = pick.value === "__new";
+    if (wantNew && !document.getElementById("pl-cname").value.trim()) {
+      go.disabled = false;
+      err.textContent = "Give the business a name.";
+      return;
+    }
+
     /* A new client first, because the placement cannot point at one that does
        not exist yet. return=representation so the id comes back rather than
        being fetched again and hoped to be the right row. */
-    var wantNew = pick.value === "__new";
     var clientStep = wantNew
       ? api("clients", {
           method: "POST",
@@ -2883,12 +3136,6 @@ function wirePlacementForm() {
           });
         })
       : Promise.resolve(pick.value);
-
-    if (wantNew && !document.getElementById("pl-cname").value.trim()) {
-      go.disabled = false;
-      err.textContent = "Give the business a name.";
-      return;
-    }
 
     clientStep.then(function (clientId) {
       return api("placements", {
@@ -2937,37 +3184,74 @@ function wirePlacementRows(box) {
       var bill = row.querySelector("[data-pl-bill]").value;
       var pay = row.querySelector("[data-pl-pay]").value;
 
-      if (bill !== "" && pay !== "" && Number(pay) > Number(bill)) {
+      var have = RATES[id] || {};
+
+      /* Falls back to what is stored when a box is empty, which is the state
+         of every row whose rate has never been set. The guard used to skip
+         itself in exactly that case, so the first pay rate typed against a
+         blank billing box was never compared with anything. */
+      var billNum = bill !== "" ? Number(bill) : (have.bill === undefined ? null : Number(have.bill));
+      var payNum  = pay  !== "" ? Number(pay)  : (have.pay  === undefined ? null : Number(have.pay));
+      if (billNum !== null && payNum !== null && payNum > billNum) {
         flash(ok, "The assistant cannot be paid more than the client is charged", true);
         return;
       }
 
       flash(ok, "Saving\u2026");
-      var jobs = [api("placements?id=eq." + encodeURIComponent(id), {
-        method: "PATCH", headers: { Prefer: "return=minimal" },
-        body: { status: status, ended_on: status === "ended" ? new Date().toISOString().slice(0, 10) : null }
-      })];
+
+      /* Only what actually changed. This used to PATCH status and ended_on on
+         every save, so correcting a rate on a placement that ended in March
+         rewrote its end date to today — silently moving the boundary that
+         decides which weeks the placement covers. A rate edit is a rate edit. */
+      var wasStatus = null;
+      for (var pi = 0; pi < PLACEMENTS.length; pi++) {
+        if (PLACEMENTS[pi].id === id) { wasStatus = PLACEMENTS[pi].status; break; }
+      }
+      var jobs = [];
+      if (status !== wasStatus) {
+        jobs.push(api("placements?id=eq." + encodeURIComponent(id), {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: { status: status, ended_on: status === "ended" ? todayCentral() : null }
+        }));
+      }
 
       /* Upserted one at a time rather than with merge-duplicates: the update
          grant covers rate and nothing else, and an upsert would try to write
          placement_id too. */
       var rate = function (table, value, had) {
-        if (value === "") return null;
+        /* An emptied box is not a change, and it never was — the old rate
+           stays. What was wrong was the screen saying "Saved" over it. It now
+           says what actually happened, because a rate that could be deleted
+           would recreate the problem where a client sees hours and no money at
+           all with nothing explaining the gap. */
+        if (value === "") {
+          if (had !== undefined) emptied = true;
+          return null;
+        }
+        /* Rounded to the cent before it is sent. The inputs carry step="0.01"
+           and nothing enforces it — this is not a form submit and nothing
+           calls checkValidity — so 7.755 went through as typed and numeric(8,2)
+           rounded it to 7.76 on the way in. On a site that sells "$7.75 flat,
+           the number you were quoted", the rate stored has to be the rate
+           somebody typed. */
+        var cents = Math.round(Number(value) * 100);
         return had === undefined
           ? api(table, { method: "POST", headers: { Prefer: "return=minimal" },
-              body: { placement_id: id, rate: Number(value) } })
+              body: { placement_id: id, rate: cents / 100 } })
           : api(table + "?placement_id=eq." + encodeURIComponent(id), {
               method: "PATCH", headers: { Prefer: "return=minimal" },
-              body: { rate: Number(value) } });
+              body: { rate: cents / 100 } });
       };
-      var have = RATES[id] || {};
+      var emptied = false;
       var a = rate("placement_billing", bill, have.bill);
       var c = rate("placement_pay", pay, have.pay);
       if (a) jobs.push(a);
       if (c) jobs.push(c);
 
-      Promise.all(jobs).then(loadPlacements)
-        .catch(function (e) { flash(ok, why(e), true); });
+      Promise.all(jobs).then(function () {
+        if (emptied) flash(ok, "Rates can be changed, not cleared", true);
+        loadPlacements();
+      }).catch(function (e) { flash(ok, why(e), true); });
     });
   });
 
@@ -2976,9 +3260,15 @@ function wirePlacementRows(box) {
       var row = b.closest("[data-place]");
       var ok = row.querySelector("[data-pl-ok]");
       flash(ok, "Saving\u2026");
+      /* Status alone. sql/046 revoked UPDATE on resolved_at and resolved_by
+         and put a trigger on the table instead, so sending either would now be
+         refused outright — and that is the point: who resolved something is a
+         record, and a record the browser fills is one the browser can choose.
+         Every other such field here is stamped from the verified token; these
+         two were the last that were not. */
       api("swap_requests?id=eq." + encodeURIComponent(b.getAttribute("data-swap")), {
         method: "PATCH", headers: { Prefer: "return=minimal" },
-        body: { status: "resolved", resolved_at: new Date().toISOString(), resolved_by: ME }
+        body: { status: "resolved" }
       }).then(loadPlacements)
         .catch(function (e) { flash(ok, why(e), true); });
     });
@@ -3093,7 +3383,7 @@ function loadSeats() {
   var box = document.getElementById("seats-card");
   if (!box) return;
   box.innerHTML = '<span class="spin"></span>Loading seat requests&hellip;';
-  api("seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,name,company,email,phone,notes,status,status_changed_at&order=created_at.desc")
+  api("seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,name,company,email,phone,notes,status,status_changed_at&order=created_at.desc")
     .then(function (rows) { drawSeats(box, rows || []); })
     .catch(function (e) {
       box.innerHTML = '<p class="msg msg--bad">Could not load seat requests. ' + esc(e.message) + "</p>";
@@ -3128,7 +3418,13 @@ function drawSeats(box, rows) {
             '<div class="row__tags">' +
               esc((r.seats || []).join(" + ") || "no roles") + " &middot; " +
               esc(r.hours || "?") + " hrs" +
-              (r.weekly ? " &middot; $" + esc(r.weekly) + "/wk quoted" : "") +
+              /* The exact figure where there is one. This read the rounded
+                 column, so /admin and the home page quoted different weeks to
+                 the same client — and a conversation about a price should not
+                 start with the two of you looking at different numbers. */
+              (r.weekly_cents !== null && r.weekly_cents !== undefined
+                ? " &middot; $" + esc((r.weekly_cents / 100).toFixed(2)) + "/wk quoted"
+                : r.weekly ? " &middot; $" + esc(r.weekly) + "/wk quoted" : "") +
               " &middot; " + esc(r.timezone || "?") +
               " &middot; asked " + esc(when(r.created_at)) +
             "</div>" +
@@ -3148,11 +3444,33 @@ function drawSeats(box, rows) {
      half-chosen state, so there is nothing a Save button was waiting for —
      it only created a way to make a change and lose it by navigating away. */
   box.querySelectorAll("[data-seat-status]").forEach(function (sel) {
+    /* What the database held when this dropdown was drawn, so a refusal can
+       put it back. hub.html learned this the hard way and says so: a value
+       that failed to save must not sit there looking saved. Here it did — the
+       select kept the new choice, the row kept the old one, and only the next
+       reload disagreed with what was on screen. */
+    sel.setAttribute("data-was", sel.value);
     sel.addEventListener("change", function () {
       var row = sel.closest("[data-seat]");
       var id = row.getAttribute("data-seat");
       var st = sel.value;
       var ok = row.querySelector("[data-seat-ok]");
+      var was = sel.getAttribute("data-was");
+
+      /* Asked before it happens, because there is no Save button on this
+         control: picking a stage writes it immediately, and the stage a seat
+         request sits at is what the client is shown on /seats. A mis-click on
+         a dropdown used to be a change the client could see before you knew
+         you had made it. Cancelling puts the dropdown back rather than leaving
+         it showing something the database does not hold. */
+      var who = row.querySelector(".row__n");
+      var okToGo = window.confirm(
+        "Move " + ((who && who.textContent) || "this request") +
+        " from “" + (SEAT_LABEL[was] || was) + "” to “" + (SEAT_LABEL[st] || st) + "”?\n\n" +
+        "The client sees this stage on their own page as soon as it saves."
+      );
+      if (!okToGo) { sel.value = was; return; }
+
       flash(ok, "Saving…");
       api("seat_requests?id=eq." + encodeURIComponent(id), {
         method: "PATCH",
@@ -3162,8 +3480,10 @@ function drawSeats(box, rows) {
         var pill = row.querySelector(".pill");
         pill.className = "pill pill--" + st;
         pill.textContent = SEAT_LABEL[st] || st;
+        sel.setAttribute("data-was", st);
         flash(ok, "Saved");
       }).catch(function (e) {
+        sel.value = sel.getAttribute("data-was");
         flash(ok, why(e), true);
       });
     });
@@ -3311,6 +3631,104 @@ var CSV_COLUMNS = [
   ["Scored by", "scored_by"]
 ];
 
+/* ── downloading a stack of CVs ────────────────────────────────────────────
+   The ask was plain: "this is all the applicants we have today, so it is not a
+   hassle to download one by one." So it follows whatever filter is on screen —
+   set the date filter to Applied today and this is today's stack.
+
+   No zip library, deliberately. This project carries no dependencies and the
+   one thing a zip would buy is a single file; against that it would be a third
+   party in the path of every CV the business handles. The files come down one
+   at a time instead.
+
+   Each one has to be fetched rather than linked. A signed URL points at
+   Supabase, which is a different origin, and a download attribute is ignored
+   across origins — the browser would navigate to the PDF instead of saving it,
+   and the second one would replace the first. Fetching gives a blob on this
+   origin, which saves properly and keeps the name we choose. */
+
+/* A name that says whose CV it is at a glance in a downloads folder, and that
+   every filesystem will accept. */
+function cvName(app, doc, n) {
+  var who = String(app.name || app.email || "applicant")
+    .normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 40);
+  var orig = String(doc.filename || "cv");
+  var dot = orig.lastIndexOf(".");
+  var ext = dot > 0 ? orig.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) : "";
+  var when_ = String(app.created_at || "").slice(0, 10);
+  return (when_ ? when_ + "_" : "") + (who || "applicant") +
+         (n > 1 ? "_" + n : "") + (ext ? "." + ext : "");
+}
+
+var CVS_RUNNING = false;
+
+function downloadCvs() {
+  if (CVS_RUNNING) return;
+  var btn = document.getElementById("cvs");
+  var msg = document.getElementById("cvs-msg");
+
+  /* Flattened here rather than in the loop, so the count in the button and the
+     count that is actually fetched can never be two different numbers. */
+  var jobs = [];
+  shownRows().forEach(function (a) {
+    (a.docs || []).forEach(function (d, i) {
+      jobs.push({ app: a, doc: d, name: cvName(a, d, i + 1) });
+    });
+  });
+
+  if (!jobs.length) {
+    msg.textContent = "No CVs attached in this filter";
+    setTimeout(function () { msg.textContent = ""; }, 3000);
+    return;
+  }
+  if (jobs.length > 5 && !window.confirm(
+        "Download " + jobs.length + " CVs?\n\n" +
+        "Your browser will ask once whether to allow multiple downloads. Say yes.")) {
+    return;
+  }
+
+  CVS_RUNNING = true;
+  btn.disabled = true;
+  var done = 0, failed = 0;
+
+  /* One at a time. A burst of signed-URL requests is a burst against storage
+     for no benefit, and the browser saves them in order this way. */
+  (function step(i) {
+    if (i >= jobs.length) {
+      CVS_RUNNING = false;
+      btn.disabled = false;
+      msg.textContent = failed
+        ? done + " saved, " + failed + " could not be fetched"
+        : done + (done === 1 ? " CV saved" : " CVs saved");
+      setTimeout(function () { msg.textContent = ""; }, 6000);
+      return;
+    }
+    msg.textContent = "Downloading " + (i + 1) + " of " + jobs.length + "…";
+
+    signDoc(jobs[i].doc.path)
+      .then(function (url) { return fetch(url); })
+      .then(function (r) {
+        if (!r.ok) throw new Error("could not fetch");
+        return r.blob();
+      })
+      .then(function (blob) {
+        var href = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = href;
+        a.download = jobs[i].name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        /* Revoked on a delay, not immediately: revoking in the same tick can
+           beat the browser to the save and produce an empty file. */
+        setTimeout(function () { URL.revokeObjectURL(href); }, 4000);
+        done++;
+      })
+      .catch(function () { failed++; })
+      .then(function () { setTimeout(function () { step(i + 1); }, 350); });
+  })(0);
+}
+
 function exportCsv() {
   var rows = shownRows();
   if (!rows.length) return;
@@ -3335,13 +3753,44 @@ function exportCsv() {
   setTimeout(function () { URL.revokeObjectURL(url); }, 0);
 }
 
+/* The ranges the date filter offers, and the only place their meaning is
+   written down. Each one answers "how many days back does this go", counted in
+   whole local days so "today" means today wherever the person reading it is
+   sitting rather than wherever the server is. */
+var DATE_RANGES = [
+  ["",    "Any time"],
+  ["0",   "Applied today"],
+  ["1",   "Today and yesterday"],
+  ["7",   "Last 7 days"],
+  ["30",  "Last 30 days"],
+  ["90",  "Last 90 days"]
+];
+
+/* Whole days between then and now, by local calendar date rather than by
+   elapsed hours: an application at 11pm last night is "yesterday", not "0.4
+   days ago". */
+function daysAgoLocal(iso) {
+  if (!iso) return null;
+  var d = new Date(iso);
+  if (isNaN(d)) return null;
+  var then = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((today - then) / 86400000);
+}
+
 function shownRows() {
   var q  = (document.getElementById("q").value || "").toLowerCase().trim();
   var st = document.getElementById("filter").value;
   var sk = document.getElementById("fskill").value;
   var lv = document.getElementById("flevel").value;
+  var dt = document.getElementById("fdate").value;
 
   var shown = ALL.filter(function (a) {
+    if (dt !== "") {
+      var ago = daysAgoLocal(a.created_at);
+      if (ago === null || ago < 0 || ago > Number(dt)) return false;
+    }
     if (st === "__late") {
       var w = days(a.waiting_since);
       if (!(a.is_ghosted || (w !== null && w >= 7 && !a.response_received))) return false;
@@ -3415,8 +3864,24 @@ function paint() {
   var shown = shownRows();
   document.getElementById("count").textContent =
     shown.length + " of " + ALL.length;
-  document.getElementById("rows").innerHTML =
+  /* The button says what it will actually fetch, because "Download CVs" over a
+     filter holding none of them is a button that does nothing and does not say
+     why. Counted the same way the download counts them, so the two can never
+     disagree. */
+  var cvBtn = document.getElementById("cvs");
+  if (cvBtn) {
+    var n = 0;
+    shown.forEach(function (a) { n += (a.docs || []).length; });
+    cvBtn.textContent = n ? "Download " + n + " CV" + (n === 1 ? "" : "s") : "No CVs here";
+    cvBtn.disabled = !n || CVS_RUNNING;
+  }
+  var rows = document.getElementById("rows");
+  rows.innerHTML =
     shown.length ? shown.map(rowHtml).join("") : '<p class="msg">Nothing matches that.</p>';
+  /* Rewired every paint, because the rows are replaced wholesale and the
+     listeners go with them. Everything else on a row is delegated from the
+     container; the assessment panel has two controls of its own. */
+  wireSit(rows);
 }
 
 function save(row) {
@@ -3485,7 +3950,11 @@ function save(row) {
     if (row.getAttribute("data-mark-contacted") === "1") {
       t.pipeline = "contacted";
       t.last_contacted_at = new Date().toISOString();
-      t.contacted_by = ME;
+      /* contacted_by is no longer sent. sql/046 stamps it from the verified
+         token whenever last_contacted_at moves, the same way 008 already
+         stamps scored_by on this very table — the comment forty lines above
+         explains why, and this field was the one that had not been given the
+         same treatment. */
       changed = true;
     }
     if (changed) {
@@ -3497,7 +3966,12 @@ function save(row) {
         if (!rec) return;
         if (t.pipeline) rec.pipeline = t.pipeline;
         if (t.last_contacted_at) rec.last_contacted_at = t.last_contacted_at;
-        if (t.contacted_by) rec.contacted_by = t.contacted_by;
+        /* Mirrored from ME rather than from t, because t no longer carries it
+           — the trigger writes it now. Safe to assume: the trigger takes the
+           address out of the same token this session is signed in with, so
+           this is what it will have written. It is a label until the next
+           load, and the next load reads the real one. */
+        if (t.last_contacted_at) rec.contacted_by = ME;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
         if ("interview_at" in t) rec.interview_at = t.interview_at;
         SKILLS.forEach(function (k) {
@@ -3572,7 +4046,7 @@ function why(e) {
   return t.slice(0, 180) || "That did not save";
 }
 
-function render(email, apps, notes, socials, docs, disc) {
+function render(email, apps, notes, socials, docs, disc, sits) {
   var byId = {};
   /* Newest first, which is the order they arrive in and the order they are
      read: the last thing said about somebody is the thing you want. */
@@ -3589,11 +4063,14 @@ function render(email, apps, notes, socials, docs, disc) {
   });
   var discById = {};
   (disc || []).forEach(function (d) { discById[d.application_id] = d; });
+  var sitById = {};
+  (sits || []).forEach(function (x) { sitById[x.application_id] = x; });
   ALL = apps.map(function (a) {
     a.notes = byId[a.id] || [];
     a.socials = socById[a.id] || [];
     a.docs = docById[a.id] || [];
     a.disc = discById[a.id] || null;
+    a.sit = sitById[a.id] || null;
     a.pipeline = a.pipeline || "new";
     return a;
   });
@@ -3687,8 +4164,19 @@ function render(email, apps, notes, socials, docs, disc) {
           return '<option value="' + l + '">' + LEVEL_LABEL[l] + " or better</option>";
         }).join("") +
       "</select>" +
+      /* When they applied. The reason this exists is the CV download beside
+         it: "everyone who applied today" is the question somebody actually
+         asks before sitting down to read a stack of them, and without a date
+         filter the only way to answer it was to read the queue by eye. */
+      '<select id="fdate" aria-label="Filter by when they applied">' +
+        DATE_RANGES.map(function (d) {
+          return '<option value="' + d[0] + '">' + d[1] + "</option>";
+        }).join("") +
+      "</select>" +
       '<span class="adm__count" id="count"></span>' +
       '<button class="btn btn--ghost" id="csv" type="button" style="padding:.5rem .8rem;font-size:.85rem">Export CSV</button>' +
+      '<button class="btn btn--ghost" id="cvs" type="button" style="padding:.5rem .8rem;font-size:.85rem">Download CVs</button>' +
+      '<span class="adm__count" id="cvs-msg" aria-live="polite"></span>' +
     "</div>" +
     '<div class="adm__canvas">' +
     '<div data-pane="apps">' +
@@ -3726,6 +4214,8 @@ function render(email, apps, notes, socials, docs, disc) {
   document.getElementById("fskill").addEventListener("change", paint);
   document.getElementById("csv").addEventListener("click", exportCsv);
   document.getElementById("flevel").addEventListener("change", paint);
+  document.getElementById("fdate").addEventListener("change", paint);
+  document.getElementById("cvs").addEventListener("click", downloadCvs);
   /* Selects and checkboxes commit immediately. There is no half-chosen state
      in a dropdown, so there is nothing to wait for. */
   document.getElementById("rows").addEventListener("change", function (e) {
@@ -3794,10 +4284,20 @@ function start() {
            not exist, and an admin page that will not load because a
            questionnaire is missing is worse than one without the questionnaire. */
         api("application_disc_read?select=application_id,d,i,s,c,primary_style,secondary_style,primary_name")
+          .catch(function () { return []; }),
+        /* Caught for the same reason as the two above: until 045 and 049 are
+           pasted this table has no such columns, and an admin page that will
+           not load because the assessment is not switched on yet is worse than
+           one without the assessment panel. */
+        api("application_assessment?select=application_id,track,submitted_at,verdict," +
+            "score_english,score_detail,score_sales,score_scenarios,score_typing," +
+            "typing_wpm,typing_accuracy,typing_proof,connection_proof," +
+            "typing_verified_wpm,typing_verified_accuracy,typing_verified_by," +
+            "written_reply,written_score,scenario_answers")
           .catch(function () { return []; })
       ];
       return Promise.all(jobs).then(function (r) {
-        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || [], r[4] || []);
+        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || [], r[4] || [], r[5] || []);
       });
     })
     .catch(function (e) {

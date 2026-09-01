@@ -125,8 +125,13 @@ check("the page never sends scored_by", () => {
   assert(!("scored_at" in b), "the page sent scored_at — the trigger owns that");
 });
 
-/* ── marking contacted stamps who and when ── */
-check("mark contacted stamps the time and the person", () => {
+/* ── marking contacted moves the stage and the clock, and names nobody ──
+   This used to assert the opposite of its second half: that the page sent
+   contacted_by itself. It was the last "who did this" field in the project
+   still filled in by a browser, and sql/046 moved it to a trigger alongside
+   scored_by — which the check above has always insisted the page leave alone.
+   Two fields on one table, one rule, and now one test each saying so. */
+check("mark contacted stamps the time and leaves the person to the database", () => {
   ctx.ALL.length = 0; ctx.ALL.push(...[{ id: "app-1", status: "applied", pipeline: "new" }]);
   const row = fakeRow({ "[data-pipe]": "new" });
   row.setAttribute("data-mark-contacted", "1");
@@ -135,7 +140,8 @@ check("mark contacted stamps the time and the person", () => {
   assert(b, "nothing was sent");
   assert(b.pipeline === "contacted", "did not move to contacted");
   assert(b.last_contacted_at, "no timestamp");
-  assert(b.contacted_by === ctx.ME, "wrong person: " + b.contacted_by);
+  assert(!("contacted_by" in b),
+    "the page sent contacted_by — the trigger owns that, the same way it owns scored_by");
 });
 
 /* ── writes are minimal, so an ungranted column cannot refuse the statement ── */

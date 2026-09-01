@@ -466,11 +466,29 @@ img{max-width:100%}
     btn.textContent = "Sending\u2026";
 
     fetch(ENDPOINT, { method: "POST", headers: HEADERS, body: JSON.stringify(d) })
-      .then(function (r) { return r.ok; })
+      .then(function (r) {
+        if (r.ok) return true;
+        /* A rule said no on purpose — 047 refuses a flood from one address —
+           and carries a message written for the person to read. Showing that
+           beats "that did not send", which invites them to try again into the
+           same limit. */
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (e) {}
+          if (j && typeof j.hint === "string" &&
+              j.hint.indexOf("sjva-") === 0 && j.message) return { refused: String(j.message) };
+          return false;
+        })["catch"](function () { return false; });
+      })
       ["catch"](function () { return false; })
       .then(function (sent) {
         form.setAttribute("hidden", "");
         done.removeAttribute("hidden");
+        if (sent && sent.refused) {
+          done.innerHTML = '<div class="cform__ok"><b>One moment.</b> ' +
+            String(sent.refused).replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>";
+          return;
+        }
         done.innerHTML = sent
           ? '<div class="cform__ok"><b>Message sent.</b> We answer within one to two business days, at ' +
             d.email.replace(/&/g, "&amp;").replace(/</g, "&lt;") + ".</div>"

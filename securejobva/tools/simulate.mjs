@@ -75,11 +75,16 @@ const hub = new Function("esc",
   hubFns.map((n) => n + ": " + n).join(", ") + " };"
 )(esc);
 
+/* placeBlock is where the body of a placement's cards moved when /seats
+   learned to draw more than one of them. clientBlock is now the loop around
+   it, so pulling only the loop into the sandbox gets a ReferenceError rather
+   than a walk — which is what happened, and is the harness doing its job. */
 const seatFns = ["when", "cIso", "cFrom", "cHours", "cNum", "cMoney", "cWeekLabel", "cDays",
-                 "clientBlock"];
+                 "clientBlock", "placeBlock"];
 const seats = new Function("esc",
   varOf(SEATS, "C_LABEL") + "\n" + 'var C_DAY = ["M","T","W","T","F","S","S"];\n' +
   "var C_PLACE = [], C_RATE = {}, C_WEEKS = [], C_SWAPS = [], C_STARTS = [], C_NAMES = [], C_OFF = false;\n" +
+  "var C_WEEK_LIMIT = 260, C_TRUNCATED = false;\n" +
   seatFns.map((n) => grab(SEATS, n)).join("\n") +
   "\nreturn { set: function (s) { C_PLACE = s.C_PLACE; C_RATE = s.C_RATE; C_WEEKS = s.C_WEEKS;" +
   " C_SWAPS = s.C_SWAPS; C_STARTS = s.C_STARTS || []; C_NAMES = s.C_NAMES || []; }, " + seatFns.map((n) => n + ": " + n).join(", ") + " };"

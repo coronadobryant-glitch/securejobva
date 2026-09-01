@@ -726,6 +726,38 @@ body:has(.adm__wrap) main{padding:0}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
+/* The assessment panel in /admin. Two of the controls on it are the only
+   things a person decides; everything else came from the trigger. */
+.sit{margin-top:.6rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface-2)}
+.sit__hd{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:baseline;margin-bottom:.55rem}
+.sit__meta{color:var(--muted);font-size:.84rem}
+.sit__wait{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;
+  border-radius:4px;background:var(--signal);color:var(--signal-ink)}
+.sit__v{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;border-radius:4px}
+.sit__v--passed{background:#0B7A63;color:#fff}
+.sit__v--below_line{background:#FAE6EB;color:#B5123A}
+.sit__v--in_progress{background:var(--line);color:var(--muted)}
+.sit__row{display:flex;flex-wrap:wrap;gap:.45rem .7rem;align-items:center;
+  padding:.4rem 0;border-top:1px dashed var(--line)}
+.sit__row:first-of-type{border-top:0;padding-top:0}
+.sit__lab{font-size:.82rem;color:var(--muted);min-width:5rem}
+.sit__s{font-size:.84rem;padding:.16rem .45rem;border-radius:4px;background:var(--surface)}
+.sit__s b{font-variant-numeric:tabular-nums}
+.sit__ok{color:#0B7A63}
+.sit__low{color:#B5123A}
+.sit__off,.sit__s.sit__off{color:var(--muted);font-size:.82rem}
+.sit__claim{font-family:"IBM Plex Mono",monospace;font-size:.84rem}
+.sit__lnk{font-size:.84rem;color:var(--accent);text-decoration:underline}
+.sit__in{font-family:"IBM Plex Mono",monospace;font-size:.84rem;width:4.6rem;
+  padding:.3rem .45rem;border:1.5px solid var(--accent);border-radius:6px;
+  background:var(--paper);color:var(--ink)}
+.sit__btn{padding:.35rem .75rem;font-size:.84rem}
+.sit__reply{margin-top:.5rem;padding:.7rem .85rem;background:var(--paper);border-radius:8px;
+  border:1px solid var(--line);white-space:pre-wrap;font-size:.9rem;line-height:1.6}
+.sit__ask{margin:.55rem 0 0;font-size:.84rem;color:var(--ink-2)}
 .docs{margin-top:.6rem;padding-top:.55rem;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
 .docs__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:.2rem}
 .doclink{
@@ -754,6 +786,7 @@ body:has(.adm__wrap) main{padding:0}
 .pill--interview{background:var(--accent);color:var(--accent-ink)}
 .pill--approved{background:var(--signal);color:var(--signal-ink)}
 .pill--declined{background:var(--surface-2);color:var(--muted)}
+
 </style>
 
 <script>
@@ -1541,7 +1574,13 @@ function unconfirmed(email) {
    with the scores stripped at build time rather than trusted to be left out.
    She sends the positions she ticked; the database decides what they were
    worth. Same rule 025 set for DISC, for the same reason: view-source. */
-var SCEN = [["A customer emails angry that they were charged twice. You can see only one charge in the system.",["Apologise for the worry, say you can see one charge, and ask for the bank line showing the second.","Tell them there is only one charge and close the ticket.","Refund one charge straight away so they stop being angry.","Forward it to your client and wait."]],["Your client asks for a report by 5pm. At 3pm you realise the data you need is not available.",["Send what you have at 5pm without mentioning the gap.","Work late and send it at 9pm complete.","Wait until 5pm, then explain why it is not coming.","Tell them at 3pm what is missing, what you can deliver, and by when the rest can follow."]],["A customer asks a question you do not know the answer to.",["Give your best guess so you seem competent.","Pass it to your client immediately without trying to find out.","Say you will find out, give a time you will come back, and come back then.","Tell them nobody can answer that."]],["You notice a mistake you made last week that nobody has spotted.",["Fix it quietly and say nothing.","Tell your client what happened, what it affected, and what you have done about it.","Leave it — it is done and nobody noticed.","Mention it at your next monthly check-in."]],["Your internet goes down thirty minutes before your shift.",["Wait to see if it comes back before saying anything.","Move to your backup connection and mention it afterwards.","Say nothing and make the hours up later.","Message your client as soon as you know, with when you expect to be back."]],["A customer is rude to you in a chat.",["Stay level, keep answering the actual question, and flag it to your client if it continues.","Match their tone so they know it is not acceptable.","Apologise repeatedly to calm them down.","End the chat."]],["Your client gives you an instruction that contradicts what they said yesterday.",["Do the newest one, since it is the newest.","Ask which one they want, quoting both, before doing either.","Do yesterday's, since it was agreed first.","Do both and let them pick."]],["You are asked to send a file that contains other customers' details.",["Send it — your client asked for it.","Refuse without explaining.","Check who it is going to and why before sending anything with other people's details in it.","Remove the other customers' rows and send the rest, saying what you removed."]],["You finish your assigned work with two hours of your shift left.",["Log off early and note the shorter day.","Start on next week's tasks without asking.","Tell your client you are free and ask what would help most.","Find something plausible to look busy with."]],["A customer asks for a discount you are not authorised to give.",["Give it — it keeps the customer.","Tell them no discounts are ever given.","Ignore that part of the message and answer the rest.","Say you cannot approve it yourself, that you will ask, and when you will reply."]],["Two urgent tasks land at once and you cannot do both by the deadline.",["Ask your client which comes first, saying what each will cost the other.","Pick the one that looks harder and start.","Do half of each.","Do the one that arrived first."]],["Your client has not replied to a question that is blocking you, and it is the end of the day.",["Stop and wait — you are blocked.","Say what you are blocked on, what you assumed to keep moving, and move on to other work.","Guess and carry on without saying so.","Message them repeatedly until they answer."]]];
+var QBANK = {"scenarios":[["A customer emails angry that they were charged twice. You can see only one charge in the system.",["Apologise for the worry, say you can see one charge, and ask for the bank line showing the second.","Tell them there is only one charge and close the ticket.","Refund one charge straight away so they stop being angry.","Forward it to your client and wait."]],["Your client asks for a report by 5pm. At 3pm you realise the data you need is not available.",["Send what you have at 5pm without mentioning the gap.","Work late and send it at 9pm complete.","Wait until 5pm, then explain why it is not coming.","Tell them at 3pm what is missing, what you can deliver, and by when the rest can follow."]],["A customer asks a question you do not know the answer to.",["Give your best guess so you seem competent.","Pass it to your client immediately without trying to find out.","Say you will find out, give a time you will come back, and come back then.","Tell them nobody can answer that."]],["You notice a mistake you made last week that nobody has spotted.",["Fix it quietly and say nothing.","Tell your client what happened, what it affected, and what you have done about it.","Leave it — it is done and nobody noticed.","Mention it at your next monthly check-in."]],["Your internet goes down thirty minutes before your shift.",["Wait to see if it comes back before saying anything.","Move to your backup connection and mention it afterwards.","Say nothing and make the hours up later.","Message your client as soon as you know, with when you expect to be back."]],["A customer is rude to you in a chat.",["Stay level, keep answering the actual question, and flag it to your client if it continues.","Match their tone so they know it is not acceptable.","Apologise repeatedly to calm them down.","End the chat."]],["Your client gives you an instruction that contradicts what they said yesterday.",["Do the newest one, since it is the newest.","Ask which one they want, quoting both, before doing either.","Do yesterday's, since it was agreed first.","Do both and let them pick."]],["You are asked to send a file that contains other customers' details.",["Send it — your client asked for it.","Refuse without explaining.","Check who it is going to and why before sending anything with other people's details in it.","Remove the other customers' rows and send the rest, saying what you removed."]],["You finish your assigned work with two hours of your shift left.",["Log off early and note the shorter day.","Start on next week's tasks without asking.","Tell your client you are free and ask what would help most.","Find something plausible to look busy with."]],["A customer asks for a discount you are not authorised to give.",["Give it — it keeps the customer.","Tell them no discounts are ever given.","Ignore that part of the message and answer the rest.","Say you cannot approve it yourself, that you will ask, and when you will reply."]],["Two urgent tasks land at once and you cannot do both by the deadline.",["Ask your client which comes first, saying what each will cost the other.","Pick the one that looks harder and start.","Do half of each.","Do the one that arrived first."]],["Your client has not replied to a question that is blocking you, and it is the end of the day.",["Stop and wait — you are blocked.","Say what you are blocked on, what you assumed to keep moving, and move on to other work.","Guess and carry on without saying so.","Message them repeatedly until they answer."]]],"english":[["You have just sent a customer their refund. Which line do you send?",["Your refund has been sent and should reach your account within three working days.","Your refund was sent and should reach to your account within three working days.","We have send your refund, it will arrive in three working days.","Your refund is sent, arriving to you within three working days."]],["A customer asks when their order will arrive. It ships tomorrow. Which do you send?",["It will be shipped since tomorrow and arrives on Friday.","Your order leaves us tomorrow and should be with you on Friday.","Your order is leaving tomorrow and will be with you since Friday.","Your order ships tomorrow, arriving Friday."]],["You need a customer to send a document before you can go further.",["Send the document.","I would be extremely grateful if you could possibly find the time to send the form.","You must send the form or I cannot do anything.","Could you send the signed form when you have a moment? I can finish this as soon as it arrives."]],["A customer has complained about a delay that was your client's fault.",["Sorry for the delay, it was not our fault but we apologise anyway.","I am sorry this has taken so long. Here is where your order is now, and what happens next.","Apologies for any inconvenience caused.","The delay is happened because of a problem in the warehouse."]],["Which of these says most clearly that you will follow up on Monday?",["I will come back to you on Monday with an answer.","I will be reverting back to you by Monday regarding this matter.","I will try to update you sometime early next week hopefully.","I will let you know on Monday."]],["A customer asks for something your client does not offer.",["We are not doing this.","Unfortunately that is impossible for us.","That is not something we offer, but here is what we can do instead.","We cannot to do that, sorry."]],["You are writing to a customer for the first time on your client's behalf.",["Hey! Just checking in about your order :)","To whom it may concern, I am writing in reference to the aforementioned order.","Hi Sarah, I am writing from Rosehill about the order you placed last week.","Dear Sarah, I hope this email finds you well. I am writing to you today about your order."]],["Which sentence is correct?",["The team have finished the report and they sent it yesterday.","The team has finish the report and sent it yesterday.","The team have finished the report and has sent it yesterday.","The team has finished the report and sent it yesterday."]]],"detail":[["An invoice reads: 3 x $40.00 = $120.00, 2 x $15.00 = $30.00, 1 x $22.50 = $22.50, total $182.50. What is wrong?",["The total should be $172.50.","Nothing is wrong.","The second line should be $35.00.","The third line cannot have a half dollar."]],["A booking says: arrives Tuesday 14 March, departs Sunday 12 March, 3 nights. What is wrong?",["Three nights is too short for that trip.","The departure is before the arrival.","March 14 is not a Tuesday.","Nothing is wrong."]],["A customer record reads: Maria Santos, maria.santos@rosehil.com, phone +63 917 555 0142, company Rosehill Plumbing. What should you check?",["The phone number has too many digits.","Nothing is wrong.","The email domain is missing an l — rosehil, not rosehill.","The country code does not match the company."]],["A timesheet reads: Mon 8, Tue 8, Wed 8, Thu 8, Fri 8, total 42. What is wrong?",["Friday should be 10.","Nothing is wrong — 42 includes a break.","The total should be 40.","The week is missing the weekend."]],["An order list has: #1041 Ana Reyes, #1042 Joy Delgado, #1042 Ana Reyes, #1043 Mark Cruz. What is wrong?",["Ana Reyes should not have two orders.","The numbers should be in order of name.","Nothing is wrong.","Two different orders share the number 1042."]],["A meeting invite says: Thursday 10:00 AM Manila time, which is 9:00 PM Wednesday in Houston. What is wrong?",["Manila is 13 hours ahead in March, so it is 9:00 PM Wednesday — this is correct.","Houston should be Thursday, not Wednesday.","10:00 AM is too early for a meeting.","The invite is missing the meeting link."]],["A quote reads: 40 hours a week at $7.75 an hour, $320.00 a week. What is wrong?",["The hourly rate should be $8.00.","Nothing is wrong.","40 hours is too many for one week.","40 x $7.75 is $310.00, not $320.00."]],["A form has: Date of birth 03/14/1995, Age 31, filled in today in 2026. What is wrong?",["The date format is ambiguous.","Somebody born in March 1995 is 30 or 31 depending on the month — check today's date before flagging it.","The age should be 30.","March 14 1995 was not a valid date."]]],"sales":[["A lead replies to your quote with: \"That is more than we wanted to spend.\"",["Offer a discount straight away to keep them.","Ask what they were expecting and what the budget has to cover, before talking about price.","Explain again why the price is fair.","Tell them to come back when they have the budget."]],["A lead was keen on a call, then went quiet for a week.",["Send a short note with one useful thing and a question they can answer in a line.","Call them repeatedly until they pick up.","Mark them dead and move on.","Send the same email again."]],["A lead asks whether you do something your client does not offer.",["Say yes and work out the details later.","Say no and end the conversation.","Say that is not something we do, ask what they were trying to solve, and see if the thing we do solves it.","Avoid the question and keep selling what you have."]],["A good lead says: \"This is right, but not until the new budget year in six months.\"",["Agree a date to speak again, note what changes by then, and keep in light touch until it.","Try to persuade them to start now.","Close the lead — six months is too far out.","Send them a monthly newsletter and hope."]],["A lead says a competitor quoted them less.",["Match the price.","Say the competitor is not as good.","Ask them to send you the competitor's quote.","Ask what is included in their quote, and say plainly what is included in yours."]],["A client you already work for mentions they are struggling to cover the afternoons.",["Say nothing — you are not on the sales team today.","Send them a price list.","Tell them a second seat could cover the afternoons, and offer to have someone explain how it would work.","Offer to work extra hours yourself."]],["A lead offers to sign today for a bigger discount than you can give.",["Give it — a signature today is worth it.","Say you cannot approve that, say what you can do, and ask if that works.","Say you will check and then never come back to them.","Tell them the price is the price and leave it there."]],["A lead wants something your client could technically do but would do badly.",["Sell it — they asked for it.","Say no without explaining.","Sell it and warn them afterwards.","Say it is not what we are best at, say what we are best at, and let them decide."]]]};
+var SCEN = QBANK.scenarios;
+/* Which measures gate which track. The page uses this for one thing only —
+   whether to show the sales part — and the database decides the verdict from
+   its own copy, so a browser that lies about its track gets asked different
+   questions and scored on the same rules either way. */
+var TRACK_AXES = {"Customer Service":["english","customer"],"Admin Tasks":["english","detail"],"Sales & Marketing":["english","sales","customer"]};
 var TYPE_TARGET = 40;
 var TYPE_MIN_ACC = 95;
 
@@ -1569,12 +1608,26 @@ function assessCard(a, s) {
       "to do on this part &mdash; you will hear from us either way.</p></div>";
   }
 
+  /* Sales is only asked of the track it gates. Nobody else answers eight
+     questions that cannot affect their result — and the database agrees,
+     because sales is in no other track's axes, so an empty bank scores zero
+     and gates nothing. */
+  var wantsSales = (TRACK_AXES[a.track] || []).indexOf("sales") > -1;
+
   var done = {
-    typing: s && s.typing_wpm !== null && s.typing_wpm !== undefined,
+    english: s && s.english_answers,
+    scen:    s && s.scenario_answers,
+    detail:  s && s.detail_answers,
+    sales:   s && s.sales_answers,
     written: s && s.written_reply,
-    scen: s && s.scenario_answers
+    typing:  s && s.typing_wpm !== null && s.typing_wpm !== undefined
   };
-  var left = (done.typing ? 0 : 1) + (done.written ? 0 : 1) + (done.scen ? 0 : 1);
+
+  var left = 0;
+  ["english", "scen", "detail", "written", "typing"].forEach(function (k) {
+    if (!done[k]) left++;
+  });
+  if (wantsSales && !done.sales) left++;
 
   function part(k, n, t, d, isDone, note) {
     return '<li class="apt' + (isDone ? " is-done" : "") + '">' +
@@ -1589,17 +1642,31 @@ function assessCard(a, s) {
 
   return '<div class="card">' +
     '<div class="row__top"><span><span class="row__n">Your assessment</span>' +
-    '<span class="row__meta"> &middot; about 45 minutes</span></span>' +
+    '<span class="row__meta"> &middot; about an hour, in parts</span></span>' +
     '<span class="pill pill--assessment">' + (left ? left + " left" : "Ready to send") + "</span></div>" +
-    '<p class="msg" style="margin:1rem 0">Three parts. You can stop between them, but once a ' +
-    "part is open it is timed, so start each one when you have a quiet moment.</p>" +
+    /* Ordered by what each one costs her, cheapest first, and that is not a
+       tidiness choice. Almost all drop-off happens at the first thing asked —
+       once somebody finishes one part they overwhelmingly finish the rest. So
+       the first part is eight quick questions with nothing to install and
+       nowhere to go, and the one that sends her to another website is last. */
+    '<p class="msg" style="margin:1rem 0">' + (wantsSales ? "Six" : "Five") + " parts, shortest " +
+    "first. You can stop between them and nothing is lost, but once a part is open it is timed &mdash; " +
+    "so start each one when you have a quiet moment.</p>" +
     '<ol class="apts">' +
-      part("typing", 1, "Typing and accuracy", "Five minutes, a real support email",
-        done.typing, done.typing ? s.typing_wpm + " wpm" : "") +
-      part("written", 2, "Written reply to a customer", "Twenty minutes, about 150 words",
-        done.written) +
-      part("scen", 3, "Judgement scenarios", SCEN.length + " questions, twenty minutes",
+      part("english", 1, "English", QBANK.english.length + " short questions, eight minutes",
+        done.english) +
+      part("scen", 2, "Judgement", SCEN.length + " situations, twenty minutes",
         done.scen) +
+      part("detail", 3, "Detail", QBANK.detail.length + " things to check, ten minutes",
+        done.detail) +
+      (wantsSales
+        ? part("sales", 4, "Sales", QBANK.sales.length + " questions, eight minutes", done.sales)
+        : "") +
+      part("written", wantsSales ? 5 : 4, "Written reply to a customer",
+        "Twenty minutes, about 150 words", done.written) +
+      part("typing", wantsSales ? 6 : 5, "Typing and your setup",
+        "A test on another site, and a connection check",
+        done.typing, done.typing ? s.typing_wpm + " wpm, we check it" : "") +
     "</ol>" +
     (left === 0
       ? '<button class="btn btn--solid" id="a-send" type="button" style="margin-top:1.2rem">Send my assessment</button>' +
@@ -1663,15 +1730,107 @@ function closePart(patch, err) {
 
    And the id is not written out in this comment, because comments ship inside
    the inline script and the audit found the one in the prose too. */
-function partShell(title, mins, inner, doneLabel) {
-  ENDS = Date.now() + mins * 60000;
+/* mins of 0 means there is no clock on this one.
+
+   The typing part used to run here and was timed, because the typing happened
+   here. It happens on another site now, and this part is a form for reporting
+   what it said — putting a five-minute countdown on typing three numbers would
+   be theatre. It still goes through this shell rather than rendering its own
+   card, because the alternative was a second copy of #a-err and #a-done in the
+   source, and the comment below already explains why that is a bad trade. */
+/* ── the deadline, and what happens when it passes ────────────────────────
+
+   Three things were wrong with the clock and they compounded.
+
+   The deadline was set in the browser when a part opened — ENDS = now + mins —
+   so it was fresh every time. Twenty minutes long, right up until somebody
+   closed the tab at nineteen and opened it again, at which point twenty
+   minutes again. The comment above it claimed the opposite.
+
+   The auto-submit at zero only ran while the page was open. Close the tab and
+   the interval died with it, so a part that ran out was not submitted, it was
+   simply never finished — and stayed open forever.
+
+   And answers lived in memory until the Done button, so anything typed before
+   a closed tab was gone regardless.
+
+   sql/051 moved the deadline into the database: open_part() records the moment
+   a part is first opened and refuses to move it afterwards. These three
+   functions are the other half. */
+
+/* Where this part's clock actually started. Asked once, on opening; the answer
+   is the same on the tenth reopen as on the first.
+
+   Fails toward letting her sit the part. If the call does not come back we run
+   the clock from now rather than refusing to open anything — a generous
+   deadline costs a few minutes, a blocked applicant costs the applicant. */
+function openPart(part, mins) {
+  return api("rpc/open_part", { method: "POST", body: { part: part } })
+    .then(function (at) {
+      var t = Date.parse(at);
+      return isNaN(t) ? Date.now() + mins * 60000 : t + mins * 60000;
+    }, function () {
+      return Date.now() + mins * 60000;
+    });
+}
+
+/* Saving as she goes, so an auto-submit is not automatically empty.
+
+   Debounced, because a radio button fires on every pick and eight questions
+   answered quickly is eight writes nobody needs. Flushed immediately when the
+   page is hidden, which is the case this exists for: closing a tab, switching
+   apps on a phone, the screen locking. visibilitychange is the one that
+   actually fires on mobile — pagehide and beforeunload are unreliable there,
+   so both are wired and whichever arrives first wins. */
+var SAVE_T = null;
+var SAVE_PENDING = null;
+
+function saveProgress(column, collect) {
+  SAVE_PENDING = function () {
+    var patch = {};
+    patch[column] = collect();
+    return savePart(patch)["catch"](function () { return null; });
+  };
+  if (SAVE_T) clearTimeout(SAVE_T);
+  SAVE_T = setTimeout(function () {
+    SAVE_T = null;
+    var run = SAVE_PENDING;
+    SAVE_PENDING = null;
+    if (run) run();
+  }, 2500);
+}
+
+function flushProgress() {
+  if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; }
+  var run = SAVE_PENDING;
+  SAVE_PENDING = null;
+  if (run) run();
+}
+
+/* Wired once, not per part, so nothing accumulates listeners as she moves
+   between them. */
+(function () {
+  var go = function () { if (document.visibilityState === "hidden") flushProgress(); };
+  document.addEventListener("visibilitychange", go);
+  window.addEventListener("pagehide", flushProgress);
+})();
+
+/* The second argument is a moment, not a length. It comes from openPart(), which asks the
+   database when this part actually started — so reopening a part does not
+   restart it, which is what "mins" allowed for as long as it was computed
+   here. Pass 0 for a part with no clock. */
+function partShell(title, ends, inner, doneLabel, pill) {
+  ENDS = ends || 0;
+  var mins = ends ? Math.max(0, ends - Date.now()) / 60000 : 0;
   view('<div class="card">' +
     '<div class="row__top"><span><span class="row__n">' + title + "</span></span>" +
-    '<span class="pill pill--assessment" id="a-clock">' + fmtLeft(mins * 60000) + "</span></div>" +
+    '<span class="pill pill--assessment" id="a-clock">' +
+      (mins ? fmtLeft(mins * 60000) : esc(pill || "no time limit")) + "</span></div>" +
     inner +
     '<p class="msg msg--bad" id="a-err" style="display:none"></p>' +
     '<button class="btn btn--solid" id="a-done" type="button" style="margin-top:1.1rem">' +
     esc(doneLabel) + "</button></div>");
+  if (!mins) return;
   TICK = setInterval(function () {
     var el = document.getElementById("a-clock");
     if (!el) { clearInterval(TICK); TICK = null; return; }
@@ -1684,36 +1843,173 @@ function partShell(title, mins, inner, doneLabel) {
   }, 500);
 }
 
-function typingPart() {
-  partShell("Typing and accuracy", 5,
-    '<p class="msg" style="margin:1rem 0">Type the passage below exactly as it is written. ' +
-    "Accuracy counts for more than speed &mdash; work you have to redo is slower than typing slowly.</p>" +
-    '<blockquote class="a-src" id="a-src">' + esc(TYPE_TEXT) + "</blockquote>" +
-    '<label class="a-lbl" for="a-type">Type the passage here</label>' +
-    '<textarea id="a-type" rows="7" placeholder="Start typing here" ' +
-    'style="width:100%;margin-top:1rem" autocomplete="off" spellcheck="false"></textarea>',
-    "Done typing");
+/* Where the typing test now happens. It is a link rather than a page of ours,
+   and that is the point: the score arrives with something behind it instead of
+   being whatever a browser said. Change this to whichever test you settle on —
+   pick one whose result has its own address, because the whole value here is
+   that somebody at this end can open the proof and read it. */
+var TYPING_TEST_URL = "https://10fastfingers.com/typing-test/english";
+var TYPING_TEST_NAME = "10FastFingers";
 
-  var began = 0;
-  var box = document.getElementById("a-type");
-  box.addEventListener("input", function () { if (!began) began = Date.now(); });
-  box.focus();
+function typingPart() {
+  partShell("Typing and accuracy", 0,
+    '<p class="msg" style="margin:1rem 0">Take the test at ' +
+      '<a href="' + esc(TYPING_TEST_URL) + '" target="_blank" rel="noopener">' +
+      esc(TYPING_TEST_NAME) + "</a>, then come back and tell us what you scored. " +
+      "Accuracy counts for more than speed &mdash; work somebody has to redo is slower " +
+      "than typing slowly.</p>" +
+
+    '<div class="note" style="margin-bottom:1.1rem"><b>We check every one.</b> ' +
+      "Paste a link to your result page, or to a screenshot of it. A score nobody " +
+      "can check is not counted, so this part matters as much as the number.</div>" +
+
+    '<label class="a-lbl" for="a-wpm">Words per minute</label>' +
+    '<input id="a-wpm" type="number" min="0" max="250" step="1" inputmode="numeric" ' +
+      'style="width:100%;margin:.4rem 0 1rem" placeholder="e.g. 58">' +
+
+    '<label class="a-lbl" for="a-acc">Accuracy, as a percentage</label>' +
+    '<input id="a-acc" type="number" min="0" max="100" step="1" inputmode="numeric" ' +
+      'style="width:100%;margin:.4rem 0 1rem" placeholder="e.g. 97">' +
+
+    '<label class="a-lbl" for="a-proof">Link to your result, or to a screenshot of it</label>' +
+    '<input id="a-proof" type="url" maxlength="500" ' +
+      'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://">' +
+    '<p class="msg" style="margin-top:.3rem">Most tests give the result its own address. ' +
+      "If yours does not, put a screenshot in Google Drive or Dropbox and paste a link " +
+      "anyone can open.</p>" +
+
+    /* The connection check. The application form has asked about equipment and
+       internet since 005 as a yes-or-no that nobody could verify, which made
+       it a question rather than a check. This is the one thing the better
+       agencies genuinely do that this process did not. It rides along here
+       because she is already off on another website for the typing test, so it
+       costs one more link rather than one more part. */
+    '<label class="a-lbl" for="a-conn">Link to a speed test of your connection</label>' +
+    '<input id="a-conn" type="url" maxlength="500" ' +
+      'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://">' +
+    '<p class="msg" style="margin-top:.3rem">Run one at speedtest.net and paste the result link. ' +
+      "It takes a minute, and it is what stops somebody starting a client on a connection that " +
+      "cannot hold a call.</p>",
+    "Save this part", "no time limit");
 
   document.getElementById("a-done").addEventListener("click", function () {
-    var typed = box.value;
-    var mins = Math.max(0.15, (Date.now() - (began || Date.now())) / 60000);
-    /* Words are five characters, which is the convention every typing test
-       uses — counting actual words would score short words as fast typing. */
-    var wpm = Math.round((typed.length / 5) / mins);
-    var right = 0;
-    for (var i = 0; i < typed.length; i++) if (typed[i] === TYPE_TEXT[i]) right++;
-    var acc = typed.length ? Math.round((right / typed.length) * 100) : 0;
-    closePart({ typing_wpm: Math.min(250, wpm), typing_accuracy: acc });
+    var err = document.getElementById("a-err");
+    var wpm = document.getElementById("a-wpm");
+    var acc = document.getElementById("a-acc");
+    var proof = document.getElementById("a-proof");
+    var conn = document.getElementById("a-conn");
+    var fail = function (m, el) {
+      err.style.display = "";
+      err.textContent = m;
+      if (el) el.focus();
+    };
+    err.style.display = "none";
+
+    var w = Number(wpm.value);
+    var a = Number(acc.value);
+    var p = String(proof.value || "").trim();
+    var c = String(conn.value || "").trim();
+
+    if (!wpm.value || !(w >= 0 && w <= 250)) {
+      return fail("Enter your words per minute — the number the test gave you.", wpm);
+    }
+    if (!acc.value || !(a >= 0 && a <= 100)) {
+      return fail("Enter your accuracy as a percentage, between 0 and 100.", acc);
+    }
+    /* Checked before the score saves, so nobody is told to go and find a link
+       after the numbers have already gone. Checked loosely on purpose — what
+       matters is that a person at this end can open it, not that it matches
+       some pattern. */
+    if (!/^https?:\/\/\S+\.\S+/i.test(p)) {
+      return fail("Paste a link we can open — it should start with http.", proof);
+    }
+    if (p.length > 500) {
+      return fail("That link is too long. Use a shorter one.", proof);
+    }
+    if (!/^https?:\/\/\S+\.\S+/i.test(c)) {
+      return fail("Paste a link to your speed test too — speedtest.net gives you one.", conn);
+    }
+    if (c.length > 500) {
+      return fail("That speed test link is too long. Use a shorter one.", conn);
+    }
+
+    closePart({
+      typing_wpm: Math.round(w),
+      typing_accuracy: Math.round(a),
+      typing_proof: p,
+      connection_proof: c
+    });
   });
 }
 
+/* How close what was typed is to the passage, allowing for the typist being a
+   human being.
+
+   This used to compare position against position — typed[i] against
+   TYPE_TEXT[i] — which is only correct while the two strings stay in step, and
+   one dropped or doubled character early on puts them out of step for good.
+   Miss a letter at position fifty and the remaining two hundred and eighty
+   comparisons all fail: accuracy came out around fifteen per cent, and
+   anything under ninety-five drops the score into a branch that caps it at
+   four, which is below the pass mark on every track. So the arithmetic
+   rejected good typists for one typo, silently, and told them they were slow.
+   The denominator was wrong too — typed.length, so three correct characters
+   and nothing else scored a hundred per cent.
+
+   An edit distance against the best-matching PREFIX of the passage answers the
+   question actually being asked: of what she typed, how much is right, whether
+   or not she finished. One missed letter in three hundred and thirty now costs
+   what one missed letter should. */
+function typingAccuracy(typed) {
+  var n = typed.length;
+  if (!n) return 0;
+  var m = TYPE_TEXT.length;
+
+  /* One row at a time: the passage is short, but there is no reason to hold a
+     330 x 330 grid to read back a single number. */
+  var prev = new Array(m + 1);
+  var cur = new Array(m + 1);
+  for (var j = 0; j <= m; j++) prev[j] = j;
+
+  for (var i = 1; i <= n; i++) {
+    cur[0] = i;
+    for (var k = 1; k <= m; k++) {
+      var cost = typed.charAt(i - 1) === TYPE_TEXT.charAt(k - 1) ? 0 : 1;
+      cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + cost);
+    }
+    for (var c = 0; c <= m; c++) prev[c] = cur[c];
+  }
+
+  /* The best prefix, not the whole passage: stopping early is a matter for the
+     speed, not for whether the words are right. */
+  var best = prev[0];
+  for (var q = 1; q <= m; q++) if (prev[q] < best) best = prev[q];
+
+  var acc = Math.round(((n - best) / n) * 100);
+  return Math.max(0, Math.min(100, acc));
+}
+
 function writtenPart() {
-  partShell("Written reply to a customer", 20,
+  openPart("written", 20).then(function (ends) {
+    /* Same rule as the question banks: the clock started when she first opened
+       this, not when she last opened it, and a part whose time has gone is
+       closed with what she had rather than handed back for another twenty
+       minutes. */
+    if (Date.now() >= ends) {
+      var e = document.getElementById("a-card-err");
+      if (e) {
+        e.style.display = "";
+        e.textContent = "That part's time had run out, so it has been closed with what you had written.";
+      }
+      savePart({ written_reply: (SIT && SIT.written_reply) || "" })
+        .then(function () { return loadApplications(); });
+      return;
+    }
+    drawWritten(ends);
+  });
+
+  function drawWritten(ends) {
+  partShell("Written reply to a customer", ends,
     '<p class="msg" style="margin:1rem 0"><b>A customer writes:</b> &ldquo;I ordered two weeks ago ' +
     "and nothing has arrived. Nobody has answered my last two emails. I want a refund and I want " +
     "to know why this happened.&rdquo;</p>" +
@@ -1729,16 +2025,66 @@ function writtenPart() {
   box.addEventListener("input", function () {
     var n = box.value.trim() ? box.value.trim().split(/\s+/).length : 0;
     count.textContent = n + " words";
+    /* Saved as she writes, on the same debounce as the question banks. This is
+       the part where losing the work would hurt most — twenty minutes of
+       writing against a tab that closed. */
+    saveProgress("written_reply", function () { return box.value.slice(0, 8000); });
   });
   box.focus();
 
   document.getElementById("a-done").addEventListener("click", function () {
+    if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; SAVE_PENDING = null; }
     closePart({ written_reply: box.value.slice(0, 8000) });
   });
+  }
 }
 
-function scenPart() {
-  var qs = SCEN.map(function (s, i) {
+/* One renderer, four banks.
+
+   This was scenPart(), and it was the only bank there was. English, detail and
+   sales are the same shape down to the last detail — a prompt, four options,
+   pick one — so they are the same function rather than three copies that drift
+   apart the first time somebody fixes a bug in one of them.
+
+   Everything specific to a bank is an argument: which questions, what the card
+   is called, how long it runs, which column the answers land in, and the line
+   of explanation above them. */
+function bankPart(key, title, mins, column, intro) {
+  var bank = QBANK[key] || [];
+
+  /* What she has picked so far, as positions. Read out of the page rather than
+     kept in a variable, so the autosave and the Done button can never disagree
+     about what is on screen. */
+  var collect = function () {
+    var out = [];
+    for (var i = 0; i < bank.length; i++) {
+      var hit = document.querySelector('input[name="q' + i + '"]:checked');
+      out.push({ p: hit ? Number(hit.value) : null });
+    }
+    return out;
+  };
+
+  openPart(key, mins).then(function (ends) {
+    /* The clock ran out while she was away. Nothing to show her and nothing to
+       decide — whatever was saved as she went is what the part is worth, and
+       the part is over. Closing it rather than reopening it is the difference
+       between a deadline and a suggestion. */
+    if (Date.now() >= ends) {
+      var e = document.getElementById("a-card-err");
+      if (e) {
+        e.style.display = "";
+        e.textContent = "That part's time had run out, so it has been closed with the answers you had.";
+      }
+      var patch = {};
+      patch[column] = (SIT && SIT[column]) || [];
+      savePart(patch).then(function () { return loadApplications(); });
+      return;
+    }
+    drawBank(ends);
+  });
+
+  function drawBank(ends) {
+  var qs = bank.map(function (s, i) {
     var opts = s[1].map(function (o, j) {
       return '<label class="a-opt"><input type="radio" name="q' + i + '" value="' + j + '"> ' +
         "<span>" + esc(o) + "</span></label>";
@@ -1747,21 +2093,53 @@ function scenPart() {
       '<div class="a-opts">' + opts + "</div></li>";
   }).join("");
 
-  partShell("Judgement scenarios", 20,
-    '<p class="msg" style="margin:1rem 0">' + SCEN.length + " situations. Pick what you would " +
-    "actually do. More than one answer is reasonable in some of them &mdash; pick the best one.</p>" +
+  partShell(title, ends,
+    '<p class="msg" style="margin:1rem 0">' + intro + "</p>" +
     '<ol class="a-qs">' + qs + "</ol>", "Done");
+
+  /* Every pick is saved, quietly, a couple of seconds later. So the clock
+     running out while the tab is shut costs her the questions she had not
+     reached rather than all of them. */
+  var card = document.querySelector(".card");
+  if (card) {
+    card.addEventListener("change", function (ev) {
+      if (!ev.target || ev.target.type !== "radio") return;
+      saveProgress(column, collect);
+    });
+  }
 
   document.getElementById("a-done").addEventListener("click", function () {
     /* Positions, never letters and never scores. The database holds the key
        and decides what each position was worth. */
-    var out = [];
-    for (var i = 0; i < SCEN.length; i++) {
-      var hit = document.querySelector('input[name="q' + i + '"]:checked');
-      out.push({ p: hit ? Number(hit.value) : null });
-    }
-    closePart({ scenario_answers: out });
+    if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; SAVE_PENDING = null; }
+    var patch = {};
+    patch[column] = collect();
+    closePart(patch);
   });
+  }
+}
+
+function scenPart() {
+  bankPart("scenarios", "Judgement scenarios", 20, "scenario_answers",
+    QBANK.scenarios.length + " situations. Pick what you would actually do. More than one " +
+    "answer is reasonable in some of them &mdash; pick the best one.");
+}
+
+function englishPart() {
+  bankPart("english", "English", 8, "english_answers",
+    "Eight short ones. Each is a line you might really send a customer &mdash; pick the version " +
+    "you would send.");
+}
+
+function detailPart() {
+  bankPart("detail", "Detail", 10, "detail_answers",
+    "Eight small records, each with one thing wrong in it. Some of them are odd but perfectly " +
+    "fine, so read before you flag.");
+}
+
+function salesPart() {
+  bankPart("sales", "Sales", 8, "sales_answers",
+    "Eight people who have not bought anything yet. Pick what you would actually do next.");
 }
 
 function wireAssess(a) {
@@ -1774,6 +2152,9 @@ function wireAssess(a) {
       startRow(a).then(function () {
         if (which === "typing") typingPart();
         else if (which === "written") writtenPart();
+        else if (which === "english") englishPart();
+        else if (which === "detail") detailPart();
+        else if (which === "sales") salesPart();
         else scenPart();
       }).catch(function () {
         var e = document.getElementById("a-card-err");
@@ -2165,7 +2546,7 @@ function loadApplications() {
        see. No row and no table both mean the same thing here: nothing to sit
        yet. The same shape 030 needed on /hub, for the same reason. */
     api("application_assessment?select=application_id,track,attempt,started_at,submitted_at," +
-        "typing_wpm,typing_accuracy,scenario_answers,written_reply,verdict")
+        "typing_wpm,typing_accuracy,typing_proof,connection_proof,scenario_answers,english_answers,detail_answers,sales_answers,written_reply,verdict")
       .catch(function () { return []; })
   ])
     .then(function (r) {

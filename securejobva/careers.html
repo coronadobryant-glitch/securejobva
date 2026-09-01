@@ -2280,7 +2280,25 @@ html{scroll-behavior:smooth}
     var f = pickedFile();
     if (!f || fileProblem(f)) return Promise.resolve(null);
 
-    var path = DRAFT_ID + "/" + safeName(f.name);
+    /* Held in a local, and that is the whole fix for a bug that lost every CV
+       ever attached.
+
+       send() fires this without waiting and then calls finish(), whose last
+       act is to mint a new DRAFT_ID so a second application in the same visit
+       does not collide with the first. finish() runs synchronously, so it
+       always wins the race against a network round trip. The path below was
+       already read synchronously and was therefore right — the file landed in
+       the correct folder every time. The application_id on the row recording
+       it was read inside the .then(), by which point DRAFT_ID named an
+       application that did not exist, so the insert failed its foreign key and
+       the catch swallowed it.
+
+       The file was in the bucket and nothing pointed at it. /admin and /status
+       both build their document lists from application_documents alone, so the
+       CV was invisible to the applicant and to the person deciding on her, and
+       there is no re-upload anywhere to recover it with. */
+    var id = DRAFT_ID;
+    var path = id + "/" + safeName(f.name);
     var base = CFG.endpoint.replace("/rest/v1/applications", "/storage/v1/object");
 
     return fetch(base + "/applicant-docs/" + path, {
@@ -2300,7 +2318,7 @@ html{scroll-behavior:smooth}
         method: "POST",
         headers: hdrs(),
         body: JSON.stringify({
-          application_id: DRAFT_ID,
+          application_id: id,
           path: "applicant-docs/" + path,
           filename: f.name.slice(0, 260),
           content_type: f.type,
@@ -2341,7 +2359,14 @@ html{scroll-behavior:smooth}
         return r.text().then(function (t) {
           var j = null;
           try { j = JSON.parse(t); } catch (e) {}
-          if (j && j.hint === "sjva-one-application" && j.message) {
+          /* Any refusal this database makes on purpose carries an sjva- hint
+             and a message written for the person to read. 027 refuses a second
+             application; 047 refuses a flood from one address. Matching the
+             prefix rather than one exact hint means the next deliberate rule
+             is understood the day it is written, instead of being reported as
+             a technical failure and parked in a queue it can never leave. */
+          if (j && typeof j.hint === "string" &&
+              j.hint.indexOf("sjva-") === 0 && j.message) {
             return { refused: String(j.message) };
           }
           return "dead";
@@ -2386,7 +2411,13 @@ html{scroll-behavior:smooth}
     (function step(i) {
       if (i >= q.length) { queueWrite(keep); return; }
       post(q[i].body).then(function (verdict) {
-        if (verdict !== "ok") keep.push(q[i]);
+        /* "ok" is done with. A refusal is also done with, and that is the case
+           this line used to miss: post() answers a deliberate no with an
+           object, which is not the string "ok", so a row 027 had already
+           refused was re-sent on every page load until its week ran out. The
+           comment above promises we keep trying; keeping trying at something
+           that has been answered is not that. */
+        if (verdict !== "ok" && !(verdict && verdict.refused)) keep.push(q[i]);
         step(i + 1);
       });
     })(0);
@@ -2396,6 +2427,13 @@ html{scroll-behavior:smooth}
     var d = collect();
     if (!CFG.endpoint) { finish("handoff", d); return; }
 
+    /* Disabled, not merely marked busy. The application row is idempotent —
+       it carries its own id and post() reads the 409 as success — but the
+       three writes that follow a success are not: postSocials() and postDisc()
+       insert without one, so a second click files a duplicate set of handles
+       and a second DISC result against the same person. aria-busy stops no
+       clicks, and the Enter handler calls next.click(). */
+    next.disabled = true;
     next.setAttribute("aria-busy", "true");
     next.textContent = "Sending…";
 
@@ -2434,6 +2472,7 @@ html{scroll-behavior:smooth}
       park(d);
       finish("handoff", d);
     }).then(function () {
+      next.disabled = false;
       next.removeAttribute("aria-busy");
       next.textContent = "Send it";
     });
@@ -2543,6 +2582,14 @@ html{scroll-behavior:smooth}
     opener = document.activeElement;
     foot.removeAttribute("hidden");
     clearErrors();
+    /* Same reason as index.html: finish() clears the draft, restore() returns
+       early when there is none, and every box keeps what the last person
+       typed. Less costly here because 027 refuses a second application anyway
+       and the done screen points at /status — but a shared machine is a shared
+       machine, and the two dialogs should not disagree about this.
+
+       reset() first so a real draft still wins. */
+    form.reset();
     restore();
     restoreDisc();
     prefill();

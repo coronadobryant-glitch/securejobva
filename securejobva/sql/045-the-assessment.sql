@@ -1,3 +1,26 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- The header above says this file is safe to re-run, and on its own it is:
+-- every statement in it is written to be repeatable. What it is not safe to
+-- do is run it AFTER the files that come later, because it defines functions
+-- they have since replaced — and `create or replace` does exactly what it
+-- says. Re-running this puts its own versions back.
+--
+-- Nothing warns you when that happens. Columns are added with `if not
+-- exists` so they survive; only the logic goes backwards. The schema looks
+-- perfect and the behaviour is months old.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   score_assessment
+--     -> re-run 049-four-things-measured-once-each.sql to restore
+--   submit_assessment
+--     -> re-run 051-the-clock-and-the-send-button.sql to restore
+--
+-- So if you ever run this file again, run every later file it names above,
+-- in number order, straight afterwards. tools/check.mjs keeps this list
+-- honest: a new file that supersedes something here fails the build until
+-- this block names it.
 -- 045 — the assessment, taken and scored in the product
 --
 -- Run after: 044

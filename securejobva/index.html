@@ -1471,16 +1471,44 @@ img{max-width:100%}
     return Array.prototype.slice.call(form.querySelectorAll("[name=" + name + "]:checked"))
       .map(function (el) { return el.value; });
   }
+  /* 168 rather than 200, and the number matters: seat_requests_sane refuses
+     anything above it. The box used to accept up to 200, so a visitor staffing
+     four or five seats who typed 180 was quoted a price on screen, pressed
+     Send, and had the whole insert refused by a constraint. post() reads a 4xx
+     as the payload's own fault, which it is, so the row was parked in a queue
+     it could never leave and the visitor was handed the write-it-yourself
+     email instead. Every screen agreed and the lead was gone. */
+  var HOURS_MAX = 168;
+
   function hours() {
     var h = picked("hours")[0];
     if (h === "custom") {
       var n = parseInt(val("in-hours"), 10);
       /* An empty or nonsense box should not blank the quote, so fall back to 40. */
       if (!n || n < 5) return 40;
-      return Math.min(n, 200);
+      return Math.min(n, HOURS_MAX);
     }
     return h ? parseInt(h, 10) : 40;
   }
+
+  /* One id per submission, minted here and sent with the row, which is what
+     careers.html has always done and this dialog never did.
+
+     Two reasons, and the second is the one that was costing something. It
+     makes a resend idempotent: post() already treats 409 as success, and
+     without an id of our own the primary key defaulted server-side so that
+     branch could never fire and a double-click wrote two leads and sent two
+     emails. It also means a retry after a lost response cannot duplicate the
+     row it is retrying. */
+  function newId() {
+    try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0;
+      return (c === "x" ? r : ((r & 0x3) | 0x8)).toString(16);
+    });
+  }
+
+  var DRAFT_ID = newId();
 
   /* Show the number box only while Custom is the pick. */
   function customHours() {
@@ -1569,13 +1597,25 @@ img{max-width:100%}
   function collect() {
     var h = hours();
     return {
+      id: DRAFT_ID,
       seats: picked("seat"),
       hours: h,
       /* seat_requests.weekly is an integer column. Sending 232.5 makes
          PostgREST reject the whole insert with 22P02 and the lead is lost, so
-         the stored figure is rounded here — the quote the visitor saw is
-         unrounded and unchanged. */
+         the stored figure is rounded here. Kept, so nothing that already reads
+         this column changes underneath — but it is no longer what anybody is
+         shown. */
       weekly: Math.round(h * CFG.rate),
+      /* The quote, exactly. 30 hours at $7.75 is 232.5, the visitor is shown
+         $232.50, and the rounded column above holds 233 — so /seats replayed a
+         price fifty cents above the one that was agreed, under the word
+         "Quoted", to the same person. On a page that sells "the number you
+         were quoted, no surprises" that is the promise breaking in writing.
+
+         Cents in an integer, added by sql/046: exact, and Math.round here is
+         rounding a value that is already whole, which is what keeps the guard
+         in tools/check.mjs satisfied without it papering over anything. */
+      weekly_cents: Math.round(h * CFG.rate * 100),
       blocks: picked("block"),
       timezone: val("in-tz"),
       name: val("in-name"),
@@ -1640,6 +1680,12 @@ img{max-width:100%}
     foot.setAttribute("hidden", "");
     show(LAST);
     try { localStorage.removeItem(DRAFT); } catch (e) {}
+
+    /* A second request needs a second id, for the reason careers.html gives:
+       without this, somebody asking for another seat in the same visit sends
+       the id we already used, post() reads the 409 as success, and their
+       second request is discarded behind a screen that says we have it. */
+    DRAFT_ID = newId();
   }
 
   /* ── Lead guard ─────────────────────────────────────────────────────────
@@ -1680,7 +1726,25 @@ img{max-width:100%}
          sending it a second time. Reporting that as a failure is how somebody
          ends up seeing "one tap left" over an application we already have. */
       if (r.status === 409) return "ok";
-      if (r.status >= 400 && r.status < 500 && r.status !== 429) return "dead";
+      /* A rule said no, and it will say no again. 047 refuses a flood of
+         submissions from one address, and carries an sjva- hint with a message
+         written for the person to read.
+
+         Telling that apart from a failure matters: "dead" parks the row in the
+         queue and promises we will keep trying, which for a deliberate refusal
+         is a promise that cannot be kept and a lead that never arrives. The
+         apply dialog has done this since 027; this one had nothing. */
+      if (r.status >= 400 && r.status < 500 && r.status !== 429) {
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (e) {}
+          if (j && typeof j.hint === "string" &&
+              j.hint.indexOf("sjva-") === 0 && j.message) {
+            return { refused: String(j.message) };
+          }
+          return "dead";
+        })["catch"](function () { return "dead"; });
+      }
       return "retry";
     })["catch"](function () { return "retry"; }); /* offline, DNS, CORS */
   }
@@ -1720,7 +1784,9 @@ img{max-width:100%}
     (function step(i) {
       if (i >= q.length) { queueWrite(keep); return; }
       post(q[i].body).then(function (verdict) {
-        if (verdict !== "ok") keep.push(q[i]);
+        /* "ok" is done with, and so is a deliberate refusal — re-sending
+           something that has already been answered is not "keeping trying". */
+        if (verdict !== "ok" && !(verdict && verdict.refused)) keep.push(q[i]);
         step(i + 1);
       });
     })(0);
@@ -1730,6 +1796,13 @@ img{max-width:100%}
     var d = collect();
     if (!CFG.endpoint) { finish("handoff", d); return; }
 
+    /* Disabled, not merely marked busy. aria-busy tells a screen reader what
+       is happening and stops no clicks at all, and the Enter handler below
+       calls next.click(), so a held key or an impatient second tap ran send()
+       twice — two rows, two notification emails, one lead counted twice.
+       The id in the payload makes the duplicate harmless; this stops it being
+       sent in the first place. */
+    next.disabled = true;
     next.setAttribute("aria-busy", "true");
     next.textContent = "Sending…";
 
@@ -1739,6 +1812,16 @@ img{max-width:100%}
       return v === "retry" ? post(d) : v;
     }).then(function (v) {
       if (v === "ok") { finish("sent", d); return; }
+      /* Refused on purpose. Not parked, not retried, and not dressed up as a
+         technical failure — the person is told the actual reason, and the
+         written email is still offered because that is the way through for
+         somebody genuinely caught by a limit meant for a script. */
+      if (v && v.refused) {
+        finish("handoff", d);
+        document.getElementById("done-h").textContent = "One moment.";
+        document.getElementById("done-p").textContent = v.refused;
+        return;
+      }
       park(d);
       finish("handoff", d);
       document.getElementById("err-send").textContent =
@@ -1747,6 +1830,7 @@ img{max-width:100%}
       park(d);
       finish("handoff", d);
     }).then(function () {
+      next.disabled = false;
       next.removeAttribute("aria-busy");
       next.textContent = "Send it";
     });
@@ -1819,6 +1903,15 @@ img{max-width:100%}
     opener = document.activeElement;
     foot.removeAttribute("hidden");
     clearErrors();
+    /* Cleared before anything is put back, because finish() removes the draft
+       and restore() returns early when there is none — so after a successful
+       booking every box kept what the last person typed. Reopening the dialog
+       showed their name, company, email, phone and notes, ready to send again.
+       localStorage was tidy; the DOM was not, and the DOM is what is on screen.
+
+       reset() first, restore() second: a draft that exists still wins, which
+       is the behaviour somebody who closed the dialog half-way is owed. */
+    form.reset();
     restore();
     paint();
     customHours();

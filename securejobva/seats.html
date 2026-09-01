@@ -726,6 +726,38 @@ body:has(.adm__wrap) main{padding:0}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
+/* The assessment panel in /admin. Two of the controls on it are the only
+   things a person decides; everything else came from the trigger. */
+.sit{margin-top:.6rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface-2)}
+.sit__hd{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:baseline;margin-bottom:.55rem}
+.sit__meta{color:var(--muted);font-size:.84rem}
+.sit__wait{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;
+  border-radius:4px;background:var(--signal);color:var(--signal-ink)}
+.sit__v{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;border-radius:4px}
+.sit__v--passed{background:#0B7A63;color:#fff}
+.sit__v--below_line{background:#FAE6EB;color:#B5123A}
+.sit__v--in_progress{background:var(--line);color:var(--muted)}
+.sit__row{display:flex;flex-wrap:wrap;gap:.45rem .7rem;align-items:center;
+  padding:.4rem 0;border-top:1px dashed var(--line)}
+.sit__row:first-of-type{border-top:0;padding-top:0}
+.sit__lab{font-size:.82rem;color:var(--muted);min-width:5rem}
+.sit__s{font-size:.84rem;padding:.16rem .45rem;border-radius:4px;background:var(--surface)}
+.sit__s b{font-variant-numeric:tabular-nums}
+.sit__ok{color:#0B7A63}
+.sit__low{color:#B5123A}
+.sit__off,.sit__s.sit__off{color:var(--muted);font-size:.82rem}
+.sit__claim{font-family:"IBM Plex Mono",monospace;font-size:.84rem}
+.sit__lnk{font-size:.84rem;color:var(--accent);text-decoration:underline}
+.sit__in{font-family:"IBM Plex Mono",monospace;font-size:.84rem;width:4.6rem;
+  padding:.3rem .45rem;border:1.5px solid var(--accent);border-radius:6px;
+  background:var(--paper);color:var(--ink)}
+.sit__btn{padding:.35rem .75rem;font-size:.84rem}
+.sit__reply{margin-top:.5rem;padding:.7rem .85rem;background:var(--paper);border-radius:8px;
+  border:1px solid var(--line);white-space:pre-wrap;font-size:.9rem;line-height:1.6}
+.sit__ask{margin:.55rem 0 0;font-size:.84rem;color:var(--ink-2)}
 .docs{margin-top:.6rem;padding-top:.55rem;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
 .docs__k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:.2rem}
 .doclink{
@@ -754,6 +786,34 @@ body:has(.adm__wrap) main{padding:0}
 .pill--interview{background:var(--accent);color:var(--accent-ink)}
 .pill--approved{background:var(--signal);color:var(--signal-ink)}
 .pill--declined{background:var(--surface-2);color:var(--muted)}
+
+/* The bill. Built to be read across a whole business rather than one seat:
+   a client may have several assistants, so a week is a heading and each
+   assistant is a line under it. Tabular figures, because a column of money
+   that does not line up is a column somebody has to check twice. */
+.bill{margin:1.3rem 0 0}
+.bill__wk{margin-top:1.1rem;border-top:1px solid var(--line);padding-top:.75rem}
+.bill__wk:first-child{border-top:0;padding-top:0;margin-top:0}
+.bill__wkh{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+.bill__wkn{font-weight:700;font-size:.95rem}
+.bill__wkt{font-variant-numeric:tabular-nums;font-weight:700;font-size:.95rem}
+.bill__ln{display:grid;grid-template-columns:1fr auto auto;gap:.4rem 1rem;align-items:baseline;
+  padding:.4rem 0;font-size:.9rem;color:var(--ink-2);border-bottom:1px solid var(--line-soft)}
+.bill__ln:last-child{border-bottom:0}
+.bill__who{min-width:0;overflow-wrap:anywhere}
+.bill__h,.bill__amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:.85rem;white-space:nowrap}
+.bill__amt{font-weight:600;color:var(--ink)}
+.bill__free{color:var(--muted);font-weight:500}
+.bill__tot{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap;
+  margin-top:1.2rem;padding-top:.95rem;border-top:2px solid var(--ink)}
+.bill__totl{font-weight:700;font-size:1.02rem}
+.bill__totv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-weight:700;font-size:1.35rem;color:var(--ink)}
+.bill__pay{margin-top:1.3rem;padding:1.1rem 1.2rem;border:1px dashed var(--line);border-radius:9px;
+  background:var(--surface-2)}
+.bill__payh{font-weight:700;margin:0 0 .35rem}
+.bill__payp{margin:0;font-size:.9rem;color:var(--muted);line-height:1.55}
+
 </style>
 
 <script>
@@ -1516,9 +1576,29 @@ SIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we 
   'No account yet? Create one with that address and it becomes how you sign in. ' +
   'If you have not asked us for a seat yet, <a href="/#book">book a call</a> first.';
 
+/* Whole dollars only, which is what a seat request's rounded `weekly` column
+   can express. Kept for the rows written before sql/046 added the exact one. */
 function money(n) {
   if (n === null || n === undefined) return "";
   return "$" + Number(n).toLocaleString("en-US");
+}
+
+/* The quote, to the cent, exactly as the visitor was shown it on the home
+   page. 30 hours at $7.75 is $232.50 there; the integer `weekly` column holds
+   233, and this page used to print that back to the same person under the word
+   "Quoted". Fifty cents is not much money and it is the whole argument the
+   site makes, so it is worth a column and a formatter.
+
+   Falls back to the rounded figure for rows taken before 046 ran — those never
+   carried the cents and guessing them back would be inventing a number rather
+   than reporting one. */
+function quoted(r) {
+  if (r.weekly_cents !== null && r.weekly_cents !== undefined) {
+    return "$" + (r.weekly_cents / 100).toLocaleString("en-US", {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+  }
+  return money(r.weekly);
 }
 
 function stages(r) {
@@ -1623,7 +1703,7 @@ function render(email, rows) {
         stages(r) +
         '<ul class="meta">' +
           "<li><b>Hours a week</b><span>" + esc(r.hours || "—") + "</span></li>" +
-          (r.weekly ? "<li><b>Quoted</b><span>" + esc(money(r.weekly)) + " a week</span></li>" : "") +
+          (r.weekly || r.weekly_cents ? "<li><b>Quoted</b><span>" + esc(quoted(r)) + " a week</span></li>" : "") +
           "<li><b>Cover</b><span>" + esc((r.blocks || []).join(", ") || "—") + "</span></li>" +
           "<li><b>Your time zone</b><span>" + esc(r.timezone || "—") + "</span></li>" +
           "<li><b>Last updated</b><span>" +
@@ -1635,6 +1715,7 @@ function render(email, rows) {
   html += '<p class="msg">Something not right? Reply to the email we sent you, or write to ' +
           '<a href="mailto:support@securejobva.com">support@securejobva.com</a>.</p>';
   html += clientBlock();
+  html += billingBlock();
   view(html);
   wireClient();
   document.getElementById("out").addEventListener("click", signOut);
@@ -1661,7 +1742,7 @@ function start() {
   /* The policy returns only rows carrying this address, so there is no filter
      here to get wrong: asking for everything and being given your own is the
      database's job, not the page's. */
-  api("seat_requests?select=id,created_at,seats,hours,weekly,blocks,timezone,company,status,status_changed_at&order=created_at.desc")
+  api("seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc")
     .then(function (rows) { return loadClient(claims.email, rows || []); })
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
@@ -1691,6 +1772,18 @@ var C_STARTS = [];
 var C_NAMES = [];
 var C_OFF = false;
 
+/* The statement adds up approved weeks, and the weeks are read with a limit,
+   so the limit is a cap on the total. At 26 it was half a year — which meant a
+   running total that started QUIETLY FALLING once the oldest approved week
+   dropped off the end, on a card headed "what the hours you have approved come
+   to". Nothing on the page said the number had a horizon.
+
+   Raised to something a placement will not reach for years, and the page now
+   says so when it is reached rather than leaving the client to notice. Both
+   halves matter: a bigger number alone just moves the day it goes wrong. */
+var C_WEEK_LIMIT = 260;
+var C_TRUNCATED = false;
+
 var C_LABEL = { matched: "matched", trial: "on trial", ongoing: "kept on", ended: "ended" };
 var C_DAY = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -1700,7 +1793,7 @@ function loadClient(email, rows) {
         "trial_weeks&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
-        "trial_week,timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=26"),
+        "trial_week,timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=" + C_WEEK_LIMIT),
     api("swap_requests?select=id,placement_id,reason,status,created_at&order=created_at.desc"),
     /* 042. A row here means this client has already said when the work starts,
        so the card asking them stops asking. */
@@ -1728,6 +1821,11 @@ function loadClient(email, rows) {
     C_RATE = {};
     (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
     C_WEEKS = r[2] || [];
+    /* Exactly at the limit is how a capped read announces itself — there may
+       be more behind it and there is no way from here to know. Treated as
+       truncated, which is the safe direction: saying so when it is not quite
+       true costs a sentence, and not saying so when it is costs a number. */
+    C_TRUNCATED = C_WEEKS.length >= C_WEEK_LIMIT;
     C_SWAPS = r[3] || [];
     C_STARTS = r[4] || [];
     C_NAMES = r[5] || [];
@@ -1771,12 +1869,153 @@ function cDays(w) {
   return '<div class="bd">' + out + "</div>";
 }
 
+/* One block per assistant working for this business, not one block.
+
+   This used to take the first placement that was not ended and return. The
+   constraint behind that reading is placements_one_live_idx, and it is unique
+   on application_id — one live placement per ASSISTANT. Nothing has ever
+   limited a business to one assistant, and the page is called /seats because
+   the product sells them by the seat.
+
+   So a client with two assistants saw one of them. The second one's weeks
+   never appeared for approval, which stalls her pay until staff step in, and
+   her hours were missing from the statement entirely — a total that looked
+   right, was internally consistent, and was wrong. */
 function clientBlock() {
-  var live = null;
+  var live = [];
   for (var i = 0; i < C_PLACE.length; i++) {
-    if (C_PLACE[i].status !== "ended") { live = C_PLACE[i]; break; }
+    if (C_PLACE[i].status !== "ended") live.push(C_PLACE[i]);
   }
-  if (!live) return "";
+  if (!live.length) return "";
+
+  return live.map(function (pl, k) { return placeBlock(pl, k); }).join("");
+}
+
+/* ── the bill ──────────────────────────────────────────────────────────────
+   One bill for the business, not one per assistant.
+
+   The statement inside each placement card answers "what has this person cost
+   me". This answers the question somebody actually pays against: what does the
+   business owe, this week and in total, across everybody working for them. A
+   client with three assistants was previously left adding three cards up by
+   hand — and, before the fix above, adding up a page that was only showing
+   them one of the three.
+
+   Everything here is derived from the same rows the placement cards use, so
+   the two can never disagree: an approved week, not a trial week, times the
+   rate on that placement. Nothing new is stored. There is no invoice table
+   because there is no invoice — this is what the approved hours come to, and
+   the moment money actually moves it will want a record of its own. */
+function billingBlock() {
+  var live = C_PLACE.filter(function (p) { return p.status !== "ended"; });
+  if (!live.length && !C_PLACE.length) return "";
+
+  /* Name lookup once rather than inside the loop. */
+  var nameOf = {};
+  C_NAMES.forEach(function (n) { if (n.name) nameOf[n.application_id] = n.name; });
+
+  var placeById = {};
+  C_PLACE.forEach(function (p) { placeById[p.id] = p; });
+
+  /* Weeks this client has agreed, grouped by the week they were worked. A week
+     with no rate on its placement is deliberately left out of the money and
+     counted separately — quoting a total that silently omits somebody's hours
+     is the bug this whole page has just been through. */
+  var byWeek = {};
+  var unpriced = 0;
+  var missingRate = false;
+
+  C_WEEKS.forEach(function (w) {
+    if (w.status !== "approved") return;
+    var p = placeById[w.placement_id];
+    if (!p) return;
+    var hours = cHours(w);
+    if (!hours) return;
+    var rate = C_RATE[p.id];
+    if (rate === undefined && !w.trial_week) { missingRate = true; unpriced += hours; return; }
+    byWeek[w.week_starts_on] = byWeek[w.week_starts_on] || [];
+    byWeek[w.week_starts_on].push({
+      who: nameOf[p.application_id] || "your assistant",
+      hours: hours,
+      rate: rate,
+      free: !!w.trial_week
+    });
+  });
+
+  /* Sorted as strings, which for an ISO date is the same as sorting by date
+     and does not build 260 Date objects to find out. Newest first, because the
+     week somebody is about to pay for is the one they came to look at. */
+  var weeks = Object.keys(byWeek).sort().reverse();
+
+  /* No early return for an empty bill. A client with a placement and nothing
+     approved yet still gets the card, saying so — otherwise the place their
+     money will appear simply does not exist until the first week lands, and
+     "there is no bill on my page" reads as something being broken rather than
+     as nothing being owed. */
+  var grand = 0;
+  var rows = weeks.map(function (wk) {
+    var lines = byWeek[wk];
+    var wkTotal = 0;
+    var body = lines.map(function (l) {
+      var amt = l.free ? 0 : l.hours * l.rate;
+      wkTotal += amt;
+      return '<div class="bill__ln">' +
+        '<span class="bill__who">' + esc(l.who) + "</span>" +
+        '<span class="bill__h">' + esc(cNum(l.hours)) + " h" +
+          (l.free ? "" : " &times; " + esc(cMoney(l.rate))) + "</span>" +
+        '<span class="bill__amt' + (l.free ? " bill__free" : "") + '">' +
+          (l.free ? "free &mdash; trial" : esc(cMoney(amt))) + "</span>" +
+      "</div>";
+    }).join("");
+    grand += wkTotal;
+    return '<div class="bill__wk">' +
+      '<div class="bill__wkh"><span class="bill__wkn">Week of ' + esc(cWeekLabel(wk)) + "</span>" +
+      '<span class="bill__wkt">' + esc(cMoney(wkTotal)) + "</span></div>" +
+      body +
+    "</div>";
+  }).join("");
+
+  return '<div class="card" id="billing">' +
+    "<h2>Your bill</h2>" +
+    '<p class="msg" style="margin-top:0">Every assistant working for you, week by week. ' +
+      "Only hours you have approved appear here, and trial weeks are ours to cover.</p>" +
+    (missingRate
+      ? '<div class="note note--warn" style="margin-top:1.1rem"><b>' + esc(cNum(unpriced)) +
+        " hours are not priced yet.</b> They are approved and recorded, and they are not in the " +
+        "total below. We are finishing your rate &mdash; write to " +
+        '<a href="mailto:support@securejobva.com">support@securejobva.com</a> if it is not sorted within a day.</div>'
+      : "") +
+    (rows
+      ? '<div class="bill">' + rows + "</div>" +
+        '<div class="bill__tot"><span class="bill__totl">Total approved, not yet paid</span>' +
+        '<span class="bill__totv">' + esc(cMoney(grand)) + "</span></div>" +
+        (C_TRUNCATED
+          ? '<p class="msg">This covers the most recent ' + C_WEEK_LIMIT +
+            " weeks on file. Write to support for anything older.</p>"
+            : "") +
+        /* Deliberately a marked gap rather than a button that looks live.
+           A control that says "Pay" and does nothing is worse than no control:
+           somebody presses it, believes the money moved, and stops chasing the
+           invoice. The shape of this panel is also the thing a payment
+           provider decides — Stripe's hosted page redirects away, its embedded
+           form wants its own container — so the button arrives with the
+           provider rather than before it. */
+        '<div class="bill__pay">' +
+          '<p class="bill__payh">Paying this</p>' +
+          '<p class="bill__payp">Card payment is not switched on yet. For now we invoice you ' +
+            "separately and you pay us the way we agreed on the call. When card payment is " +
+            "live it appears here, and this total is the number it will charge.</p>" +
+        "</div>"
+      : '<p class="msg">Nothing to pay yet. Approved hours appear here as they come in.</p>') +
+  "</div>";
+}
+
+function placeBlock(live, k) {
+  /* Every id below carries this, because there are now several of these on the
+     page and an id that appears twice is a control that operates on somebody
+     else's placement. Where a label does not need to point at it, the hook is
+     a data attribute scoped to the section instead. */
+  var sfx = "-" + k;
 
   /* Matched up here rather than embedded — see loadClient for why that embed
      was a 400 and what it cost. */
@@ -1796,6 +2035,7 @@ function clientBlock() {
   });
 
   var html =
+    '<section data-place-block="' + esc(live.id) + '">' +
     '<div class="card">' +
       '<div class="row__top"><span><span class="row__n">' + esc(who) + "</span>" +
         '<span class="row__meta"> &middot; ' +
@@ -1816,7 +2056,7 @@ function clientBlock() {
   }
   if (live.status === "matched") {
     html +=
-      '<div class="card" id="c-start">' +
+      '<div class="card">' +
         "<h2>When can they start?</h2>" +
         (said
           ? '<div class="note"><b>You said ' + esc(when(said.starts_on)) + ".</b> " +
@@ -1825,13 +2065,13 @@ function clientBlock() {
               esc(when(live.started_on) || "a date to agree") + "</b>. Confirm it, or give us " +
               "the day that actually suits you &mdash; the trial is counted from the day work " +
               "begins, so this is the date your free weeks run from.</p>" +
-            '<div class="fld"><label for="c-when">First day</label>' +
-              '<input id="c-when" type="date"' +
+            '<div class="fld"><label for="c-when' + sfx + '">First day</label>' +
+              '<input id="c-when' + sfx + '" data-start-when type="date"' +
               (live.started_on ? ' value="' + esc(live.started_on) + '"' : "") + "></div>" +
-            '<p class="err" id="c-start-err" aria-live="polite"></p>' +
+            '<p class="err" data-start-err aria-live="polite"></p>' +
             '<div class="edit__foot"><span></span><span class="edit__act">' +
-              '<span class="row__ok" id="c-start-ok"></span>' +
-              '<button class="btn btn--solid" id="c-start-go" type="button" data-place="' +
+              '<span class="row__ok" data-start-ok></span>' +
+              '<button class="btn btn--solid" data-start-go type="button" data-place="' +
                 esc(live.id) + '">That is the day</button>' +
             "</span></div>") +
       "</div>";
@@ -1839,7 +2079,7 @@ function clientBlock() {
 
   /* ── the week waiting on them ── */
   html +=
-    '<div class="card" id="c-weeks">' +
+    '<div class="card" data-weeks>' +
       "<h2>Hours</h2>" +
       (waiting.length
         ? '<p class="msg" style="margin-top:0">' + waiting.length +
@@ -1904,12 +2144,38 @@ function clientBlock() {
           "<li><b>Rate</b><span>" + esc(cMoney(rate)) + " an hour</span></li>" +
           "<li><b>Comes to</b><span>" + esc(cMoney(total)) + "</span></li>" +
         "</ul>" +
+        /* Said out loud rather than left to be discovered. The weeks are read
+           with a limit, so a placement old enough to reach it has approved
+           weeks that are not in this total — and a running total that quietly
+           starts falling as the oldest weeks drop off the end is worse than no
+           total at all. */
+        (C_TRUNCATED
+          ? '<p class="msg">This covers the most recent ' + C_WEEK_LIMIT +
+            " weeks on file. Older approved weeks are not included &mdash; " +
+            'write to <a href="mailto:support@securejobva.com">support@securejobva.com</a> ' +
+            "for the full history.</p>"
+          : "") +
+      "</div>";
+  } else if (live.status === "trial" || live.status === "ongoing") {
+    /* The card used to be omitted when no rate had been set, which is the one
+       case where a client most needs to be told something. 032 stores the rate
+       in its own row and /admin can leave that row unwritten — the match form
+       says so in as many words when it fails. So the hours appeared, the
+       statement did not, and nothing on the page accounted for the gap. */
+    html +=
+      '<div class="card">' +
+        "<h2>Your statement</h2>" +
+        '<div class="note note--warn"><b>We have not finished setting up your rate.</b> ' +
+          esc(who.split(" ")[0]) + "&rsquo;s hours are being recorded and nothing is lost &mdash; " +
+          "the statement appears here as soon as the rate is on your account. " +
+          'If that is not within a day, write to <a href="mailto:support@securejobva.com">' +
+          "support@securejobva.com</a>.</div>" +
       "</div>";
   }
 
   /* ── asking for somebody different ── */
   html +=
-    '<div class="card" id="c-swap">' +
+    '<div class="card">' +
       "<h2>Not working out?</h2>" +
       (asked.length
         ? '<div class="note"><b>You have asked us for somebody different.</b> ' +
@@ -1918,102 +2184,137 @@ function clientBlock() {
         : '<p class="msg" style="margin-top:0">Tell us what is not working and we will find you ' +
           "somebody else. Nothing changes today: " + esc(who.split(" ")[0]) +
           " keeps working and you keep being billed as normal until a replacement is agreed with you.</p>" +
-          '<div class="fld"><label for="c-why">What is not working?</label>' +
-            '<textarea id="c-why" rows="3"></textarea></div>' +
-          '<p class="err" id="c-swap-err" aria-live="polite"></p>' +
+          '<div class="fld"><label for="c-why' + sfx + '">What is not working?</label>' +
+            '<textarea id="c-why' + sfx + '" data-swap-why rows="3"></textarea></div>' +
+          '<p class="err" data-swap-err aria-live="polite"></p>' +
           '<div class="edit__foot"><span></span><span class="edit__act">' +
-            '<span class="row__ok" id="c-swap-ok"></span>' +
-            '<button class="btn btn--ghost" id="c-swap-go" type="button" data-place="' +
+            '<span class="row__ok" data-swap-ok></span>' +
+            '<button class="btn btn--ghost" data-swap-go type="button" data-place="' +
               esc(live.id) + '">Ask for a different assistant</button>' +
           "</span></div>") +
-    "</div>";
+    "</div>" +
+    "</section>";
 
   return html;
 }
 
-function wireClient() {
-  var box = document.getElementById("c-weeks");
-  if (box) {
-    box.querySelectorAll("[data-c-yes], [data-c-no]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var row = b.closest("[data-week]");
-        var ok = row.querySelector("[data-c-ok]");
-        var yes = b.hasAttribute("data-c-yes");
-        var note = row.querySelector("[data-c-why]").value.trim();
-        if (!yes && !note) {
-          ok.textContent = "Say what needs fixing — that is the whole message";
-          ok.classList.add("is-on", "is-bad");
-          row.querySelector("[data-c-why]").focus();
-          return;
-        }
-        ok.classList.remove("is-bad");
-        ok.textContent = "Saving\u2026";
-        ok.classList.add("is-on");
-        api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-week")), {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: yes ? { status: "approved" } : { status: "returned", note: note }
-        }).then(function () { location.reload(); })
-          .catch(function (e) {
-            ok.textContent = "Did not save";
-            ok.classList.add("is-bad");
-          });
-      });
-    });
-  }
+/* Wired per section rather than per page.
 
-  /* Wired before the swap form's early return, because a matched placement has
-     this card and may not have that one. */
-  var startGo = document.getElementById("c-start-go");
-  if (startGo) {
-    startGo.addEventListener("click", function () {
-      var when_ = document.getElementById("c-when");
-      var err = document.getElementById("c-start-err");
-      var ok = document.getElementById("c-start-ok");
-      err.textContent = "";
-      if (!when_.value) {
-        err.textContent = "Pick the first day and we will set everything from it.";
-        when_.focus();
+   Every lookup in here used to be a getElementById against a fixed id, which
+   was right while exactly one placement could ever be drawn. Now that a client
+   may have several, a fixed id is a control that operates on the first
+   placement on the page whichever one you clicked — the worst kind of wrong,
+   because it does something and it looks like it worked.
+
+   So the section is found first and every control is looked up inside it.
+   Nothing here reaches out to the document. */
+function wireClient() {
+  var blocks = document.querySelectorAll("[data-place-block]");
+  Array.prototype.forEach.call(blocks, function (sec) {
+    wireWeeks(sec);
+    wireStart(sec);
+    wireSwap(sec);
+  });
+}
+
+function wireWeeks(sec) {
+  var box = sec.querySelector("[data-weeks]");
+  if (!box) return;
+  box.querySelectorAll("[data-c-yes], [data-c-no]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-week]");
+      var ok = row.querySelector("[data-c-ok]");
+      var yes = b.hasAttribute("data-c-yes");
+      var whyEl = row.querySelector("[data-c-why]");
+      var note = whyEl.value.trim();
+      if (!yes && !note) {
+        ok.textContent = "Say what needs fixing — that is the whole message";
+        ok.classList.add("is-on", "is-bad");
+        whyEl.focus();
         return;
       }
-      startGo.disabled = true;
-      ok.textContent = "Saving\u2026";
+      /* Both buttons on the row, not only the one pressed. A second click
+         while the first is in flight sends a PATCH the policy refuses — the
+         row is no longer 'submitted' — and PostgREST answers that 204 with
+         nothing changed, so it reads as success and reloads over the top of
+         one. Harmless, and it should still not be reachable. */
+      var pair = row.querySelectorAll("[data-c-yes], [data-c-no]");
+      Array.prototype.forEach.call(pair, function (x) { x.disabled = true; });
+
+      ok.classList.remove("is-bad");
+      ok.textContent = "Saving…";
       ok.classList.add("is-on");
-      /* confirmed_by is not sent and is not grantable — the trigger stamps it
-         from the token, because a field the browser fills is a field the
-         browser can lie about, and this is the record of who agreed a date. */
-      api("placement_starts", {
-        method: "POST",
+      api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-week")), {
+        method: "PATCH",
         headers: { Prefer: "return=minimal" },
-        body: { placement_id: startGo.getAttribute("data-place"), starts_on: when_.value }
+        /* The note reaches the assistant now. Until sql/046 the trigger from
+           030 put it back to whatever it had been for anybody without
+           applications.edit — which is every client — so this field was
+           required by the form above, sent, discarded before it was stored,
+           and then left out of the email telling her a week needed changing. */
+        body: yes ? { status: "approved" } : { status: "returned", note: note }
       }).then(function () { location.reload(); })
         .catch(function (e) {
-          startGo.disabled = false;
-          ok.classList.remove("is-on");
-          err.textContent = why(e);
+          Array.prototype.forEach.call(pair, function (x) { x.disabled = false; });
+          ok.textContent = "Did not save";
+          ok.classList.add("is-bad");
         });
     });
-  }
+  });
+}
 
-  var go = document.getElementById("c-swap-go");
+function wireStart(sec) {
+  var startGo = sec.querySelector("[data-start-go]");
+  if (!startGo) return;
+  startGo.addEventListener("click", function () {
+    var when_ = sec.querySelector("[data-start-when]");
+    var err = sec.querySelector("[data-start-err]");
+    var ok = sec.querySelector("[data-start-ok]");
+    err.textContent = "";
+    if (!when_.value) {
+      err.textContent = "Pick the first day and we will set everything from it.";
+      when_.focus();
+      return;
+    }
+    startGo.disabled = true;
+    ok.textContent = "Saving…";
+    ok.classList.add("is-on");
+    /* confirmed_by is not sent and is not grantable — the trigger stamps it
+       from the token, because a field the browser fills is a field the
+       browser can lie about, and this is the record of who agreed a date. */
+    api("placement_starts", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: { placement_id: startGo.getAttribute("data-place"), starts_on: when_.value }
+    }).then(function () { location.reload(); })
+      .catch(function (e) {
+        startGo.disabled = false;
+        ok.classList.remove("is-on");
+        err.textContent = why(e);
+      });
+  });
+}
+
+function wireSwap(sec) {
+  var go = sec.querySelector("[data-swap-go]");
   if (!go) return;
   go.addEventListener("click", function () {
-    var why = document.getElementById("c-why");
-    var err = document.getElementById("c-swap-err");
-    var ok = document.getElementById("c-swap-ok");
+    var reason = sec.querySelector("[data-swap-why]");
+    var err = sec.querySelector("[data-swap-err]");
+    var ok = sec.querySelector("[data-swap-ok]");
     err.textContent = "";
-    if (!why.value.trim()) {
+    if (!reason.value.trim()) {
       err.textContent = "Tell us what is not working — that is what we go on.";
-      why.focus();
+      reason.focus();
       return;
     }
     go.disabled = true;
-    ok.textContent = "Sending\u2026";
+    ok.textContent = "Sending…";
     ok.classList.add("is-on");
     api("swap_requests", {
       method: "POST",
       headers: { Prefer: "return=minimal" },
-      body: { placement_id: go.getAttribute("data-place"), reason: why.value.trim() }
+      body: { placement_id: go.getAttribute("data-place"), reason: reason.value.trim() }
     }).then(function () { location.reload(); })
       .catch(function (e) {
         go.disabled = false;

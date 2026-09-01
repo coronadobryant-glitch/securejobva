@@ -105,13 +105,213 @@ export const SCENARIOS = [
      ["Message them repeatedly until they answer.", 0]]]
 ];
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ENGLISH — how comfortably she writes to a customer
+   ══════════════════════════════════════════════════════════════════════════
+
+   This exists because until now the English score WAS THE TYPING SPEED. Fast
+   typing and good English are not the same thing and are barely related: a
+   fast typist with weak English writes bad emails quickly. Every track is
+   gated on english, so that one substitution decided the whole assessment for
+   most applicants on a number about their fingers.
+
+   Not a grammar exam. Each item is a line somebody would actually send, and
+   the question is which version to send — so a person who speaks fluently but
+   never learned the terminology scores what she deserves. The wrong options
+   are wrong in the ways second-language writers are actually caught out:
+   preposition after a verb, tense in a sentence about something just done,
+   and the register slipping too casual or too stiff. */
+export const ENGLISH = [
+  ["You have just sent a customer their refund. Which line do you send?",
+    [["Your refund has been sent and should reach your account within three working days.", 2],
+     ["Your refund was sent and should reach to your account within three working days.", 0],
+     ["We have send your refund, it will arrive in three working days.", 0],
+     ["Your refund is sent, arriving to you within three working days.", 1]]],
+
+  ["A customer asks when their order will arrive. It ships tomorrow. Which do you send?",
+    [["It will be shipped since tomorrow and arrives on Friday.", 0],
+     ["Your order leaves us tomorrow and should be with you on Friday.", 2],
+     ["Your order is leaving tomorrow and will be with you since Friday.", 0],
+     ["Your order ships tomorrow, arriving Friday.", 1]]],
+
+  ["You need a customer to send a document before you can go further.",
+    [["Send the document.", 0],
+     ["I would be extremely grateful if you could possibly find the time to send the form.", 1],
+     ["You must send the form or I cannot do anything.", 0],
+     ["Could you send the signed form when you have a moment? I can finish this as soon as it arrives.", 2]]],
+
+  ["A customer has complained about a delay that was your client's fault.",
+    [["Sorry for the delay, it was not our fault but we apologise anyway.", 0],
+     ["I am sorry this has taken so long. Here is where your order is now, and what happens next.", 2],
+     ["Apologies for any inconvenience caused.", 1],
+     ["The delay is happened because of a problem in the warehouse.", 0]]],
+
+  ["Which of these says most clearly that you will follow up on Monday?",
+    [["I will come back to you on Monday with an answer.", 2],
+     ["I will be reverting back to you by Monday regarding this matter.", 0],
+     ["I will try to update you sometime early next week hopefully.", 0],
+     ["I will let you know on Monday.", 1]]],
+
+  ["A customer asks for something your client does not offer.",
+    [["We are not doing this.", 0],
+     ["Unfortunately that is impossible for us.", 1],
+     ["That is not something we offer, but here is what we can do instead.", 2],
+     ["We cannot to do that, sorry.", 0]]],
+
+  ["You are writing to a customer for the first time on your client's behalf.",
+    [["Hey! Just checking in about your order :)", 0],
+     ["To whom it may concern, I am writing in reference to the aforementioned order.", 0],
+     ["Hi Sarah, I am writing from Rosehill about the order you placed last week.", 2],
+     ["Dear Sarah, I hope this email finds you well. I am writing to you today about your order.", 1]]],
+
+  ["Which sentence is correct?",
+    [["The team have finished the report and they sent it yesterday.", 1],
+     ["The team has finish the report and sent it yesterday.", 0],
+     ["The team have finished the report and has sent it yesterday.", 0],
+     ["The team has finished the report and sent it yesterday.", 2]]]
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DETAIL — whether she notices the thing that is wrong
+   ══════════════════════════════════════════════════════════════════════════
+
+   Also scored from typing speed until now, under the name data_entry, which
+   was the same mistake twice: speed at a keyboard says nothing about whether
+   somebody spots that an invoice does not add up.
+
+   Each item is a small record with exactly one thing wrong in it. The wrong
+   options are all things that are ODD BUT FINE — a weekend delivery date, an
+   unusual spelling — because the failure mode being tested for is somebody who
+   flags everything as much as somebody who flags nothing. */
+export const DETAIL = [
+  ["An invoice reads: 3 x $40.00 = $120.00, 2 x $15.00 = $30.00, 1 x $22.50 = $22.50, total $182.50. What is wrong?",
+    [["The total should be $172.50.", 2],
+     ["Nothing is wrong.", 0],
+     ["The second line should be $35.00.", 0],
+     ["The third line cannot have a half dollar.", 0]]],
+
+  ["A booking says: arrives Tuesday 14 March, departs Sunday 12 March, 3 nights. What is wrong?",
+    [["Three nights is too short for that trip.", 0],
+     ["The departure is before the arrival.", 2],
+     ["March 14 is not a Tuesday.", 0],
+     ["Nothing is wrong.", 0]]],
+
+  ["A customer record reads: Maria Santos, maria.santos@rosehil.com, phone +63 917 555 0142, company Rosehill Plumbing. What should you check?",
+    [["The phone number has too many digits.", 0],
+     ["Nothing is wrong.", 0],
+     ["The email domain is missing an l — rosehil, not rosehill.", 2],
+     ["The country code does not match the company.", 0]]],
+
+  ["A timesheet reads: Mon 8, Tue 8, Wed 8, Thu 8, Fri 8, total 42. What is wrong?",
+    [["Friday should be 10.", 0],
+     ["Nothing is wrong — 42 includes a break.", 0],
+     ["The total should be 40.", 2],
+     ["The week is missing the weekend.", 0]]],
+
+  ["An order list has: #1041 Ana Reyes, #1042 Joy Delgado, #1042 Ana Reyes, #1043 Mark Cruz. What is wrong?",
+    [["Ana Reyes should not have two orders.", 0],
+     ["The numbers should be in order of name.", 0],
+     ["Nothing is wrong.", 0],
+     ["Two different orders share the number 1042.", 2]]],
+
+  ["A meeting invite says: Thursday 10:00 AM Manila time, which is 9:00 PM Wednesday in Houston. What is wrong?",
+    [["Manila is 13 hours ahead in March, so it is 9:00 PM Wednesday — this is correct.", 2],
+     ["Houston should be Thursday, not Wednesday.", 0],
+     ["10:00 AM is too early for a meeting.", 0],
+     ["The invite is missing the meeting link.", 1]]],
+
+  ["A quote reads: 40 hours a week at $7.75 an hour, $320.00 a week. What is wrong?",
+    [["The hourly rate should be $8.00.", 0],
+     ["Nothing is wrong.", 0],
+     ["40 hours is too many for one week.", 0],
+     ["40 x $7.75 is $310.00, not $320.00.", 2]]],
+
+  ["A form has: Date of birth 03/14/1995, Age 31, filled in today in 2026. What is wrong?",
+    [["The date format is ambiguous.", 1],
+     ["Somebody born in March 1995 is 30 or 31 depending on the month — check today's date before flagging it.", 2],
+     ["The age should be 30.", 0],
+     ["March 14 1995 was not a valid date.", 0]]]
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SALES — what she does with somebody who has not bought yet
+   ══════════════════════════════════════════════════════════════════════════
+
+   There was no sales measure at all. The Sales & Marketing track was gated on
+   english and customer, so somebody was hired into a sales seat on the
+   strength of how they handle a complaint.
+
+   The line every item is drawn along: a good answer keeps the conversation
+   alive and tells the truth. Two of the wrong answers are always the two ways
+   people lose deals — pushing, and vanishing. */
+export const SALES = [
+  ["A lead replies to your quote with: \"That is more than we wanted to spend.\"",
+    [["Offer a discount straight away to keep them.", 0],
+     ["Ask what they were expecting and what the budget has to cover, before talking about price.", 2],
+     ["Explain again why the price is fair.", 1],
+     ["Tell them to come back when they have the budget.", 0]]],
+
+  ["A lead was keen on a call, then went quiet for a week.",
+    [["Send a short note with one useful thing and a question they can answer in a line.", 2],
+     ["Call them repeatedly until they pick up.", 0],
+     ["Mark them dead and move on.", 0],
+     ["Send the same email again.", 1]]],
+
+  ["A lead asks whether you do something your client does not offer.",
+    [["Say yes and work out the details later.", 0],
+     ["Say no and end the conversation.", 0],
+     ["Say that is not something we do, ask what they were trying to solve, and see if the thing we do solves it.", 2],
+     ["Avoid the question and keep selling what you have.", 0]]],
+
+  ["A good lead says: \"This is right, but not until the new budget year in six months.\"",
+    [["Agree a date to speak again, note what changes by then, and keep in light touch until it.", 2],
+     ["Try to persuade them to start now.", 0],
+     ["Close the lead — six months is too far out.", 0],
+     ["Send them a monthly newsletter and hope.", 1]]],
+
+  ["A lead says a competitor quoted them less.",
+    [["Match the price.", 0],
+     ["Say the competitor is not as good.", 0],
+     ["Ask them to send you the competitor's quote.", 1],
+     ["Ask what is included in their quote, and say plainly what is included in yours.", 2]]],
+
+  ["A client you already work for mentions they are struggling to cover the afternoons.",
+    [["Say nothing — you are not on the sales team today.", 0],
+     ["Send them a price list.", 0],
+     ["Tell them a second seat could cover the afternoons, and offer to have someone explain how it would work.", 2],
+     ["Offer to work extra hours yourself.", 1]]],
+
+  ["A lead offers to sign today for a bigger discount than you can give.",
+    [["Give it — a signature today is worth it.", 0],
+     ["Say you cannot approve that, say what you can do, and ask if that works.", 2],
+     ["Say you will check and then never come back to them.", 0],
+     ["Tell them the price is the price and leave it there.", 1]]],
+
+  ["A lead wants something your client could technically do but would do badly.",
+    [["Sell it — they asked for it.", 0],
+     ["Say no without explaining.", 0],
+     ["Sell it and warn them afterwards.", 0],
+     ["Say it is not what we are best at, say what we are best at, and let them decide.", 2]]]
+];
+
 /* Which axes each track is scored on. A Customer Service applicant is not
    marked down for a bookkeeping score she was never asked to earn — the
-   columns are recorded for everyone, but only these gate the stage. */
+   columns are recorded for everyone, but only these gate the stage.
+   Sales & Marketing now carries a sales axis, which it could not before,
+   because there was nothing to put in it. */
 export const TRACK_AXES = {
-  "Customer Service": ["english", "customer"],
-  "Admin Tasks":      ["english", "data_entry"],
-  "Sales & Marketing": ["english", "customer"]
+  "Customer Service":  ["english", "customer"],
+  "Admin Tasks":       ["english", "detail"],
+  "Sales & Marketing": ["english", "sales", "customer"]
+};
+
+/* Every bank the page shows and the trigger scores, in one place, so adding a
+   fifth is one line here rather than a hunt through three files. */
+export const BANKS = {
+  scenarios: SCENARIOS,
+  english:   ENGLISH,
+  detail:    DETAIL,
+  sales:     SALES
 };
 
 export const PASS_MARK = 7;          /* out of 10, on each axis the track needs */
