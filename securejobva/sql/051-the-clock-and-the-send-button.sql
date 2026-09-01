@@ -165,10 +165,16 @@ where proname = 'submit_assessment' and pronamespace = 'public'::regnamespace;
 
 -- part_opened must appear in no UPDATE grant. A page that can write it is a
 -- page that can restart its own clock.
+--
+-- Filtered to UPDATE, and that filter is the whole point: 045 grants SELECT on
+-- this table as a whole, so without it this lists part_opened as readable and
+-- looks like a failure. It is not one — both people who can see the row are
+-- meant to see this column. Empty is the pass.
 select column_name, privilege_type
 from information_schema.column_privileges
 where table_name = 'application_assessment'
   and grantee in ('anon', 'authenticated')
+  and privilege_type = 'UPDATE'
   and column_name = 'part_opened';
 
 -- How long each part has been open for anybody still mid-assessment. A part

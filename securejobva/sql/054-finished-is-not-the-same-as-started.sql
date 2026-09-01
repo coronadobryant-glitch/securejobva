@@ -115,12 +115,16 @@ grant execute on function public.close_part(text) to authenticated;
 -- Check it worked
 -- ==========================================================================
 
--- Neither of the two things a part knows about itself may be written by a
--- page. Both of these must come back empty.
+-- Neither of the two things a part knows about itself may be WRITTEN by a
+-- page. Reading them is fine and expected — 045 grants SELECT on this table as
+-- a whole, so leaving the privilege_type filter off lists both as readable and
+-- reads like a failure when nothing is wrong. This asks the question it means.
+-- Empty is the pass.
 select column_name, privilege_type
 from information_schema.column_privileges
 where table_name = 'application_assessment'
   and grantee in ('anon', 'authenticated')
+  and privilege_type = 'UPDATE'
   and column_name in ('part_opened', 'part_done');
 
 -- Where everybody mid-assessment has actually got to. A part that is opened
