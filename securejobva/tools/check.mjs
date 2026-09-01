@@ -1318,6 +1318,36 @@ await check("the assessment key matches its item bank", async () => {
   return said.join(", ") + " — every key identical to its bank, in " + newest;
 });
 
+/* Hiding something has to actually hide it.
+
+   The hidden attribute gets display:none from the browser's own stylesheet,
+   and any author rule setting display beats it. So `el.setAttribute("hidden")`
+   does nothing to an element some other rule gave a display to — and it fails
+   silently, because the JS is correct and the element is simply still there.
+
+   This project hit it five times and patched one element at a time each time:
+   .mobnav, .step, .intake__foot, .logos, and finally .cform, where the contact
+   form stayed on screen after a successful send with its Send button reading
+   "Sending…" for ever. Found by pressing the button, not by reading the code,
+   which is exactly why it needs a check rather than another patch. */
+await check("hiding an element actually hides it", () => {
+  const PAGES = ["index.html", "careers.html", "contact.html",
+                 "status.html", "admin.html", "hub.html", "seats.html"]
+    .filter((f) => existsSync(f));
+
+  const RULE = /\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*\}/;
+  const missing = PAGES.filter((f) => !RULE.test(read(f)));
+
+  if (missing.length) {
+    throw new Error(missing.join(", ") + " — no `[hidden]{display:none!important}`. " +
+      "Every one of these pages hides something with the attribute, and one " +
+      "display rule anywhere in the stylesheet is enough to make that do nothing at all. " +
+      "The rule lives in careers.html inside the block lib-chrome.mjs lifts, which is how " +
+      "the four generated pages get it.");
+  }
+  return PAGES.length + " pages, hidden beats every display rule on all of them";
+});
+
 /* A migration that has been superseded has to say so.
 
    Every file in sql/ says "Safe to re-run: yes", and every one of them is —

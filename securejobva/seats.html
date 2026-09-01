@@ -224,6 +224,26 @@ img{max-width:100%}
 .navtog[aria-expanded="true"] .i-close{display:block}
 
 .mobnav{border-top:1px solid var(--line);background:var(--paper);padding:.25rem 0 1.15rem}
+/* hidden means hidden, on anything, once.
+
+   The hidden attribute gets display:none from the browser's own stylesheet,
+   which any author rule setting display beats — so an element the JS hides
+   stays on screen if some other rule gives it a display. This has been hit at
+   least four times in this project and patched one element at a time each
+   time: .mobnav, .step, .intake__foot, .logos, and most recently .cform, where
+   the contact form stayed on screen after a successful send with its Send
+   button reading "Sending…" for ever.
+
+   The specific rules below are left where they are — harmless now, and
+   rewriting five of them across four files to prove a point is churn. This one
+   line is what stops the sixth.
+
+   !important because there is no case where an author rule should win over
+   hidden. That is the whole meaning of the attribute. This block is inside the
+   part of the stylesheet lib-chrome.mjs lifts into the four generated pages,
+   so it reaches all seven from here. */
+[hidden]{display:none!important}
+
 .mobnav[hidden]{display:none}
 .mobnav__in{display:grid}
 .mobnav a{

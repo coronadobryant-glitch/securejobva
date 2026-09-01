@@ -234,6 +234,11 @@ img{max-width:100%}
 .navtog[aria-expanded="true"] .i-close{display:block}
 
 .mobnav{border-top:1px solid var(--line);background:var(--paper);padding:.25rem 0 1.15rem}
+/* hidden means hidden, on anything, once. The attribute gets display:none from
+   the browser own stylesheet, and any author rule setting display beats it — so
+   an element the JS hides stays on screen. Hit four times here and patched one
+   element at a time each time; this is the line that stops the fifth. */
+[hidden]{display:none!important}
 .mobnav[hidden]{display:none}
 .mobnav__in{display:grid}
 .mobnav a{
