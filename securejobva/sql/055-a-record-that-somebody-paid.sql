@@ -1,3 +1,26 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- The header below says this file is safe to re-run, and on its own it is:
+-- every statement in it is written to be repeatable. What it is not safe to
+-- do is run it AFTER the files that come later, because it defines a function
+-- one of them has since replaced — and `create or replace` does exactly what
+-- it says. Re-running this puts its own version back.
+--
+-- Nothing warns you when that happens. The table and its policies survive;
+-- only the logic goes backwards, and the schema looks perfect afterwards.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   stamp_payment_author
+--     -> re-run 059-the-grant-nobody-asked-for.sql to restore
+--
+-- 059 also puts right the grants at the bottom of this file. They revoke from
+-- anon and not from authenticated, which left every signed-in account holding
+-- TRUNCATE on a table row-level security cannot protect from it. Re-running
+-- this file re-opens that. Run 059 straight afterwards.
+--
+-- ==========================================================================
+
 -- 055 — a record that somebody paid
 --
 -- Run after: 054

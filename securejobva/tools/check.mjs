@@ -2104,6 +2104,62 @@ await check("views run as the caller, not the owner", () => {
    An earlier version of this check failed any grant that was not insert,
    whatever the grantee, and flagged the admin portal as a breach. A guard that
    cries wolf gets switched off, which is worse than not having one. */
+/* ── a new table does not start empty ─────────────────────────────────────
+   Supabase ships ALTER DEFAULT PRIVILEGES granting everything on a new table
+   in `public` to anon, authenticated and service_role. So the line every
+   migration here opens its grants with —
+
+     revoke all on public.<table> from anon, authenticated;
+
+   — is not a formality. It is the whole of the lockdown, and 055, 056 and 057
+   each wrote only half of it: `from anon`, with authenticated left holding
+   INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES and TRIGGER.
+
+   RLS caught nearly all of it, because those first three pass through a
+   policy. TRUNCATE does not. A policy filters rows and TRUNCATE never visits
+   one, so it is checked against the table privilege alone — which meant any
+   signed-in account could have emptied the payments ledger and every interview
+   being arranged, with no policy consulted and nothing written down.
+
+   Fixed by 059. This is what stops the next one: every table created in sql/
+   must be revoked from BOTH roles somewhere in the same file. */
+await check("every new table is revoked from both public roles", () => {
+  /* Asked of the folder rather than of each file, because what matters is
+     where the database ends up. 055, 056 and 057 have already been pasted and
+     are not editable; 059 revokes what they left behind, and that is a real
+     fix rather than a excuse — the schema is right once it has run. A table
+     nothing anywhere revokes is still caught, which is the case this exists
+     for. */
+  const created = new Map();
+  const revokedBoth = new Set();
+
+  for (const f of sqlFiles) {
+    const body = read(SQL_DIR + "/" + f);
+    for (const m of body.matchAll(/create table if not exists\s+public\.(\w+)/gi)) {
+      if (!created.has(m[1])) created.set(m[1], f);
+    }
+    /* One revoke may name several tables, so the statement is matched first
+       and its table list read out of it. */
+    for (const m of body.matchAll(/revoke\s+all\s+on\s+([^;]*?)\bfrom\s+([^;]+);/gi)) {
+      if (!/\banon\b/i.test(m[2]) || !/\bauthenticated\b/i.test(m[2])) continue;
+      for (const t of m[1].matchAll(/public\.(\w+)/gi)) revokedBoth.add(t[1]);
+    }
+  }
+
+  const missing = [...created]
+    .filter(([t]) => !revokedBoth.has(t))
+    .map(([t, f]) => "public." + t + " (created in " + f + ")");
+
+  if (missing.length) {
+    throw new Error(missing.join("; ") + " — Supabase grants every privilege on a new " +
+      "public table to anon AND authenticated, so a table is only locked down once both " +
+      "are revoked. Leaving authenticated holding TRUNCATE is not covered by RLS: a policy " +
+      "filters rows and TRUNCATE never visits one. Add `revoke all on public.<table> from " +
+      "anon, authenticated;` before the grants, as every file from 001 does.");
+  }
+  return created.size + " tables, every one revoked from anon and authenticated";
+});
+
 await check("anon can still only INSERT", () => {
   /* A grant can span lines and carry a column list —
         grant select ( id, created_at, … ) on public.applications to authenticated;
