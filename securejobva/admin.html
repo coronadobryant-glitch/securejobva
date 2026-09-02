@@ -4189,7 +4189,11 @@ function drawPayments(box) {
                   (x.o.paid ? " &middot; " + esc(payMoney(x.o.paid)) + " paid" : "") + "</span>" +
               "</span>" +
               '<span class="row__tot' + (x.o.owed > 0 ? "" : " sit__ok") + '">' +
-                esc(payMoney(x.o.owed)) + (x.o.owed < 0 ? " in credit" : " owed") + "</span></div>" +
+                /* The sign is dropped when the word carries it. "$-620.00 in
+                   credit" says the same thing twice and reads like a bug in
+                   the figure rather than money in hand. */
+                esc(payMoney(Math.abs(x.o.owed))) +
+                (x.o.owed < 0 ? " in credit" : " owed") + "</span></div>" +
             "</div>";
           }).join("") +
         "</div>"
@@ -4295,12 +4299,19 @@ function drawPayWeeks() {
         }).join("") + "</div>"
       : '<p class="payw__d">No approved chargeable weeks for this client yet.</p>');
 
-  hint.textContent = open.length
-    ? payMoney(o.owed) + " outstanding across " + open.length +
-      (open.length === 1 ? " unsettled week" : " unsettled weeks") + "."
+  /* A client can be in credit and still have weeks nobody has ticked — they
+     paid a round number up front. "$-90.00 outstanding across 2 unsettled
+     weeks" is two wrong things in one sentence, so credit is said as credit
+     and the weeks are mentioned separately. */
+  var weeksBit = open.length
+    ? " " + open.length + (open.length === 1 ? " week is" : " weeks are") + " not ticked against a payment."
+    : "";
+
+  hint.textContent = o.owed < 0
+    ? payMoney(-o.owed) + " in credit." + weeksBit
     : o.owed > 0
-      ? payMoney(o.owed) + " outstanding, with every week already ticked against a payment."
-      : "Nothing outstanding for this client.";
+      ? payMoney(o.owed) + " outstanding." + weeksBit
+      : "Nothing outstanding for this client." + weeksBit;
 }
 
 function wirePayments(box) {

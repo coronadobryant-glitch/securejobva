@@ -251,3 +251,93 @@ order by a.created_at desc;
 -- Then delete those objects under Storage -> applicant-docs in the dashboard.
 -- Doing it from SQL means writing to storage.objects directly, which is a
 -- sharper tool than this job needs.
+
+-- ==========================================================================
+-- OPTION C — THE CLIENT SIDE, ADDED AFTER 055 AND 057
+-- ==========================================================================
+--
+-- Everything above this line was written when an application, its weeks and
+-- its placement were the whole of a test run. Since then a walkthrough also
+-- leaves a client, the interview times the two of them exchanged, and any
+-- payment written down against them. None of those is reachable from /admin:
+-- the only delete controls in the product are for a client logo and a
+-- payment, so a test client and a test placement can only go from here.
+--
+-- Order matters and is enforced rather than remembered. client_payments
+-- references clients ON DELETE RESTRICT, so a client who has paid cannot be
+-- removed until the payment is — which is the right refusal for real money
+-- and an obstacle only for a test.
+--
+-- interview_slots needs no line of its own: it references placements ON
+-- DELETE CASCADE, so the times go when the placement does.
+
+-- 1. Read first. Copy the client id out of this.
+select c.id,
+       c.name,
+       cp.contact_email,
+       (select count(*) from public.placements      p where p.client_id = c.id) as placements,
+       (select count(*) from public.client_payments q where q.client_id = c.id) as payments,
+       (select count(*) from public.interview_slots s
+          join public.placements p2 on p2.id = s.placement_id
+         where p2.client_id = c.id)                                             as interview_times
+from public.clients c
+left join public.client_private cp on cp.client_id = c.id
+order by c.created_at desc;
+
+-- 2. Then this, with the id pasted in both places. Wrapped so that a client
+--    who is not a test client cannot be taken out by a mistyped id: it
+--    refuses rather than deleting the wrong business.
+do $cleanup$
+declare
+  target uuid := '00000000-0000-0000-0000-000000000000';  -- <- paste the id
+  nm     text;
+  live   integer;
+begin
+  select c.name into nm from public.clients c where c.id = target;
+  if nm is null then
+    raise exception 'no client with that id — read step 1 again';
+  end if;
+
+  -- The guard. A real client has weeks behind them; a test one, walked
+  -- through in an afternoon, does not. If this fires on something you meant
+  -- to remove, remove it by hand and know exactly what you are doing.
+  select count(*) into live
+  from public.timesheets t
+  join public.placements p on p.id = t.placement_id
+  where p.client_id = target and t.status = 'approved';
+
+  if live > 0 then
+    raise exception
+      '% has % approved week(s) behind it. That is not a test client.', nm, live;
+  end if;
+
+  delete from public.client_payments where client_id = target;
+  delete from public.placements      where client_id = target;   -- takes interview_slots
+  delete from public.client_private  where client_id = target;
+  delete from public.clients         where id = target;
+
+  raise notice 'removed the client %, its placements and its interview times', nm;
+end
+$cleanup$;
+
+-- 3. Confirm. Both counts should be zero.
+select (select count(*) from public.clients)         as clients_left,
+       (select count(*) from public.interview_slots) as interview_times_left,
+       (select count(*) from public.client_payments) as payments_left;
+
+-- ==========================================================================
+-- AND ONE ROW NOTHING IN THE PRODUCT CAN DELETE
+-- ==========================================================================
+--
+-- A contact message. sql/010 grants staff SELECT and UPDATE on
+-- contact_messages and nothing else, so /admin offers Reply and Mark answered
+-- and there is no third button. That is fine for real correspondence and
+-- wrong for a test row — and it is also the reason somebody who asks to be
+-- forgotten cannot be honoured from inside the product.
+--
+-- Until that is decided one way or the other, a test message goes from here:
+--
+--   select id, name, email, reason, created_at::date
+--   from public.contact_messages order by created_at desc;
+--
+--   delete from public.contact_messages where id = '…';
