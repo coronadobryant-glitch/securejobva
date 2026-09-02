@@ -2022,13 +2022,33 @@ var PAY = [
 SIGNIN_HINT = "Use the address on your application &mdash; that is how we find you. " +
   "If you already made a password on your application page, it is the same one here.";
 
+/* The way out has to be on the page that closed the door.
+
+   Both messages this draws end by telling somebody to sign out: "we cannot
+   find an application for <address> — if you applied with a different address,
+   sign out and use that one." There was no sign-out on it. No header either,
+   and no brand mark: /hub draws its chrome in render(), and shut() returns
+   before render() ever runs, so the locked-out state was a bare white page
+   with one link on it.
+
+   Somebody signed in on the wrong address — which is precisely who this
+   message is addressed to — could read the instruction and had nothing to
+   follow it with. Walked on 2 Sep as an account with no application, which is
+   the state that produces it. */
 function shut(title, body) {
   view(
     '<div class="card">' +
       '<div class="note"><b>' + esc(title) + "</b> " + body + "</div>" +
-      '<p style="margin-top:1.2rem"><a class="btn btn--ghost" href="/status">See where your application is</a></p>' +
+      '<p style="margin-top:1.2rem;display:flex;gap:.6rem;flex-wrap:wrap">' +
+        '<a class="btn btn--ghost" href="/status">See where your application is</a>' +
+        '<button class="btn btn--ghost" id="shut-out" type="button">Sign out</button>' +
+      "</p>" +
     "</div>"
   );
+  /* After view(), because the button does not exist until the markup is in the
+     document — the same order wireEdit and the rest use. */
+  var out = document.getElementById("shut-out");
+  if (out) out.addEventListener("click", signOut);
 }
 
 function tile(href, label, path, sub) {

@@ -2060,6 +2060,38 @@ await check("both sides of an interview are told the same thing", async () => {
   }
 });
 
+/* A page that tells somebody to sign out has to offer them a sign out.
+
+   /hub's locked-out state says "we cannot find an application for <address> —
+   if you applied with a different address, sign out and use that one", and
+   rendered no sign-out control, no header and no brand mark: the chrome is
+   drawn in render(), and shut() returns before render() ever runs. So the one
+   person that message is written for — signed in on the wrong address — could
+   read the instruction and had nothing on the page to follow it with.
+
+   Asserted against the built page rather than the intention, because the copy
+   and the control are written in different functions and only ever meet in
+   the output. */
+await check("a page that says sign out offers one", async () => {
+  if (!existsSync("hub.html")) return "no hub.html to check";
+  const html = read("hub.html");
+  const at = html.indexOf("function shut(");
+  if (at < 0) throw new Error("no shut() in hub.html — has the locked-out state been renamed?");
+  let depth = 0, i = html.indexOf("{", at), end = -1;
+  for (; i < html.length; i++) {
+    if (html[i] === "{") depth++;
+    else if (html[i] === "}") { depth--; if (!depth) { end = i; break; } }
+  }
+  const body = html.slice(at, end + 1);
+  if (!/sign out/i.test(html.slice(0, at) + html.slice(end))) {
+    return "nothing tells anybody to sign out";
+  }
+  if (!/signOut/.test(body)) {
+    throw new Error("shut() tells somebody to sign out and wires no control that does it");
+  }
+  return "the locked-out portal offers the way out it names";
+});
+
 /* The assessment card on /status, which had no test of any kind — part_done
    appeared in exactly one file in this repo, the generator that writes it.
 
