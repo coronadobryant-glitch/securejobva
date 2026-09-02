@@ -1066,6 +1066,80 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* ── whose rows are these? ────────────────────────────────────
+
+   Every portal page below asks the database for its rows and, until now, took
+   the answer as final: "the policy returns only rows carrying this address, so
+   there is no filter here to get wrong". That is true of an applicant and
+   false of staff, because every one of those SELECT policies ends with an or
+   on has_permission('applications.view_all') so that /admin can read the queue
+   at all. A staff account is therefore handed EVERY row, on four pages whose
+   whole premise is that the rows are yours.
+
+   What it looked like: /status listed five strangers' applications under
+   "Where you are in the process"; /hub opened as somebody else and greeted
+   them by name; /seats put another company's name on the account. And it was
+   not only something to read. The edit form binds to the first row, so Save
+   changes sent a PATCH to the newest application in the database, whoever it
+   belonged to.
+
+   So the pages narrow as well. This is not a second fence and not distrust of
+   the first — Postgres still decides what may leave it, and nothing here can
+   widen that by a single row. It is the page choosing, from among the rows it
+   is allowed, the ones belonging to the person reading them.
+
+   The test mirrors the applicant half of those policies word for word: the
+   account id, or the address on the token. An applicant's set therefore comes
+   back exactly as it did before, by construction, and only the accounts the
+   policies deliberately widen for see any change at all. */
+function whoAmI() {
+  var s = session();
+  var c = s ? readToken(s.access_token) : null;
+  return {
+    uid: (c && c.sub) || "",
+    email: String((c && c.email) || "").toLowerCase()
+  };
+}
+
+/* Throws when the row carries neither column, rather than answering no. The
+   two ways of getting this wrong are not equally bad: a select that forgets
+   email and user_id would otherwise quietly filter away an applicant's own
+   application and show her a portal that says nothing is wrong with it. An
+   error says which line to look at. */
+function isMine(row) {
+  if (!row) return false;
+  var hasId = Object.prototype.hasOwnProperty.call(row, "user_id");
+  var hasEmail = Object.prototype.hasOwnProperty.call(row, "email");
+  if (!hasId && !hasEmail) {
+    throw new Error("cannot tell whose row this is: the select is missing email and user_id");
+  }
+  var me = whoAmI();
+  if (hasId && row.user_id && me.uid && row.user_id === me.uid) return true;
+  return hasEmail && !!row.email && String(row.email).toLowerCase() === me.email;
+}
+
+function onlyMine(rows) {
+  return (rows || []).filter(isMine);
+}
+
+/* Rows hanging off one application — leave, weeks, placements. Kept apart
+   from isMine because these carry no address of their own: they are mine
+   because the application they point at is. */
+function forApplication(id, rows) {
+  return (rows || []).filter(function (r) { return r.application_id === id; });
+}
+
+/* The client side asks sql/032's question instead — is_client_contact() — so
+   it gets its own test rather than being bent into the one above. Returns a
+   lookup rather than a list, because every use of it is a membership test. */
+function myClientIds(clients) {
+  var me = whoAmI(), out = {};
+  (clients || []).forEach(function (c) {
+    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) out[c.id] = true;
+  });
+  return out;
+}
+
 function signIn() {
   var back = location.origin + location.pathname;
   location.href = SB + "/auth/v1/authorize?provider=google&redirect_to=" +
@@ -2187,11 +2261,13 @@ function start() {
 
   loadMyTz().then(function () {
 
-  /* The policy returns only rows carrying this address, so there is no filter
-     here to get wrong: asking for everything and being given your own is the
-     database's job, not the page's. */
-  api("seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc")
-    .then(function (rows) { return loadClient(claims.email, rows || []); })
+  /* The policy returns the rows carrying this address and, for anybody
+     holding a role, everybody else's as well - that trailing or on
+     has_permission is what makes /admin possible at all. So being handed your
+     own is half the database's job and half this page's, and the half that was
+     missing put another company's name on this account. */
+  api("seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc")
+    .then(function (rows) { return loadClient(claims.email, onlyMine(rows || [])); })
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
       view('<div class="card"><p class="msg msg--bad">We could not load your seats just now. ' +
@@ -2213,6 +2289,11 @@ start();
    questions and a client may well have one and not the other — somebody
    matched by hand never filled in the seats form, and somebody who filled it
    in may still be waiting. */
+/* 032 again, asked from the page rather than from a policy: the clients this
+   address is the contact for. Everything on the client side is narrowed
+   through it, because every one of those policies also answers yes to a role,
+   and a role is not a client. */
+var MY_CLIENTS = {};
 var C_PLACE = [];
 var C_RATE = {};
 var C_WEEKS = [];
@@ -2245,7 +2326,7 @@ var C_DAY = ["M", "T", "W", "T", "F", "S", "S"];
 
 function loadClient(email, rows) {
   return Promise.all([
-    api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week," +
+    api("placements?select=id,client_id,application_id,status,started_on,ended_on,hours_per_week," +
         "trial_weeks&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
@@ -2274,7 +2355,7 @@ function loadClient(email, rows) {
        own catch hides the entire client block on any failure, which for a
        missing table would mean a live placement vanishing behind "nothing here
        under this address yet" — the exact failure 041 already cost us once. */
-    api("client_payments?select=id,amount_cents,paid_on,method,reference&order=paid_on.desc")
+    api("client_payments?select=id,client_id,amount_cents,paid_on,method,reference&order=paid_on.desc")
       .catch(function () { return []; }),
     api("client_payment_weeks?select=timesheet_id")
       .catch(function () { return []; }),
@@ -2282,31 +2363,40 @@ function loadClient(email, rows) {
        returns only their own, so there is no filter here to get wrong. */
     api("interview_slots?select=id,placement_id,starts_at,minutes,chosen_at," +
         "confirmed_at,declined_at,meeting_url&order=starts_at.asc")
-      .catch(function () { return []; })
+      .catch(function () { return []; }),
+    /* Which clients this address is actually the contact for. sql/032 decides
+       that with is_client_contact(); this asks the same question from here,
+       and its answer is what narrows every list above. Without it a role reads
+       this page as somebody else's statement. */
+    api("clients?select=id,contact_email").catch(function () { return []; })
   ]).catch(function (e) {
     if (String(e.message) === "signed out") throw e;
     /* 032 is pasted by hand some time after this ships, and a client who has
        no placement is an ordinary thing rather than a fault. Either way the
        seats half of the page is unaffected. */
     C_OFF = true;
-    return [[], [], [], [], [], [], [], [], []];
+    return [[], [], [], [], [], [], [], [], [], []];
   }).then(function (r) {
-    C_PLACE = r[0] || [];
+    MY_CLIENTS = myClientIds(r[9]);
+    C_PLACE = (r[0] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });
+    var onMine = {};
+    C_PLACE.forEach(function (p) { onMine[p.id] = true; });
     C_RATE = {};
     (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
-    C_WEEKS = r[2] || [];
+    var rawWeeks = r[2] || [];
+    C_WEEKS = rawWeeks.filter(function (w) { return onMine[w.placement_id]; });
     /* Exactly at the limit is how a capped read announces itself — there may
        be more behind it and there is no way from here to know. Treated as
        truncated, which is the safe direction: saying so when it is not quite
        true costs a sentence, and not saying so when it is costs a number. */
-    C_TRUNCATED = C_WEEKS.length >= C_WEEK_LIMIT;
-    C_SWAPS = r[3] || [];
-    C_STARTS = r[4] || [];
+    C_TRUNCATED = rawWeeks.length >= C_WEEK_LIMIT;
+    C_SWAPS = (r[3] || []).filter(function (w) { return onMine[w.placement_id]; });
+    C_STARTS = (r[4] || []).filter(function (w) { return onMine[w.placement_id]; });
     C_NAMES = r[5] || [];
-    C_PAID = r[6] || [];
+    C_PAID = (r[6] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });
     C_SETTLED = {};
     (r[7] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
-    C_SLOTS = r[8] || [];
+    C_SLOTS = (r[8] || []).filter(function (w) { return onMine[w.placement_id]; });
     render(email, rows);
   });
 }

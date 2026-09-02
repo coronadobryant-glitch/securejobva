@@ -966,6 +966,80 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* ── whose rows are these? ────────────────────────────────────
+
+   Every portal page below asks the database for its rows and, until now, took
+   the answer as final: "the policy returns only rows carrying this address, so
+   there is no filter here to get wrong". That is true of an applicant and
+   false of staff, because every one of those SELECT policies ends with an or
+   on has_permission('applications.view_all') so that /admin can read the queue
+   at all. A staff account is therefore handed EVERY row, on four pages whose
+   whole premise is that the rows are yours.
+
+   What it looked like: /status listed five strangers' applications under
+   "Where you are in the process"; /hub opened as somebody else and greeted
+   them by name; /seats put another company's name on the account. And it was
+   not only something to read. The edit form binds to the first row, so Save
+   changes sent a PATCH to the newest application in the database, whoever it
+   belonged to.
+
+   So the pages narrow as well. This is not a second fence and not distrust of
+   the first — Postgres still decides what may leave it, and nothing here can
+   widen that by a single row. It is the page choosing, from among the rows it
+   is allowed, the ones belonging to the person reading them.
+
+   The test mirrors the applicant half of those policies word for word: the
+   account id, or the address on the token. An applicant's set therefore comes
+   back exactly as it did before, by construction, and only the accounts the
+   policies deliberately widen for see any change at all. */
+function whoAmI() {
+  var s = session();
+  var c = s ? readToken(s.access_token) : null;
+  return {
+    uid: (c && c.sub) || "",
+    email: String((c && c.email) || "").toLowerCase()
+  };
+}
+
+/* Throws when the row carries neither column, rather than answering no. The
+   two ways of getting this wrong are not equally bad: a select that forgets
+   email and user_id would otherwise quietly filter away an applicant's own
+   application and show her a portal that says nothing is wrong with it. An
+   error says which line to look at. */
+function isMine(row) {
+  if (!row) return false;
+  var hasId = Object.prototype.hasOwnProperty.call(row, "user_id");
+  var hasEmail = Object.prototype.hasOwnProperty.call(row, "email");
+  if (!hasId && !hasEmail) {
+    throw new Error("cannot tell whose row this is: the select is missing email and user_id");
+  }
+  var me = whoAmI();
+  if (hasId && row.user_id && me.uid && row.user_id === me.uid) return true;
+  return hasEmail && !!row.email && String(row.email).toLowerCase() === me.email;
+}
+
+function onlyMine(rows) {
+  return (rows || []).filter(isMine);
+}
+
+/* Rows hanging off one application — leave, weeks, placements. Kept apart
+   from isMine because these carry no address of their own: they are mine
+   because the application they point at is. */
+function forApplication(id, rows) {
+  return (rows || []).filter(function (r) { return r.application_id === id; });
+}
+
+/* The client side asks sql/032's question instead — is_client_contact() — so
+   it gets its own test rather than being bent into the one above. Returns a
+   lookup rather than a list, because every use of it is a membership test. */
+function myClientIds(clients) {
+  var me = whoAmI(), out = {};
+  (clients || []).forEach(function (c) {
+    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) out[c.id] = true;
+  });
+  return out;
+}
+
 function signIn() {
   var back = location.origin + location.pathname;
   location.href = SB + "/auth/v1/authorize?provider=google&redirect_to=" +
@@ -3068,12 +3142,12 @@ function load() {
   /* Everything the settings pane shows. The check that a portal page only
      reads columns it is granted covers this list, so a typo here fails the
      build rather than the page. */
-  return api("applications?select=id,name,email,status,payout_method,phone,cv,note," +
+  return api("applications?select=id,name,email,user_id,status,payout_method,phone,cv,note," +
              "region,availability,has_equipment,posting_consent,posting_consent_at," +
              "skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping" +
              "&order=created_at.desc")
     .then(function (rows) {
-      var a = (rows || [])[0];
+      var a = onlyMine(rows || [])[0];
       if (!a) {
         shut("Nothing here under this address.",
           "We cannot find an application for " + esc(ME) + ". If you applied with a different address, sign out and use that one.");
@@ -3089,7 +3163,7 @@ function load() {
          Neither filter is written here, because a filter written in a page is
          a filter somebody can change. */
       return Promise.all([
-        api("leave_requests?select=id,starts_on,ends_on,reason,status&order=starts_on.desc"),
+        api("leave_requests?select=id,application_id,starts_on,ends_on,reason,status&order=starts_on.desc"),
         api("notices?select=id,title,body,pinned,published_at&order=pinned.desc,published_at.desc"),
         /* The days come back nested under their week in one request. Fetching
            them separately would mean the totals on screen are assembled from
@@ -3100,7 +3174,7 @@ function load() {
            after the code that needs it ships, and in that window this request
            404s — which, inside Promise.all, would take leave and the notice
            board down with it. The portal keeps working and the card says why. */
-        api("timesheets?select=id,week_starts_on,status,note,submitted_at,decided_at,decided_by," +
+        api("timesheets?select=id,application_id,week_starts_on,status,note,submitted_at,decided_at,decided_by," +
             "timesheet_days(id,worked_on,hours,note)&order=week_starts_on.desc&limit=12")
           .catch(function (e) {
             if (String(e.message) === "signed out") throw e;
@@ -3111,7 +3185,7 @@ function load() {
            hand some time after this ships. A missing client card claims
            nothing, so unlike the timesheet there is no message to show — an
            assistant who has not been placed sees exactly the same page. */
-        api("placements?select=id,status,started_on,ended_on,hours_per_week,trial_weeks," +
+        api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week,trial_weeks," +
             "clients(name)&order=started_on.desc.nullslast&limit=5")
           .catch(function (e) {
             if (String(e.message) === "signed out") throw e;
@@ -3127,19 +3201,28 @@ function load() {
             return [];
           })
       ]).then(function (r) {
+        /* Cut down to this application before a single row of it is drawn.
+           The gate above already turns away an account with no application of
+           its own; this is for the account that has one and holds a role as
+           well, which the policies hand everybody else's weeks to. Notices are
+           left whole — a published notice is addressed to everyone. */
+        var myPlace = forApplication(a.id, r[3]);
+        var onMine = {};
+        myPlace.forEach(function (p) { onMine[p.id] = true; });
+
         /* The live one, if there is one. A placement that has ended is history
            and does not belong at the top of somebody's portal. */
         PLACE = null;
-        (r[3] || []).forEach(function (p) {
+        myPlace.forEach(function (p) {
           if (!PLACE && p.status !== "ended") PLACE = p;
         });
         SHEETS = {};
-        (r[2] || []).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
+        forApplication(a.id, r[2]).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
         /* Opens on the week in progress. Anything older is a click away in the
            list underneath, which is where a week you have to fix will be. */
-        H_SLOTS = r[4] || [];
+        H_SLOTS = (r[4] || []).filter(function (s) { return onMine[s.placement_id]; });
         VIEW = isoDay(mondayOf(new Date()));
-        render(a, r[0] || [], r[1] || []);
+        render(a, forApplication(a.id, r[0]), r[1] || []);
       });
     });
 }

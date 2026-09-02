@@ -641,6 +641,80 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* ── whose rows are these? ────────────────────────────────────
+
+   Every portal page below asks the database for its rows and, until now, took
+   the answer as final: "the policy returns only rows carrying this address, so
+   there is no filter here to get wrong". That is true of an applicant and
+   false of staff, because every one of those SELECT policies ends with an or
+   on has_permission('applications.view_all') so that /admin can read the queue
+   at all. A staff account is therefore handed EVERY row, on four pages whose
+   whole premise is that the rows are yours.
+
+   What it looked like: /status listed five strangers' applications under
+   "Where you are in the process"; /hub opened as somebody else and greeted
+   them by name; /seats put another company's name on the account. And it was
+   not only something to read. The edit form binds to the first row, so Save
+   changes sent a PATCH to the newest application in the database, whoever it
+   belonged to.
+
+   So the pages narrow as well. This is not a second fence and not distrust of
+   the first — Postgres still decides what may leave it, and nothing here can
+   widen that by a single row. It is the page choosing, from among the rows it
+   is allowed, the ones belonging to the person reading them.
+
+   The test mirrors the applicant half of those policies word for word: the
+   account id, or the address on the token. An applicant's set therefore comes
+   back exactly as it did before, by construction, and only the accounts the
+   policies deliberately widen for see any change at all. */
+function whoAmI() {
+  var s = session();
+  var c = s ? readToken(s.access_token) : null;
+  return {
+    uid: (c && c.sub) || "",
+    email: String((c && c.email) || "").toLowerCase()
+  };
+}
+
+/* Throws when the row carries neither column, rather than answering no. The
+   two ways of getting this wrong are not equally bad: a select that forgets
+   email and user_id would otherwise quietly filter away an applicant's own
+   application and show her a portal that says nothing is wrong with it. An
+   error says which line to look at. */
+function isMine(row) {
+  if (!row) return false;
+  var hasId = Object.prototype.hasOwnProperty.call(row, "user_id");
+  var hasEmail = Object.prototype.hasOwnProperty.call(row, "email");
+  if (!hasId && !hasEmail) {
+    throw new Error("cannot tell whose row this is: the select is missing email and user_id");
+  }
+  var me = whoAmI();
+  if (hasId && row.user_id && me.uid && row.user_id === me.uid) return true;
+  return hasEmail && !!row.email && String(row.email).toLowerCase() === me.email;
+}
+
+function onlyMine(rows) {
+  return (rows || []).filter(isMine);
+}
+
+/* Rows hanging off one application — leave, weeks, placements. Kept apart
+   from isMine because these carry no address of their own: they are mine
+   because the application they point at is. */
+function forApplication(id, rows) {
+  return (rows || []).filter(function (r) { return r.application_id === id; });
+}
+
+/* The client side asks sql/032's question instead — is_client_contact() — so
+   it gets its own test rather than being bent into the one above. Returns a
+   lookup rather than a list, because every use of it is a membership test. */
+function myClientIds(clients) {
+  var me = whoAmI(), out = {};
+  (clients || []).forEach(function (c) {
+    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) out[c.id] = true;
+  });
+  return out;
+}
+
 function signIn() {
   var back = location.origin + location.pathname;
   location.href = SB + "/auth/v1/authorize?provider=google&redirect_to=" +
@@ -2777,7 +2851,9 @@ function loadApplications() {
   var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
   Promise.all([
-    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
+    /* email and user_id are read to be filtered on, not to be shown: they are
+       what onlyMine() compares, and without them it cannot tell. */
+    api("applications?select=id,created_at,email,user_id,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
     api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
       .catch(function () { return []; }),
     /* Caught rather than allowed to fail the page. Until sql/045 is pasted
@@ -2791,7 +2867,9 @@ function loadApplications() {
       .catch(function () { return []; })
   ])
     .then(function (r) {
-      var rows = r[0] || [];
+      /* Mine, not every row the policy was willing to hand over. For staff
+         that is the difference between this page and the admin queue. */
+      var rows = onlyMine(r[0] || []);
       var byId = {};
       (r[1] || []).forEach(function (d) {
         (byId[d.application_id] = byId[d.application_id] || []).push(d);
@@ -2960,7 +3038,7 @@ var C_PAY_METHOD = {
 };
 `;
 
-const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\n/* No signedOut() of its own — the shared one carries Google, email and\n   password, create-an-account and reset. This page used to shadow it with the\n   Google button alone, which left a client contact on a company address with\n   no way in at all: they never apply, never set a password, and nothing ever\n   invited them. Creating an account is the path they actually need, so the\n   line below points at it. */\nSIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your seats. ' +\n  'No account yet? Create one with that address and it becomes how you sign in. ' +\n  'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.';\n\n/* Whole dollars only, which is what a seat request's rounded `weekly` column\n   can express. Kept for the rows written before sql/046 added the exact one. */\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\n/* The quote, to the cent, exactly as the visitor was shown it on the home\n   page. 30 hours at $7.75 is $232.50 there; the integer `weekly` column holds\n   233, and this page used to print that back to the same person under the word\n   \"Quoted\". Fifty cents is not much money and it is the whole argument the\n   site makes, so it is worth a column and a formatter.\n\n   Falls back to the rounded figure for rows taken before 046 ran — those never\n   carried the cents and guessing them back would be inventing a number rather\n   than reporting one. */\nfunction quoted(r) {\n  if (r.weekly_cents !== null && r.weekly_cents !== undefined) {\n    return \"$\" + (r.weekly_cents / 100).toLocaleString(\"en-US\", {\n      minimumFractionDigits: 2, maximumFractionDigits: 2\n    });\n  }\n  return money(r.weekly);\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<span style=\"display:flex;gap:.5rem\">' +\n      /* A client who arrived by link has no password at all. Offering one here\n         is the difference between signing in and waiting for an email every\n         time; declining it is perfectly reasonable, so it is a quiet button\n         rather than a prompt. */\n      '<button class=\"btn btn--ghost\" id=\"setpw\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Set a password</button>' +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n      \"</span>\" +\n    \"</div>\";\n\n  /* Arriving by a link is not the same as being able to come back. On a\n     phone the link opens inside the mail app\u2019s own browser, so the session\n     lands in that webview\u2019s storage and is simply not there when they open\n     Safari or Chrome. It looks like the link failed. It did not \u2014 it worked\n     somewhere they cannot get back to. A password is what survives that, so\n     this offers one at the only moment they are certain to see it. */\n  if (CAME_FROM_LINK) {\n    who += '<div class=\"note\" style=\"margin-bottom:1.2rem\"><b>You came in by a link.</b> ' +\n      'A link signs you in wherever you clicked it \u2014 on a phone that is usually the mail ' +\n      'app rather than your browser, so you may find yourself signed out again there. ' +\n      'Set a password and you can sign in anywhere. ' +\n      '<button class=\"lnk\" id=\"nudgepw\" type=\"button\">Set one now</button></div>';\n  }\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  /* A client made in /admin has no seat_requests row \u2014 that table is the\n     enquiry form on the home page, and a business we matched by hand never\n     filled it in. This branch used to return here, so the placement, the week\n     waiting to be approved and the statement were all unreachable for every\n     client who arrived the way clients actually arrive. The note below is\n     about seat requests, so it now only stands in when there is genuinely\n     nothing else to show. */\n  if (!rows.length) {\n    var only = clientBlock();\n    view(who + (only ||\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\") + tzCard());\n    if (only) wireClient();\n    wireTz();\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly || r.weekly_cents ? \"<li><b>Quoted</b><span>\" + esc(quoted(r)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  html += billingBlock();\n  html += tzCard();\n  view(html);\n  wireTz();\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  loadMyTz().then(function () {\n\n  /* The policy returns only rows carrying this address, so there is no filter\n     here to get wrong: asking for everything and being given your own is the\n     database's job, not the page's. */\n  api(\"seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n  });\n}\n\nstart();" + `
+const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\n/* No signedOut() of its own — the shared one carries Google, email and\n   password, create-an-account and reset. This page used to shadow it with the\n   Google button alone, which left a client contact on a company address with\n   no way in at all: they never apply, never set a password, and nothing ever\n   invited them. Creating an account is the path they actually need, so the\n   line below points at it. */\nSIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your seats. ' +\n  'No account yet? Create one with that address and it becomes how you sign in. ' +\n  'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.';\n\n/* Whole dollars only, which is what a seat request's rounded `weekly` column\n   can express. Kept for the rows written before sql/046 added the exact one. */\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\n/* The quote, to the cent, exactly as the visitor was shown it on the home\n   page. 30 hours at $7.75 is $232.50 there; the integer `weekly` column holds\n   233, and this page used to print that back to the same person under the word\n   \"Quoted\". Fifty cents is not much money and it is the whole argument the\n   site makes, so it is worth a column and a formatter.\n\n   Falls back to the rounded figure for rows taken before 046 ran — those never\n   carried the cents and guessing them back would be inventing a number rather\n   than reporting one. */\nfunction quoted(r) {\n  if (r.weekly_cents !== null && r.weekly_cents !== undefined) {\n    return \"$\" + (r.weekly_cents / 100).toLocaleString(\"en-US\", {\n      minimumFractionDigits: 2, maximumFractionDigits: 2\n    });\n  }\n  return money(r.weekly);\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<span style=\"display:flex;gap:.5rem\">' +\n      /* A client who arrived by link has no password at all. Offering one here\n         is the difference between signing in and waiting for an email every\n         time; declining it is perfectly reasonable, so it is a quiet button\n         rather than a prompt. */\n      '<button class=\"btn btn--ghost\" id=\"setpw\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Set a password</button>' +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n      \"</span>\" +\n    \"</div>\";\n\n  /* Arriving by a link is not the same as being able to come back. On a\n     phone the link opens inside the mail app\u2019s own browser, so the session\n     lands in that webview\u2019s storage and is simply not there when they open\n     Safari or Chrome. It looks like the link failed. It did not \u2014 it worked\n     somewhere they cannot get back to. A password is what survives that, so\n     this offers one at the only moment they are certain to see it. */\n  if (CAME_FROM_LINK) {\n    who += '<div class=\"note\" style=\"margin-bottom:1.2rem\"><b>You came in by a link.</b> ' +\n      'A link signs you in wherever you clicked it \u2014 on a phone that is usually the mail ' +\n      'app rather than your browser, so you may find yourself signed out again there. ' +\n      'Set a password and you can sign in anywhere. ' +\n      '<button class=\"lnk\" id=\"nudgepw\" type=\"button\">Set one now</button></div>';\n  }\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  /* A client made in /admin has no seat_requests row \u2014 that table is the\n     enquiry form on the home page, and a business we matched by hand never\n     filled it in. This branch used to return here, so the placement, the week\n     waiting to be approved and the statement were all unreachable for every\n     client who arrived the way clients actually arrive. The note below is\n     about seat requests, so it now only stands in when there is genuinely\n     nothing else to show. */\n  if (!rows.length) {\n    var only = clientBlock();\n    view(who + (only ||\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\") + tzCard());\n    if (only) wireClient();\n    wireTz();\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly || r.weekly_cents ? \"<li><b>Quoted</b><span>\" + esc(quoted(r)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  html += billingBlock();\n  html += tzCard();\n  view(html);\n  wireTz();\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  loadMyTz().then(function () {\n\n  /* The policy returns the rows carrying this address and, for anybody\n     holding a role, everybody else's as well - that trailing or on\n     has_permission is what makes /admin possible at all. So being handed your\n     own is half the database's job and half this page's, and the half that was\n     missing put another company's name on this account. */\n  api(\"seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, onlyMine(rows || [])); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n  });\n}\n\nstart();" + `
 
 /* ── the client's own portal ──
    Everything above this line is about seats somebody once asked us for.
@@ -2971,6 +3049,11 @@ const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead
    questions and a client may well have one and not the other — somebody
    matched by hand never filled in the seats form, and somebody who filled it
    in may still be waiting. */
+/* 032 again, asked from the page rather than from a policy: the clients this
+   address is the contact for. Everything on the client side is narrowed
+   through it, because every one of those policies also answers yes to a role,
+   and a role is not a client. */
+var MY_CLIENTS = {};
 var C_PLACE = [];
 var C_RATE = {};
 var C_WEEKS = [];
@@ -3003,7 +3086,7 @@ var C_DAY = ["M", "T", "W", "T", "F", "S", "S"];
 
 function loadClient(email, rows) {
   return Promise.all([
-    api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week," +
+    api("placements?select=id,client_id,application_id,status,started_on,ended_on,hours_per_week," +
         "trial_weeks&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
@@ -3032,7 +3115,7 @@ function loadClient(email, rows) {
        own catch hides the entire client block on any failure, which for a
        missing table would mean a live placement vanishing behind "nothing here
        under this address yet" — the exact failure 041 already cost us once. */
-    api("client_payments?select=id,amount_cents,paid_on,method,reference&order=paid_on.desc")
+    api("client_payments?select=id,client_id,amount_cents,paid_on,method,reference&order=paid_on.desc")
       .catch(function () { return []; }),
     api("client_payment_weeks?select=timesheet_id")
       .catch(function () { return []; }),
@@ -3040,31 +3123,40 @@ function loadClient(email, rows) {
        returns only their own, so there is no filter here to get wrong. */
     api("interview_slots?select=id,placement_id,starts_at,minutes,chosen_at," +
         "confirmed_at,declined_at,meeting_url&order=starts_at.asc")
-      .catch(function () { return []; })
+      .catch(function () { return []; }),
+    /* Which clients this address is actually the contact for. sql/032 decides
+       that with is_client_contact(); this asks the same question from here,
+       and its answer is what narrows every list above. Without it a role reads
+       this page as somebody else's statement. */
+    api("clients?select=id,contact_email").catch(function () { return []; })
   ]).catch(function (e) {
     if (String(e.message) === "signed out") throw e;
     /* 032 is pasted by hand some time after this ships, and a client who has
        no placement is an ordinary thing rather than a fault. Either way the
        seats half of the page is unaffected. */
     C_OFF = true;
-    return [[], [], [], [], [], [], [], [], []];
+    return [[], [], [], [], [], [], [], [], [], []];
   }).then(function (r) {
-    C_PLACE = r[0] || [];
+    MY_CLIENTS = myClientIds(r[9]);
+    C_PLACE = (r[0] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });
+    var onMine = {};
+    C_PLACE.forEach(function (p) { onMine[p.id] = true; });
     C_RATE = {};
     (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
-    C_WEEKS = r[2] || [];
+    var rawWeeks = r[2] || [];
+    C_WEEKS = rawWeeks.filter(function (w) { return onMine[w.placement_id]; });
     /* Exactly at the limit is how a capped read announces itself — there may
        be more behind it and there is no way from here to know. Treated as
        truncated, which is the safe direction: saying so when it is not quite
        true costs a sentence, and not saying so when it is costs a number. */
-    C_TRUNCATED = C_WEEKS.length >= C_WEEK_LIMIT;
-    C_SWAPS = r[3] || [];
-    C_STARTS = r[4] || [];
+    C_TRUNCATED = rawWeeks.length >= C_WEEK_LIMIT;
+    C_SWAPS = (r[3] || []).filter(function (w) { return onMine[w.placement_id]; });
+    C_STARTS = (r[4] || []).filter(function (w) { return onMine[w.placement_id]; });
     C_NAMES = r[5] || [];
-    C_PAID = r[6] || [];
+    C_PAID = (r[6] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });
     C_SETTLED = {};
     (r[7] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
-    C_SLOTS = r[8] || [];
+    C_SLOTS = (r[8] || []).filter(function (w) { return onMine[w.placement_id]; });
     render(email, rows);
   });
 }
@@ -8519,12 +8611,12 @@ function load() {
   /* Everything the settings pane shows. The check that a portal page only
      reads columns it is granted covers this list, so a typo here fails the
      build rather than the page. */
-  return api("applications?select=id,name,email,status,payout_method,phone,cv,note," +
+  return api("applications?select=id,name,email,user_id,status,payout_method,phone,cv,note," +
              "region,availability,has_equipment,posting_consent,posting_consent_at," +
              "skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping" +
              "&order=created_at.desc")
     .then(function (rows) {
-      var a = (rows || [])[0];
+      var a = onlyMine(rows || [])[0];
       if (!a) {
         shut("Nothing here under this address.",
           "We cannot find an application for " + esc(ME) + ". If you applied with a different address, sign out and use that one.");
@@ -8540,7 +8632,7 @@ function load() {
          Neither filter is written here, because a filter written in a page is
          a filter somebody can change. */
       return Promise.all([
-        api("leave_requests?select=id,starts_on,ends_on,reason,status&order=starts_on.desc"),
+        api("leave_requests?select=id,application_id,starts_on,ends_on,reason,status&order=starts_on.desc"),
         api("notices?select=id,title,body,pinned,published_at&order=pinned.desc,published_at.desc"),
         /* The days come back nested under their week in one request. Fetching
            them separately would mean the totals on screen are assembled from
@@ -8551,7 +8643,7 @@ function load() {
            after the code that needs it ships, and in that window this request
            404s — which, inside Promise.all, would take leave and the notice
            board down with it. The portal keeps working and the card says why. */
-        api("timesheets?select=id,week_starts_on,status,note,submitted_at,decided_at,decided_by," +
+        api("timesheets?select=id,application_id,week_starts_on,status,note,submitted_at,decided_at,decided_by," +
             "timesheet_days(id,worked_on,hours,note)&order=week_starts_on.desc&limit=12")
           .catch(function (e) {
             if (String(e.message) === "signed out") throw e;
@@ -8562,7 +8654,7 @@ function load() {
            hand some time after this ships. A missing client card claims
            nothing, so unlike the timesheet there is no message to show — an
            assistant who has not been placed sees exactly the same page. */
-        api("placements?select=id,status,started_on,ended_on,hours_per_week,trial_weeks," +
+        api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week,trial_weeks," +
             "clients(name)&order=started_on.desc.nullslast&limit=5")
           .catch(function (e) {
             if (String(e.message) === "signed out") throw e;
@@ -8578,19 +8670,28 @@ function load() {
             return [];
           })
       ]).then(function (r) {
+        /* Cut down to this application before a single row of it is drawn.
+           The gate above already turns away an account with no application of
+           its own; this is for the account that has one and holds a role as
+           well, which the policies hand everybody else's weeks to. Notices are
+           left whole — a published notice is addressed to everyone. */
+        var myPlace = forApplication(a.id, r[3]);
+        var onMine = {};
+        myPlace.forEach(function (p) { onMine[p.id] = true; });
+
         /* The live one, if there is one. A placement that has ended is history
            and does not belong at the top of somebody's portal. */
         PLACE = null;
-        (r[3] || []).forEach(function (p) {
+        myPlace.forEach(function (p) {
           if (!PLACE && p.status !== "ended") PLACE = p;
         });
         SHEETS = {};
-        (r[2] || []).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
+        forApplication(a.id, r[2]).forEach(function (s) { SHEETS[s.week_starts_on] = s; });
         /* Opens on the week in progress. Anything older is a click away in the
            list underneath, which is where a week you have to fix will be. */
-        H_SLOTS = r[4] || [];
+        H_SLOTS = (r[4] || []).filter(function (s) { return onMine[s.placement_id]; });
         VIEW = isoDay(mondayOf(new Date()));
-        render(a, r[0] || [], r[1] || []);
+        render(a, forApplication(a.id, r[0]), r[1] || []);
       });
     });
 }
@@ -8787,6 +8888,11 @@ SIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we 
 
 /* The same globals /seats fills, so the shared arithmetic below reads exactly
    the same shape on both pages. */
+/* 032 again, asked from the page rather than from a policy: the clients this
+   address is the contact for. Everything on the client side is narrowed
+   through it, because every one of those policies also answers yes to a role,
+   and a role is not a client. */
+var MY_CLIENTS = {};
 var C_PLACE = [];
 var C_RATE = {};
 var C_WEEKS = [];
@@ -9035,7 +9141,7 @@ function start() {
   view('<div class="card"><span class="spin"></span>Working out what you owe&hellip;</div>');
 
   Promise.all([
-    api("placements?select=id,application_id,status,started_on,ended_on,hours_per_week," +
+    api("placements?select=id,client_id,application_id,status,started_on,ended_on,hours_per_week," +
         "trial_weeks&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,trial_week," +
@@ -9044,25 +9150,31 @@ function start() {
     /* Both wrapped, because a database without 055 pasted should show this
        page with an empty receipts panel rather than an error. The figure above
        it is then the old one, which is exactly what it was before. */
-    api("client_payments?select=id,amount_cents,paid_on,method,reference&order=paid_on.desc")
+    api("client_payments?select=id,client_id,amount_cents,paid_on,method,reference&order=paid_on.desc")
       .catch(function () { return []; }),
     api("client_payment_weeks?select=timesheet_id")
       .catch(function () { return []; }),
     /* Only for the name in the corner. A client matched by hand has no seat
        request at all, so this coming back empty is ordinary. */
-    api("seat_requests?select=company&order=created_at.desc&limit=1")
-      .catch(function () { return []; })
+    api("seat_requests?select=company,email&order=created_at.desc&limit=1")
+      .catch(function () { return []; }),
+    /* The same question loadClient asks, for the same reason. */
+    api("clients?select=id,contact_email").catch(function () { return []; })
   ]).then(function (r) {
-    C_PLACE = r[0] || [];
+    MY_CLIENTS = myClientIds(r[7]);
+    C_PLACE = (r[0] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });
+    var onMine = {};
+    C_PLACE.forEach(function (p) { onMine[p.id] = true; });
     C_RATE = {};
     (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
-    C_WEEKS = r[2] || [];
-    C_TRUNCATED = C_WEEKS.length >= C_WEEK_LIMIT;
+    var rawWeeks = r[2] || [];
+    C_WEEKS = rawWeeks.filter(function (w) { return onMine[w.placement_id]; });
+    C_TRUNCATED = rawWeeks.length >= C_WEEK_LIMIT;
     C_NAMES = r[3] || [];
-    C_PAID = r[4] || [];
+    C_PAID = (r[4] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });
     C_SETTLED = {};
     (r[5] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
-    C_COMPANY = (r[6] && r[6][0] && r[6][0].company) || "";
+    C_COMPANY = (onlyMine(r[6])[0] || {}).company || "";
     render(claims.email);
   }).catch(function (e) {
     if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }

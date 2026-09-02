@@ -1997,6 +1997,22 @@ await check("both sides of an interview are told the same thing", async () => {
   }
 });
 
+/* Whose rows a portal page is showing. Every one of them used to trust the
+   policy completely — and every one of those policies ends with an or on
+   has_permission, so that /admin can read the queue. Signed in as staff,
+   /status listed five strangers' applications as yours, /hub opened as the
+   newest applicant, /seats named another company, and the edit form PATCHed
+   whichever application was newest. Nothing failed: the markup was right. */
+await check("a portal page shows the reader their own rows", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-whose-rows.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours across the four portals";
+  } catch (e) {
+    throw new Error("tools/test-whose-rows.mjs failed — run it directly for the detail");
+  }
+});
+
 /* Everything else here checks a piece. This walks one person from applying to
    being billed for, through the cards the pages actually render and the real
    notify handler, and asserts what each party can see at every step —

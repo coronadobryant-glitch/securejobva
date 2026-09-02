@@ -985,6 +985,80 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* ── whose rows are these? ────────────────────────────────────
+
+   Every portal page below asks the database for its rows and, until now, took
+   the answer as final: "the policy returns only rows carrying this address, so
+   there is no filter here to get wrong". That is true of an applicant and
+   false of staff, because every one of those SELECT policies ends with an or
+   on has_permission('applications.view_all') so that /admin can read the queue
+   at all. A staff account is therefore handed EVERY row, on four pages whose
+   whole premise is that the rows are yours.
+
+   What it looked like: /status listed five strangers' applications under
+   "Where you are in the process"; /hub opened as somebody else and greeted
+   them by name; /seats put another company's name on the account. And it was
+   not only something to read. The edit form binds to the first row, so Save
+   changes sent a PATCH to the newest application in the database, whoever it
+   belonged to.
+
+   So the pages narrow as well. This is not a second fence and not distrust of
+   the first — Postgres still decides what may leave it, and nothing here can
+   widen that by a single row. It is the page choosing, from among the rows it
+   is allowed, the ones belonging to the person reading them.
+
+   The test mirrors the applicant half of those policies word for word: the
+   account id, or the address on the token. An applicant's set therefore comes
+   back exactly as it did before, by construction, and only the accounts the
+   policies deliberately widen for see any change at all. */
+function whoAmI() {
+  var s = session();
+  var c = s ? readToken(s.access_token) : null;
+  return {
+    uid: (c && c.sub) || "",
+    email: String((c && c.email) || "").toLowerCase()
+  };
+}
+
+/* Throws when the row carries neither column, rather than answering no. The
+   two ways of getting this wrong are not equally bad: a select that forgets
+   email and user_id would otherwise quietly filter away an applicant's own
+   application and show her a portal that says nothing is wrong with it. An
+   error says which line to look at. */
+function isMine(row) {
+  if (!row) return false;
+  var hasId = Object.prototype.hasOwnProperty.call(row, "user_id");
+  var hasEmail = Object.prototype.hasOwnProperty.call(row, "email");
+  if (!hasId && !hasEmail) {
+    throw new Error("cannot tell whose row this is: the select is missing email and user_id");
+  }
+  var me = whoAmI();
+  if (hasId && row.user_id && me.uid && row.user_id === me.uid) return true;
+  return hasEmail && !!row.email && String(row.email).toLowerCase() === me.email;
+}
+
+function onlyMine(rows) {
+  return (rows || []).filter(isMine);
+}
+
+/* Rows hanging off one application — leave, weeks, placements. Kept apart
+   from isMine because these carry no address of their own: they are mine
+   because the application they point at is. */
+function forApplication(id, rows) {
+  return (rows || []).filter(function (r) { return r.application_id === id; });
+}
+
+/* The client side asks sql/032's question instead — is_client_contact() — so
+   it gets its own test rather than being bent into the one above. Returns a
+   lookup rather than a list, because every use of it is a membership test. */
+function myClientIds(clients) {
+  var me = whoAmI(), out = {};
+  (clients || []).forEach(function (c) {
+    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) out[c.id] = true;
+  });
+  return out;
+}
+
 function signIn() {
   var back = location.origin + location.pathname;
   location.href = SB + "/auth/v1/authorize?provider=google&redirect_to=" +
@@ -3010,7 +3084,9 @@ function loadApplications() {
   var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
   Promise.all([
-    api("applications?select=id,created_at,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
+    /* email and user_id are read to be filtered on, not to be shown: they are
+       what onlyMine() compares, and without them it cannot tell. */
+    api("applications?select=id,created_at,email,user_id,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),
     api("application_documents?select=application_id,path,filename,bytes&order=uploaded_at.desc")
       .catch(function () { return []; }),
     /* Caught rather than allowed to fail the page. Until sql/045 is pasted
@@ -3024,7 +3100,9 @@ function loadApplications() {
       .catch(function () { return []; })
   ])
     .then(function (r) {
-      var rows = r[0] || [];
+      /* Mine, not every row the policy was willing to hand over. For staff
+         that is the difference between this page and the admin queue. */
+      var rows = onlyMine(r[0] || []);
       var byId = {};
       (r[1] || []).forEach(function (d) {
         (byId[d.application_id] = byId[d.application_id] || []).push(d);
