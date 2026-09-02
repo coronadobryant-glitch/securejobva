@@ -732,10 +732,12 @@ function forApplication(id, rows) {
 /* The client side asks sql/032's question instead — is_client_contact() — so
    it gets its own test rather than being bent into the one above. Returns a
    lookup rather than a list, because every use of it is a membership test. */
-function myClientIds(clients) {
+function myClientIds(rows) {
   var me = whoAmI(), out = {};
-  (clients || []).forEach(function (c) {
-    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) out[c.id] = true;
+  (rows || []).forEach(function (c) {
+    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) {
+      out[c.client_id] = true;
+    }
   });
   return out;
 }
@@ -3153,7 +3155,7 @@ function loadClient(email, rows) {
        that with is_client_contact(); this asks the same question from here,
        and its answer is what narrows every list above. Without it a role reads
        this page as somebody else's statement. */
-    api("clients?select=id,contact_email").catch(function () { return []; })
+    api("client_private?select=client_id,contact_email").catch(function () { return []; })
   ]).catch(function (e) {
     if (String(e.message) === "signed out") throw e;
     /* 032 is pasted by hand some time after this ships, and a client who has
@@ -9503,7 +9505,7 @@ function start() {
     api("seat_requests?select=company,email&order=created_at.desc&limit=1")
       .catch(function () { return []; }),
     /* The same question loadClient asks, for the same reason. */
-    api("clients?select=id,contact_email").catch(function () { return []; })
+    api("client_private?select=client_id,contact_email").catch(function () { return []; })
   ]).then(function (r) {
     MY_CLIENTS = myClientIds(r[7]);
     C_PLACE = (r[0] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });

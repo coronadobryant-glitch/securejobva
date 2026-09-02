@@ -24,7 +24,7 @@
    Nothing here touches the network or the database.
 
    Run: node tools/test-whose-rows.mjs */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 
 function grab(html, name, file) {
   const at = html.indexOf("function " + name + "(");
@@ -157,12 +157,42 @@ ok("weeks are kept by the application they hang off",
 ok("and an application with none keeps none",
    h.forApplication("a9", WEEKS).length, 0);
 
+/* Whichever table the policy reads, the page has to read the same one.
+
+   This is here because the page did not. is_client_contact() moved from
+   clients to client_private in 039 — "a client has a name" and everything
+   private went with it — and the narrowing added later asked
+   clients?select=id,contact_email against a column that had not existed for
+   twenty migrations. PostgREST answered 42703, the catch turned that into an
+   empty list, and every client's placements were filtered away: /seats and
+   /pay would have shown a real client nothing at all.
+
+   Nothing caught it. The behavioural test below fed myClientIds() rows it had
+   made up, so it proved the comparison worked while never touching the column
+   name; and there was no client in the database that week to notice. */
+const fence = readdirSync("sql")
+  .filter((f) => /^\d{3}-.*\.sql$/.test(f)).sort()
+  .map((f) => readFileSync("sql/" + f, "utf8"))
+  .join("\n")
+  .split("create or replace function public.is_client_contact")
+  .pop();
+const fenceTable = (fence.match(/from public\.(\w+)/) || [])[1];
+ok("the policy's own table is findable", !!fenceTable, true, fenceTable);
+for (const file of ["seats.html", "pay.html"].filter((f) => existsSync(f))) {
+  const html = readFileSync(file, "utf8");
+  ok(file + ": asks " + fenceTable + ", the table the policy asks",
+     html.includes(fenceTable + "?select="), true);
+  ok(file + ": does not ask clients for a contact it no longer holds",
+     /clients\?select=[^"']*contact_email/.test(html), false);
+}
+
 const c = load("pay.html");
 c.as("uid-boss", "boss@theircompany.com");
+/* Keyed the way client_private really is: client_id, not id. */
 const CLIENTS = [
-  { id: "c1", contact_email: "Boss@TheirCompany.com" },
-  { id: "c2", contact_email: "other@firm.com" },
-  { id: "c3", contact_email: null }
+  { client_id: "c1", contact_email: "Boss@TheirCompany.com" },
+  { client_id: "c2", contact_email: "other@firm.com" },
+  { client_id: "c3", contact_email: null }
 ];
 const owned = c.myClientIds(CLIENTS);
 ok("a client contact is matched without case", owned.c1 === true, true);

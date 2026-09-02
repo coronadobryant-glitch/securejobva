@@ -1076,10 +1076,12 @@ function forApplication(id, rows) {
 /* The client side asks sql/032's question instead — is_client_contact() — so
    it gets its own test rather than being bent into the one above. Returns a
    lookup rather than a list, because every use of it is a membership test. */
-function myClientIds(clients) {
+function myClientIds(rows) {
   var me = whoAmI(), out = {};
-  (clients || []).forEach(function (c) {
-    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) out[c.id] = true;
+  (rows || []).forEach(function (c) {
+    if (c.contact_email && String(c.contact_email).toLowerCase() === me.email) {
+      out[c.client_id] = true;
+    }
   });
   return out;
 }
