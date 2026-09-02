@@ -635,7 +635,12 @@ img{max-width:100%}
 .field{display:grid;gap:.4rem;margin-bottom:1.05rem}
 .field--split{margin-bottom:0}
 @media(min-width:470px){
-  .fields2{display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem}
+  /* align-items:start, because these two columns are not the same height
+     whenever one of them is wrong. The country field grows by the line of its
+     error message and, stretched, the optional State or region box beside it
+     grew with it - an untouched field visibly reacting to a mistake in its
+     neighbour. Seen in the walk of 2 Sep. */
+  .fields2{display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem;align-items:start}
 }
 .field > label{
   font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.09em;
@@ -650,7 +655,24 @@ img{max-width:100%}
 }
 .field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
 .field input:hover,.field textarea:hover,.field select:hover{border-color:var(--muted)}
-.field.is-bad input,.field.is-bad select,.field.is-bad textarea{border-color:var(--accent)}
+/* The border a field gets when it is wrong, and it has to be a different
+   colour from the one it gets when it is focused. This said var(--accent),
+   which is the focus colour, so on step 3 an invalid field and the field you
+   are currently typing in looked identical — four rejected fields and a calm
+   blue screen.
+
+   The rest of the form already knew: .disc__g.is-bad and .skill.is-bad both
+   use this red, and have since they were written. This rule is more specific
+   than the plain .is-bad above it, so it quietly won and took the contact
+   fields — the ones every single applicant fills in — out of the pattern.
+
+   The dark pair is here rather than only on .err because a border at #B3261E
+   on a near-black ground is nearly invisible, which would trade one unreadable
+   state for another. */
+.field.is-bad input,.field.is-bad select,.field.is-bad textarea{border-color:#B3261E}
+:root[data-theme="dark"] .field.is-bad input,
+:root[data-theme="dark"] .field.is-bad select,
+:root[data-theme="dark"] .field.is-bad textarea{border-color:#F2B8B5}
 /* Same reason as careers.html: an error in the accent colour reads as a hint. */
 .err{font-size:.88rem;color:#B3261E;font-weight:600;line-height:1.4}
 :root[data-theme="dark"] .err{color:#F2B8B5}

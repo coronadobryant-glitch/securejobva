@@ -1810,11 +1810,29 @@ await check("the apply form asks rather than assumes", async () => {
       throw new Error(g + " has a slot for an error and nothing that fills it");
     }
   }
-  /* And a refusal has to look like one. Walked on 2 Sep with four errors on
-     screen at once, all in the brand blue, and the page still read as calm. */
-  const err = (src.match(/\n\.err\{([^}]*)\}/) || [])[1] || "";
-  if (/var\(--accent\)/.test(err)) {
-    throw new Error(".err is the accent colour — an error that reads as a hint");
+  /* And a refusal has to look like one, in every rule that draws one.
+
+     This started as a check on .err alone and that was not enough: .err was
+     fixed, and .field.is-bad input was still var(--accent), so on step 3 an
+     invalid field stayed exactly the colour of a focused field. The rest of
+     the form had been red since it was written — .disc__g.is-bad and
+     .skill.is-bad both — and the contact fields were the odd ones out because
+     a more specific selector quietly won.
+
+     So the rule is the general one: nothing that paints a rejection may paint
+     it in the colour of the thing the eye is already following. */
+  for (const file of ["careers.html", "index.html"]) {
+    /* Comments out first. They explain these rules at length and mention both
+       the class names and the colours, so leaving them in makes a failure
+       print a paragraph where a selector should be. */
+    const css = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const m of css.matchAll(/([^{};]*(?:\.err|is-bad)[^{};]*)\{([^}]*)\}/g)) {
+      const [, selector, body] = m;
+      if (/var\(--accent\)/.test(body)) {
+        throw new Error(file + ": " + selector.trim().replace(/\s+/g, " ") +
+          " paints a rejection in the accent colour — the same colour as focus");
+      }
+    }
   }
   const groups = [...new Set([...dialog.matchAll(/<input type="radio" name="(\w+)"/g)].map((m) => m[1]))];
   return groups.length + " radio groups, none pre-answered";
