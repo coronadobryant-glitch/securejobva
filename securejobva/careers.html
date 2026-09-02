@@ -608,7 +608,13 @@ img{max-width:100%}
 .field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
 .field input:hover,.field textarea:hover,.field select:hover{border-color:var(--muted)}
 .field.is-bad input,.field.is-bad select,.field.is-bad textarea{border-color:var(--accent)}
-.err{font-size:.88rem;color:var(--accent);font-weight:600;line-height:1.4}
+/* Not var(--accent). A refusal written in the brand blue is the same colour as
+   the logo, the links and the focus ring, so four errors at once still read as
+   four hints — walked on 2 Sep and that is exactly how it looked. This red is
+   already in this stylesheet for other failures; the form simply never reached
+   for it. */
+.err{font-size:.88rem;color:#B3261E;font-weight:600;line-height:1.4}
+:root[data-theme="dark"] .err{color:#F2B8B5}
 .err:empty{display:none}
 
 .intake__foot{
@@ -1385,10 +1391,11 @@ html{scroll-behavior:smooth}
         <p class="q__sub">Paid work in any setting &mdash; office, call center or remote.</p>
         <div class="seg">
           <label><input type="radio" name="exp" value="Under 1 year"><span>Under 1 yr</span></label>
-          <label><input type="radio" name="exp" value="1 to 3 years" checked><span>1&ndash;3 yrs</span></label>
+          <label><input type="radio" name="exp" value="1 to 3 years"><span>1&ndash;3 yrs</span></label>
           <label><input type="radio" name="exp" value="3 to 5 years"><span>3&ndash;5 yrs</span></label>
           <label><input type="radio" name="exp" value="5 years or more"><span>5 yrs+</span></label>
         </div>
+        <p class="err" id="err-exp" aria-live="polite"></p>
       </section>
 
       <section class="step" data-step="1" hidden>
@@ -1422,10 +1429,11 @@ html{scroll-behavior:smooth}
         <p class="q__sub">Run a speed test on the wired connection you would work on.</p>
         <div class="seg">
           <label><input type="radio" name="speed" value="Under 10 Mbps"><span>Under 10</span></label>
-          <label><input type="radio" name="speed" value="10 to 25 Mbps" checked><span>10&ndash;25</span></label>
+          <label><input type="radio" name="speed" value="10 to 25 Mbps"><span>10&ndash;25</span></label>
           <label><input type="radio" name="speed" value="25 to 50 Mbps"><span>25&ndash;50</span></label>
           <label><input type="radio" name="speed" value="50 Mbps or more"><span>50+</span></label>
         </div>
+        <p class="err" id="err-speed" aria-live="polite"></p>
 
         <h3 class="q q--again">What do you already have?</h3>
         <p class="q__sub">Missing one is not an automatic no &mdash; we would rather know now.</p>
@@ -2065,16 +2073,36 @@ html{scroll-behavior:smooth}
 
   function valid(step) {
     clearErrors();
+    /* Both questions on a step are answered at once rather than one at a
+       time. Returning on the first miss makes somebody press Continue twice to
+       find out there were two things wrong, which reads as the form changing
+       its mind. Step 2 below already works this way.
+
+       Neither of these used to be asked at all: exp and speed shipped with the
+       second option already selected, so the form answered them on the
+       applicant's behalf and could never find them missing. Both are claims
+       about the person, and a claim nobody made is worse than a blank. */
     if (step === 0) {
-      if (picked("track").length) return true;
-      document.getElementById("err-track").textContent = "Choose at least one track you are applying for.";
-      return false;
+      var okTrack = picked("track").length > 0;
+      var okExp = picked("exp").length > 0;
+      document.getElementById("err-track").textContent =
+        okTrack ? "" : "Choose at least one track you are applying for.";
+      /* Says that a short answer is a fine answer. Taking the default away
+         without this invites everybody to round themselves up, which would be
+         a worse problem than the one it fixes: the site hires on the exams and
+         trains from scratch, so under a year genuinely costs nothing. */
+      document.getElementById("err-exp").textContent =
+        okExp ? "" : "How long have you done this kind of work? Under a year is fine — we train from scratch.";
+      return okTrack && okExp;
     }
     if (step === 1) {
-      if (picked("shift").length) return true;
+      var okShift = picked("shift").length > 0;
+      var okSpeed = picked("speed").length > 0;
       document.getElementById("err-shift").textContent =
-        "Pick at least one shift you can hold — it decides which seats we can match you to.";
-      return false;
+        okShift ? "" : "Pick at least one shift you can hold — it decides which seats we can match you to.";
+      document.getElementById("err-speed").textContent =
+        okSpeed ? "" : "Pick the speed you actually get — run a test on the connection you would work on.";
+      return okShift && okSpeed;
     }
     if (step === 4) return validDisc();
     if (step === 3) return validSkills();

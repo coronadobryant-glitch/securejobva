@@ -1781,6 +1781,45 @@ await check("a step index past the end is refused", async () => {
   }
 });
 
+/* The apply form must not answer its own questions.
+
+   exp and speed shipped with the second of four options already selected, so
+   every application carried a claim about the applicant's experience and their
+   connection whether or not they ever looked at those rows — and the form could
+   never report them missing, because they were never empty. Two of the four
+   real applicants were sitting on the experience default when this was found.
+
+   The checked= half is what regresses; the rest is here so that taking a
+   default off without asking the question instead cannot pass either. */
+await check("the apply form asks rather than assumes", async () => {
+  const src = readFileSync("careers.html", "utf8");
+  const dialog = src.slice(src.indexOf('id="apply"'), src.indexOf("</form>"));
+  const bad = [...dialog.matchAll(/<input type="radio" name="(\w+)" value="([^"]*)" checked/g)]
+    .map((m) => m[1] + '="' + m[2] + '"');
+  if (bad.length) {
+    throw new Error("these answer themselves: " + bad.join(", ") +
+      " — a defaulted radio is a claim the applicant never made");
+  }
+  /* Every group the walk found defaulted now has to be asked for, which means
+     a slot to say so in and a line that fills it. */
+  for (const g of ["exp", "speed"]) {
+    if (!dialog.includes('id="err-' + g + '"')) {
+      throw new Error(g + " has nowhere to say it is missing");
+    }
+    if (!src.includes('getElementById("err-' + g + '")')) {
+      throw new Error(g + " has a slot for an error and nothing that fills it");
+    }
+  }
+  /* And a refusal has to look like one. Walked on 2 Sep with four errors on
+     screen at once, all in the brand blue, and the page still read as calm. */
+  const err = (src.match(/\n\.err\{([^}]*)\}/) || [])[1] || "";
+  if (/var\(--accent\)/.test(err)) {
+    throw new Error(".err is the accent colour — an error that reads as a hint");
+  }
+  const groups = [...new Set([...dialog.matchAll(/<input type="radio" name="(\w+)"/g)].map((m) => m[1]))];
+  return groups.length + " radio groups, none pre-answered";
+});
+
 /* Which Monday a week belongs to is worked out on the assistant's own clock,
    in their own timezone, and the database cannot check that for us — it only
    sees the date it is handed. A wrong answer files a week of hours against the

@@ -651,7 +651,9 @@ img{max-width:100%}
 .field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
 .field input:hover,.field textarea:hover,.field select:hover{border-color:var(--muted)}
 .field.is-bad input,.field.is-bad select,.field.is-bad textarea{border-color:var(--accent)}
-.err{font-size:.88rem;color:var(--accent);font-weight:600;line-height:1.4}
+/* Same reason as careers.html: an error in the accent colour reads as a hint. */
+.err{font-size:.88rem;color:#B3261E;font-weight:600;line-height:1.4}
+:root[data-theme="dark"] .err{color:#F2B8B5}
 .err:empty{display:none}
 
 .intake__foot{
