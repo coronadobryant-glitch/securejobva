@@ -204,6 +204,57 @@ Then one webhook per table in Supabase -> Database -> Webhooks, on INSERT for
 deploy -- the refusals as much as the sending, since the endpoint is public and
 describes real applicants.
 
+Not every notification is a Database Webhook. A timesheet decision, a leave
+answer, a swap request and an interview carry an `application_id` or a
+`placement_id` and no address, so the person they are about has to be looked up
+-- which is ordinary in the database and impossible in a function holding no
+credential. Those post from a trigger instead: `sql/031`, `035`, `036`, `037`, `040` and
+`058`. Each one carries `__WEBHOOK_SECRET__` as a placeholder and posts nothing
+until it is replaced, which is what the `*.local.sql` copies are for -- copy the
+file, paste the secret into the copy, run the copy, delete it. `.gitignore`
+keeps `*.local.sql` out of the repo so the real secret is never committed.
+
+In `058` replace only the quoted placeholder on the `x-webhook-secret` line.
+That file has a check at the bottom that looks for the placeholder in the
+function body, and a blanket find-and-replace rewrites the check too -- so it
+starts hunting for the secret and reports "nothing will be emailed" about a copy
+that emails perfectly well.
+
+### The mail DNS, both directions
+
+Two services, and they are not the same one. **Zoho receives** at
+`support@securejobva.com`; **Resend sends** as it. Both need records on this
+domain, and the mail is only trustworthy when both are right -- an outbound
+message with no DKIM of its own is one your own DMARC policy quarantines.
+
+| Record | Host | Value | Whose |
+| --- | --- | --- | --- |
+| MX | `@` | `mx.zoho.com` 10, `mx2.zoho.com` 20, `mx3.zoho.com` 50 | Zoho, receiving |
+| TXT | `@` | `v=spf1 include:zohomail.com include:amazonses.com ~all` | both senders |
+| TXT | `@` | `zoho-verification=zb...zmverify.zoho.com` | Zoho, ownership |
+| TXT | `zmail._domainkey` | the Zoho DKIM key | Zoho, signing |
+| TXT | `resend._domainkey` | the Resend DKIM key | Resend, signing |
+| TXT | `send` | `v=spf1 include:amazonses.com ~all` | Resend, Return-Path |
+| MX | `send` | `feedback-smtp.us-east-1.amazonses.com` 10 | Resend, bounces |
+| TXT | `_dmarc` | `v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=mailto:support@securejobva.com;` | the policy over both |
+
+The `send` subdomain is the part that is easy to leave off and expensive to
+leave off. DMARC asks whether the domain that signed the message and the domain
+in the From line are the same, and alignment is relaxed here, so a bounce path
+at `send.securejobva.com` counts as aligned with `securejobva.com`. Without it
+Resend sends on its own domain, alignment fails, and `p=quarantine` sends your
+own application confirmations to spam.
+
+All eight were verified live on 1 September 2026 and are correct.
+
+**And none of that proves a mailbox exists.** MX records route mail; they do not
+create an inbox. A domain with perfect DNS and no mailbox behind it looks
+identical from the outside to one that works, right up until a message bounces.
+So the one check that matters cannot be done from here or from this repo: send a
+real message from an outside provider to `support@securejobva.com` and open the
+Zoho inbox to confirm it landed. If it bounces, the mailbox needs creating in
+Zoho Mail -- the DNS above is already done and needs no changes.
+
 ## Brand
 
 Four colours, read pixel by pixel out of the supplied logo file. They are the
@@ -248,13 +299,10 @@ want the wordmark card instead, then overwrite `og.png`.
 ## Still to do before launch
 
 - **Confirm `support@` receives mail.** The only one still open, and the only one
-  that cannot be checked from this repo. Mail is on **Zoho**, not GoDaddy, and the
-  DNS side is complete and correct: MX at `mx.zoho.com` (10/20/50), SPF
-  `include:zohomail.com`, DKIM on `zmail._domainkey`, DMARC `p=quarantine` with
-  reports going to `support@`, domain verified. But MX records route mail, they do
-  not create a mailbox. Send a real message from an outside account and confirm it
-  lands in the Zoho inbox rather than bouncing. Every fallback on both pages hands
-  the visitor this address, so a dead box loses the leads the guards just saved.
+  that cannot be checked from this repo — see **The mail DNS, both directions**
+  under Notifications for why. Every fallback on both pages hands this address to
+  the visitor, and
+  DMARC reports go there too, so a dead box loses the leads the guards just saved.
 - **A booking link** (optional). `CFG.scheduler` on `index.html` takes a Cal.com or
   Calendly URL and adds a "Pick your time" step after submit.
 
