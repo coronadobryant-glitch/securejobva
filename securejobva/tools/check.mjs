@@ -1569,7 +1569,13 @@ await check("no record of who did something is writable by a page", () => {
 await check("the answer key never reaches the browser", async () => {
   if (!existsSync("status.html")) return "no status.html to check";
   const html = read("status.html");
-  const m = html.match(/var QBANK = (\{[\s\S]*?\});\n/);
+  /* \r?\n, not \n. The generator writes LF and git hands Windows a CRLF
+     working copy, so this said "no QBANK in status.html — has the assessment
+     been renamed?" about a bank sitting plainly in the file, on any checkout
+     that had not been rebuilt since. A fresh clone failed here before anybody
+     had touched anything, which is the worst kind of failing check: it accuses
+     the code of a rename that never happened. */
+  const m = html.match(/var QBANK = (\{[\s\S]*?\});\r?\n/);
   if (!m) throw new Error("no QBANK in status.html — has the assessment been renamed?");
 
   let bank;
