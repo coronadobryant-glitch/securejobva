@@ -190,5 +190,50 @@ ok("a confirmed interview outranks everything else",
    st([slot("s1", T1, { declined_at: "x", chosen_at: "y", confirmed_at: "z" })]), "confirmed",
    "however the rows got into that shape, it is on");
 
+/* ── the sentence staff read ─────────────────────────────────────────────
+   The admin list turns a day count into English, and a day count reads
+   differently depending on whether the sentence is about a moment or a
+   duration. One helper served both and produced "matched today ago" on a
+   placement created that morning — which is the only day anybody looks at a
+   brand new one. Found by matching somebody and reading the row. */
+console.log("\n  How the admin list reads");
+
+const adminHtml = readFileSync("admin.html", "utf8");
+const says = (function () {
+  const g = (n) => {
+    const at = adminHtml.indexOf("function " + n + "(");
+    if (at < 0) throw new Error(n + "() is not in admin.html any more");
+    let d = 0, i = adminHtml.indexOf("{", at);
+    for (; i < adminHtml.length; i++) {
+      if (adminHtml[i] === "{") d++;
+      else if (adminHtml[i] === "}") { d--; if (!d) return adminHtml.slice(at, i + 1); }
+    }
+  };
+  return new Function("whenTime",
+    g("ivWhen") + g("ivFor") + g("ivSays") + "; return ivSays;")(() => "a time");
+})();
+
+const line = (state, days) => says({ state, days_waiting: days, offered: 3 });
+
+ok("a placement matched today", line("not_started", 0),
+   "matched today — no times offered yet", "not \"today ago\"");
+ok("matched yesterday", line("not_started", 1), "matched yesterday — no times offered yet");
+ok("matched a while ago", line("not_started", 5), "matched 5 days ago — no times offered yet");
+ok("waiting on her, same day", line("waiting_on_assistant", 0),
+   "3 times offered — waiting on her since today");
+ok("waiting on her, one day", line("waiting_on_assistant", 1),
+   "3 times offered — waiting on her for 1 day");
+ok("waiting on them", line("waiting_on_client", 3),
+   "she picked a time — waiting on the client for 3 days");
+ok("declined today", line("declined", 0),
+   "none of the times worked — the client needs to offer more, today");
+
+/* The shape of the bug, stated directly: no sentence may ever contain both a
+   bare "today" and the word "ago". */
+["not_started", "waiting_on_assistant", "waiting_on_client", "declined"].forEach((s) => {
+  const t = line(s, 0);
+  ok(s + " reads as English on day zero", /today ago/.test(t), false, t);
+});
+
 console.log("\n" + (failed ? "  " + failed + " FAILED" : "  the handshake holds"));
 process.exit(failed ? 1 : 0);

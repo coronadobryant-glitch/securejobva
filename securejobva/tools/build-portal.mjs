@@ -5952,24 +5952,34 @@ function drawInterviews(box) {
 
 /* One sentence per row, and it has to carry the two things somebody reads:
    where it has got to, and how long it has been there. */
+/* Two shapes, not one. A day count reads differently depending on whether the
+   sentence is about a moment or a duration, and one helper for both produced
+   "matched today ago" on the day a placement was created — which is the only
+   day anybody looks at a brand new one. */
+function ivWhen(days) {
+  return days === 0 ? "today" : days === 1 ? "yesterday" : days + " days ago";
+}
+function ivFor(days) {
+  return days === 0 ? "since today" : days === 1 ? "for 1 day" : "for " + days + " days";
+}
+
 function ivSays(r) {
   var days = Number(r.days_waiting || 0);
-  var age = days === 0 ? "today" : days === 1 ? "1 day" : days + " days";
 
   if (r.state === "confirmed") {
     return "confirmed for " + whenTime(r.earliest);
   }
   if (r.state === "waiting_on_client") {
-    return "she picked a time — waiting on the client for " + age;
+    return "she picked a time — waiting on the client " + ivFor(days);
   }
   if (r.state === "waiting_on_assistant") {
     return r.offered + (r.offered === 1 ? " time" : " times") +
-      " offered — waiting on her for " + age;
+      " offered — waiting on her " + ivFor(days);
   }
   if (r.state === "declined") {
-    return "none of the times worked — the client needs to offer more, " + age + " ago";
+    return "none of the times worked — the client needs to offer more, " + ivWhen(days);
   }
-  return "matched " + age + " ago — no times offered yet";
+  return "matched " + ivWhen(days) + " — no times offered yet";
 }
 
 /* ── money in ──────────────────────────────────────────────────────────────
