@@ -2054,6 +2054,26 @@ await check("both sides of an interview are told the same thing", async () => {
   }
 });
 
+/* The assessment card on /status, which had no test of any kind — part_done
+   appeared in exactly one file in this repo, the generator that writes it.
+
+   Every regression the walkthrough warns about lives on this card, and the
+   worst of them already happened once: answering one question of eight marked
+   the whole part finished, the Start button vanished, and there was no way
+   back in. 054 fixed it by separating HAVING ANSWERS from BEING FINISHED —
+   answers save as she goes, and only close_part writes part_done. A card that
+   reads the answer columns instead locks her out of a part she is halfway
+   through, and nothing here could have seen it coming back. */
+await check("the assessment card counts finished, not touched", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-assessment-card.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, both tracks";
+  } catch (e) {
+    throw new Error("tools/test-assessment-card.mjs failed — run it directly for the detail");
+  }
+});
+
 /* Can the product forget somebody, and only in the ways it is meant to?
    Almost every assertion in here is about a delete grant that must NOT exist,
    because that is the easiest thing in this schema to add carelessly and the
