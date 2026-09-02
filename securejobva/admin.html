@@ -399,6 +399,31 @@ img{max-width:100%}
 .msg--bad{color:#B3261E}
 :root[data-theme="dark"] .msg--bad{color:#F2B8B5}
 
+/* 060. Every button in /admin was the same blue, which is fine while nothing
+   there is destructive and wrong the moment something is: a delete that looks
+   like Save is a delete somebody presses on the way to Save. These are the
+   only red controls in the product and they are meant to stop the eye. */
+.btn--stop{background:#A11B2B;color:#fff;border-color:#A11B2B}
+.btn--stop:hover{background:#8A1624;border-color:#8A1624}
+.btn--stop[disabled]{opacity:.4;cursor:not-allowed}
+.lnk--stop{color:#A11B2B}
+.forget{margin-top:1rem;padding-top:.95rem;border-top:1px dashed var(--line);width:100%}
+.danger{border:1px solid #F2C6CC;background:#FDECEE;border-radius:10px;padding:1rem 1.1rem}
+.danger__t{font-weight:700;font-size:.97rem;margin:0;color:var(--ink)}
+.danger p{margin:.45rem 0 0;font-size:.9rem;color:var(--ink-2);line-height:1.55}
+.goes{list-style:none;margin:.85rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.3rem .9rem}
+.goes li{font-size:.87rem;color:var(--ink-2);display:flex;gap:.5rem;align-items:baseline}
+.goes b{font-weight:600;font-size:.82rem;color:var(--ink);font-variant-numeric:tabular-nums;min-width:1.4rem;text-align:right;flex:none}
+.goes .is-file{color:#A11B2B;font-weight:600}
+.goes .is-file b{color:#A11B2B}
+.type{margin-top:1rem;display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
+.type input{flex:1;min-width:12rem;font-size:.88rem;padding:.5rem .65rem;border-radius:7px;border:1px solid #F2C6CC;background:var(--surface);color:var(--ink)}
+:root[data-theme="dark"] .btn--stop{background:#8E1826;border-color:#8E1826;color:#FFECEE}
+:root[data-theme="dark"] .lnk--stop{color:#FF9AA6}
+:root[data-theme="dark"] .danger{background:#2A1116;border-color:#4E2028}
+:root[data-theme="dark"] .goes .is-file,:root[data-theme="dark"] .goes .is-file b{color:#FF9AA6}
+:root[data-theme="dark"] .type input{border-color:#4E2028}
+
 .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:.5rem}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}}
@@ -2236,6 +2261,157 @@ function discLine(a) {
   );
 }
 
+/* ── removing somebody, and the file that goes with them ──────────────────
+
+   Closed, and one line high. The stakes are not the same as Add note and the
+   control should not be the same size as Add note — a red button sitting in
+   that strip is one somebody eventually presses while reaching past it.
+
+   To turn an applicant down you set the stage to declined. This is the other
+   thing entirely: somebody has asked to be forgotten, and until sql/060 the
+   only way to honour that was a hand-written DO block in the SQL editor. */
+function forgetBlock() {
+  return (
+    '<div class="forget" data-forget>' +
+      '<button class="lnk lnk--stop" data-forget-open type="button">' +
+        "Remove this person entirely&hellip;</button>" +
+    "</div>"
+  );
+}
+
+/* The row on screen back to the record it was drawn from. save() already goes
+   the same way round, by data-id, and this is the read-only half of it. */
+function byRow(row) {
+  var id = row.getAttribute("data-id");
+  for (var i = 0; i < ALL.length; i++) if (ALL[i].id === id) return ALL[i];
+  return { id: id, name: "", email: "" };
+}
+
+/* Counted when the panel opens rather than when the page loaded, because by
+   the time somebody is reading this they are deciding on the strength of it.
+   A table that is not there yet answers null and prints as a question mark:
+   a zero would be a claim, and the honest answer is that we do not know. */
+function forgetCounts(id) {
+  var one = function (t) {
+    return api(t + "?select=application_id&application_id=eq." + encodeURIComponent(id))
+      .then(function (r) { return (r || []).length; })
+      ["catch"](function () { return null; });
+  };
+  return Promise.all([
+    one("application_notes"),
+    one("application_disc"),
+    one("application_assessment"),
+    one("timesheets"),
+    one("placements"),
+    api("application_documents?select=id,path,filename&application_id=eq." + encodeURIComponent(id))
+      ["catch"](function () { return []; })
+  ]).then(function (r) {
+    return { notes: r[0], disc: r[1], sit: r[2], weeks: r[3], places: r[4], docs: r[5] || [] };
+  });
+}
+
+function openForget(row, a) {
+  var box = row.querySelector("[data-forget]");
+  if (!box) return;
+  box.innerHTML = '<span class="spin"></span>Counting what would go&hellip;';
+  var who = a.name || a.email || "this person";
+  forgetCounts(a.id).then(function (c) {
+    var n = function (v) { return v === null ? "?" : String(v); };
+    var s = function (v, one, many) { return v === 1 ? one : many; };
+    box.innerHTML =
+      '<div class="danger">' +
+        '<p class="danger__t">Remove ' + esc(who) + " entirely</p>" +
+        "<p>Everything below goes with them, in one action, and none of it comes back. " +
+        "Use this when somebody asks to be forgotten &mdash; not to tidy the queue. To turn " +
+        "an applicant down, set the stage to <b>declined</b>: they keep their record and may " +
+        "apply again in three months.</p>" +
+        '<ul class="goes">' +
+          "<li><b>1</b> application</li>" +
+          "<li><b>" + n(c.notes) + "</b> private " + s(c.notes, "note", "notes") + "</li>" +
+          "<li><b>" + n(c.disc) + "</b> strengths " + s(c.disc, "questionnaire", "questionnaires") + "</li>" +
+          "<li><b>" + n(c.sit) + "</b> " + s(c.sit, "assessment", "assessments") + "</li>" +
+          "<li><b>" + n(c.weeks) + "</b> " + s(c.weeks, "week", "weeks") + " filed</li>" +
+          "<li><b>" + n(c.places) + "</b> " + s(c.places, "placement", "placements") + "</li>" +
+          '<li class="' + (c.docs.length ? "is-file" : "") + '"><b>' + c.docs.length + "</b> " +
+            s(c.docs.length, "file", "files") + ", bytes and all</li>" +
+        "</ul>" +
+        '<div class="type">' +
+          '<input type="text" data-forget-name autocomplete="off" spellcheck="false" ' +
+            'placeholder="Type their name to confirm" aria-label="Type the name to confirm">' +
+          '<button class="btn btn--stop" data-forget-go type="button" disabled>Remove ' +
+            esc(who) + "</button>" +
+        "</div>" +
+        '<span class="hint" data-forget-say>Counted just now, not when the page loaded. ' +
+          "The name has to match.</span>" +
+      "</div>";
+    box.setAttribute("data-forget-want", String(who).trim().toLowerCase());
+    box.setAttribute("data-forget-docs", JSON.stringify(c.docs.map(function (d) { return d.path; })));
+  })["catch"](function (e) {
+    box.innerHTML = '<p class="msg msg--bad">Could not count what would go: ' + esc(why(e)) + "</p>";
+  });
+}
+
+/* The row first, then the files, and that order is not arbitrary. If the row
+   goes and a file will not, the orphan panel still knows the file is there and
+   says so. Do it the other way round and a failure on the row leaves a CV
+   destroyed for an application that still exists. */
+function doForget(row, a, go) {
+  var box = row.querySelector("[data-forget]");
+  var say = box.querySelector("[data-forget-say]");
+  var who = a.name || a.email || "this person";
+  var paths = [];
+  try { paths = JSON.parse(box.getAttribute("data-forget-docs") || "[]"); } catch (e) { paths = []; }
+  go.disabled = true;
+  say.textContent = "Removing…";
+
+  api("applications?id=eq." + encodeURIComponent(a.id), {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" }
+  }).then(function () {
+    if (!paths.length) return { ok: 0, bad: 0 };
+    return liveSession().then(function (sess) {
+      if (!sess) throw new Error("signed out");
+      var ok = 0, bad = 0;
+      return paths.reduce(function (chain, p) {
+        return chain.then(function () {
+          return fetch(storageBase() + "/object/applicant-docs/" +
+                       p.split("/").map(encodeURIComponent).join("/"), {
+            method: "DELETE",
+            headers: { apikey: ANON, Authorization: "Bearer " + sess.access_token }
+          }).then(function (r) { if (r.ok) { ok++; } else { bad++; } })
+            ["catch"](function () { bad++; });
+        });
+      }, Promise.resolve()).then(function () { return { ok: ok, bad: bad }; });
+    });
+  }).then(function (f) {
+    /* Two outcomes, reported separately. One tick covering both would mean a
+       tick that is sometimes half true, and the half it hides is the person's
+       CV still sitting in a bucket. */
+    box.innerHTML =
+      '<div class="danger">' +
+        '<p class="danger__t">' + esc(who) + " is gone.</p>" +
+        "<p>The application and everything under it &mdash; removed." +
+        (paths.length
+          ? (f.bad
+              ? "<br><b>" + f.bad + " " + (f.bad === 1 ? "file" : "files") +
+                " could not be removed.</b> They are still in the bucket. Clear them under " +
+                "<b>Files with no application</b> on the Inbox tab."
+              : "<br>" + f.ok + " " + (f.ok === 1 ? "file" : "files") + " &mdash; removed too.")
+          : "<br>There were no files to remove.") +
+        "</p>" +
+      "</div>";
+    /* Out of the list as well, after long enough to read the result. Leaving
+       them on screen would be the page disagreeing with the database. */
+    setTimeout(function () {
+      ALL = ALL.filter(function (x) { return x.id !== a.id; });
+      paint();
+    }, 3200);
+  })["catch"](function (e) {
+    go.disabled = false;
+    say.textContent = "Did not remove it: " + why(e);
+  });
+}
+
 function rowHtml(a) {
   var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "—";
 
@@ -2274,6 +2450,7 @@ function rowHtml(a) {
           ? noteBox(a)
           : "") +
         '<span class="row__ok" data-ok></span>' +
+        (can("applications.edit") ? forgetBlock() : "") +
       "</div>";
   }
 
@@ -3526,14 +3703,129 @@ function drawPlacements(box, swaps) {
                 'aria-label="What the assistant is paid an hour" value="' + esc(r.pay === undefined ? "" : r.pay) + '" ' +
                 'style="width:8rem">' +
               '<button class="btn btn--ghost" data-pl-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
+              '<button class="btn btn--ghost" data-pl-del type="button" style="padding:.45rem .8rem;font-size:.85rem">Remove</button>' +
               '<span class="row__ok" data-pl-ok></span>' +
             "</div>" +
           "</div>";
         }).join("") + "</div>"
-      : '<p class="msg">Nobody is placed yet.</p>');
+      : '<p class="msg">Nobody is placed yet.</p>') +
+
+    /* Until now a client existed only as a name inside the select above, which
+       meant a business could be created here and then never seen again — and
+       a client made by a typo could not be removed from anywhere in the
+       product. */
+    '<div class="edit__sec">Clients</div>' +
+    (CLIENTS.length
+      ? '<div class="rows">' + CLIENTS.map(function (c) {
+          var mine = PLACEMENTS.filter(function (p) { return p.client_id === c.id; });
+          return '<div class="row" data-client="' + esc(c.id) + '">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(c.name) + "</span>" +
+              '<span class="row__meta"> &middot; ' + mine.length +
+                (mine.length === 1 ? " placement" : " placements") + "</span>" +
+            "</span></div>" +
+            (can("applications.edit")
+              ? '<div class="row__ctl">' +
+                  '<button class="btn btn--ghost" data-client-del type="button" ' +
+                    'style="padding:.45rem .8rem;font-size:.85rem">Remove client</button>' +
+                  '<span class="row__ok" data-client-ok></span>' +
+                "</div>"
+              : "") +
+          "</div>";
+        }).join("") + "</div>"
+      : '<p class="msg">No clients yet. One is made the first time you match somebody to a business that is not on the list.</p>');
 
   wirePlacementForm();
   wirePlacementRows(box);
+  wireRemovals(box);
+}
+
+/* The two smaller removals. Neither asks for a name to be typed: a placement
+   is a match that can be made again in a minute, and a client is a name and a
+   contact address. The panel on the queue is the only one that removes
+   something nobody can reconstruct, and it is the only one with that friction.
+
+   What both do have is the refusal, explained. clients and client_payments are
+   ON DELETE RESTRICT in sql/032 and sql/055 — deliberately, because a business
+   with money against its name should not be removable by accident. Without
+   this the page would hand somebody 23503 in an alert box. */
+function wireRemovals(box) {
+  box.querySelectorAll("[data-pl-del]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-place]");
+      var id = row.getAttribute("data-place");
+      if (!window.confirm(
+            "Remove this placement?\n\nIts two rates, the agreed start and any interview " +
+            "times offered on it go with it. The assistant and the client both stay — only " +
+            "the match between them goes.")) {
+        return;
+      }
+      b.disabled = true;
+      api("placements?id=eq." + encodeURIComponent(id), {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" }
+      }).then(loadPlacements)
+        .catch(function (e) {
+          b.disabled = false;
+          flash(row.querySelector("[data-pl-ok]"), why(e), true);
+        });
+    });
+  });
+
+  box.querySelectorAll("[data-client-del]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-client]");
+      var id = row.getAttribute("data-client");
+      var ok = row.querySelector("[data-client-ok]");
+      b.disabled = true;
+      flash(ok, "Checking…");
+      /* Counted now rather than when the panel was drawn, so the refusal is
+         about what is true at the moment somebody presses the button. */
+      Promise.all([
+        api("client_payments?select=id&client_id=eq." + encodeURIComponent(id))
+          ["catch"](function () { return []; }),
+        api("placements?select=id&client_id=eq." + encodeURIComponent(id))
+          ["catch"](function () { return []; })
+      ]).then(function (r) {
+        var pays = (r[0] || []).length;
+        var places = (r[1] || []).length;
+        if (pays) {
+          b.disabled = false;
+          flash(ok, "Refused", true);
+          window.alert(
+            "This client has " + pays + (pays === 1 ? " payment" : " payments") +
+            " recorded against them.\n\nA business with money against its name is not a " +
+            "test row, so this is refused until the payments are removed. Remove them in " +
+            "Money in first, and only if you really mean to.");
+          return null;
+        }
+        if (!window.confirm(
+              "Remove this client?\n\n" + places +
+              (places === 1 ? " placement goes" : " placements go") + " with them, along " +
+              "with any interview times offered. Their contact details go too. " +
+              "This cannot be undone.")) {
+          b.disabled = false;
+          flash(ok, "");
+          return null;
+        }
+        /* Placements first. sql/032 makes them ON DELETE RESTRICT against the
+           client, so the order is enforced by the database rather than
+           remembered here — this just does it in the order that works. */
+        return api("placements?client_id=eq." + encodeURIComponent(id), {
+          method: "DELETE",
+          headers: { Prefer: "return=minimal" }
+        }).then(function () {
+          return api("clients?id=eq." + encodeURIComponent(id), {
+            method: "DELETE",
+            headers: { Prefer: "return=minimal" }
+          });
+        }).then(loadPlacements);
+      })["catch"](function (e) {
+        b.disabled = false;
+        flash(ok, why(e), true);
+      });
+    });
+  });
 }
 
 function wirePlacementForm() {
@@ -4655,12 +4947,42 @@ function drawInbox(box, rows) {
               (r.handled_at
                 ? '<button class="btn btn--ghost" data-msg-open type="button" style="padding:.45rem .8rem;font-size:.85rem">Mark unanswered</button>'
                 : '<button class="btn btn--ghost" data-msg-done type="button" style="padding:.45rem .8rem;font-size:.85rem">Mark answered</button>') +
+              /* 060. This is the third button sql/010 never allowed: staff had
+                 select and update and nothing else, so a message from somebody
+                 asking to be forgotten could not be honoured from in here. */
+              (can("applications.edit")
+                ? '<button class="btn btn--ghost" data-msg-del type="button" style="padding:.45rem .8rem;font-size:.85rem">Delete</button>'
+                : "") +
               '<span class="row__ok" data-msg-ok>Saved</span>' +
             "</div>" +
           "</div>"
         );
       }).join("") +
     "</div>";
+
+  box.querySelectorAll("[data-msg-del]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-msg]");
+      var id = row.getAttribute("data-msg");
+      /* An ordinary confirm. A message is not a person: the panel on the
+         queue asks for a name to be typed because what it removes cannot be
+         reconstructed, and this can be asked for again. */
+      if (!window.confirm(
+            "Delete this message?\n\nIt goes for good, along with what they wrote. " +
+            "Reply first if you still owe them one.")) {
+        return;
+      }
+      b.disabled = true;
+      api("contact_messages?id=eq." + encodeURIComponent(id), {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" }
+      }).then(loadInbox)
+        .catch(function (e) {
+          b.disabled = false;
+          flash(row.querySelector("[data-msg-ok]"), why(e), true);
+        });
+    });
+  });
 
   box.querySelectorAll("[data-msg-done], [data-msg-open]").forEach(function (b) {
     b.addEventListener("click", function () {
@@ -5335,7 +5657,29 @@ function render(email, apps, notes, socials, docs, disc, sits) {
   });
 
 
+  /* The name box, delegated like everything else here: the panel it lives in
+     does not exist until somebody opens it. */
+  document.getElementById("rows").addEventListener("input", function (e) {
+    if (!e.target.matches("[data-forget-name]")) return;
+    var box = e.target.closest("[data-forget]");
+    var go = box.querySelector("[data-forget-go]");
+    var want = box.getAttribute("data-forget-want") || " ";
+    go.disabled = e.target.value.trim().toLowerCase() !== want;
+  });
+
   document.getElementById("rows").addEventListener("click", function (e) {
+    var open = e.target.closest("[data-forget-open]");
+    if (open) {
+      var r1 = open.closest(".row");
+      openForget(r1, byRow(r1));
+      return;
+    }
+    var go = e.target.closest("[data-forget-go]");
+    if (go && !go.disabled) {
+      var r2 = go.closest(".row");
+      doForget(r2, byRow(r2), go);
+      return;
+    }
     var add = e.target.closest("[data-note-add]");
     if (add) { addNote(add.closest(".row")); return; }
     var doc = e.target.closest("[data-doc]");

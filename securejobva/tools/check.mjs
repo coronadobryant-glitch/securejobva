@@ -1997,6 +1997,22 @@ await check("both sides of an interview are told the same thing", async () => {
   }
 });
 
+/* Can the product forget somebody, and only in the ways it is meant to?
+   Almost every assertion in here is about a delete grant that must NOT exist,
+   because that is the easiest thing in this schema to add carelessly and the
+   hardest to see: nothing looks wrong on a page holding a privilege it never
+   uses. Plus the friction on the one delete that cannot be undone, which no
+   screenshot would ever show missing. */
+await check("the product can forget somebody, and not by accident", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-forgetting.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, sql/060 and /admin";
+  } catch (e) {
+    throw new Error("tools/test-forgetting.mjs failed — run it directly for the detail");
+  }
+});
+
 /* Whose rows a portal page is showing. Every one of them used to trust the
    policy completely — and every one of those policies ends with an or on
    has_permission, so that /admin can read the queue. Signed in as staff,
