@@ -4992,7 +4992,16 @@ function wireTabs() {
     });
     var top = document.querySelector(".adm__top h2");
     var k = document.querySelector(".adm__top .k");
-    if (top) top.textContent = b.textContent.replace(/d+$/, "").trim();
+    /* The rail button's text is its label plus its badge count — "Messages1",
+       "Seats3" — so the count is stripped before it becomes a heading.
+
+       The backslash is doubled because this script is built inside a template
+       literal, which eats one on the way out. Written singly it shipped as a
+       pattern stripping trailing letter d's, leaving every digit exactly where
+       it was — so each tab carrying a badge showed its count welded to its own
+       title. Applications escaped it only because that heading is written in
+       the static markup and never comes through here. */
+    if (top) top.textContent = b.textContent.replace(/\\d+$/, "").trim();
     if (k) {
       var grp = b.previousElementSibling;
       while (grp && !grp.classList.contains("rail__k")) grp = grp.previousElementSibling;
@@ -6075,8 +6084,13 @@ function payMoney(cents) {
    truncated — sql/046 is the migration that exists because a money figure was
    quietly rounded once and nothing said so. */
 function payCents(text) {
-  var t = String(text || "").replace(/[$,\s]/g, "");
-  if (!t || !/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  /* Every backslash here is doubled because this script is assembled inside a
+     template literal, which eats one on the way out. Written singly it shipped
+     as [$,s] and ^d+(.d{1,2})?$ — a class stripping the letter s, and a pattern
+     demanding a literal d before the digits. Nothing threw. The panel simply
+     refused every amount anybody typed, and said the amount looked wrong. */
+  var t = String(text || "").replace(/[$,\\s]/g, "");
+  if (!t || !/^\\d+(\\.\\d{1,2})?$/.test(t)) return null;
   return Math.round(Number(t) * 100);
 }
 

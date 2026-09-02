@@ -213,5 +213,38 @@ seats.set({
 ok("a part payment leaves an exact remainder", /\$182\.88/.test(seats.billingBlock()), true,
    "36.5 x 7.75 is 282.875, rounded once to 282.88, less 100.00");
 
+/* ── the other end of the money: what staff type in ──────────────────────
+   payCents lives in /admin rather than /seats, and it is the only place a
+   figure enters this product by hand. It shipped unable to accept anything at
+   all — the backslashes in its two regexes were eaten by the template literal
+   that builds the page, so the class stripped the letter s and the pattern
+   demanded a literal d in front of the digits. Nothing threw. Every amount
+   anybody typed was refused as malformed, which made the whole Money in panel
+   inert, and no test here was looking at the input end. Now one is. */
+console.log("\n  What staff can type into Money in");
+
+const adminHtml = readFileSync("admin.html", "utf8");
+const payCents = (function () {
+  const at = adminHtml.indexOf("function payCents(");
+  if (at < 0) throw new Error("payCents() is not in admin.html any more");
+  let d = 0, i = adminHtml.indexOf("{", at);
+  for (; i < adminHtml.length; i++) {
+    if (adminHtml[i] === "{") d++;
+    else if (adminHtml[i] === "}") { d--; if (!d) break; }
+  }
+  return new Function("return " + adminHtml.slice(at, i + 1))();
+})();
+
+ok("a plain figure", payCents("620"), 62000);
+ok("cents", payCents("620.50"), 62050);
+ok("a dollar sign", payCents("$620.00"), 62000, "people paste what the bank showed them");
+ok("a thousands comma", payCents("1,250.00"), 125000);
+ok("stray spaces", payCents(" 620 "), 62000);
+ok("one decimal place", payCents("620.5"), 62050);
+ok("nothing", payCents(""), null);
+ok("words", payCents("abc"), null);
+ok("three decimals", payCents("620.505"), null, "money has two, and rounding somebody's payment silently is how 046 happened");
+ok("a negative", payCents("-5"), null, "a wrong entry is deleted, not offset");
+
 console.log("\n" + (failed ? "  " + failed + " FAILED" : "  the bill adds up"));
 process.exit(failed ? 1 : 0);

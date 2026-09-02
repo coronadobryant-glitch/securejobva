@@ -1900,6 +1900,44 @@ await check("every class a portal writes has a rule on that page", () => {
   return PAGES.length + " pages, every class they write is styled";
 });
 
+/* ── a backslash the template literal ate ─────────────────────────────────
+   The portal scripts are built inside template literals, so `\d` in the
+   generator arrives in the page as a bare `d`. The regex still compiles, still
+   runs, and quietly means something else: /d+$/ strips trailing letter d's
+   rather than digits.
+
+   That shipped. Every tab in /admin carrying a badge count showed the count
+   welded to its own heading — "Messages1", "Seats3" — because the line meant
+   to strip it was matching the wrong thing. Nothing failed, nothing threw, and
+   the Applications tab looked right because its heading is written in the
+   static markup and never goes through that line.
+
+   A character class letter sitting immediately before a quantifier is the
+   signature — a slash, then a bare d, w or s, then + or a star or a count.
+   Nobody writes those on purpose, and `/day/` and `/style/` are unaffected
+   because the letter after them is not a quantifier. */
+await check("no regex in a portal lost its backslash", () => {
+  const PAGES = ["status.html", "admin.html", "hub.html", "seats.html", "pay.html"]
+    .filter((f) => existsSync(f));
+
+  const SUSPECT = /\/(?:\^)?[dwsDWSb](?:[+*?]|\{\d)/g;
+  const found = [];
+
+  for (const f of PAGES) {
+    for (const m of read(f).matchAll(SUSPECT)) {
+      found.push(f + ": " + m[0]);
+    }
+  }
+
+  if (found.length) {
+    throw new Error([...new Set(found)].join(", ") + " — that reads as a literal letter, " +
+      "not a character class. These scripts are built inside a template literal, which eats " +
+      "one backslash, so `\\d` in tools/build-portal.mjs has to be written `\\\\d`. The regex " +
+      "will compile either way and match the wrong thing in silence.");
+  }
+  return PAGES.length + " pages, no character class missing its backslash";
+});
+
 /* The bill a client reads before they pay us, driven with more than one
    assistant — which is the case simulate.mjs cannot reach, because that walk
    follows one person. It is also the case /seats got wrong for its whole life:
