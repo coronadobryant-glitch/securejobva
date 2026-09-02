@@ -244,6 +244,82 @@ for (const [what, tbl, payload, wanted] of [
   } catch { line("fail", what, "unreachable"); }
 }
 
+/* ── where an emailed link actually lands ────────────────────────────────
+ *
+ * Every link this product mails carries a redirect_to saying which page to
+ * come back to: the reset link, the sign-up confirmation, the resend, the
+ * client invite in api/invite.js, and the Google sign-in itself. GoTrue
+ * accepts none of them unless the URL is on the project's Redirect URLs
+ * allow-list, and silently substitutes the Site URL when it is not.
+ *
+ * Silently is the problem. Nothing errors. The mail arrives, the link works,
+ * and it drops somebody on the home page — which has nothing that reads an
+ * auth fragment, so the token sits in the address bar and the password is
+ * never set. It looks exactly like an email that did not arrive, and it has
+ * now cost this project the same afternoon twice.
+ *
+ * It is dashboard configuration rather than code, so no amount of reading
+ * this repo can catch it. Asking is the only way. generate_link returns the
+ * link WITHOUT sending anything, so this costs nobody an email.
+ *
+ * Needs the service role key, which lives in .env.local and is not in CI —
+ * skipped with a note rather than failed when it is not there. */
+head("where an emailed link lands");
+
+const envFile = ".env.local";
+let SERVICE = null;
+if (existsSync(envFile)) {
+  const m = readFileSync(envFile, "utf8").match(/^SUPABASE_SERVICE_ROLE_KEY=(.+)$/m);
+  if (m) SERVICE = m[1].trim().replace(/^"|"$/g, "");
+}
+
+if (!SERVICE) {
+  line("warn", "redirect targets", "no service role key here — run this where .env.local is");
+} else {
+  const AUTH = B.replace(/\/rest\/v1$/, "") + "/auth/v1";
+  const H2 = { apikey: SERVICE, Authorization: "Bearer " + SERVICE, "Content-Type": "application/json" };
+
+  /* A recovery link can only be generated for an account that exists, so the
+     probe borrows a real one rather than inventing an address. Inventing one
+     fails for "no such user" and reads identically to a rejected redirect —
+     a check that cannot tell those apart would cry wolf forever. */
+  let probe = null;
+  try {
+    const u = await (await fetch(AUTH + "/admin/users?per_page=1", { headers: H2 })).json();
+    probe = ((u.users || [])[0] || {}).email || null;
+  } catch { /* handled below */ }
+
+  /* Every page a link is ever sent to. /seats is the one api/invite.js uses. */
+  const WANTED = ["/status", "/seats", "/hub", "/pay"];
+  let asked = 0, kept = 0, sub = null, why = null;
+  for (const path of probe ? WANTED : []) {
+    const want = SITE + path;
+    try {
+      const r = await fetch(AUTH + "/admin/generate_link", {
+        method: "POST",
+        headers: H2,
+        body: JSON.stringify({ type: "recovery", email: probe, options: { redirect_to: want } })
+      });
+      const j = await r.json();
+      if (!j.action_link) { why = j.msg || j.message || ("HTTP " + r.status); continue; }
+      asked++;
+      const got = new URL(j.action_link).searchParams.get("redirect_to");
+      if (got === want) kept++; else sub = got;
+    } catch (e) { why = e.message; }
+  }
+  if (!probe) {
+    line("warn", "redirect targets", "no account to probe with");
+  } else if (!asked) {
+    line("warn", "redirect targets", "could not ask the auth server" + (why ? " — " + why : ""));
+  } else if (kept === WANTED.length) {
+    line("ok", "every emailed link lands where it says", asked + " of " + asked + " paths allowed");
+  } else {
+    line("fail", "emailed links land on the wrong page",
+      kept + " of " + asked + " allowed — the rest become " + sub +
+      ". Add " + SITE + "/** to Authentication → URL Configuration → Redirect URLs");
+  }
+}
+
 /* ── what cannot be checked from here ────────────────────────────────────── */
 
 head("needs a signed-in session");
