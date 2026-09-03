@@ -1269,12 +1269,43 @@ function passwordForm(msg, back) {
   document.getElementById("pwskip").addEventListener("click", already ? back : signOut);
 }
 
+/* The message an emailed link came back with, kept where anything can reach
+   it. It used to be a local in start(): read once, handed to signedOut(), and
+   dropped for anybody who happened to already be signed in. So an expired
+   reset link explained itself to a signed-out person and said nothing at all
+   to a signed-in one — the same silence the home page used to give everybody,
+   one step further in. */
+var AUTH_ERR = "";
+
 function authError() {
   if (!location.hash) return "";
   var p = new URLSearchParams(location.hash.slice(1));
   var e = p.get("error_description") || p.get("error");
   if (e) history.replaceState(null, "", location.pathname);
-  return e ? decodeURIComponent(e.replace(/\+/g, " ")) : "";
+  AUTH_ERR = e ? decodeURIComponent(e.replace(/\+/g, " ")) : "";
+  return AUTH_ERR;
+}
+
+/* Drawn outside the view root, because every page replaces that wholesale when
+   it renders and a banner written into it would be gone before anybody read
+   it. Cleared as it is shown, so a later render cannot stack a second copy.
+
+   It names the link rather than only quoting the server: "Email link is
+   invalid or has expired" on its own reads as the site being broken to
+   somebody who has just clicked a button in their mail. */
+function noteAuthError() {
+  if (!AUTH_ERR) return;
+  if (typeof root === "undefined" || !root || !root.parentNode) return;
+  var n = document.createElement("div");
+  n.className = "note note--warn";
+  n.style.margin = "0 0 1.2rem";
+  var b = document.createElement("b");
+  b.textContent = "That link did not work.";
+  n.appendChild(b);
+  n.appendChild(document.createTextNode(" " + AUTH_ERR +
+    " You are still signed in, so nothing is lost — ask for a new link and use the newest email."));
+  root.parentNode.insertBefore(n, root);
+  AUTH_ERR = "";
 }
 
 /* An expired token reads as "not signed in" rather than failing mid-request. */
@@ -3295,6 +3326,7 @@ function start() {
   if (CAME_FROM_RESET) { passwordForm(""); return; }
   var err = authError();
   if (!session()) { signedOut(err); return; }
+  noteAuthError();
 
   var claims = readToken(session().access_token);
   if (!claims || !claims.email) {

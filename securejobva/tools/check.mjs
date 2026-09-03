@@ -2313,6 +2313,29 @@ await check("an auth link that lands on the home page is handed on", async () =>
   }
 });
 
+/* The other end of the same swallow. An emailed link that fails comes back
+   with the reason in the fragment; authError() read it, start() handed it to
+   signedOut(), and that was the end of it. So the message reached somebody
+   who was signed out and nobody else — follow an expired reset link while
+   still holding a session and you got silence, which is exactly what the home
+   page used to hand everybody, one step further in. On /status a business
+   account was then redirected to /seats, dropping it a second time.
+
+   The banner has to be drawn outside the view root, because every page
+   replaces that wholesale when it renders — a message written into it would
+   be gone before it was read. That is asserted directly rather than inferred,
+   with a fake root that is perfectly capable of accepting it, so putting it in
+   the wrong place fails an assertion instead of throwing. */
+await check("a link that failed says so, signed in or not", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-auth-error.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours across five portal pages";
+  } catch (e) {
+    throw new Error("tools/test-auth-error.mjs failed — run it directly to see which page");
+  }
+});
+
 /* Every pane on /admin is drawn by a loader called from render(). Interviews
    was not. Its one call had landed inside the client-logo upload handler, two
    spaces out of line with the callback around it, so the tab opened blank —
