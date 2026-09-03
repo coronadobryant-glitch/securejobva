@@ -2993,7 +2993,6 @@ function wireClients(box, rows) {
     }).then(function () {
       msg.textContent = "";
       loadClients();
-  drawCalendar();
     }).catch(function (e) {
       btn.disabled = false;
       msg.className = "msg msg--bad";
@@ -5476,7 +5475,13 @@ function save(row) {
       ok = next.querySelector("[data-ok]") || ok;
     }
     flash(ok, "Saved");
-    if ("interview_at" in t) drawCalendar();
+    /* drawCalendar() reads the date, the stage and the scores. Watching only
+       the date left it stale for the two problems it exists to raise: "at
+       interview with no date set" moves when the stage does, and
+       "interviewed, not scored" clears when a score arrives. */
+    if (Object.keys(t).some(function (k) {
+      return k === "interview_at" || k === "pipeline" || k.indexOf("score_") === 0;
+    })) drawCalendar();
   }).catch(function (e) {
     flash(ok, why(e), true);
   });
@@ -5671,6 +5676,15 @@ function render(email, apps, notes, socials, docs, disc, sits) {
   loadInbox();
   loadOrphans();
   loadClients();
+  /* Every other pane is drawn here; this one was drawn from inside the
+     client-logo upload handler, two spaces out of line with the callback it
+     had landed in. So /admin opened with Interviews blank — not an empty
+     state, no card, nothing — and it stayed blank until somebody uploaded a
+     logo or saved an interview date. The tab exists to raise three things
+     nobody else will (interviewed and never scored, at interview with no
+     date, two bookings inside an hour) and its badge counts them, so the
+     silence was the failure. */
+  drawCalendar();
   document.getElementById("q").addEventListener("input", paint);
   document.getElementById("filter").addEventListener("change", paint);
   document.getElementById("fskill").addEventListener("change", paint);

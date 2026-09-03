@@ -2266,6 +2266,97 @@ await check("a tab shows the queue's toolbar only on the queue", async () => {
   }
 });
 
+/* Every pane on /admin is drawn by a loader called from render(). Interviews
+   was not. Its one call had landed inside the client-logo upload handler, two
+   spaces out of line with the callback around it, so the tab opened blank —
+   no card, no heading, not even the "Nothing booked" it already had written —
+   and stayed blank until somebody uploaded a logo or saved an interview date.
+
+   That tab is the only thing that raises three problems nobody else will:
+   interviewed and never scored, at interview with no date, two bookings inside
+   an hour. Its rail badge counts them, and the badge is set by the same
+   function, so an empty tab and a quiet rail were one silence.
+
+   The rule is "drawn when the page opens", not "called from somewhere", and
+   the difference is the whole check: drawCalendar() was still reachable from
+   render() through the save handler the entire time it was broken. So the
+   walk cuts the arguments to addEventListener out of every body before
+   following it — what a listener does happens when somebody clicks, which is
+   exactly the state the person opening the tab is not in. Verified by putting
+   the call back where it was: the loose version passes, this one names
+   cal-card. */
+await check("every card on a portal page is drawn when the page opens", () => {
+  const pages = ["admin.html", "status.html", "hub.html", "seats.html", "pay.html"]
+    .filter((f) => existsSync(f));
+  if (!pages.length) return "no portal pages built";
+
+  const seen = [];
+  const orphans = [];
+  for (const f of pages) {
+    const html = read(f);
+    const js = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
+
+    const bodyAt = (at) => {
+      let d = 0;
+      for (let i = js.indexOf("{", at); i < js.length; i++) {
+        if (js[i] === "{") d++;
+        else if (js[i] === "}") { d--; if (!d) return js.slice(at, i + 1); }
+      }
+      return "";
+    };
+    const fns = new Map();
+    for (const m of js.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/g)) fns.set(m[1], bodyAt(m.index));
+    if (!fns.has("render")) continue;
+
+    /* Cut out every addEventListener argument list. What a listener does
+       happens on a click; this walk is only about what happens on load. */
+    const onLoadOnly = (body) => {
+      let out = "", i = 0;
+      for (;;) {
+        const at = body.indexOf("addEventListener(", i);
+        if (at < 0) return out + body.slice(i);
+        out += body.slice(i, at);
+        let d = 0, j = body.indexOf("(", at);
+        for (; j < body.length; j++) {
+          if (body[j] === "(") d++;
+          else if (body[j] === ")") { d--; if (!d) break; }
+        }
+        i = j + 1;
+      }
+    };
+
+    const drawn = new Set(["render"]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const name of [...drawn]) {
+        const body = onLoadOnly(fns.get(name) || "");
+        for (const other of fns.keys()) {
+          if (!drawn.has(other) && body.includes(other + "(")) { drawn.add(other); grew = true; }
+        }
+      }
+    }
+
+    /* A card nobody looks up by id is written whole by whatever returns it,
+       and needs no call of its own. */
+    for (const id of new Set([...js.matchAll(/id="([a-z][\w-]*-card)"/g)].map((m) => m[1]))) {
+      const needle = 'getElementById("' + id + '")';
+      const fillers = [...fns].filter(([n, b]) => n !== "render" && b.includes(needle)).map(([n]) => n);
+      if (!fillers.length) continue;
+      seen.push(id);
+      if (!fillers.some((n) => drawn.has(n))) {
+        orphans.push(f + " #" + id + " (filled by " + fillers.join("/") + ")");
+      }
+    }
+  }
+
+  if (orphans.length) {
+    throw new Error(orphans.join("; ") + " — reached only from a handler, so the pane " +
+      "opens empty and stays empty until somebody happens to trigger it. Call it " +
+      "from render() with the other loaders.");
+  }
+  return seen.length + " cards across " + pages.length + " pages, every one drawn on load";
+});
+
 /* A SECURITY DEFINER function runs as its owner, so it reaches past every
    policy that applies to the caller. That is the point — is_admin() has to read
    a table the caller cannot — but it means the function body is the only thing
