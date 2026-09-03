@@ -2698,6 +2698,34 @@ html{scroll-behavior:smooth}
         : "Up to 10 MB. A photo of a printed CV is fine.";
   });
 
+  /* An error that outlives the thing it is about is the form calling somebody
+     a liar. Text fields already clear as you type — the handler below — and
+     the DISC grid clears on change, for the reason written above it: an answer
+     that does not visibly land is indistinguishable from a broken control.
+
+     The chip groups and the skills grid were the exception. Tick the track you
+     were just told to tick, or pick the experience you were just told to pick,
+     and the red stayed exactly where it was until you pressed Continue a second
+     time. These are the first things anybody touches, so it was the first thing
+     the form did after the applicant did as they were asked.
+
+     The skills grid is refreshed rather than cleared: with three ratings
+     missing, answering one leaves a true sentence with a stale number. It is
+     only refreshed once it has already spoken, so nothing turns red before the
+     applicant has been asked to Continue at all. */
+  var GROUP_ERR = { track: "err-track", exp: "err-exp", shift: "err-shift", speed: "err-speed" };
+  form.addEventListener("change", function (e) {
+    var n = e.target.name;
+    if (!n || !form.querySelector("[name=" + n + "]:checked")) return;
+    if (GROUP_ERR[n]) {
+      var slot = document.getElementById(GROUP_ERR[n]);
+      if (slot) slot.textContent = "";
+    }
+    var summary = document.getElementById("err-skills");
+    if (summary && summary.textContent && form.querySelector("[data-skill-err=" + n + "]")) {
+      validSkills();
+    }
+  });
   form.addEventListener("input", function (e) {
     if (e.target.closest(".is-bad")) mark(e.target, "");
   });

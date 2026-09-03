@@ -2266,6 +2266,31 @@ await check("a tab shows the queue's toolbar only on the queue", async () => {
   }
 });
 
+/* Steps 1 and 2 of the apply form validate on Continue and nowhere else, so
+   the red they write outlives what it is about. Tick the track you were just
+   told to tick and "Choose at least one track you are applying for." is still
+   under the ticked box; the same for experience, shift and speed. The form
+   asks, is answered, and goes on saying it was not — to somebody who has done
+   exactly as they were asked, on the first two screens anybody sees.
+
+   The page already held the principle in two places, which is what makes this
+   a gap rather than a decision: text fields clear as you type, and the DISC
+   grid clears on change under a comment saying that an answer which does not
+   visibly land is indistinguishable from a broken control.
+
+   Driven, not parsed — including the case that makes it harder than blanking
+   a string: the skills summary counts what is missing, so it is refreshed,
+   and only after it has already spoken. */
+await check("an answered question stops being marked unanswered", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-apply-errors.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, four chip groups and the skills grid";
+  } catch (e) {
+    throw new Error("tools/test-apply-errors.mjs failed — run it directly to see which group");
+  }
+});
+
 /* Every pane on /admin is drawn by a loader called from render(). Interviews
    was not. Its one call had landed inside the client-logo upload handler, two
    spaces out of line with the callback around it, so the tab opened blank —
