@@ -2037,6 +2037,22 @@ SIGNIN_HINT = "Use the address on your application &mdash; that is how we find y
    the state that produces it. */
 function shut(title, body) {
   view(
+    /* The page has to say whose it is.
+
+       /hub passes app:true to shell(), which drops the site header on purpose:
+       an assistant who is signed in gets the sidebar this portal draws for
+       itself, and two sets of navigation would be worse than one. But the
+       sidebar is drawn in render(), and shut() runs instead of render() — so
+       the locked-out state inherited the missing header and grew nothing in
+       its place. Bare white, one notice, no mark of what site it belonged to.
+
+       Not the sidebar: that is a hired assistant's navigation and every link
+       in it goes somewhere this person cannot reach. A wordmark that goes
+       home is the whole of what is missing. */
+    '<a class="brand" href="/" aria-label="SecureJobVA home" ' +
+      'style="display:inline-flex;margin-bottom:1.4rem">' +
+      '<span class="brand__word">SecureJob<b class="brand__va">VA</b></span>' +
+    "</a>" +
     '<div class="card">' +
       '<div class="note"><b>' + esc(title) + "</b> " + body + "</div>" +
       '<p style="margin-top:1.2rem;display:flex;gap:.6rem;flex-wrap:wrap">' +
