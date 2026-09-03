@@ -2984,7 +2984,7 @@ function loadApplications() {
        see. No row and no table both mean the same thing here: nothing to sit
        yet. The same shape 030 needed on /hub, for the same reason. */
     api("application_assessment?select=application_id,track,attempt,started_at,submitted_at," +
-        "typing_wpm,typing_accuracy,typing_proof,connection_proof,scenario_answers,english_answers,detail_answers,sales_answers,written_reply,verdict,part_done")
+        "typing_wpm,typing_accuracy,typing_proof,connection_proof,scenario_answers,english_answers,detail_answers,sales_answers,written_reply,verdict,part_done,part_opened")
       .catch(function () { return []; })
   ])
     .then(function (r) {

@@ -2363,6 +2363,58 @@ await check("the redirect probe does not break somebody's password reset", async
   }
 });
 
+/* The same shape as the queue check above, one page over. /status reads the
+   assessment row with an explicit column list, and the card reads fields off
+   that row by name — so a field missing from the list is undefined forever and
+   whatever stands beside it speaks instead.
+
+   It happened within hours of the queue one being fixed: part_opened is
+   written by open_part(), the card was taught to read it, and the select ended
+   at part_done. The card's own test passed the whole time, because it builds
+   the row object by hand and never goes through the fetch — a fixture cannot
+   fail to contain the column you gave it.
+
+   So this compares the two things that only meet in a browser: what the page
+   asks the database for, and what it reads back. */
+await check("the assessment card reads only columns /status asks for", () => {
+  if (!existsSync("status.html")) return "no status.html to check";
+  const html = read("status.html");
+
+  /* Read to the closing paren, not to the first quote. The list is written as
+     two concatenated string literals, so stopping at the quote parses the five
+     columns before the break and calls the other eleven missing — which is how
+     this check first reported part_done and typing_wpm as absent from a select
+     they were plainly in. Truncating here can only produce a false failure,
+     which is loud; the count below is the tripwire for it. */
+  const sel = html.match(/application_assessment\?select=([^)]+)\)/);
+  if (!sel) throw new Error("no application_assessment select in status.html");
+  /* The quotes and the + joining the literals survive the match; strip them. */
+  const asked = new Set(sel[1].replace(/["'+\s]/g, "").split(",").filter(Boolean));
+  if (asked.size < 10) {
+    throw new Error("only parsed " + asked.size + " columns out of the select — " +
+      "the parse is wrong, not the page");
+  }
+
+  const at = html.indexOf("function assessCard(");
+  if (at < 0) throw new Error("no assessCard() in status.html — renamed? this reads it by name");
+  let depth = 0, end = at;
+  for (let i = html.indexOf("{", at); i < html.length; i++) {
+    if (html[i] === "{") depth++;
+    else if (html[i] === "}") { depth--; if (!depth) { end = i; break; } }
+  }
+  const body = html.slice(at, end + 1);
+
+  /* `s` is the assessment row throughout that function. */
+  const readOff = new Set([...body.matchAll(/\bs\.([a-z_][a-z0-9_]*)/g)].map((m) => m[1]));
+  const missing = [...readOff].filter((c) => !asked.has(c));
+  if (missing.length) {
+    throw new Error("read off the assessment row but never selected: " + missing.join(", ") +
+      " — PostgREST returns only what it was asked for, so the field arrives undefined " +
+      "and whatever stands beside it speaks instead. Add it to the select in build-portal.mjs.");
+  }
+  return readOff.size + " fields read, all of them asked for";
+});
+
 /* Every pane on /admin is drawn by a loader called from render(). Interviews
    was not. Its one call had landed inside the client-logo upload handler, two
    spaces out of line with the callback around it, so the tab opened blank —
