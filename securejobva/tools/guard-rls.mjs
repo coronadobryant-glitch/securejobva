@@ -286,8 +286,15 @@ try {
  * Probed the only way it can be from outside: ask for a session on an address
  * that cannot receive mail, and see whether one comes back. Nothing is left
  * behind that a person could sign in with — the address is not real and the
- * password is thrown away — but an unconfirmed row may be created in
- * auth.users, which is the cost of asking. It is worth it.
+ * password is thrown away.
+ *
+ * It used to leave an unconfirmed row in auth.users every run, described here
+ * as the cost of asking. It is not a cost worth paying repeatedly: one row per
+ * run accumulates quietly, and a list of accounts that is mostly probes is a
+ * list nobody reads carefully. So the probe now clears up after itself when a
+ * service role key is at hand, and says so plainly when it cannot — an
+ * uncollected row you have been told about is a different thing from one you
+ * have not.
  */
 const probeEmail = "guard-rls-probe-" + Date.now() + "@securejobva-guard.invalid";
 
@@ -317,6 +324,65 @@ try {
   }
 } catch (e) {
   console.log("  warn    could not probe the sign-up path — " + e.message);
+}
+
+/* ── take the probe back out ───────────────────────────────────────────────
+ *
+ * Deleting a user needs the service role key, which this file deliberately
+ * does not otherwise use: everything above is asked with the public key,
+ * because the whole point is to see what a stranger can reach. So the key is
+ * read here and nowhere else, only if .env.local is sitting next to the tool,
+ * and it is used for exactly one thing — removing the row this run created.
+ *
+ * This run's own row is matched by id. Sweeping every
+ * @securejobva-guard.invalid row would also delete probes belonging to a run
+ * happening at the same time somewhere else, and a cleanup that removes
+ * somebody else's row is worse than the leak it fixes.
+ *
+ * Abandoned ones are swept as well, and an hour is what makes that safe: no
+ * run of this file lasts sixty seconds, so a probe row still sitting there an
+ * hour later belongs to a run that is long over. Without this the rows left
+ * behind before the cleanup existed would sit there for good, and the fix
+ * would only apply to leaks it had not already caused. */
+const ABANDONED_MS = 60 * 60 * 1000;
+try {
+  const { existsSync: hasFile, readFileSync: readEnv } = await import("node:fs");
+  let serviceKey = null;
+  if (hasFile(".env.local")) {
+    const m = readEnv(".env.local", "utf8").match(/^SUPABASE_SERVICE_ROLE_KEY=(.+)$/m);
+    if (m) serviceKey = m[1].trim().replace(/^"|"$/g, "");
+  }
+
+  if (!serviceKey) {
+    console.log("  note    the probe account " + probeEmail + " is still there — " +
+      "no service role key here to remove it with");
+  } else {
+    const authBase = base.replace("/rest/v1", "/auth/v1");
+    const H = { apikey: serviceKey, Authorization: "Bearer " + serviceKey };
+    const list = await (await fetch(authBase + "/admin/users?per_page=200", { headers: H })).json();
+    const users = list.users || [];
+    const mine = users.find((u) => (u.email || "").toLowerCase() === probeEmail.toLowerCase());
+    const stale = users.filter((u) =>
+      /@securejobva-guard\.invalid$/i.test(u.email || "") &&
+      (!mine || u.id !== mine.id) &&
+      Date.now() - Date.parse(u.created_at) > ABANDONED_MS);
+
+    let gone = 0, stuck = 0;
+    for (const u of [].concat(mine || [], stale)) {
+      const d = await fetch(authBase + "/admin/users/" + u.id, { method: "DELETE", headers: H });
+      if (d.ok) gone++; else stuck++;
+    }
+
+    if (!mine && !stale.length) {
+      console.log("  ok      no probe row to clear — sign-up created none");
+    } else {
+      console.log("  ok      probe cleared" +
+        (stale.length ? ", and " + stale.length + " abandoned from earlier run(s)" : "") +
+        " — " + gone + " removed" + (stuck ? ", " + stuck + " could not be" : ""));
+    }
+  }
+} catch (e) {
+  console.log("  note    probe account " + probeEmail + " may still be there — " + e.message);
 }
 
 if (fails.length) {
