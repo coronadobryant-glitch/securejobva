@@ -7258,8 +7258,18 @@ function addNote(row) {
   });
 }
 
-function paint() {
+/* Both summaries, together, because they read the same ALL and going stale
+   separately is how one of them ends up disagreeing with the other. drawStats
+   is behind a permission at its only other call site, and asks for its own
+   element and returns quietly when it is not on the page, so this is safe on
+   an account that cannot see it. */
+function repaintSummaries() {
   drawKpis();
+  if (can("analytics.view")) drawStats();
+}
+
+function paint() {
+  repaintSummaries();
   var shown = shownRows();
   document.getElementById("count").textContent =
     shown.length + " of " + ALL.length;
@@ -7395,6 +7405,15 @@ function save(row) {
       pill.textContent = LABEL[st] || st;
     }
     row.removeAttribute("data-mark-contacted");
+    /* The tiles and the Breakdown are counted off ALL, which the lines above
+       have just changed. Neither was redrawn, so moving somebody from applied
+       to assessment left "2 waiting over 3 days" and a pipeline bar reading
+       New 2 sitting over a queue that no longer matched them, until a reload.
+
+       Summaries only, deliberately: paint() replaces every row wholesale, and
+       doing that here would throw away the focus and the scroll position of
+       whoever is part-way through editing the row underneath. */
+    repaintSummaries();
     if (rec) {
       /* Recompute the average locally rather than refetching: the row is about
          to be redrawn and a stale header under a changed score reads as a bug. */
