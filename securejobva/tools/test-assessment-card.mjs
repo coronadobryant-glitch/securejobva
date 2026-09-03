@@ -169,6 +169,66 @@ const salesFive = card({ status: "assessment", track: "Sales & Marketing" }, {
 ok("the sales track cannot send with the sales part open", hasSend(salesFive), false);
 ok("it still shows one left", salesFive.indexOf("1 left") > -1, true);
 
+/* ── open, with a clock running ────────────────────────────────────────── */
+console.log("\n  Open is not the same thing as untouched");
+
+/* part_opened is written by open_part() the first time a part is opened, and
+   the deadline is measured from it — 051 put it in the database precisely so
+   that reopening could not reset it. The card read part_done and never
+   part_opened, so a part with six minutes gone looked identical to one nobody
+   had touched: same Start, same silence. Found by closing the tab mid-part on
+   the live site and coming back.
+
+   054 stays exactly as it is. An open part is still not a finished one and is
+   still counted as left; what changes is only what the row says about it. */
+const minsAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
+const labelFor = (h, k) => {
+  const m = h.match(new RegExp('data-part="' + k + '" type="button">([^<]*)<'));
+  return m ? m[1] : null;
+};
+
+const untouched = card(atAssessment, { part_done: {}, part_opened: {} });
+ok("a part nobody has opened says Start", labelFor(untouched, "english"), "Start");
+ok("and offers no clock it has not started", / \d+:\d\d left/.test(untouched), false);
+
+/* English is eight minutes. Opened three ago leaves five. */
+const running = card(atAssessment, { part_done: {}, part_opened: { english: minsAgo(3) } });
+ok("an open part says Resume", labelFor(running, "english"), "Resume");
+ok("and says how much time is left", /(4:5\d|5:00) left/.test(running), true,
+   "eight minutes, opened three ago");
+ok("an open part is still not a finished one", startFor(running, "english"), true);
+ok("and is still counted as left", running.indexOf("5 left") > -1, true,
+   "054 counts finished, and open is not finished");
+ok("the parts she has not opened still say Start", labelFor(running, "scen"), "Start");
+
+/* The deadline passed while she was away. Opening it now closes it and banks
+   whatever was saved, so offering Start would be the third lie in a row. */
+const expired = card(atAssessment, { part_done: {}, part_opened: { english: minsAgo(9) } });
+ok("a part whose time has gone does not say Start", labelFor(expired, "english"), "Finish");
+ok("and says so in words", expired.indexOf("the time on this one has gone") > -1, true);
+ok("it does not offer a negative clock", / -\d/.test(expired), false);
+
+/* Each part carries its own length: judgement is twenty minutes, so nine
+   minutes in it is still running while english would be over. */
+const mixed = card(atAssessment, {
+  part_done: {},
+  part_opened: { english: minsAgo(9), scenarios: minsAgo(9) }
+});
+ok("english is over after nine minutes", labelFor(mixed, "english"), "Finish");
+ok("judgement is not, because it is twenty", labelFor(mixed, "scen"), "Resume");
+
+/* Typing has no clock at all — partShell gets 0 minutes and never opens a
+   part — so it must never claim one. */
+const typingOpened = card(atAssessment, { part_done: {}, part_opened: { typing: minsAgo(30) } });
+ok("the untimed part never reports a deadline", labelFor(typingOpened, "typing"), "Start");
+
+/* And finishing it still takes the button away, clock or no clock. */
+const closedAfterOpen = card(atAssessment, {
+  part_done: { english: true }, part_opened: { english: minsAgo(3) }
+});
+ok("a finished part has no button at all", startFor(closedAfterOpen, "english"), false);
+ok("and no leftover clock", / \d+:\d\d left/.test(closedAfterOpen), false);
+
 console.log("");
 if (failed) {
   console.log("  " + failed + " failed");

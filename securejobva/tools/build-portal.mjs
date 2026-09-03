@@ -1927,20 +1927,65 @@ function assessCard(a, s) {
     typing:  !!fin.typing
   };
 
+  /* part_opened is written by open_part() and, until now, read by nothing on
+     this page. So a part with its clock running looked exactly like one never
+     touched: the same Start, the same silence. Close the tab mid-part — a
+     phone, a dropped connection — and you came back to a card offering to
+     start something that had been running for six minutes.
+
+     The deadline itself is right and stays: a clock that pauses when you close
+     the tab is not a clock, and 051 moved it into the database precisely so
+     reopening could not reset it. What was missing was saying so.
+
+     Typing is not in here because it is not timed — partShell gets 0 minutes
+     and never calls open_part, so it has no clock to report. */
+  var OPEN = (s && s.part_opened) || {};
+  var MINS = { english: 8, scen: 20, detail: 10, sales: 8, written: 20 };
+  var OPEN_KEY = { english: "english", scen: "scenarios", detail: "detail",
+                   sales: "sales", written: "written" };
+
+  /* Milliseconds left, or null when the part has no clock or has never been
+     opened. Negative means the deadline passed while she was away, which is a
+     real state: opening it then closes it and banks whatever was saved. */
+  function msLeft(k) {
+    if (!MINS[k]) return null;
+    var at = Date.parse(OPEN[OPEN_KEY[k]] || "");
+    if (isNaN(at)) return null;
+    return at + MINS[k] * 60000 - Date.now();
+  }
+
+  function clockText(ms) {
+    var secs = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
+  }
+
   var left = 0;
   ["english", "scen", "detail", "written", "typing"].forEach(function (k) {
     if (!done[k]) left++;
   });
   if (wantsSales && !done.sales) left++;
 
+  /* Three states, not two. A part is untouched, or open with time on it, or
+     open with the time gone — and the middle one is the whole point: the
+     button has to say Resume and the row has to say how long is left, or the
+     card is telling somebody their clock has not started. The time shown is
+     read when the card is drawn, which is every time this page loads and
+     every time a part closes. */
   function part(k, n, t, d, isDone, note) {
+    var ms = isDone ? null : msLeft(k);
+    var live = ms !== null && ms > 0;
+    var over = ms !== null && ms <= 0;
     return '<li class="apt' + (isDone ? " is-done" : "") + '">' +
       '<span class="apt__n">' + (isDone ? "&#10003;" : n) + "</span>" +
       '<span><span class="apt__t">' + t + "</span>" +
-      '<span class="apt__d">' + d + "</span></span>" +
+      '<span class="apt__d">' + d +
+        (live ? " &middot; " + clockText(ms) + " left"
+              : over ? " &middot; the time on this one has gone" : "") +
+      "</span></span>" +
       (isDone
         ? '<span class="apt__s">' + esc(note || "done") + "</span>"
-        : '<button class="btn btn--solid apt__go" data-part="' + k + '" type="button">Start</button>') +
+        : '<button class="btn btn--solid apt__go" data-part="' + k + '" type="button">' +
+          (live ? "Resume" : over ? "Finish" : "Start") + "</button>") +
       "</li>";
   }
 
