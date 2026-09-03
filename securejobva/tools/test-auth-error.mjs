@@ -106,6 +106,10 @@ for (const page of PAGES) {
     banner.text.indexOf("That link did not work") > -1, true);
   is("it says nothing is lost, because nothing is",
     banner.text.indexOf("still signed in") > -1, true);
+  /* GoTrue does not punctuate its reason, and joining it straight to the next
+     sentence read as "has expired You are still signed in". */
+  is("the server’s words end in a full stop before the next sentence",
+    banner.text.indexOf("has expired. You are still") > -1, true);
 }
 
 /* Shown once. render() runs more than once on these pages — after setting a
@@ -148,4 +152,4 @@ for (const page of PAGES) {
 
 console.log("");
 if (bad) { console.log(bad + " failed"); process.exit(1); }
-console.log((PAGES.length * 3 + 11) + " behaviours across " + PAGES.length + " portal pages");
+console.log((PAGES.length * 3 + 12) + " behaviours across " + PAGES.length + " portal pages");

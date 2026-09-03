@@ -1282,7 +1282,12 @@ function noteAuthError() {
   var b = document.createElement("b");
   b.textContent = "That link did not work.";
   n.appendChild(b);
-  n.appendChild(document.createTextNode(" " + AUTH_ERR +
+  /* GoTrue sends its reason without a full stop, so joining it to the next
+     sentence read as "has expired You are still signed in". Punctuated here
+     rather than rewritten, because the server’s words are the accurate half. */
+  var said = AUTH_ERR;
+  if (!/[.!?]$/.test(said)) said += ".";
+  n.appendChild(document.createTextNode(" " + said +
     " You are still signed in, so nothing is lost — ask for a new link and use the newest email."));
   root.parentNode.insertBefore(n, root);
   AUTH_ERR_SHOWN = true;
