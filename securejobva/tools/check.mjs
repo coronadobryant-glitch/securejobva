@@ -2336,6 +2336,33 @@ await check("a link that failed says so, signed in or not", async () => {
   }
 });
 
+/* The redirect probe can only ask where a link would land by asking the auth
+   server to mint one, and a recovery token is single use — minting a new one
+   voids the one already sitting in somebody's inbox. It took the first
+   account the API returned, which was the same person every run, so the check
+   that exists to prove password reset works was breaking password reset:
+   somebody asked for a reset, got a real email, clicked it, and was told it
+   had expired.
+
+   Now it spends the oldest link, and never-had-one counts as oldest, which
+   puts whoever just asked for a reset last by construction rather than by a
+   special case. When even the oldest is inside the hour it declines.
+
+   That declining branch is the one that matters and the one that will never
+   fire on the machine it was written on, so the chooser is pure and driven
+   here — lifted out of the file rather than imported, because importing that
+   script probes the live project and would spend a token to test not spending
+   one. */
+await check("the redirect probe does not break somebody's password reset", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-probe-choice.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, whose token gets spent and when none may be";
+  } catch (e) {
+    throw new Error("tools/test-probe-choice.mjs failed — run it directly to see which case");
+  }
+});
+
 /* Every pane on /admin is drawn by a loader called from render(). Interviews
    was not. Its one call had landed inside the client-logo upload handler, two
    spaces out of line with the callback around it, so the tab opened blank —

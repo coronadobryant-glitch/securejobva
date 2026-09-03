@@ -264,6 +264,30 @@ for (const [what, tbl, payload, wanted] of [
  *
  * Needs the service role key, which lives in .env.local and is not in CI —
  * skipped with a note rather than failed when it is not there. */
+/* Whose recovery token to spend, given every account and the clock.
+
+   Oldest first, and an account that has never had one is oldest of all —
+   there is no live link to break. That ordering is the safety property, not
+   a tidiness one: whoever has just asked for a reset carries the newest
+   timestamp, which makes them the last address this will ever pick.
+
+   When even the oldest is inside the window, every link in existence is live
+   and there is nothing safe to spend, so it declines. Pure, and separate from
+   the fetch, because that declining branch is the one that will never happen
+   on the machine where it is written. */
+export function chooseProbe(users, now, windowMs) {
+  const cand = (users || [])
+    .filter((x) => x && x.email)
+    .map((x) => ({
+      email: x.email,
+      at: x.recovery_sent_at ? new Date(x.recovery_sent_at).getTime() : 0
+    }))
+    .sort((a, b) => a.at - b.at)[0];
+  if (!cand) return { email: null, held: null };
+  if (cand.at && now - cand.at < windowMs) return { email: null, held: cand.email };
+  return { email: cand.email, held: null };
+}
+
 head("where an emailed link lands");
 
 const envFile = ".env.local";
@@ -282,11 +306,30 @@ if (!SERVICE) {
   /* A recovery link can only be generated for an account that exists, so the
      probe borrows a real one rather than inventing an address. Inventing one
      fails for "no such user" and reads identically to a rejected redirect —
-     a check that cannot tell those apart would cry wolf forever. */
-  let probe = null;
+     a check that cannot tell those apart would cry wolf forever.
+
+     Borrowing is not free. A recovery token is single use and issuing one
+     invalidates the token before it, so every run of this quietly killed the
+     reset link sitting in somebody's inbox. It took the first account in the
+     list every time — always the same person — and that person then clicked a
+     brand new email and was told it had expired. The check meant to prove
+     password reset works was breaking password reset.
+
+     So: the account whose recovery link is oldest, nulls first, and never one
+     that has had a link issued in the last hour, because that link is live in
+     a mailbox right now. It rotates rather than picking on one address, and
+     when the only candidates are recent it declines and says so, which is a
+     check skipping itself rather than doing damage to run.
+
+     No email is sent by any of this — generate_link only mints the link. The
+     harm was never a message; it was the token underneath one. */
+  const LIVE_LINK_MS = 60 * 60 * 1000;
+  let probe = null, probeHeld = null;
   try {
-    const u = await (await fetch(AUTH + "/admin/users?per_page=1", { headers: H2 })).json();
-    probe = ((u.users || [])[0] || {}).email || null;
+    const u = await (await fetch(AUTH + "/admin/users?per_page=100", { headers: H2 })).json();
+    const pick = chooseProbe(u.users || [], Date.now(), LIVE_LINK_MS);
+    probe = pick.email;
+    probeHeld = pick.held;
   } catch { /* handled below */ }
 
   /* redirect_to goes at the top level of the body. Nested under `options` —
@@ -333,7 +376,11 @@ if (!SERVICE) {
       if (got === want) kept++; else sub = got;
     } catch (e) { why = e.message; }
   }
-  if (!probe) {
+  if (probeHeld) {
+    line("warn", "redirect targets", "not asked — every account has had a reset link " +
+      "issued within the hour, and asking would invalidate one that is live in a mailbox. " +
+      "Run again later, or after that link has been used.");
+  } else if (!probe) {
     line("warn", "redirect targets", "no account to probe with");
   } else if (blind) {
     line("fail", "the redirect probe proved nothing",
@@ -343,7 +390,9 @@ if (!SERVICE) {
   } else if (!asked) {
     line("warn", "redirect targets", "could not ask the auth server" + (why ? " — " + why : ""));
   } else if (kept === WANTED.length) {
-    line("ok", "every emailed link lands where it says", asked + " of " + asked + " paths allowed");
+    line("ok", "every emailed link lands where it says",
+      asked + " of " + asked + " paths allowed — asked with " + probe +
+      ", whose reset link (if any) is now void");
   } else {
     line("fail", "emailed links land on the wrong page",
       kept + " of " + asked + " allowed — the rest become " + sub +
