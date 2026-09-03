@@ -59,7 +59,7 @@ function harness(file, hash) {
   const js = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
   const dom = fakeDom();
   const src =
-    "var AUTH_ERR = '';\n" +
+    "var AUTH_ERR = ''; var AUTH_ERR_SHOWN = false;\n" +
     grab(js, "authError") + "\n" +
     grab(js, "noteAuthError") + "\n" +
     "return { authError: authError, noteAuthError: noteAuthError, seen: function () { return AUTH_ERR; } };";
@@ -117,7 +117,11 @@ for (const page of PAGES) {
   api.noteAuthError();
   api.noteAuthError();
   is("three renders draw one banner", dom.host.children.length, 1);
-  is("the message is cleared once it has been said", api.seen(), "");
+  /* And it must still be there afterwards. Clearing it on display also
+     emptied what the /seats redirect carries, so the banner appeared for the
+     instant before the page navigated and the destination showed nothing. */
+  is("the message survives being shown, so the redirect can carry it",
+    api.seen(), "Email link is invalid or has expired");
 }
 
 /* ── silence when there is nothing to say ────────────────────────────────── */

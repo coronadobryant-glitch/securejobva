@@ -1381,6 +1381,13 @@ function passwordForm(msg, back) {
    to a signed-in one — the same silence the home page used to give everybody,
    one step further in. */
 var AUTH_ERR = "";
+/* Separate from the message on purpose. Clearing AUTH_ERR as it was drawn
+   stopped a second banner and also emptied the thing the /seats redirect
+   below reads, so the message was shown for the instant before the page
+   navigated away and then lost — the same silence, arrived at differently.
+   Found by following an expired link on the live site, not by the test, which
+   checked the two behaviours one at a time. */
+var AUTH_ERR_SHOWN = false;
 
 function authError() {
   if (!location.hash) return "";
@@ -1399,7 +1406,7 @@ function authError() {
    invalid or has expired" on its own reads as the site being broken to
    somebody who has just clicked a button in their mail. */
 function noteAuthError() {
-  if (!AUTH_ERR) return;
+  if (!AUTH_ERR || AUTH_ERR_SHOWN) return;
   if (typeof root === "undefined" || !root || !root.parentNode) return;
   var n = document.createElement("div");
   n.className = "note note--warn";
@@ -1410,7 +1417,7 @@ function noteAuthError() {
   n.appendChild(document.createTextNode(" " + AUTH_ERR +
     " You are still signed in, so nothing is lost — ask for a new link and use the newest email."));
   root.parentNode.insertBefore(n, root);
-  AUTH_ERR = "";
+  AUTH_ERR_SHOWN = true;
 }
 
 /* An expired token reads as "not signed in" rather than failing mid-request. */
