@@ -442,6 +442,83 @@ await check("portal reads only columns it is granted", () => {
   return asked.size + " columns read, all granted";
 });
 
+/* The check above guards a select list against a grant, and skips `*` because
+   asking for everything cannot name a column it failed to ask for. The queue is
+   read with select=*, so it fell in that gap entirely: the page reads fields off
+   the row in JavaScript, and nothing tied those names to what the view returns.
+
+   `a.experience` was undefined for every applicant since the view was first
+   written. It reads `a.experience || "?"`, so every row in /admin showed `?`
+   where the answer should be — for a question every applicant is asked, whose
+   answer is stored, and which is quoted back to them in their own confirmation
+   email. A missing column and an unanswered question look identical once a
+   fallback has spoken for both, which is why this reads the view rather than
+   trusting the page.
+
+   The rule: a field the row renderer reads is either a column the view selects,
+   or one the page attaches itself after fetching — and the second list is read
+   out of the page, not kept here, so it cannot drift. */
+await check("the queue page reads only fields the queue view returns", () => {
+  const defs = [...sql.matchAll(
+    /create\s+(?:or\s+replace\s+)?view\s+public\.application_queue\b([\s\S]*?);/gi)];
+  if (!defs.length) throw new Error("no create view public.application_queue found in sql/");
+
+  /* Strip comments before splitting: the last definition has a comma inside a
+     comment, and splitting first turns that prose into two column names. */
+  const body = defs[defs.length - 1][1].replace(/--[^\n]*/g, "");
+  const list = body.slice(body.search(/\bselect\b/i) + 6, body.search(/\bfrom\s+public\./i));
+
+  /* Top-level commas only — score_avg and is_ghosted are parenthesised. */
+  const items = [];
+  let depth = 0, cur = "";
+  for (const ch of list) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) { items.push(cur); cur = ""; continue; }
+    cur += ch;
+  }
+  items.push(cur);
+
+  const returned = new Set(items.map((s) => s.trim()).filter(Boolean).map((s) => {
+    const as = s.match(/\bas\s+([a-z_][a-z0-9_]*)\s*$/i);
+    return as ? as[1] : s.split(".").pop().trim();
+  }));
+  if (returned.size < 10) throw new Error("only parsed " + returned.size + " columns out of the view");
+
+  const page = read("admin.html");
+
+  /* Anything the page sets on a row after the fetch — socials, docs, disc, sit
+     come from four separate queries and are never the view's to return. */
+  const attached = new Set(
+    [...page.matchAll(/\ba\.([a-z_][a-z0-9_]*)\s*=[^=]/g)].map((m) => m[1]));
+
+  /* Every function that is handed a queue row. */
+  const FNS = ["rowHtml", "skillLine", "discLine", "sitLine", "contactLine", "scoreLine"];
+  const asked = new Map();
+  for (const fn of FNS) {
+    const at = page.indexOf("function " + fn + "(a)");
+    if (at < 0) throw new Error("no function " + fn + "(a) in admin.html — renamed? this check reads it by name");
+    let d = 0, end = at;
+    for (let i = page.indexOf("{", at); i < page.length; i++) {
+      if (page[i] === "{") d++;
+      else if (page[i] === "}") { d--; if (d === 0) { end = i; break; } }
+    }
+    for (const m of page.slice(at, end).matchAll(/\ba\.([a-z_][a-z0-9_]*)/g)) {
+      if (!asked.has(m[1])) asked.set(m[1], fn);
+    }
+  }
+
+  const missing = [...asked].filter(([c]) => !returned.has(c) && !attached.has(c));
+  if (missing.length) {
+    throw new Error("read off a queue row but not returned by application_queue: " +
+      missing.map(([c, fn]) => c + " (in " + fn + ")").join(", ") +
+      " — the row is fetched with select=*, so a column the view never selected " +
+      "arrives undefined and the fallback beside it prints instead of the answer. " +
+      "Add it to the view, or stop reading it.");
+  }
+  return asked.size + " fields read, all returned by the view or set by the page";
+});
+
 /* The queue is the last thing standing between a failed POST and a lost lead,
    so its behaviour is driven, not just parsed. tools/test-queue.mjs pulls the
    real block out of index.html and runs it against a mocked store. */
