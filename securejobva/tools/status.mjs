@@ -289,26 +289,57 @@ if (!SERVICE) {
     probe = ((u.users || [])[0] || {}).email || null;
   } catch { /* handled below */ }
 
+  /* redirect_to goes at the top level of the body. Nested under `options` —
+     where supabase-js puts it, which is why it was written that way — GoTrue
+     never reads it, quietly falls back to the Site URL, and every target comes
+     back substituted. That reports "0 of 4 allowed" against a perfectly good
+     allow-list, and did for two days across two handovers, each time sending
+     somebody into the dashboard to fix a setting that was already right.
+
+     The tell was in the output the whole time: the only target it ever called
+     allowed was the bare Site URL, because the Site URL is what the fallback
+     is. Every reading agreed with every other because none of them were
+     measurements. */
+  const ask = async (target) => {
+    const r = await fetch(AUTH + "/admin/generate_link", {
+      method: "POST",
+      headers: H2,
+      body: JSON.stringify({ type: "recovery", email: probe, redirect_to: target })
+    });
+    const j = await r.json();
+    if (!j.action_link) throw new Error(j.msg || j.message || ("HTTP " + r.status));
+    return new URL(j.action_link).searchParams.get("redirect_to");
+  };
+
+  /* A probe that cannot fail is not proving anything. This target must be
+     refused: it is not this site. If it comes back untouched then either the
+     allow-list admits the whole internet or the request has stopped reaching
+     the field again — and in both cases every answer below is worthless, so
+     say that instead of reporting a number nobody can trust. */
+  const CONTROL = "https://not-securejobva.example.invalid/status";
+
   /* Every page a link is ever sent to. /seats is the one api/invite.js uses. */
   const WANTED = ["/status", "/seats", "/hub", "/pay"];
-  let asked = 0, kept = 0, sub = null, why = null;
-  for (const path of probe ? WANTED : []) {
+  let asked = 0, kept = 0, sub = null, why = null, blind = false;
+  if (probe) {
+    try { blind = (await ask(CONTROL)) === CONTROL; }
+    catch (e) { why = e.message; }
+  }
+  for (const path of (probe && !blind) ? WANTED : []) {
     const want = SITE + path;
     try {
-      const r = await fetch(AUTH + "/admin/generate_link", {
-        method: "POST",
-        headers: H2,
-        body: JSON.stringify({ type: "recovery", email: probe, options: { redirect_to: want } })
-      });
-      const j = await r.json();
-      if (!j.action_link) { why = j.msg || j.message || ("HTTP " + r.status); continue; }
+      const got = await ask(want);
       asked++;
-      const got = new URL(j.action_link).searchParams.get("redirect_to");
       if (got === want) kept++; else sub = got;
     } catch (e) { why = e.message; }
   }
   if (!probe) {
     line("warn", "redirect targets", "no account to probe with");
+  } else if (blind) {
+    line("fail", "the redirect probe proved nothing",
+      "a target that is not even this site came back allowed — either the list admits " +
+      "anything, or redirect_to is not reaching GoTrue again. Fix the probe before " +
+      "trusting anything it says about the list.");
   } else if (!asked) {
     line("warn", "redirect targets", "could not ask the auth server" + (why ? " — " + why : ""));
   } else if (kept === WANTED.length) {
