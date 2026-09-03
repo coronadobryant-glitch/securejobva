@@ -734,6 +734,42 @@ img{max-width:100%}
 </style>
 
 <script>
+/* An emailed auth link whose redirect_to is refused falls back to the project's
+   Site URL, which is this page. This page has nothing that reads an auth
+   fragment, so the token has always died here: it sits in the address bar, the
+   password is never set, and from the outside it is indistinguishable from an
+   email that never arrived. That is what a password reset looked like for
+   anybody whose page was not on the allow-list.
+
+   The list is right now. This is here anyway, for two reasons. Every reset
+   email sent before it was corrected still carries the old target and still
+   lands here — fixing the configuration cannot reach into an inbox. And a
+   dashboard setting is a thing that can drift again, silently, in a way no
+   amount of reading this repo would catch; it already has, twice.
+
+   So the fragment is handed to a page that knows what to do with it rather
+   than trusted to arrive there. /status reads it, saves the session and shows
+   the set-a-password form; /seats is where a client invite is meant to land.
+   Errors travel too — an expired link should say so, not drop somebody on a
+   marketing page with nothing to click.
+
+   Returns the target instead of navigating, so it can be driven by a test
+   without a browser. Requires access_token, error_code or error_description
+   rather than a bare `error`, so an ordinary #anchor is never hijacked. */
+function forwardAuthFragment(loc) {
+  var h = loc.hash;
+  if (!h || h.length < 2) return "";
+  var p;
+  try { p = new URLSearchParams(h.slice(1)); } catch (e) { return ""; }
+  if (!p.get("access_token") && !p.get("error_code") && !p.get("error_description")) return "";
+  var kind = p.get("type") || "";
+  return ((kind === "invite" || kind === "magiclink") ? "/seats" : "/status") + h;
+}
+(function () {
+  var to = forwardAuthFragment(location);
+  if (to) location.replace(to);
+})();
+
 /* Restore the saved theme before paint so the page never flashes the wrong one. */
 (function () {
   try {

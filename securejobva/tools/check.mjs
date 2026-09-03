@@ -2291,6 +2291,28 @@ await check("an answered question stops being marked unanswered", async () => {
   }
 });
 
+/* An emailed auth link whose redirect_to is refused falls back to the project's
+   Site URL, which is the home page, which reads no auth fragment. So the token
+   sat in the address bar, the password was never set, and it looked exactly
+   like an email that never arrived — the shape this bug has worn all week.
+
+   The allow-list is correct now. This is not about the allow-list: every reset
+   email sent before it was corrected still carries the old target, and no
+   dashboard setting can reach into an inbox. A page that is the documented
+   fallback for every auth link the project sends has to do something with one.
+
+   Driven, and the half worth driving is the refusal: a forwarder that fires on
+   any hash sends somebody reading the pricing section to a sign-in page. */
+await check("an auth link that lands on the home page is handed on", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-auth-forward.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, four link types and the anchors it must not touch";
+  } catch (e) {
+    throw new Error("tools/test-auth-forward.mjs failed — run it directly to see which link");
+  }
+});
+
 /* Every pane on /admin is drawn by a loader called from render(). Interviews
    was not. Its one call had landed inside the client-logo upload handler, two
    spaces out of line with the callback around it, so the tab opened blank —
