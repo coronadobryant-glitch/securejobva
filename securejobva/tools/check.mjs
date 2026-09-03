@@ -2245,6 +2245,27 @@ await check("lead queue behaves", async () => {
   }
 });
 
+/* Nine screens sit behind one rail on /admin, and only the panes were ever
+   switched. The queue's toolbar and its backlog count live outside
+   .adm__canvas, so every other tab opened wearing them: an applicant search, a
+   pipeline filter, an "N of N", a Download CVs and an Export CSV that exports
+   the queue — on Clients, on Timesheets, on Placements. Nothing failed. Each
+   control did exactly what it says while the heading above it named a
+   different screen, which is why it read as furniture and survived being
+   looked at.
+
+   Driven rather than parsed: the rail, the toolbar and the switch are written
+   a thousand lines apart in build-portal.mjs and only meet in a browser. */
+await check("a tab shows the queue's toolbar only on the queue", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-admin-tabs.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, nine tabs";
+  } catch (e) {
+    throw new Error("tools/test-admin-tabs.mjs failed — run it directly to see which tab");
+  }
+});
+
 /* A SECURITY DEFINER function runs as its owner, so it reaches past every
    policy that applies to the caller. That is the point — is_admin() has to read
    a table the caller cannot — but it means the function body is the only thing

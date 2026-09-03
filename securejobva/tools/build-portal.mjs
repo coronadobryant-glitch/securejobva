@@ -5278,6 +5278,17 @@ function wireTabs() {
       while (grp && !grp.classList.contains("rail__k")) grp = grp.previousElementSibling;
       k.textContent = grp ? grp.textContent : "";
     }
+    /* The bar and the backlog number belong to the queue, not to every tab.
+       Both sit outside .adm__canvas, so the pane switch below never reached
+       them: Clients opened with a search for "name, email, country, region,
+       track", four applicant filters, a 4 of 4 count and an Export CSV that
+       hands you the applicant queue — under a heading reading Clients, and
+       beside a 4 waiting on you that was never about clients at all. */
+    var isApps = want === "apps";
+    var qbar = document.querySelector(".adm__bar");
+    if (qbar) qbar.hidden = !isApps;
+    var topn = document.querySelector(".adm__topn");
+    if (topn) topn.hidden = !isApps;
     root.querySelectorAll("[data-pane]").forEach(function (p) {
       if (p.getAttribute("data-pane") === want) p.removeAttribute("hidden");
       else p.setAttribute("hidden", "");
