@@ -2358,6 +2358,43 @@ await check("a refused paste stops being mentioned once she types", async () => 
   }
 });
 
+/* Two pages described the same two interviews and disagreed about who was in
+   the room. /careers promised, on the public timeline, "one with us, one with
+   the business you would work for" before the decision. Her own page said
+   "one on how you work, one on your setup and connection" — both with us, and
+   that is the process: SecureJobVA interviews, decides, and sends her to
+   training. The business meets her later, at placement, through the interview
+   handshake in 057 — which cannot even exist before then, because it hangs off
+   a placement row.
+
+   So the careers page was telling a stranger she would meet the client before
+   anybody had decided to hire her. Nobody would find that by reading either
+   page alone; it only shows when they are read together, which is what this
+   does. The stage description is the source, because it is the one the
+   applicant is shown while it is actually happening. */
+await check("both pages describe the same two interviews", () => {
+  if (!existsSync("careers.html") || !existsSync("status.html")) return "pages not built";
+  const stage = read("status.html").match(/"interview",\s*"Two interviews",\s*"([^"]+)"/);
+  if (!stage) {
+    throw new Error("no interview stage description in status.html — renamed? this reads it by name");
+  }
+  /* The stage sentence, minus its full stop, has to appear on the careers
+     timeline. Anything else means the two pages have drifted again. */
+  const said = stage[1].replace(/\.$/, "");
+  const careers = read("careers.html");
+  if (!careers.includes(said)) {
+    throw new Error("/careers does not describe the interviews the way /status does. " +
+      "Hers says: \"" + said + "\". The careers timeline has to say the same, or a stranger " +
+      "is being promised something the process does not do.");
+  }
+  if (/business you would work for/i.test(careers)) {
+    throw new Error("/careers still promises an interview with the business before the decision. " +
+      "The client only meets her after she is hired and matched — offer_interview hangs off a " +
+      "placement, which does not exist until then.");
+  }
+  return "same sentence on both, and no client interview promised before the decision";
+});
+
 /* The redirect probe can only ask where a link would land by asking the auth
    server to mint one, and a recovery token is single use — minting a new one
    voids the one already sitting in somebody's inbox. It took the first
