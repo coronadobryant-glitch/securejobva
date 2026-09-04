@@ -55,7 +55,7 @@ export function walk(html, fn) {
 }
 
 export const PAGES = [
-  ["index.html",    "es/index.html",    "/es/",         "/"],
+  ["index.html",    "es/index.html",    "/es",          "/"],
   ["careers.html",  "es/careers.html",  "/es/careers",  "/careers"],
   ["contact.html",  "es/contact.html",  "/es/contact",  "/contact"],
   ["privacy.html",  "es/privacy.html",  "/es/privacy",  "/privacy"],

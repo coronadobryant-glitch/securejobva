@@ -20,7 +20,7 @@ const PAGES = [
   {
     src: "index.html",
     path: "/",
-    alt: "/es/",
+    alt: "/es",
     /* The <title> in the page file names the Claude artifact; a search result
        wants more than the brand on its own, so dist gets this instead. */
     title: "Dedicated virtual assistants at $7.75/hr flat | SecureJobVA",
@@ -128,7 +128,7 @@ const PAGES = [
      other. The portal pages have no Spanish twin and no alt. */
   {
     src: "es/index.html",
-    path: "/es/",
+    path: "/es",
     lang: "es",
     alt: "/",
     title: "Asistentes virtuales dedicados a $7.75/hora fijos | SecureJobVA",
