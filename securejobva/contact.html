@@ -194,10 +194,27 @@ img{max-width:100%}
 .nav__links a.nav__cross:focus-visible,
 .nav__tools a.nav__cross:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
 .mobnav__in a.nav__cross{margin-top:.4rem}
+/* Staff shortcut. Injected by script, so it does not exist for the people
+   who make up nearly all of this page's traffic. */
+.nav__links a.nav__admin,
+.mobnav__in a.nav__admin{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  padding:.5rem .9rem;border-radius:8px;
+  border:1.5px solid var(--accent);color:var(--accent);
+  font-weight:600;line-height:1;
+  transition:background-color .16s ease,color .16s ease;
+}
+.nav__links a.nav__admin:hover,
+.mobnav__in a.nav__admin:hover{background:var(--accent);color:var(--accent-ink)}
+.mobnav__in a.nav__admin{margin-top:.4rem}
 .mobnav__in a.nav__signin{margin-top:.5rem}
 .nav__cta{margin-left:0}
 .nav__tools{display:flex;align-items:center;gap:.55rem;margin-left:auto}
-.themetog,.navtog{
+.langtog{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;font-weight:600;
+  letter-spacing:.02em;text-decoration:none;
+}
+.themetog,.navtog,.langtog{
   width:38px;height:38px;flex:none;
   display:inline-flex;align-items:center;justify-content:center;
   border:1px solid var(--line);border-radius:8px;
@@ -211,11 +228,26 @@ img{max-width:100%}
 .navtog[aria-expanded="true"] .i-close{display:block}
 
 .mobnav{border-top:1px solid var(--line);background:var(--paper);padding:.25rem 0 1.15rem}
-/* hidden means hidden, on anything, once. The attribute gets display:none from
-   the browser own stylesheet, and any author rule setting display beats it — so
-   an element the JS hides stays on screen. Hit four times here and patched one
-   element at a time each time; this is the line that stops the fifth. */
+/* hidden means hidden, on anything, once.
+
+   The hidden attribute gets display:none from the browser's own stylesheet,
+   which any author rule setting display beats — so an element the JS hides
+   stays on screen if some other rule gives it a display. This has been hit at
+   least four times in this project and patched one element at a time each
+   time: .mobnav, .step, .intake__foot, .logos, and most recently .cform, where
+   the contact form stayed on screen after a successful send with its Send
+   button reading "Sending…" for ever.
+
+   The specific rules below are left where they are — harmless now, and
+   rewriting five of them across four files to prove a point is churn. This one
+   line is what stops the sixth.
+
+   !important because there is no case where an author rule should win over
+   hidden. That is the whole meaning of the attribute. This block is inside the
+   part of the stylesheet lib-chrome.mjs lifts into the four generated pages,
+   so it reaches all seven from here. */
 [hidden]{display:none!important}
+
 .mobnav[hidden]{display:none}
 .mobnav__in{display:grid}
 .mobnav a{
@@ -273,16 +305,12 @@ img{max-width:100%}
 :root[data-theme="dark"] .doc__open{background:#2A2110}
 .doc__open b{display:block;margin-bottom:.3rem}
 
+/* Which language governs. Quiet on purpose — it is a fact about the document,
+   not a warning about it. */
+.doc__gov{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.8rem 1rem;margin:0 0 1.7rem;font-size:.88rem;color:var(--ink-2);line-height:1.6}
+.doc__gov a{color:var(--accent)}
+
 .cform{display:grid;gap:0}
-/* The send handler hides the form with the hidden attribute and shows the
-   note in its place. That did nothing here: `hidden` gets display:none from
-   the browser's own stylesheet, and any author rule setting display beats it —
-   so the line above kept the form on screen after a successful send, message
-   still in it, next to a Send button reading "Sending…" forever because it is
-   only re-enabled on failure. It said "Message sent." and looked like it was
-   still sending, which is the sort of thing that gets a message sent twice.
-   Found by pressing the button rather than by reading it. */
-.cform[hidden]{display:none}
 .cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
 .cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .cform label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
@@ -337,6 +365,7 @@ img{max-width:100%}
         <a href="/careers">Careers</a>
         <a href="/contact">Contact</a>
         <a class="nav__signin" href="/status">Sign in</a>
+        <a class="langtog" id="langtog" href="/es/contact" hreflang="es" lang="es" aria-label="Ver esta página en español">ES</a>
       </nav>
     </div>
   </div>
@@ -480,29 +509,11 @@ img{max-width:100%}
     btn.textContent = "Sending\u2026";
 
     fetch(ENDPOINT, { method: "POST", headers: HEADERS, body: JSON.stringify(d) })
-      .then(function (r) {
-        if (r.ok) return true;
-        /* A rule said no on purpose — 047 refuses a flood from one address —
-           and carries a message written for the person to read. Showing that
-           beats "that did not send", which invites them to try again into the
-           same limit. */
-        return r.text().then(function (t) {
-          var j = null;
-          try { j = JSON.parse(t); } catch (e) {}
-          if (j && typeof j.hint === "string" &&
-              j.hint.indexOf("sjva-") === 0 && j.message) return { refused: String(j.message) };
-          return false;
-        })["catch"](function () { return false; });
-      })
+      .then(function (r) { return r.ok; })
       ["catch"](function () { return false; })
       .then(function (sent) {
         form.setAttribute("hidden", "");
         done.removeAttribute("hidden");
-        if (sent && sent.refused) {
-          done.innerHTML = '<div class="cform__ok"><b>One moment.</b> ' +
-            String(sent.refused).replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>";
-          return;
-        }
         done.innerHTML = sent
           ? '<div class="cform__ok"><b>Message sent.</b> We answer within one to two business days, at ' +
             d.email.replace(/&/g, "&amp;").replace(/</g, "&lt;") + ".</div>"

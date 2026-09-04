@@ -20,6 +20,7 @@ const PAGES = [
   {
     src: "index.html",
     path: "/",
+    alt: "/es/",
     /* The <title> in the page file names the Claude artifact; a search result
        wants more than the brand on its own, so dist gets this instead. */
     title: "Dedicated virtual assistants at $7.75/hr flat | SecureJobVA",
@@ -30,6 +31,7 @@ const PAGES = [
   {
     src: "careers.html",
     path: "/careers",
+    alt: "/es/careers",
     title: "Online jobs: remote VA roles with paid training | SecureJobVA",
     description:
       "Online jobs hiring worldwide. Training is paid only after you pass the exams and are approved, then 40 hours a week on fixed hours in American time. No fee to apply, ever.",
@@ -66,6 +68,7 @@ const PAGES = [
   {
     src: "privacy.html",
     path: "/privacy",
+    alt: "/es/privacy",
     title: "Privacy Policy — SecureJobVA",
     description:
       "How SecureJobVA collects, uses and protects information from visitors, applicants and clients.",
@@ -74,6 +77,7 @@ const PAGES = [
   {
     src: "terms.html",
     path: "/terms",
+    alt: "/es/terms",
     title: "Terms of Service — SecureJobVA",
     description:
       "The terms you agree to by using securejobva.com, for both applicants and clients.",
@@ -82,6 +86,7 @@ const PAGES = [
   {
     src: "refunds.html",
     path: "/refunds",
+    alt: "/es/refunds",
     title: "Refund Policy — SecureJobVA",
     description:
       "How refunds, the free first week and the replacement guarantee work. Applicants are never charged.",
@@ -90,6 +95,7 @@ const PAGES = [
   {
     src: "contact.html",
     path: "/contact",
+    alt: "/es/contact",
     title: "Contact — SecureJobVA",
     description:
       "Reach SecureJobVA about an application, hiring, billing or a privacy request.",
@@ -112,6 +118,69 @@ const PAGES = [
     /* The address that goes in the weekly email. Signed in, and about one
        business's money, so it is no more for search than /seats is. */
     noindex: true
+  },
+
+  /* ── the Spanish half ──────────────────────────────────────────────────
+     Written by tools/build-es.mjs from the English pages, so these six are
+     generated and never edited by hand. Each one is paired with its English
+     original through `alt`, which becomes the hreflang links below: without
+     them the two versions compete in search instead of pointing at each
+     other. The portal pages have no Spanish twin and no alt. */
+  {
+    src: "es/index.html",
+    path: "/es/",
+    lang: "es",
+    alt: "/",
+    title: "Asistentes virtuales dedicados a $7.75/hora fijos | SecureJobVA",
+    description:
+      "Asistentes virtuales dedicados en atención al cliente, ventas y marketing, y soporte administrativo — asignados a su negocio en cerca de una semana a $7.75 la hora, tarifa fija. Sin cargo de instalación, sin cargo de reclutamiento, sin contrato a largo plazo.",
+    ogTitle: "Cubra las horas que no alcanza."
+  },
+  {
+    src: "es/careers.html",
+    path: "/es/careers",
+    lang: "es",
+    alt: "/careers",
+    title: "Empleos en línea: puestos remotos de asistente con formación pagada | SecureJobVA",
+    description:
+      "Empleos en línea con contratación en todo el mundo. La formación se paga solo después de que apruebes los exámenes y seas aceptado; después, 40 horas a la semana en horario fijo de Estados Unidos. Nunca se cobra por postular.",
+    ogTitle: "Empleos en línea con formación pagada y un puesto de tiempo completo."
+  },
+  {
+    src: "es/contact.html",
+    path: "/es/contact",
+    lang: "es",
+    alt: "/contact",
+    title: "Contacto — SecureJobVA",
+    description: "Preguntas sobre una postulación, sobre contratar o sobre facturación. Una persona lee todos los mensajes.",
+    ogTitle: "Hablemos."
+  },
+  {
+    src: "es/privacy.html",
+    path: "/es/privacy",
+    lang: "es",
+    alt: "/privacy",
+    title: "Política de privacidad — SecureJobVA",
+    description: "Cómo SecureJobVA recopila, usa y protege la información de visitantes, postulantes y clientes.",
+    ogTitle: "Política de privacidad"
+  },
+  {
+    src: "es/terms.html",
+    path: "/es/terms",
+    lang: "es",
+    alt: "/terms",
+    title: "Términos del servicio — SecureJobVA",
+    description: "Las condiciones bajo las que se usa securejobva.com. La versión en inglés es la que rige.",
+    ogTitle: "Términos del servicio"
+  },
+  {
+    src: "es/refunds.html",
+    path: "/es/refunds",
+    lang: "es",
+    alt: "/refunds",
+    title: "Política de reembolsos — SecureJobVA",
+    description: "La primera semana gratis, el reemplazo sin costo y cuándo se reembolsa. La versión en inglés es la que rige.",
+    ogTitle: "Política de reembolsos"
   }
 ];
 
@@ -164,8 +233,19 @@ function build(page) {
     ? '<meta name="robots" content="noindex, nofollow">'
     : "";
 
+  /* Each page points at its twin and at itself, which is what hreflang
+     wants: a pair that agrees. x-default goes to English, the language
+     somebody gets when we cannot tell. */
+  const alt = page.alt
+    ? [
+        '<link rel="alternate" hreflang="en" href="' + SITE + (page.lang === "es" ? page.alt : page.path) + '">',
+        '<link rel="alternate" hreflang="es" href="' + SITE + (page.lang === "es" ? page.path : page.alt) + '">',
+        '<link rel="alternate" hreflang="x-default" href="' + SITE + (page.lang === "es" ? page.alt : page.path) + '">'
+      ].join(String.fromCharCode(10))
+    : "";
+
   const doc = `<!doctype html>
-<html lang="en">
+<html lang="${page.lang || "en"}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -188,6 +268,7 @@ function build(page) {
 <meta name="twitter:description" content="${page.description}">
 <meta name="twitter:image" content="${SITE}/og.png">
 ${robots}
+${alt}
 ${head}
 </head>
 <body>
@@ -201,6 +282,7 @@ ${body}
 }
 
 mkdirSync("dist", { recursive: true });
+mkdirSync("dist/es", { recursive: true });
 
 const built = PAGES.map(build);
 

@@ -2374,6 +2374,101 @@ await check("the typing part measures what was actually typed", async () => {
   }
 });
 
+/* The Spanish half of the public site is generated from the English half by
+   tools/build-es.mjs, which refuses to write a page until every segment on it
+   has a translation. Running it here is how that refusal reaches the build:
+   without this, adding an English sentence would leave the Spanish page a
+   version behind and nothing would say so.
+
+   It is also why the Spanish is a build step rather than a script that
+   rewrites the page in the browser. Every guard in this file reads the English
+   pages, and the English pages are untouched. */
+await check("every Spanish page is a complete translation", async () => {
+  if (!existsSync("es/strings.json")) return "no translations yet";
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/build-es.mjs", "--check"], { stdio: "pipe" }).toString();
+    const pages = (out.match(/matches what the generator produces/g) || []).length;
+    const strings = Object.keys(JSON.parse(read("es/strings.json"))).length;
+    return pages + " pages, " + strings + " strings, none missing";
+  } catch (e) {
+    const said = (e.stdout ? e.stdout.toString() : "").split("\n")
+      .filter((l) => l.indexOf("NOT WRITTEN") > -1).join("; ");
+    throw new Error("a Spanish page is behind its English original — " +
+      (said || "run node tools/build-es.mjs for the list"));
+  }
+});
+
+/* The two versions have to point at each other. A language link that only goes
+   one way is a page somebody can reach and not leave, and hreflang that is not
+   reciprocal is ignored by search engines entirely — so the Spanish page would
+   compete with the English one instead of being offered instead of it. */
+await check("the two languages point at each other", () => {
+  const PAIRS = [
+    ["index.html", "es/index.html"],
+    ["careers.html", "es/careers.html"],
+    ["contact.html", "es/contact.html"],
+    ["privacy.html", "es/privacy.html"],
+    ["terms.html", "es/terms.html"],
+    ["refunds.html", "es/refunds.html"]
+  ];
+  const bad = [];
+  for (const [en, es] of PAIRS) {
+    if (!existsSync(en) || !existsSync(es)) continue;
+    const a = read(en), b = read(es);
+    if (a.indexOf('class="langtog"') < 0) bad.push(en + " has no language link");
+    if (b.indexOf('class="langtog"') < 0) bad.push(es + " has no language link");
+    if (b.indexOf(">EN</a>") < 0) bad.push(es + " still offers Spanish to a Spanish reader");
+    if (a.indexOf(">ES</a>") < 0) bad.push(en + " still offers English to an English reader");
+  }
+  if (bad.length) throw new Error(bad.join("; "));
+
+  /* And the pairing in the manifest, which is what becomes hreflang. */
+  const build = read("build.mjs");
+  for (const [, es] of PAIRS) {
+    if (build.indexOf('src: "' + es + '"') < 0) {
+      throw new Error(es + " is not in build.mjs, so it is never written to dist/ — " +
+        "the language link on its English twin points at a 404");
+    }
+  }
+  return PAIRS.length + " pairs, each linking both ways";
+});
+
+/* The one way a translation can break the product rather than just read badly.
+
+   value= and name= are what the browser submits: the track names the schema
+   matches on, the shift names, the DISC indices, the contact reason that lands
+   in contact_messages.reason. Translating one would put Spanish in a column the
+   product reads in English, and nothing would fail until a track stopped
+   scoring — months later, quietly, on somebody's real application.
+
+   tools/lib-seg.mjs excludes both attributes from what it will ever touch. This
+   checks the result rather than trusting the intent. */
+await check("translation never changes what a form submits", () => {
+  const PAIRS = [
+    ["index.html", "es/index.html"],
+    ["careers.html", "es/careers.html"],
+    ["contact.html", "es/contact.html"]
+  ];
+  const submitted = (h) => [...h.matchAll(/(value|name)="([^"]*)"/g)].map((m) => m[1] + "=" + m[2]);
+  for (const [en, es] of PAIRS) {
+    if (!existsSync(en) || !existsSync(es)) continue;
+    const a = submitted(read(en)), b = submitted(read(es));
+    if (a.length !== b.length) {
+      throw new Error(es + " submits " + b.length + " values where " + en + " submits " +
+        a.length + " — the translation has added or dropped a field");
+    }
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) {
+        throw new Error(es + " changed a submitted value: " + en + " sends " + a[i] +
+          " and the Spanish page sends " + b[i] + ". These reach the database and are " +
+          "matched in English; only the label a person reads may be translated.");
+      }
+    }
+  }
+  return "every submitted value identical across both languages";
+});
+
 /* The typing test moved back onto this page and the row that introduces it
    did not. It still read "A test on another site, and a connection check" —
    so the card sent her looking for a test that is three inches below it, and

@@ -69,6 +69,11 @@ const CSS = `
 :root[data-theme="dark"] .doc__open{background:#2A2110}
 .doc__open b{display:block;margin-bottom:.3rem}
 
+/* Which language governs. Quiet on purpose — it is a fact about the document,
+   not a warning about it. */
+.doc__gov{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.8rem 1rem;margin:0 0 1.7rem;font-size:.88rem;color:var(--ink-2);line-height:1.6}
+.doc__gov a{color:var(--accent)}
+
 .cform{display:grid;gap:0}
 .cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
 .cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
@@ -113,6 +118,8 @@ function shell(o) {
     '        <a href="/careers">Careers</a>',
     '        <a href="/contact">Contact</a>',
     '        <a class="nav__signin" href="/status">Sign in</a>',
+    '        <a class="langtog" id="langtog" href="' + o.es + '" hreflang="es" ' +
+      'lang="es" aria-label="Ver esta página en español">ES</a>',
     "      </nav>",
     "    </div>",
     "  </div>",
@@ -488,14 +495,17 @@ const CONTACT_SCRIPT = [
   "</script>"
 ].join(nl);
 
+/* The fifth column is where the language link points. Written out per page
+   rather than derived from the filename: /contact and /privacy do not follow
+   one rule, and a link that guesses is a link that 404s. */
 const PAGES = [
-  ["privacy.html",  "Privacy Policy — SecureJobVA",  PRIVACY, ""],
-  ["terms.html",    "Terms of Service — SecureJobVA", TERMS,  ""],
-  ["refunds.html",  "Refund Policy — SecureJobVA",   REFUNDS, ""],
-  ["contact.html",  "Contact — SecureJobVA",         CONTACT, CONTACT_SCRIPT]
+  ["privacy.html",  "Privacy Policy — SecureJobVA",  PRIVACY, "",             "/es/privacy"],
+  ["terms.html",    "Terms of Service — SecureJobVA", TERMS,  "",             "/es/terms"],
+  ["refunds.html",  "Refund Policy — SecureJobVA",   REFUNDS, "",             "/es/refunds"],
+  ["contact.html",  "Contact — SecureJobVA",         CONTACT, CONTACT_SCRIPT, "/es/contact"]
 ];
 
-for (const [file, title, body, script] of PAGES) {
-  writeFileSync(file, shell({ title, body, script }));
+for (const [file, title, body, script, es] of PAGES) {
+  writeFileSync(file, shell({ title, body, script, es }));
   console.log(file + " written");
 }
