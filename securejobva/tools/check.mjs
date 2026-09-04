@@ -1955,7 +1955,7 @@ await check("no generated page has lost a fix to its generator", () => {
     ["seats.html",  "function billingBlock", "the bill"],
     ["seats.html",  "function quoted",      "the quote shown to the cent"],
     ["seats.html",  "C_WEEK_LIMIT",         "the statement's week limit"],
-    ["status.html", "TYPING_TEST_URL",      "the typing test moved off this site"],
+    ["status.html", "typingAccuracy",       "the typing test is measured in the page"],
     ["status.html", "typing_proof",         "proof of the typing score"],
     ["admin.html",  "function todayCentral", "dates stamped in Central"],
     ["admin.html",  "function downloadCvs", "the bulk CV download"],

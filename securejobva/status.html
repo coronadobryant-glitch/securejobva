@@ -2442,47 +2442,46 @@ function partShell(title, ends, inner, doneLabel, pill) {
   }, 500);
 }
 
-/* Where the typing test now happens. It is a link rather than a page of ours,
-   and that is the point: the score arrives with something behind it instead of
-   being whatever a browser said. Change this to whichever test you settle on —
-   pick one whose result has its own address, because the whole value here is
-   that somebody at this end can open the proof and read it. */
-var TYPING_TEST_URL = "https://10fastfingers.com/typing-test/english";
-var TYPING_TEST_NAME = "10FastFingers";
+/* The typing test, back on this page.
 
+   It was moved to another site because a number she types into a box is not
+   evidence and a link to a result page is something a person can open. That
+   was right about the evidence and wrong about the cost: every application
+   then needed somebody to open two links and copy two numbers across, which
+   is a job that does not survive the first dozen applicants.
+
+   So the passage is typed here and the browser measures it. That is still the
+   browser's word, and it goes in the columns that mean "what she reported"
+   rather than the two that mean "somebody checked" — those stay yours to
+   overrule after the interview. But it is a measurement of an actual typing
+   run instead of a number she liked the look of, and the accuracy is measured
+   against the passage rather than asserted.
+
+   Pasting is refused, for the same reason and with the same honest limit as
+   the written reply: a speed bump, not a wall.
+
+   The connection speed test stays a link. That one genuinely cannot be
+   measured from in here, and it is the thing that stops somebody starting a
+   client on a line that cannot hold a call. */
 function typingPart() {
   partShell("Typing and accuracy", 0,
-    '<p class="msg" style="margin:1rem 0">Take the test at ' +
-      '<a href="' + esc(TYPING_TEST_URL) + '" target="_blank" rel="noopener">' +
-      esc(TYPING_TEST_NAME) + "</a>, then come back and tell us what you scored. " +
-      "Accuracy counts for more than speed &mdash; work somebody has to redo is slower " +
-      "than typing slowly.</p>" +
+    '<p class="msg" style="margin:1rem 0">Type the message below exactly as it is written. ' +
+      "We time it from your first keystroke, so start when you are ready &mdash; and type it as you " +
+      "would really send it. Accuracy counts for more than speed: work somebody has to redo is " +
+      "slower than typing slowly.</p>" +
 
-    '<div class="note" style="margin-bottom:1.1rem"><b>We check every one.</b> ' +
-      "Paste a link to your result page, or to a screenshot of it. A score nobody " +
-      "can check is not counted, so this part matters as much as the number.</div>" +
+    '<p style="margin:0 0 1rem;padding:.9rem 1rem;border-radius:8px;background:var(--paper);' +
+      'border:1px solid var(--line);font-size:.95rem;line-height:1.7">' + esc(TYPE_TEXT) + "</p>" +
 
-    '<label class="a-lbl" for="a-wpm">Words per minute</label>' +
-    '<input id="a-wpm" type="number" min="0" max="250" step="1" inputmode="numeric" ' +
-      'style="width:100%;margin:.4rem 0 1rem" placeholder="e.g. 58">' +
+    '<div class="note" style="margin-bottom:1.1rem"><b>Type it yourself.</b> ' +
+      "Pasting is turned off here, and the number that counts is the one measured while you " +
+      "type &mdash; there is nothing to fill in.</div>" +
 
-    '<label class="a-lbl" for="a-acc">Accuracy, as a percentage</label>' +
-    '<input id="a-acc" type="number" min="0" max="100" step="1" inputmode="numeric" ' +
-      'style="width:100%;margin:.4rem 0 1rem" placeholder="e.g. 97">' +
+    '<label class="a-lbl" for="a-type">Type it here</label>' +
+    '<textarea id="a-type" rows="6" style="width:100%;margin:.4rem 0 .3rem" ' +
+      'placeholder="Start typing the message above"></textarea>' +
+    '<p class="msg" id="a-live" style="margin:.3rem 0 1.3rem">Not started yet.</p>' +
 
-    '<label class="a-lbl" for="a-proof">Link to your result, or to a screenshot of it</label>' +
-    '<input id="a-proof" type="url" maxlength="500" ' +
-      'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://">' +
-    '<p class="msg" style="margin-top:.3rem">Most tests give the result its own address. ' +
-      "If yours does not, put a screenshot in Google Drive or Dropbox and paste a link " +
-      "anyone can open.</p>" +
-
-    /* The connection check. The application form has asked about equipment and
-       internet since 005 as a yes-or-no that nobody could verify, which made
-       it a question rather than a check. This is the one thing the better
-       agencies genuinely do that this process did not. It rides along here
-       because she is already off on another website for the typing test, so it
-       costs one more link rather than one more part. */
     '<label class="a-lbl" for="a-conn">Link to a speed test of your connection</label>' +
     '<input id="a-conn" type="url" maxlength="500" ' +
       'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://">' +
@@ -2491,12 +2490,51 @@ function typingPart() {
       "cannot hold a call.</p>",
     "Save this part", "no time limit");
 
+  var box = document.getElementById("a-type");
+  var live = document.getElementById("a-live");
+  var conn = document.getElementById("a-conn");
+  var started = 0;
+
+  /* Everything that puts text in without it being typed. Same pair as the
+     written reply, and the same message taken down again the moment she
+     starts typing, so a refused paste does not follow her to the end. */
+  ["paste", "drop"].forEach(function (ev) {
+    box.addEventListener(ev, function (e) {
+      e.preventDefault();
+      var w = document.getElementById("a-err");
+      if (w) {
+        w.style.display = "";
+        w.textContent = "Type it yourself — pasting is turned off on this part.";
+      }
+    });
+  });
+
+  /* Gross words a minute, the way every typing test counts it: five characters
+     is a word. Accuracy is the edit distance against the passage, which is the
+     one number here that cannot be inflated by typing faster. */
+  function figures() {
+    var typed = box.value;
+    var secs = started ? (Date.now() - started) / 1000 : 0;
+    if (!typed.length || secs < 1) return { wpm: 0, acc: typed.length ? typingAccuracy(typed) : 0, secs: secs };
+    var wpm = Math.round((typed.length / 5) / (secs / 60));
+    return { wpm: Math.max(0, Math.min(250, wpm)), acc: typingAccuracy(typed), secs: secs };
+  }
+
+  box.addEventListener("input", function () {
+    if (!started) started = Date.now();
+    var f = figures();
+    live.textContent = f.secs < 1
+      ? "Timing from your first keystroke…"
+      : f.wpm + " wpm, " + f.acc + "% accurate so far";
+    var w = document.getElementById("a-err");
+    if (w && w.textContent.indexOf("pasting is turned off") > -1) {
+      w.textContent = "";
+      w.style.display = "none";
+    }
+  });
+
   document.getElementById("a-done").addEventListener("click", function () {
     var err = document.getElementById("a-err");
-    var wpm = document.getElementById("a-wpm");
-    var acc = document.getElementById("a-acc");
-    var proof = document.getElementById("a-proof");
-    var conn = document.getElementById("a-conn");
     var fail = function (m, el) {
       err.style.display = "";
       err.textContent = m;
@@ -2504,27 +2542,14 @@ function typingPart() {
     };
     err.style.display = "none";
 
-    var w = Number(wpm.value);
-    var a = Number(acc.value);
-    var p = String(proof.value || "").trim();
+    var f = figures();
+    /* Enough of it, and long enough, for the numbers to mean anything. Four
+       words in two seconds is a very fast typist by arithmetic and by nothing
+       else. */
+    if (box.value.length < 60 || f.secs < 5) {
+      return fail("Type the message above first — we measure it as you go.", box);
+    }
     var c = String(conn.value || "").trim();
-
-    if (!wpm.value || !(w >= 0 && w <= 250)) {
-      return fail("Enter your words per minute — the number the test gave you.", wpm);
-    }
-    if (!acc.value || !(a >= 0 && a <= 100)) {
-      return fail("Enter your accuracy as a percentage, between 0 and 100.", acc);
-    }
-    /* Checked before the score saves, so nobody is told to go and find a link
-       after the numbers have already gone. Checked loosely on purpose — what
-       matters is that a person at this end can open it, not that it matches
-       some pattern. */
-    if (!/^https?:\/\/\S+\.\S+/i.test(p)) {
-      return fail("Paste a link we can open — it should start with http.", proof);
-    }
-    if (p.length > 500) {
-      return fail("That link is too long. Use a shorter one.", proof);
-    }
     if (!/^https?:\/\/\S+\.\S+/i.test(c)) {
       return fail("Paste a link to your speed test too — speedtest.net gives you one.", conn);
     }
@@ -2533,9 +2558,8 @@ function typingPart() {
     }
 
     closePart({
-      typing_wpm: Math.round(w),
-      typing_accuracy: Math.round(a),
-      typing_proof: p,
+      typing_wpm: f.wpm,
+      typing_accuracy: f.acc,
       connection_proof: c
     }, "typing");
   });

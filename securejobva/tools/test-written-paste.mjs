@@ -24,7 +24,11 @@
 import { readFileSync } from "node:fs";
 
 const html = readFileSync("status.html", "utf8");
-const from = html.indexOf('box.addEventListener("input", function () {');
+/* Anchored inside writtenPart, because the typing part now wires a box of
+   its own and indexOf would hand back whichever comes first in the file. */
+const wp = html.indexOf("function writtenPart(");
+if (wp < 0) throw new Error("no writtenPart() in status.html");
+const from = html.indexOf('box.addEventListener("input", function () {', wp);
 if (from < 0) throw new Error("no input handler on the written box in status.html");
 const to = html.indexOf("box.focus();", from);
 if (to < 0) throw new Error("could not find the end of the written wiring");
