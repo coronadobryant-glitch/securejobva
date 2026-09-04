@@ -2336,6 +2336,28 @@ await check("a link that failed says so, signed in or not", async () => {
   }
 });
 
+/* The written reply is the one part of the assessment a chatbot can simply
+   write, so pasting is refused there. That half held the first time anybody
+   tried it — paste and drop are both cancelled and nothing lands.
+
+   The refusal outlived the paste, though: it wrote a line and nothing took it
+   down, so somebody who tried once, was refused, and then wrote all hundred
+   and fifty words by hand was still being told off for pasting when they
+   pressed Done. The same rule as the apply form earlier today, one page over.
+
+   Only that line is cleared on typing. #a-err is shared with closePart(), and
+   a save that failed is not answered by the next keystroke — which is the
+   half a careless fix gets wrong, so it is asserted too. */
+await check("a refused paste stops being mentioned once she types", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-written-paste.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, the guard and the line it left behind";
+  } catch (e) {
+    throw new Error("tools/test-written-paste.mjs failed — run it directly to see which half");
+  }
+});
+
 /* The redirect probe can only ask where a link would land by asking the auth
    server to mint one, and a recovery token is single use — minting a new one
    voids the one already sitting in somebody's inbox. It took the first

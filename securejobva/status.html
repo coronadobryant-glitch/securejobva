@@ -2638,6 +2638,21 @@ function writtenPart() {
        the part where losing the work would hurt most — twenty minutes of
        writing against a tab that closed. */
     saveProgress("written_reply", function () { return box.value.slice(0, 8000); });
+
+    /* The refusal below is about a paste, and the paste is over. Typing is
+       the thing it asked for, so the first keystroke answers it — otherwise
+       somebody tries to paste once, is correctly refused, writes the whole
+       hundred and fifty words by hand, and is still being told off for
+       pasting when they press Done. Found doing exactly that.
+
+       Only this message is cleared. #a-err is shared with closePart, and a
+       save that failed is not something a keystroke resolves — clearing that
+       on the next letter typed would hide the one error here worth seeing. */
+    var pasteWarn = document.getElementById("a-err");
+    if (pasteWarn && pasteWarn.textContent.indexOf("pasting is turned off") > -1) {
+      pasteWarn.textContent = "";
+      pasteWarn.style.display = "none";
+    }
   });
   /* Pasting is off here, and this is the part where it matters most.
 
