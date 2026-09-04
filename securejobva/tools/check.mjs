@@ -2559,7 +2559,11 @@ await check("both pages describe the same two interviews", () => {
       "Hers says: \"" + said + "\". The careers timeline has to say the same, or a stranger " +
       "is being promised something the process does not do.");
   }
-  if (/business you would work for/i.test(careers)) {
+  /* Any phrasing, not one sentence. The first version of this named
+     "business you would work for" exactly, and /careers still carried "the
+     business you would sit with" in the four-stage section — the same promise,
+     four sections down, passing a guard written against its wording. */
+  if (/business you would/i.test(careers) || /interview with the business/i.test(careers)) {
     throw new Error("/careers still promises an interview with the business before the decision. " +
       "The client only meets her after she is hired and matched — offer_interview hangs off a " +
       "placement, which does not exist until then.");
