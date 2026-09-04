@@ -4133,12 +4133,21 @@ function notAdmin(email) {
   );
 }
 
+/* What the dropdown calls a stage, where that differs from what a pill calls
+   it. Setting Approved is how you record that paid training has started — her
+   rung says so in as many words — but the control said only "Approved", so the
+   person marking it had to know that from somewhere else.
+
+   Only the control is relabelled. LABEL still draws the pill on her own page
+   and on the row, where a short word is the right word. */
+var SET_LABEL = { approved: "Approved — in training" };
+
 function options(cur) {
   var keys = ["applied", "assessment", "interview", "approved", "hired", "declined"];
   var out = "";
   for (var i = 0; i < keys.length; i++) {
     out += '<option value="' + keys[i] + '"' + (keys[i] === cur ? " selected" : "") + ">" +
-           LABEL[keys[i]] + "</option>";
+           (SET_LABEL[keys[i]] || LABEL[keys[i]]) + "</option>";
   }
   return out;
 }

@@ -2395,6 +2395,32 @@ await check("both pages describe the same two interviews", () => {
   return "same sentence on both, and no client interview promised before the decision";
 });
 
+/* Approved is the stage that means paid training has started. Her rung says
+   so in as many words, and the email she gets says it twice — but the control
+   that sets it said only "Approved", so the person marking it had to know
+   from somewhere else that it was the training step. It was asked out loud,
+   which is how it got found.
+
+   The pill stays short: LABEL draws it on her own page too, where a long
+   phrase in small caps helps nobody. Only the dropdown is relabelled, and
+   this pins that — including that her page did not quietly change with it. */
+await check("the stage you set says what it does", () => {
+  if (!existsSync("admin.html") || !existsSync("status.html")) return "pages not built";
+  const admin = read("admin.html");
+  const opt = admin.match(/var SET_LABEL = {([^}]*)}/);
+  if (!opt) throw new Error("no SET_LABEL in admin.html — the dropdown no longer relabels anything");
+  if (!/approved/.test(opt[1]) || !/training/i.test(opt[1])) {
+    throw new Error("the stage dropdown no longer tells you Approved means training. " +
+      "Somebody setting it cannot see that it is the training step.");
+  }
+  /* And her page keeps the short word. */
+  if (/Approved — in training/.test(read("status.html"))) {
+    throw new Error("the long label leaked onto /status — LABEL draws her pill, and only " +
+      "the admin control was meant to change");
+  }
+  return "the control says training, her pill still says Approved";
+});
+
 /* The redirect probe can only ask where a link would land by asking the auth
    server to mint one, and a recovery token is single use — minting a new one
    voids the one already sitting in somebody's inbox. It took the first
