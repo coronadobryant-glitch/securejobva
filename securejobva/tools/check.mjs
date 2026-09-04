@@ -2358,6 +2358,83 @@ await check("a refused paste stops being mentioned once she types", async () => 
   }
 });
 
+/* The typing part is measured rather than reported now, and a measurement
+   nobody has watched being taken is just a number with a better story. This
+   types the passage at a known speed and requires the page to say that speed
+   back — plus the floors that stop four words in two seconds being a very
+   fast typist, the paste guard and the line it leaves behind, and the edit
+   distance costing one missed letter what one missed letter should cost. */
+await check("the typing part measures what was actually typed", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-typing.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, typed a character at a time";
+  } catch (e) {
+    throw new Error("tools/test-typing.mjs failed — run it directly to see which scenario");
+  }
+});
+
+/* The typing test moved back onto this page and the row that introduces it
+   did not. It still read "A test on another site, and a connection check" —
+   so the card sent her looking for a test that is three inches below it, and
+   the one part of the assessment that now needs nothing but the page was the
+   one described as needing another website.
+
+   Nothing failed. The part worked, the measurement was right, and the sentence
+   above it was left over from the arrangement it replaced. That is the same
+   shape as the careers page below: copy that outlived the thing it described,
+   findable only by reading the description against the behaviour.
+
+   So this reads them against each other. Where the test actually lives is not
+   a matter of opinion — typingAccuracy() in the page means it is measured
+   here — and the row has to agree. */
+await check("the typing row says where the typing happens", () => {
+  if (!existsSync("status.html")) return "page not built";
+  const page = read("status.html");
+
+  /* Read by anchor and by quote position rather than by a pattern: the row is
+     four arguments across two lines, and something that has to span them is one
+     reformat away from matching nothing. The odd-numbered pieces of a split on
+     the quote character are what was inside the quotes, so the part key, the
+     title and the description come back in that order. */
+  const at = page.indexOf('part("typing"');
+  if (at < 0) {
+    throw new Error("no typing row in the assessment card in status.html — " +
+      "renamed? this reads it by the part key");
+  }
+  const quoted = page.slice(at, at + 400).split('"').filter((_, i) => i % 2);
+  const said = quoted[2] || "";
+
+  /* Measured here, or not. Both halves have to be true together: the arithmetic
+     and the box she types into. */
+  const here = page.includes("function typingAccuracy(") && page.includes('id="a-type"');
+  if (!here) {
+    throw new Error("the typing test is no longer measured in status.html. If it has moved " +
+      "off the page again, this guard and the row's description both have to move with it — " +
+      "that is the drift it exists to stop.");
+  }
+
+  if (/(another|other) (site|website)/i.test(said)) {
+    throw new Error("the assessment card still sends her to another site for the typing: " +
+      '"' + said + '". It is typed on this page and measured by the browser, so the row is ' +
+      "telling her to go and find a test that is already in front of her.");
+  }
+  if (!/type/i.test(said)) {
+    throw new Error("the typing row no longer says she types anything: \"" + said + "\". " +
+      "It is the only description she gets before opening the part.");
+  }
+
+  /* The connection speed test is the one thing here that genuinely is
+     somewhere else, and it has to stay described that way. */
+  if (!page.includes("speedtest.net")) {
+    throw new Error("the connection speed test link is gone from the typing part — that one " +
+      "cannot be measured in the browser, and it is what stops somebody starting a client on " +
+      "a line that will not hold a call.");
+  }
+
+  return "typed and measured in the page, and the row says so";
+});
+
 /* Two pages described the same two interviews and disagreed about who was in
    the room. /careers promised, on the public timeline, "one with us, one with
    the business you would work for" before the decision. Her own page said

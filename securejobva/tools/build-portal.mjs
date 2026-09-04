@@ -2014,7 +2014,7 @@ function assessCard(a, s) {
       part("written", wantsSales ? 5 : 4, "Written reply to a customer",
         "Twenty minutes, about 150 words", done.written) +
       part("typing", wantsSales ? 6 : 5, "Typing and your setup",
-        "A test on another site, and a connection check",
+        "A short message to type, and a connection check",
         done.typing, done.typing ? s.typing_wpm + " wpm, we check it" : "") +
     "</ol>" +
     (left === 0
@@ -2098,12 +2098,13 @@ function closePart(patch, part, err) {
    the inline script and the audit found the one in the prose too. */
 /* mins of 0 means there is no clock on this one.
 
-   The typing part used to run here and was timed, because the typing happened
-   here. It happens on another site now, and this part is a form for reporting
-   what it said — putting a five-minute countdown on typing three numbers would
-   be theatre. It still goes through this shell rather than rendering its own
-   card, because the alternative was a second copy of #a-err and #a-done in the
-   source, and the comment below already explains why that is a bad trade. */
+   The typing part is the only caller that passes 0. The typing happens here
+   again and is measured here, but it is still not timed: it is timed from her
+   first keystroke to her last, by the part itself, and a deadline on top of
+   that would be a second clock measuring the same thing and disagreeing with
+   it. It goes through this shell rather than rendering its own card, because
+   the alternative was a second copy of #a-err and #a-done in the source, and
+   the comment below already explains why that is a bad trade. */
 /* ── the deadline, and what happens when it passes ────────────────────────
 
    Three things were wrong with the clock and they compounded.
