@@ -5248,8 +5248,26 @@ function drawCalendar() {
     if (gap < 3600000) clashes.push([upcoming[i - 1], upcoming[i]]);
   }
 
+  /* Booked for somebody who has not sat the exams yet.
+
+     The process is assessment first, then interviews — STAGES says so and
+     /careers tells applicants so. The screen does not enforce it: the
+     interview date sits on every row with no stage gate, so a date can be
+     set on somebody still at applied.
+
+     That stays allowed on purpose. Pencilling in a time before the exams are
+     finished is a reasonable thing to want, and this project has been hurt
+     more by controls that refuse legitimate things than by ones that permit
+     early ones. What was missing was being told — an interview quietly
+     booked for somebody who has not been assessed is an hour of your time
+     spent on a decision the exams might have made for you. */
+  var beforeAssessment = booked.filter(function (a) {
+    return !a.sit || !a.sit.submitted_at;
+  });
+
   var badge = document.getElementById("tab-cal");
-  var problems = unresolved.length + clashes.length + atInterviewNoDate.length;
+  var problems = unresolved.length + clashes.length + atInterviewNoDate.length +
+    beforeAssessment.length;
   if (badge) badge.textContent = problems ? String(problems) : "";
 
   var issues = "";
@@ -5268,6 +5286,13 @@ function drawCalendar() {
             "Nothing will remind you about these: " +
             atInterviewNoDate.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
             (atInterviewNoDate.length > 6 ? " and " + (atInterviewNoDate.length - 6) + " more" : "") + "</p>"
+          : "") +
+        (beforeAssessment.length
+          ? '<p class="cal__i"><b>' + beforeAssessment.length +
+            " booked before sitting the assessment.</b> " +
+            "The exams and the strengths test come first, and these have not sent one: " +
+            beforeAssessment.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
+            (beforeAssessment.length > 6 ? " and " + (beforeAssessment.length - 6) + " more" : "") + "</p>"
           : "") +
         (clashes.length
           ? '<p class="cal__i"><b>' + clashes.length + " booked within an hour of each other.</b> " +

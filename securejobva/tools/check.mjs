@@ -2374,6 +2374,30 @@ await check("the typing part measures what was actually typed", async () => {
   }
 });
 
+/* The Interviews tab is the only thing that raises what nobody else would
+   notice: an interview that has been and gone with nothing written down, a
+   stage set with no date, two bookings inside an hour, and an interview
+   booked for somebody who has not sat the assessment.
+
+   That last one is there because the process and the screen disagree on
+   purpose. The exams come before the interviews, and the interview date sits
+   on every row with no stage gate — which stays allowed, because pencilling
+   in a time early is a reasonable thing to want. Saying so is the fix; 
+   refusing it would not be.
+
+   Nothing drove this function until today. It shipped being called from
+   exactly two places, one of them the client-logo upload handler, and the tab
+   was blank on load for a fortnight. */
+await check("the interviews tab raises what nobody would notice", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-interview-flags.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours across all four flags";
+  } catch (e) {
+    throw new Error("tools/test-interview-flags.mjs failed — run it directly to see which flag");
+  }
+});
+
 /* The Spanish half of the public site is generated from the English half by
    tools/build-es.mjs, which refuses to write a page until every segment on it
    has a translation. Running it here is how that refusal reaches the build:
