@@ -325,8 +325,12 @@ is("and says which exams", sent.body.text.includes("strengths test"), true);
 is("and greets them by first name", sent.body.text.startsWith("Hi Maria,"), true);
 
 await call(STAGE("interview"));
-is("the interviews email says there are two",
-  sent.body.text.includes("one on how you work"), true);
+is("the interview email says one, not two",
+  sent.body.text.includes("One interview with us"), true);
+is("and the subject says one too",
+  sent.body.subject, "Your application — interview next");
+is("and nothing in it still says two",
+  /two interviews|There are two/i.test(sent.body.subject + " " + sent.body.text), false);
 
 await call(STAGE("approved"));
 is("approved repeats the training promise",

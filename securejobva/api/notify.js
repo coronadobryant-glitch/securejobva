@@ -244,10 +244,10 @@ const STAGE_MAIL = {
     where: "/status", label: "See where you are"
   },
   interview: {
-    subject: "Your application — two interviews next",
-    lead: "has moved on to the interviews",
-    body: "There are two: one on how you work, and one on your setup and " +
-      "connection. We will be in touch to arrange them.",
+    subject: "Your application — interview next",
+    lead: "has moved on to the interview",
+    body: "One interview with us, on how you work and on your setup and " +
+      "connection. We will be in touch to arrange it.",
     where: "/status", label: "See where you are"
   },
   approved: {
