@@ -247,8 +247,9 @@ const STAGE_MAIL = {
     subject: "Your application — interview next",
     lead: "has moved on to the interview",
     body: "One interview with us, on how you work and on your setup and " +
-      "connection. We will be in touch to arrange it.",
-    where: "/status", label: "See where you are"
+      "connection. Some times are waiting on your application page — pick " +
+      "whichever suits you, and tell us if none of them do.",
+    where: "/status", label: "Pick your time"
   },
   approved: {
     subject: "You are through — paid training starts within a week",

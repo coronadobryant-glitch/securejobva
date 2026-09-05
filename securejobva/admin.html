@@ -368,6 +368,24 @@ img{max-width:100%}
 .apt__d{display:block;font-size:.88rem;color:var(--ink-2);margin-top:.15rem}
 .apt__s{font-size:.85rem;color:var(--accent);font-weight:700;white-space:nowrap}
 .apt__go{padding:.45rem .9rem;font-size:.88rem}
+/* the times she is offered */
+.iv{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.6rem}
+.iv__s{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+  border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem;background:var(--paper)}
+.iv__s--on{background:var(--accent-soft);border-color:var(--accent)}
+.iv__s b{display:block;font-weight:700}
+.iv__alt{display:block;font-size:.82rem;color:var(--ink-2);margin-top:.15rem;
+  font-family:'IBM Plex Mono',ui-monospace,monospace}
+.iv__note{font-size:.85rem;color:var(--accent);font-weight:700;white-space:nowrap}
+.iv__go{padding:.45rem .9rem;font-size:.88rem;white-space:nowrap}
+/* A link, not a button: saying none of them work is the quiet option and
+   should not compete with choosing one. */
+.iv__none{display:inline-block;margin-top:.9rem;padding:0;border:0;background:none;
+  font:inherit;font-size:.88rem;color:var(--ink-2);text-decoration:underline;
+  text-underline-offset:.2em;cursor:pointer}
+.iv__none:hover{color:var(--accent)}
+.iv__none:disabled{opacity:.6;cursor:default}
+@media(max-width:520px){.iv__s{flex-direction:column;align-items:flex-start;gap:.6rem}}
 .a-lbl{display:block;font-weight:700;font-size:.9rem;margin:1rem 0 .35rem}
 .a-src{margin:0;padding:1rem 1.1rem;border-left:3px solid var(--accent);background:var(--accent-soft);
   border-radius:0 8px 8px 0;font-size:1rem;line-height:1.7}
@@ -524,6 +542,26 @@ img{max-width:100%}
   .cl__ord,.cl [data-cl-toggle],.cl [data-cl-del]{grid-column:2}}
 .cal__set{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--ink-2)}
 .cal__set input{font-family:inherit;font-size:.82rem;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+/* the times offered to an applicant, on her row */
+.ivo{flex-basis:100%;display:flex;flex-direction:column;gap:.5rem;margin-top:.2rem;
+  padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}
+.ivo__h{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.66rem;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.ivo__l{list-style:none;margin:0;padding:0;display:grid;gap:.35rem}
+.ivo__s{display:flex;justify-content:space-between;align-items:center;gap:.8rem;
+  padding:.45rem .6rem;border:1px solid var(--line);border-radius:7px;background:var(--surface)}
+.ivo__s--pick{border-color:var(--accent);background:var(--accent-soft)}
+.ivo__s--on{border-color:var(--good, #0B6B3A)}
+.ivo__s b{font-size:.85rem;font-weight:700;display:block}
+.ivo__st{display:block;font-size:.72rem;color:var(--muted);
+  font-family:'IBM Plex Mono',ui-monospace,monospace;margin-top:.1rem}
+.ivo__b{padding:.28rem .6rem;font-size:.76rem;white-space:nowrap}
+.ivo__add{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.ivo__add input{font-family:inherit;font-size:.8rem;padding:.3rem .45rem;
+  border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.ivo__msg{margin:0;font-size:.8rem;color:var(--ink-2)}
+.ivo__err{font-size:.78rem;color:#B3261E;min-height:1em}
+:root[data-theme="dark"] .ivo__err{color:#F2B8B5}
 .cal__issues{background:#FDECEA;border-left:3px solid #B3261E;border-radius:0 8px 8px 0;padding:1rem 1.15rem;margin-top:1rem}
 :root[data-theme="dark"] .cal__issues{background:#2B1512}
 .cal__ih{margin:0 0 .5rem;font-size:.95rem;color:#B3261E}
@@ -2470,6 +2508,141 @@ function doForget(row, a, go) {
   });
 }
 
+/* ── the times we offer her ───────────────────────────────────────────────
+
+   The date box beside this still works and still writes interview_at directly,
+   which is how it has always been done and how it should stay for a time
+   agreed on the phone. This is the other way: offer two or three, let her pick
+   one, confirm it.
+
+   Times are shown in Central, because this is our side of the screen. Hers are
+   shown to her in her own zone, with Central underneath, on /status.
+
+   Nothing here is a write. Every button calls one of the functions in 062, and
+   each one asks who is calling — the page is granted no insert or update on
+   interview_slots at all. */
+/* Offering a time reads the box next to the button, because a datetime-local
+   is local to the browser and the function takes an absolute moment. new Date
+   on the value does that conversion, which is the same thing localDateTime
+   undoes when the date box is drawn. */
+function ivOffer(btn) {
+  var wrap = btn.closest(".ivo");
+  var at = wrap ? wrap.querySelector("[data-ivat]") : null;
+  var err = wrap ? wrap.querySelector("[data-iverr]") : null;
+  var say = function (m) { if (err) err.textContent = m; };
+  say("");
+  if (!at || !at.value) { say("Pick a time first."); return; }
+  var when = new Date(at.value);
+  if (isNaN(when)) { say("That is not a time."); return; }
+  ivAct(btn, "rpc/offer_application_interview",
+    { app: btn.getAttribute("data-ivoffer"), at_time: when.toISOString(), mins: 30 },
+    "Offering…", err);
+}
+
+/* One shape for all three: disable, call, reload, and put the reason on the
+   row rather than in a dialog. The functions in 062 raise sentences meant to
+   be read — "she has not picked that one", "that one is confirmed" — so the
+   message is shown as it comes back instead of being replaced with a generic
+   one that says less. */
+/* One shape for all three: disable, call, refetch, redraw the row.
+
+   Refetched rather than guessed at locally, the same rule addNote follows a
+   few functions up. Confirming writes application_tracking.interview_at as
+   well as the slot, so the row is read back from the queue too — inventing
+   that date here would put a different one on the screen from the one in the
+   database, and the Interviews tab reads the database.
+
+   The reason is shown as it comes back. The functions in 062 raise sentences
+   meant to be read — "she has not picked that one", "that one is confirmed
+   — cancel it with her, not from here" — and replacing those with a generic
+   failure would say less than the database already did. */
+function ivAct(btn, fn, body, saying, errEl) {
+  var row = btn.closest(".row");
+  var id = row ? row.getAttribute("data-id") : null;
+  var wrap = btn.closest(".ivo");
+  var err = errEl || (wrap ? wrap.querySelector("[data-iverr]") : null);
+  var was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = saying;
+  if (err) err.textContent = "";
+
+  api(fn, { method: "POST", body: body })
+    .then(function () {
+      return Promise.all([
+        api("interview_slots?select=id,application_id,starts_at,minutes,offered_by," +
+            "chosen_at,confirmed_at,declined_at,meeting_url&application_id=eq." +
+            encodeURIComponent(id) + "&order=starts_at"),
+        api("application_queue?select=*&id=eq." + encodeURIComponent(id))
+      ]);
+    })
+    .then(function (r) {
+      var rec = ALL.filter(function (x) { return x.id === id; })[0];
+      if (!rec) return;
+      rec.slots = r[0] || [];
+      var fresh = (r[1] || [])[0];
+      if (fresh) rec.interview_at = fresh.interview_at;
+      var tmp = document.createElement("div");
+      tmp.innerHTML = rowHtml(rec);
+      row.replaceWith(tmp.firstChild);
+      /* The tab beside this one counts interviews with no date, interviews
+         nobody scored and now interviews booked before the assessment. A
+         confirm changes all three inputs, so it is redrawn rather than left
+         showing the count from before the click. */
+      drawCalendar();
+    })
+    .catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = was;
+      var m = String((e && e.message) || "");
+      if (err) err.textContent = m && m !== "signed out" ? m : "That did not save. Try again.";
+    });
+}
+function ivOffered(a) {
+  var slots = (a.slots || []).slice().sort(function (x, y) {
+    return new Date(x.starts_at) - new Date(y.starts_at);
+  });
+
+  var confirmed = null;
+  for (var i = 0; i < slots.length; i++) if (slots[i].confirmed_at) confirmed = slots[i];
+
+  var declined = !confirmed && slots.length &&
+    slots.every(function (v) { return !!v.declined_at; });
+
+  var list = slots.map(function (v) {
+    var when = slotDay(v.starts_at, CENTRAL) + " · " + slotClock(v.starts_at, CENTRAL);
+    var state = v.confirmed_at ? "confirmed"
+      : v.declined_at ? "she said no"
+      : v.chosen_at ? "she picked this" : "offered";
+    return '<li class="ivo__s' + (v.chosen_at && !v.confirmed_at ? " ivo__s--pick" : "") +
+      (v.confirmed_at ? " ivo__s--on" : "") + '">' +
+      "<span><b>" + esc(when) + "</b>" +
+      '<span class="ivo__st">' + esc(state) + " · " + esc(String(v.minutes || 30)) + " min</span></span>" +
+      (v.confirmed_at
+        ? ""
+        : v.chosen_at
+          ? '<button class="btn btn--solid ivo__b" type="button" data-ivconfirm="' + esc(v.id) + '">Confirm</button>'
+          : '<button class="btn btn--ghost ivo__b" type="button" data-ivdrop="' + esc(v.id) + '">Withdraw</button>') +
+      "</li>";
+  }).join("");
+
+  return '<div class="ivo">' +
+    '<span class="ivo__h">Times offered</span>' +
+    (slots.length ? '<ul class="ivo__l">' + list + "</ul>" : "") +
+    (declined
+      ? '<p class="ivo__msg">She said none of these work. Offer a new set.</p>'
+      : "") +
+    (confirmed
+      ? '<p class="ivo__msg">Confirmed, and the date is on her row. Withdraw is off ' +
+        "&mdash; moving a confirmed interview is a conversation, not a button.</p>"
+      : '<span class="ivo__add">' +
+        '<input type="datetime-local" data-ivat aria-label="A time to offer her">' +
+        '<button class="btn btn--ghost ivo__b" type="button" data-ivoffer="' + esc(a.id) + '">Offer</button>' +
+        "</span>") +
+    '<span class="ivo__err" data-iverr></span>' +
+    "</div>";
+}
+
+
 function rowHtml(a) {
   var tracks = (a.tracks && a.tracks.length ? a.tracks.join(" + ") : a.track) || "—";
 
@@ -2499,6 +2672,7 @@ function rowHtml(a) {
               '<input type="datetime-local" data-interview value="' +
                 esc(localDateTime(a.interview_at)) + '" aria-label="Interview date and time">' +
             "</label>" +
+            ivOffered(a) +
             '<label class="chk"><input type="checkbox" data-replied' +
               (a.response_received ? " checked" : "") + "> replied</label>" +
             '<button class="btn btn--ghost" data-contacted type="button" ' +
@@ -3180,7 +3354,9 @@ function drawCalendar() {
     return a.interview_unresolved || (a.pipeline === "interviewed" && !a.score_avg);
   });
   var atInterviewNoDate = ALL.filter(function (a) {
-    return a.pipeline === "interviewed" && !a.interview_at;
+    var live = (a.slots || []).filter(function (v) { return !v.declined_at; });
+    if (a.interview_at || live.length) return false;
+    return a.pipeline === "interviewed" || a.status === "interview";
   });
   /* Two bookings inside the same hour is nearly always a mistake, and the one
      nobody catches until the second person is waiting. */
@@ -3207,9 +3383,27 @@ function drawCalendar() {
     return !a.sit || !a.sit.submitted_at;
   });
 
+  /* She said none of the times work.
+
+     decline_application_interviews marks them all declined and tells nobody —
+     it is a database function, it has no inbox. Without this the most active
+     thing an applicant can do in this flow is also the most invisible: she
+     answers within the hour, and the answer sits in a column until somebody
+     opens her row for an unrelated reason.
+
+     Read off the slots rather than off a stage, because declining does not
+     move her stage — she is still at interview, still waiting, and that is
+     exactly why nothing else would notice. */
+  var saidNo = ALL.filter(function (a) {
+    var v = a.slots || [];
+    if (!v.length) return false;
+    if (v.some(function (x) { return x.confirmed_at; })) return false;
+    return v.every(function (x) { return x.declined_at; });
+  });
+
   var badge = document.getElementById("tab-cal");
   var problems = unresolved.length + clashes.length + atInterviewNoDate.length +
-    beforeAssessment.length;
+    beforeAssessment.length + saidNo.length;
   if (badge) badge.textContent = problems ? String(problems) : "";
 
   var issues = "";
@@ -3224,10 +3418,17 @@ function drawCalendar() {
             (unresolved.length > 6 ? " and " + (unresolved.length - 6) + " more" : "") + "</p>"
           : "") +
         (atInterviewNoDate.length
-          ? '<p class="cal__i"><b>' + atInterviewNoDate.length + " at interview with no date set.</b> " +
-            "Nothing will remind you about these: " +
+          ? '<p class="cal__i"><b>' + atInterviewNoDate.length + " at interview with nothing arranged.</b> " +
+            "No date, and no times offered for them to pick from: " +
             atInterviewNoDate.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
             (atInterviewNoDate.length > 6 ? " and " + (atInterviewNoDate.length - 6) + " more" : "") + "</p>"
+          : "") +
+        (saidNo.length
+          ? '<p class="cal__i"><b>' + saidNo.length +
+            " said none of the times work.</b> " +
+            "Waiting on a new set from you: " +
+            saidNo.slice(0, 6).map(function (a) { return esc(a.name || a.email); }).join(", ") +
+            (saidNo.length > 6 ? " and " + (saidNo.length - 6) + " more" : "") + "</p>"
           : "") +
         (beforeAssessment.length
           ? '<p class="cal__i"><b>' + beforeAssessment.length +
@@ -3245,7 +3446,7 @@ function drawCalendar() {
       "</div>";
   }
 
-  if (!booked.length && !atInterviewNoDate.length) {
+  if (!booked.length && !atInterviewNoDate.length && !saidNo.length) {
     box.innerHTML = '<h2 class="edit__h">Interviews</h2>' +
       '<p class="msg">Nothing booked. Set a date on any row in the Applications tab and it appears here.</p>';
     return;
@@ -5590,7 +5791,7 @@ function why(e) {
   return t.slice(0, 180) || "That did not save";
 }
 
-function render(email, apps, notes, socials, docs, disc, sits) {
+function render(email, apps, notes, socials, docs, disc, sits, slots) {
   var byId = {};
   /* Newest first, which is the order they arrive in and the order they are
      read: the last thing said about somebody is the thing you want. */
@@ -5609,12 +5810,18 @@ function render(email, apps, notes, socials, docs, disc, sits) {
   (disc || []).forEach(function (d) { discById[d.application_id] = d; });
   var sitById = {};
   (sits || []).forEach(function (x) { sitById[x.application_id] = x; });
+  var slotsById = {};
+  (slots || []).forEach(function (v) {
+    if (!v.application_id) return;
+    (slotsById[v.application_id] = slotsById[v.application_id] || []).push(v);
+  });
   ALL = apps.map(function (a) {
     a.notes = byId[a.id] || [];
     a.socials = socById[a.id] || [];
     a.docs = docById[a.id] || [];
     a.disc = discById[a.id] || null;
     a.sit = sitById[a.id] || null;
+    a.slots = slotsById[a.id] || [];
     a.pipeline = a.pipeline || "new";
     return a;
   });
@@ -5807,6 +6014,14 @@ function render(email, apps, notes, socials, docs, disc, sits) {
       doForget(r2, byRow(r2), go);
       return;
     }
+    var ivo = e.target.closest("[data-ivoffer]");
+    if (ivo && !ivo.disabled) { ivOffer(ivo); return; }
+    var ivc = e.target.closest("[data-ivconfirm]");
+    if (ivc && !ivc.disabled) { ivAct(ivc, "rpc/confirm_application_interview",
+      { slot: ivc.getAttribute("data-ivconfirm") }, "Confirming…"); return; }
+    var ivd = e.target.closest("[data-ivdrop]");
+    if (ivd && !ivd.disabled) { ivAct(ivd, "rpc/withdraw_application_slot",
+      { slot: ivd.getAttribute("data-ivdrop") }, "Withdrawing…"); return; }
     var add = e.target.closest("[data-note-add]");
     if (add) { addNote(add.closest(".row")); return; }
     var doc = e.target.closest("[data-doc]");

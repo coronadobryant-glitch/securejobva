@@ -329,6 +329,8 @@ is("the interview email says one, not two",
   sent.body.text.includes("One interview with us"), true);
 is("and the subject says one too",
   sent.body.subject, "Your application — interview next");
+is("and it sends her somewhere to act, not somewhere to read",
+  sent.body.text.includes("pick") || sent.body.text.includes("Pick"), true);
 is("and nothing in it still says two",
   /two interviews|There are two/i.test(sent.body.subject + " " + sent.body.text), false);
 

@@ -120,7 +120,7 @@ console.log("\n5. The three that were already here still work");
     { id: "2", name: "Ben Cruz", email: "b@x.com", interview_at: null, pipeline: "interviewed", sit: sat },
   ]);
   is("interviewed, not scored", /1 interviewed, not scored/.test(r.html), true);
-  is("at interview with no date", /1 at interview with no date set/.test(r.html), true);
+  is("at interview with nothing arranged", /1 at interview with nothing arranged/.test(r.html), true);
   is("both counted", r.badge, "2");
 }
 {
@@ -146,7 +146,7 @@ console.log("\n6. All four at once add up");
   ]);
   is("badge counts all four", r.badge, "4");
   is("and each has its own line",
-    ["not scored", "no date set", "before sitting the assessment", "within an hour"]
+    ["not scored", "nothing arranged", "before sitting the assessment", "within an hour"]
       .every((s) => r.html.indexOf(s) > -1), true);
 }
 
@@ -155,6 +155,40 @@ console.log("\n7. The empty state still says what to do");
   const r = draw([{ id: "1", name: "Ana", email: "a@x.com", interview_at: null, pipeline: "shortlisted", sit: sat }]);
   is("nothing booked", /Nothing booked/.test(r.html), true);
   is("and no badge", r.badge, "");
+}
+
+console.log("\n8. She said none of the times work");
+{
+  const no = (h) => ({ id: "9", starts_at: soon(h), declined_at: past(1), chosen_at: null, confirmed_at: null });
+  const r = draw([
+    { id: "1", name: "Ana Reyes", email: "a@x.com", interview_at: null, pipeline: "shortlisted",
+      sit: sat, slots: [no(48), no(72)] },
+  ]);
+  is("it is raised", /1 said none of the times work/.test(r.html), true);
+  is("and she is named", /Ana Reyes/.test(line(r.html, "said none of the times work")), true);
+  is("and it counts", r.badge, "1");
+}
+{
+  /* One still open is not a refusal — she simply has not answered yet. */
+  const r = draw([
+    { id: "1", name: "Ana Reyes", email: "a@x.com", interview_at: null, pipeline: "shortlisted",
+      sit: sat, slots: [
+        { id: "9", starts_at: soon(48), declined_at: past(1) },
+        { id: "8", starts_at: soon(72), declined_at: null },
+      ] },
+  ]);
+  is("one still open is not a refusal", /said none of the times work/.test(r.html), false);
+}
+{
+  /* And a confirmed interview ends the question however the rest are marked. */
+  const r = draw([
+    { id: "1", name: "Ana Reyes", email: "a@x.com", interview_at: soon(48), pipeline: "shortlisted",
+      sit: sat, slots: [
+        { id: "9", starts_at: soon(48), chosen_at: past(2), confirmed_at: past(1) },
+        { id: "8", starts_at: soon(72), declined_at: past(3) },
+      ] },
+  ]);
+  is("a confirmed interview settles it", /said none of the times work/.test(r.html), false);
 }
 
 console.log("\n" + (bad ? bad + " FAILED" : "all ok"));

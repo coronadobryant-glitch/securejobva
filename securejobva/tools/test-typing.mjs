@@ -30,7 +30,10 @@ function slice(from, to, what) {
 }
 
 const TYPE_TEXT = (() => {
-  const src = slice('var TYPE_TEXT = "', "\nfunction assessCard(", "TYPE_TEXT");
+  /* The next top-level function of any kind, rather than the one that happened
+     to follow. A new function landing between TYPE_TEXT and assessCard moved
+     the end of this slice into the middle of it. */
+  const src = slice('var TYPE_TEXT = "', "\nfunction ", "TYPE_TEXT");
   return eval("(function(){" + src.slice(0, src.lastIndexOf(";") + 1) + "return TYPE_TEXT})()");
 })();
 const accSrc = slice("function typingAccuracy(typed) {", "\nfunction writtenPart(", "typingAccuracy");
