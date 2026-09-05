@@ -2252,6 +2252,31 @@ await check("the assessment card counts finished, not touched", async () => {
   }
 });
 
+/* And the same assessment as /admin sees it, which has now been wrong twice in
+   the same way.
+
+   045 scored an assessment, reached a verdict and moved somebody to Interview,
+   and no screen in /admin showed any of it. 049 then held the verdict until a
+   person had checked the typing and marked the writing, so the panel showed
+   "waiting on ..." instead of a verdict — correct, because there was none.
+
+   063 grades on the send, and the old branch kept hiding the verdict behind
+   that same sentence: grading became automatic and the grade still could not
+   be seen. Nothing failed either time. The panel rendered and its words were
+   true of the database that used to be underneath it.
+
+   So the walk drives the real sitLine() against rows shaped the way 063's
+   scorer leaves them. */
+await check("the admin panel shows the grade the scorer reached", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-sit-panel.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, verdict and what is provisional";
+  } catch (e) {
+    throw new Error("tools/test-sit-panel.mjs failed — run it directly for the detail");
+  }
+});
+
 /* Can the product forget somebody, and only in the ways it is meant to?
    Almost every assertion in here is about a delete grant that must NOT exist,
    because that is the easiest thing in this schema to add carelessly and the

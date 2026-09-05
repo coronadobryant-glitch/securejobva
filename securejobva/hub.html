@@ -849,6 +849,11 @@ body:has(.adm__wrap) main{padding:0}
 .sit__wait{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
   letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;
   border-radius:4px;background:var(--signal);color:var(--signal-ink)}
+/* Two of these can appear beside a verdict since 063, and only one of them is
+   an instruction. What is still provisional is worth knowing; what is actually
+   stopping her moving is worth acting on, so it keeps the loud colour. */
+.sit__wait--soft{background:var(--surface-2);color:var(--muted);
+  border:1px solid var(--line)}
 .sit__v{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
   letter-spacing:.07em;text-transform:uppercase;font-weight:600;padding:.18rem .45rem;border-radius:4px}
 .sit__v--passed{background:#0B7A63;color:#fff}
