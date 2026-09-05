@@ -367,6 +367,8 @@ img{max-width:100%}
 .apt__t{font-weight:700;display:block}
 .apt__d{display:block;font-size:.88rem;color:var(--ink-2);margin-top:.15rem}
 .apt__s{font-size:.85rem;color:var(--accent);font-weight:700;white-space:nowrap}
+/* a note that reports something missing, not something achieved */
+.apt__s--none{color:var(--muted)}
 .apt__go{padding:.45rem .9rem;font-size:.88rem}
 /* the times she is offered */
 .iv{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.6rem}
@@ -2374,6 +2376,24 @@ function assessCard(a, s) {
     return Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
   }
 
+  /* ── a written part marked done with nothing in it ───────────────────────
+
+     close_part stamps part_done for whichever part it is told about and never
+     looks at what it is stamping, so an accidental press one second after the
+     part opened reads here as finished — the same tick, the same word, as
+     twenty minutes of work. It is not finished in any sense she would
+     recognise, and while the twenty minutes are still running there is
+     nothing stopping her writing the reply after all: close_part returns the
+     original timestamp when a part is closed twice, so finishing it properly
+     writes the text and leaves the record of when she first stopped alone.
+
+     So the row goes back to being unfinished. Everything else follows from
+     that on its own — part() reads the clock for anything not done, which
+     puts a Resume on it and says how long is left — and once the time has
+     gone it is done for real, and says what it holds instead of "done". */
+  var writtenEmpty = !!fin.written && !((s && s.written_reply) || "").trim();
+  if (writtenEmpty && msLeft("written") > 0) done.written = false;
+
   var left = 0;
   ["english", "scen", "detail", "written", "typing"].forEach(function (k) {
     if (!done[k]) left++;
@@ -2386,7 +2406,11 @@ function assessCard(a, s) {
      card is telling somebody their clock has not started. The time shown is
      read when the card is drawn, which is every time this page loads and
      every time a part closes. */
-  function part(k, n, t, d, isDone, note) {
+  /* dim is for a note that reports something missing rather than something
+     achieved. "16 wpm, we check it" and "nothing written" are both notes, and
+     printing them in the same confident accent is how an empty work sample
+     reaches the person marking it wearing the colour of a finished one. */
+  function part(k, n, t, d, isDone, note, dim) {
     var ms = isDone ? null : msLeft(k);
     var live = ms !== null && ms > 0;
     var over = ms !== null && ms <= 0;
@@ -2398,7 +2422,8 @@ function assessCard(a, s) {
               : over ? " &middot; the time on this one has gone" : "") +
       "</span></span>" +
       (isDone
-        ? '<span class="apt__s">' + esc(note || "done") + "</span>"
+        ? '<span class="apt__s' + (dim ? " apt__s--none" : "") + '">' +
+          esc(note || "done") + "</span>"
         : '<button class="btn btn--solid apt__go" data-part="' + k + '" type="button">' +
           (live ? "Resume" : over ? "Finish" : "Start") + "</button>") +
       "</li>";
@@ -2427,7 +2452,8 @@ function assessCard(a, s) {
         ? part("sales", 4, "Sales", QBANK.sales.length + " questions, eight minutes", done.sales)
         : "") +
       part("written", wantsSales ? 5 : 4, "Written reply to a customer",
-        "Twenty minutes, about 150 words", done.written) +
+        "Twenty minutes, about 150 words" + (writtenEmpty ? " &middot; nothing written yet" : ""),
+        done.written, writtenEmpty ? "nothing written" : null, writtenEmpty) +
       part("typing", wantsSales ? 6 : 5, "Typing and your setup",
         "A short message to type, and a connection check",
         done.typing, done.typing ? s.typing_wpm + " wpm, we check it" : "") +
@@ -2860,6 +2886,10 @@ function writtenPart() {
       pasteWarn.textContent = "";
       pasteWarn.style.display = "none";
     }
+
+    /* And the empty-box question is answered by writing something, so the
+       button pair goes back to being one button the moment she does. */
+    if (box.value.trim()) resetConfirm();
   });
   /* Pasting is off here, and this is the part where it matters most.
 
@@ -2890,8 +2920,63 @@ function writtenPart() {
 
   box.focus();
 
-  document.getElementById("a-done").addEventListener("click", function () {
+  /* ── closing this part with nothing in it ────────────────────────────────
+
+     Pressing Done on an empty box used to close the part, and the card has no
+     way back into a finished one — so one misclick a second after opening it
+     ended the work sample, silently and for good. It happened: the written
+     part on the only assessment in the database was opened at 01:57:01 and
+     marked done at 01:57:02 with nought characters in it.
+
+     This asks rather than refuses. Somebody who genuinely wants to give up on
+     the part may, and this project has been hurt more by controls that refuse
+     legitimate things than by ones that ask. */
+  var doneBtn = document.getElementById("a-done");
+  var keepBtn = null;
+
+  function resetConfirm() {
+    if (!keepBtn) return;
+    keepBtn.parentNode.removeChild(keepBtn);
+    keepBtn = null;
+    doneBtn.textContent = "Done writing";
+    doneBtn.className = "btn btn--solid";
+    var w = document.getElementById("a-err");
+    if (w && w.textContent.indexOf("not written anything") > -1) {
+      w.textContent = "";
+      w.style.display = "none";
+    }
+  }
+
+  doneBtn.addEventListener("click", function (ev) {
     if (SAVE_T) { clearTimeout(SAVE_T); SAVE_T = null; SAVE_PENDING = null; }
+
+    /* The deadline closes this part by clicking this very button — partShell's
+       tick calls done.click() when the clock passes zero, which is how twenty
+       minutes of writing gets banked rather than lost with the tab. That path
+       must never be stopped by a question nobody is there to answer.
+
+       isTrusted is the line: false on a scripted click, true on a real press.
+       So expiry closes straight through exactly as it did before, and only a
+       person pressing the button is ever asked. */
+    if (ev && ev.isTrusted && !keepBtn && !box.value.trim()) {
+      var w = document.getElementById("a-err");
+      if (w) {
+        w.style.display = "";
+        w.textContent = "You have not written anything yet. A person reads this part, " +
+          "and closing it empty leaves them nothing to read.";
+      }
+      doneBtn.textContent = "Close it empty";
+      doneBtn.className = "btn btn--ghost";
+      keepBtn = document.createElement("button");
+      keepBtn.type = "button";
+      keepBtn.className = "btn btn--solid";
+      keepBtn.style.cssText = "margin-top:1.1rem;margin-right:.6rem";
+      keepBtn.textContent = "Keep writing";
+      keepBtn.addEventListener("click", function () { resetConfirm(); box.focus(); });
+      doneBtn.parentNode.insertBefore(keepBtn, doneBtn);
+      return;
+    }
+
     closePart({ written_reply: box.value.slice(0, 8000) }, "written");
   });
   }

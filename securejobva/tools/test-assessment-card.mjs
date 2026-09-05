@@ -229,6 +229,61 @@ const closedAfterOpen = card(atAssessment, {
 ok("a finished part has no button at all", startFor(closedAfterOpen, "english"), false);
 ok("and no leftover clock", / \d+:\d\d left/.test(closedAfterOpen), false);
 
+/* ── a written part closed with nothing in it ───────────────────────────
+   close_part stamps part_done without looking at what it is stamping, so the
+   press that ends the work sample by accident produced exactly the row below:
+   written marked done, written_reply empty, nineteen minutes still on the
+   clock. The card called that finished, took the button away, and left her
+   nowhere to go. It happened once already. */
+console.log("\n  A written part that is done and empty");
+
+const emptyLive = card(atAssessment, {
+  part_done: { written: true },
+  part_opened: { written: minsAgo(1) },
+  written_reply: ""
+});
+ok("an empty reply with time left is not finished", startFor(emptyLive, "written"), true,
+   "the one press that used to be finalest");
+ok("and the button says Resume", labelFor(emptyLive, "written"), "Resume");
+ok("and it says what is missing", emptyLive.indexOf("nothing written yet") > -1, true);
+ok("and it still counts as outstanding", emptyLive.indexOf("5 left") > -1, true);
+ok("so nothing can be sent yet", hasSend(emptyLive), false);
+
+/* Whitespace is not an answer either — a box holding a stray newline is a box
+   holding nothing, and the person marking it would say so. */
+const spacesLive = card(atAssessment, {
+  part_done: { written: true },
+  part_opened: { written: minsAgo(1) },
+  written_reply: "   \n  "
+});
+ok("nor is a box of whitespace", startFor(spacesLive, "written"), true);
+
+/* Once the twenty minutes have gone it is finished for real — she cannot
+   write it now, and pretending otherwise would be the card lying the other
+   way. But it must not reach the marker wearing the word "done". */
+const emptyOver = card(atAssessment, {
+  part_done: { written: true },
+  part_opened: { written: minsAgo(30) },
+  written_reply: ""
+});
+ok("once the time has gone it is closed", startFor(emptyOver, "written"), false);
+ok("and says what it holds instead of done",
+   emptyOver.indexOf("nothing written") > -1, true);
+ok("in the colour of something missing",
+   emptyOver.indexOf("apt__s--none") > -1, true);
+
+/* And the ordinary case is untouched: a reply she wrote and closed is done, in
+   the ordinary way, with no note and no way back in. */
+const writtenProperly = card(atAssessment, {
+  part_done: { written: true },
+  part_opened: { written: minsAgo(5) },
+  written_reply: "Dear customer, I am sorry about the delay and I have chased it."
+});
+ok("a reply she actually wrote is finished", startFor(writtenProperly, "written"), false);
+ok("and carries no note about being empty",
+   writtenProperly.indexOf("nothing written") > -1, false);
+ok("and is not dimmed", writtenProperly.indexOf("apt__s--none") > -1, false);
+
 console.log("");
 if (failed) {
   console.log("  " + failed + " failed");
