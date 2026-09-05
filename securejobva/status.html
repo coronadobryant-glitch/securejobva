@@ -864,7 +864,13 @@ body:has(.adm__wrap) main{padding:0}
 .sit__low{color:#B5123A}
 .sit__off,.sit__s.sit__off{color:var(--muted);font-size:.82rem}
 .sit__claim{font-family:"IBM Plex Mono",monospace;font-size:.84rem}
-.sit__lnk{font-size:.84rem;color:var(--accent);text-decoration:underline}
+/* An anchor when the proof is a link she pasted, a button when it is a
+   screenshot that has to be signed first. Both have to look like the same
+   thing, so the button is stripped back to the anchor rather than the anchor
+   being dressed up as a button. */
+.sit__lnk{font-size:.84rem;color:var(--accent);text-decoration:underline;
+  font-family:inherit;background:none;border:0;padding:0;cursor:pointer}
+.sit__lnk[disabled]{cursor:default;opacity:.6}
 .sit__in{font-family:"IBM Plex Mono",monospace;font-size:.84rem;width:4.6rem;
   padding:.3rem .45rem;border:1.5px solid var(--accent);border-radius:6px;
   background:var(--paper);color:var(--ink)}
@@ -2161,13 +2167,11 @@ var TRACK_AXES = {"Customer Service":["english","customer"],"Admin Tasks":["engl
 var TYPE_TARGET = 40;
 var TYPE_MIN_ACC = 95;
 
-/* The passage she types. Support-email prose rather than random words, because
-   the thing being measured is typing the work, not typing. */
-var TYPE_TEXT = "Thank you for getting in touch about your order. I have checked " +
-  "the account and I can see the payment went through on Tuesday. The parcel " +
-  "left our warehouse the same evening and the tracking number is in the email " +
-  "below. If it has not arrived by Friday, reply to this message and I will " +
-  "open a case with the courier straight away.";
+/* TYPE_TEXT, the passage she used to type here, went with the in-page test.
+   The typing is taken at typingtest.com now and the proof is a screenshot, so
+   there is no passage to hold and nothing in the page to measure it against.
+   typingAccuracy() went the same way for the same reason. */
+var TYPE_SITE = "https://www.typingtest.com/";
 
 /* ── her interview, which she books herself ───────────────────────────────
 
@@ -2455,7 +2459,7 @@ function assessCard(a, s) {
         "Twenty minutes, about 150 words" + (writtenEmpty ? " &middot; nothing written yet" : ""),
         done.written, writtenEmpty ? "nothing written" : null, writtenEmpty) +
       part("typing", wantsSales ? 6 : 5, "Typing and your setup",
-        "A short message to type, and a connection check",
+        "A typing test on another site, a screenshot of it, and a connection check",
         done.typing, done.typing ? s.typing_wpm + " wpm, we check it" : "") +
     "</ol>" +
     (left === 0
@@ -2651,95 +2655,105 @@ function partShell(title, ends, inner, doneLabel, pill) {
   }, 500);
 }
 
-/* The typing test, back on this page.
+/* The typing test, on typingtest.com, with a screenshot as the proof.
 
-   It was moved to another site because a number she types into a box is not
-   evidence and a link to a result page is something a person can open. That
-   was right about the evidence and wrong about the cost: every application
-   then needed somebody to open two links and copy two numbers across, which
-   is a job that does not survive the first dozen applicants.
+   It has been in both places now. 045 built it into this page; 048 moved it
+   off, because score_typing is worked out from typing_wpm and typing_accuracy,
+   those columns are granted to the applicant, and anybody who can open a
+   browser console can send whatever numbers they like — which on the Admin
+   Tasks track walked an application to Interview on a made-up figure. 481c5df
+   brought it back on the grounds that opening two links per applicant is a job
+   that does not survive the first dozen of them.
 
-   So the passage is typed here and the browser measures it. That is still the
-   browser's word, and it goes in the columns that mean "what she reported"
-   rather than the two that mean "somebody checked" — those stay yours to
-   overrule after the interview. But it is a measurement of an actual typing
-   run instead of a number she liked the look of, and the accuracy is measured
-   against the passage rather than asserted.
+   Both of those are true, and the second one is a cost rather than a
+   correction. This is that cost being accepted deliberately: she takes the
+   test somewhere that will show her a result, sends the result as a picture,
+   and somebody here opens the picture and writes down what it says.
 
-   Pasting is refused, for the same reason and with the same honest limit as
-   the written reply: a speed bump, not a wall.
+   What it buys is the thing 048 was built around — the two figures on the row
+   mean different things, and the scoring uses the checked pair:
 
-   The connection speed test stays a link. That one genuinely cannot be
-   measured from in here, and it is the thing that stops somebody starting a
-   client on a line that cannot hold a call. */
+     typing_wpm, typing_accuracy                    what she says she scored
+     typing_verified_wpm, typing_verified_accuracy  what somebody here read
+
+   So nothing reaches a verdict on its own any more. That is not a side effect
+   to be fixed later, it is the point, and /admin has had the panel for it
+   since 048 with nothing to open.
+
+   Worth being honest about what a screenshot is: proof that a run happened,
+   not that she ran it. Same class of thing as the paste guard on the written
+   reply — a speed bump, not a wall — and the real check is still the
+   interviewer asking her about her own answers.
+
+   The connection speed test is untouched. It stays a link, because it
+   genuinely cannot be measured from in here, and it is the thing that stops
+   somebody starting a client on a line that cannot hold a call. */
 function typingPart() {
+  /* Her own folder in applicant-docs, which is where her CV already is. The
+     bucket takes png and jpeg from a signed-in applicant into the folder named
+     after her application and nothing else, so this needed no new policy — and
+     047 caps that folder at five files, which a CV plus a screenshot per
+     re-sit stays inside. */
+  var appId = (SIT && SIT.application_id) || "";
+  var shot = null;                                 /* chosen this visit */
+  var shotPath = (SIT && SIT.typing_proof) || "";  /* one already sent */
+
   partShell("Typing and accuracy", 0,
-    '<p class="msg" style="margin:1rem 0">Type the message below exactly as it is written. ' +
-      "We time it from your first keystroke, so start when you are ready &mdash; and type it as you " +
-      "would really send it. Accuracy counts for more than speed: work somebody has to redo is " +
-      "slower than typing slowly.</p>" +
+    '<p class="msg" style="margin:1rem 0">Take a one-minute typing test at typingtest.com, ' +
+      "then come back to this page with your result. Nothing here is timed, so take it as many " +
+      "times as you like and give us the run you are happy with.</p>" +
 
-    '<p style="margin:0 0 1rem;padding:.9rem 1rem;border-radius:8px;background:var(--paper);' +
-      'border:1px solid var(--line);font-size:.95rem;line-height:1.7">' + esc(TYPE_TEXT) + "</p>" +
+    '<p style="margin:1.1rem 0"><a class="btn btn--ghost" id="a-site" target="_blank" ' +
+      'rel="noopener noreferrer" href="' + TYPE_SITE + '">Take the test at typingtest.com ' +
+      "&nearr;</a></p>" +
 
-    '<div class="note" style="margin-bottom:1.1rem"><b>Type it yourself.</b> ' +
-      "Pasting is turned off here, and the number that counts is the one measured while you " +
-      "type &mdash; there is nothing to fill in.</div>" +
+    '<label class="a-lbl" for="a-shot">Screenshot of your result</label>' +
+    '<input id="a-shot" type="file" accept="image/png,image/jpeg" ' +
+      'style="width:100%;margin:.4rem 0 .3rem">' +
+    '<p class="msg" id="a-shot-s" style="margin:.3rem 0 1.3rem">' +
+      (shotPath ? "A screenshot is already attached. Choose another to replace it."
+                : "The whole result page, showing your words a minute and your accuracy. A photo " +
+                  "of the screen is fine as long as both numbers can be read.") + "</p>" +
 
-    '<label class="a-lbl" for="a-type">Type it here</label>' +
-    '<textarea id="a-type" rows="6" style="width:100%;margin:.4rem 0 .3rem" ' +
-      'placeholder="Start typing the message above"></textarea>' +
-    '<p class="msg" id="a-live" style="margin:.3rem 0 1.3rem">Not started yet.</p>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:.9rem">' +
+      '<div style="flex:1 1 11rem">' +
+        '<label class="a-lbl" for="a-wpm">Words a minute</label>' +
+        '<input id="a-wpm" type="number" min="0" max="250" style="width:100%;margin-top:.4rem" ' +
+          'value="' + (SIT && SIT.typing_wpm != null ? SIT.typing_wpm : "") + '">' +
+      "</div>" +
+      '<div style="flex:1 1 11rem">' +
+        '<label class="a-lbl" for="a-acc">Accuracy</label>' +
+        '<input id="a-acc" type="number" min="0" max="100" style="width:100%;margin-top:.4rem" ' +
+          'value="' + (SIT && SIT.typing_accuracy != null ? SIT.typing_accuracy : "") + '">' +
+      "</div>" +
+    "</div>" +
+    '<p class="msg" style="margin:.5rem 0 1.3rem">Both are printed on the result page. Type them ' +
+      "in exactly as they appear &mdash; we check them against your screenshot.</p>" +
 
     '<label class="a-lbl" for="a-conn">Link to a speed test of your connection</label>' +
     '<input id="a-conn" type="url" maxlength="500" ' +
-      'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://">' +
+      'style="width:100%;margin:.4rem 0 .3rem" placeholder="https://" value="' +
+      esc((SIT && SIT.connection_proof) || "") + '">' +
     '<p class="msg" style="margin-top:.3rem">Run one at speedtest.net and paste the result link. ' +
       "It takes a minute, and it is what stops somebody starting a client on a connection that " +
       "cannot hold a call.</p>",
     "Save this part", "no time limit");
 
-  var box = document.getElementById("a-type");
-  var live = document.getElementById("a-live");
+  var file = document.getElementById("a-shot");
+  var shotMsg = document.getElementById("a-shot-s");
+  var wpm = document.getElementById("a-wpm");
+  var acc = document.getElementById("a-acc");
   var conn = document.getElementById("a-conn");
-  var started = 0;
 
-  /* Everything that puts text in without it being typed. Same pair as the
-     written reply, and the same message taken down again the moment she
-     starts typing, so a refused paste does not follow her to the end. */
-  ["paste", "drop"].forEach(function (ev) {
-    box.addEventListener(ev, function (e) {
-      e.preventDefault();
-      var w = document.getElementById("a-err");
-      if (w) {
-        w.style.display = "";
-        w.textContent = "Type it yourself — pasting is turned off on this part.";
-      }
-    });
-  });
-
-  /* Gross words a minute, the way every typing test counts it: five characters
-     is a word. Accuracy is the edit distance against the passage, which is the
-     one number here that cannot be inflated by typing faster. */
-  function figures() {
-    var typed = box.value;
-    var secs = started ? (Date.now() - started) / 1000 : 0;
-    if (!typed.length || secs < 1) return { wpm: 0, acc: typed.length ? typingAccuracy(typed) : 0, secs: secs };
-    var wpm = Math.round((typed.length / 5) / (secs / 60));
-    return { wpm: Math.max(0, Math.min(250, wpm)), acc: typingAccuracy(typed), secs: secs };
-  }
-
-  box.addEventListener("input", function () {
-    if (!started) started = Date.now();
-    var f = figures();
-    live.textContent = f.secs < 1
-      ? "Timing from your first keystroke…"
-      : f.wpm + " wpm, " + f.acc + "% accurate so far";
-    var w = document.getElementById("a-err");
-    if (w && w.textContent.indexOf("pasting is turned off") > -1) {
-      w.textContent = "";
-      w.style.display = "none";
+  file.addEventListener("change", function () {
+    shot = (file.files && file.files[0]) || null;
+    if (!shot) {
+      shotMsg.textContent = shotPath
+        ? "A screenshot is already attached. Choose another to replace it."
+        : "No screenshot chosen yet.";
+      return;
     }
+    shotMsg.textContent = shot.name + " — " + kb(shot.size) + ", not sent yet.";
   });
 
   document.getElementById("a-done").addEventListener("click", function () {
@@ -2747,16 +2761,24 @@ function typingPart() {
     var fail = function (m, el) {
       err.style.display = "";
       err.textContent = m;
-      if (el) el.focus();
+      if (el && el.focus) el.focus();
+      return null;
     };
     err.style.display = "none";
 
-    var f = figures();
-    /* Enough of it, and long enough, for the numbers to mean anything. Four
-       words in two seconds is a very fast typist by arithmetic and by nothing
-       else. */
-    if (box.value.length < 60 || f.secs < 5) {
-      return fail("Type the message above first — we measure it as you go.", box);
+    /* Everything is read and refused before anything is uploaded, so a number
+       she has to fix does not cost her a round trip and leave a file in the
+       bucket that nothing points at. */
+    var w = String(wpm.value || "").trim();
+    var a = String(acc.value || "").trim();
+    if (w === "" || !(Number(w) >= 0 && Number(w) <= 250)) {
+      return fail("Put in the words a minute from your result page — a number up to 250.", wpm);
+    }
+    if (a === "" || !(Number(a) >= 0 && Number(a) <= 100)) {
+      return fail("Put in the accuracy from your result page, as a percentage.", acc);
+    }
+    if (!shot && !shotPath) {
+      return fail("Attach the screenshot of your result — it is what we check the numbers against.", file);
     }
     var c = String(conn.value || "").trim();
     if (!/^https?:\/\/\S+\.\S+/i.test(c)) {
@@ -2766,59 +2788,71 @@ function typingPart() {
       return fail("That speed test link is too long. Use a shorter one.", conn);
     }
 
-    closePart({
-      typing_wpm: f.wpm,
-      typing_accuracy: f.acc,
-      connection_proof: c
-    }, "typing");
+    var done = document.getElementById("a-done");
+    done.disabled = true;
+    done.textContent = shot ? "Sending your screenshot…" : "Saving…";
+
+    /* The upload first, the row second. A row naming a file that never arrived
+       is the one order that lies; a file with no row yet is just a file, and
+       the next save names it. The apply form learned this the other way round
+       and left the bucket holding a CV nothing pointed at. */
+    (shot ? sendShot(shot) : Promise.resolve(shotPath)).then(function (path) {
+      return closePart({
+        typing_wpm: Number(w),
+        typing_accuracy: Number(a),
+        typing_proof: path,
+        connection_proof: c
+      }, "typing");
+    })["catch"](function (e) {
+      done.disabled = false;
+      done.textContent = "Save this part";
+      fail(e && e.message === "signed out"
+        ? "You have been signed out. Sign in again — the rest of this is still here."
+        : "That screenshot did not send. Check your connection and try again.", null);
+    });
   });
-}
 
-/* How close what was typed is to the passage, allowing for the typist being a
-   human being.
-
-   This used to compare position against position — typed[i] against
-   TYPE_TEXT[i] — which is only correct while the two strings stay in step, and
-   one dropped or doubled character early on puts them out of step for good.
-   Miss a letter at position fifty and the remaining two hundred and eighty
-   comparisons all fail: accuracy came out around fifteen per cent, and
-   anything under ninety-five drops the score into a branch that caps it at
-   four, which is below the pass mark on every track. So the arithmetic
-   rejected good typists for one typo, silently, and told them they were slow.
-   The denominator was wrong too — typed.length, so three correct characters
-   and nothing else scored a hundred per cent.
-
-   An edit distance against the best-matching PREFIX of the passage answers the
-   question actually being asked: of what she typed, how much is right, whether
-   or not she finished. One missed letter in three hundred and thirty now costs
-   what one missed letter should. */
-function typingAccuracy(typed) {
-  var n = typed.length;
-  if (!n) return 0;
-  var m = TYPE_TEXT.length;
-
-  /* One row at a time: the passage is short, but there is no reason to hold a
-     330 x 330 grid to read back a single number. */
-  var prev = new Array(m + 1);
-  var cur = new Array(m + 1);
-  for (var j = 0; j <= m; j++) prev[j] = j;
-
-  for (var i = 1; i <= n; i++) {
-    cur[0] = i;
-    for (var k = 1; k <= m; k++) {
-      var cost = typed.charAt(i - 1) === TYPE_TEXT.charAt(k - 1) ? 0 : 1;
-      cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + cost);
-    }
-    for (var c = 0; c <= m; c++) prev[c] = cur[c];
+  /* Into the bucket, then into the table the document lists are built from.
+     Both pages read application_documents rather than listing storage, so a
+     file that skips the table is invisible to her and to whoever is deciding
+     on her — which is exactly how a CV went missing once already. */
+  function sendShot(f) {
+    if (!appId) return Promise.reject(new Error("no application"));
+    var name = "typing-" + Date.now() + (f.type === "image/png" ? ".png" : ".jpg");
+    var path = appId + "/" + name;
+    return liveSession().then(function (sess) {
+      if (!sess) throw new Error("signed out");
+      return fetch(storageBase() + "/object/applicant-docs/" +
+                   path.split("/").map(encodeURIComponent).join("/"), {
+        method: "POST",
+        headers: {
+          apikey: ANON,
+          Authorization: "Bearer " + sess.access_token,
+          "Content-Type": f.type,
+          "x-upsert": "false"
+        },
+        body: f
+      });
+    }).then(function (r) {
+      if (!r.ok) throw new Error("upload failed");
+      /* The record of it, which is what the lists read. If this half fails the
+         file is still there and the path still goes on the row, so the proof
+         opens — it just will not be in her document list until the next save. */
+      return api("application_documents", {
+        method: "POST",
+        body: {
+          application_id: appId,
+          path: "applicant-docs/" + path,
+          filename: f.name.slice(0, 260),
+          content_type: f.type,
+          bytes: f.size
+        }
+      })["catch"](function () { return null; });
+    }).then(function () {
+      shotPath = "applicant-docs/" + path;
+      return shotPath;
+    });
   }
-
-  /* The best prefix, not the whole passage: stopping early is a matter for the
-     speed, not for whether the words are right. */
-  var best = prev[0];
-  for (var q = 1; q <= m; q++) if (prev[q] < best) best = prev[q];
-
-  var acc = Math.round(((n - best) / n) * 100);
-  return Math.max(0, Math.min(100, acc));
 }
 
 function writtenPart() {

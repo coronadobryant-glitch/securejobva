@@ -1955,7 +1955,7 @@ await check("no generated page has lost a fix to its generator", () => {
     ["seats.html",  "function billingBlock", "the bill"],
     ["seats.html",  "function quoted",      "the quote shown to the cent"],
     ["seats.html",  "C_WEEK_LIMIT",         "the statement's week limit"],
-    ["status.html", "typingAccuracy",       "the typing test is measured in the page"],
+    ["status.html", "id=\"a-shot\"",        "the typing result screenshot she attaches"],
     ["status.html", "typing_proof",         "proof of the typing score"],
     ["admin.html",  "function todayCentral", "dates stamped in Central"],
     ["admin.html",  "function downloadCvs", "the bulk CV download"],
@@ -2524,34 +2524,77 @@ await check("the typing row says where the typing happens", () => {
   const quoted = page.slice(at, at + 400).split('"').filter((_, i) => i % 2);
   const said = quoted[2] || "";
 
-  /* Measured here, or not. Both halves have to be true together: the arithmetic
-     and the box she types into. */
+  /* Where the test lives is not a matter of opinion, and it has now been in
+     both places twice. A box she types into and arithmetic to score it means
+     it is measured here; a file input and a link out means it is taken
+     somewhere else and sent back as a picture. Exactly one of those may be
+     true, and the row's description has to agree with whichever it is.
+
+     Both halves are asserted rather than one, because the failure this guard
+     exists to catch is a half-move: the in-page test removed and the sentence
+     above it left behind, or a screenshot field added next to a typing box so
+     that the part asks for the same number twice. */
   const here = page.includes("function typingAccuracy(") && page.includes('id="a-type"');
-  if (!here) {
-    throw new Error("the typing test is no longer measured in status.html. If it has moved " +
-      "off the page again, this guard and the row's description both have to move with it — " +
-      "that is the drift it exists to stop.");
+  const away = page.includes('id="a-shot"') && page.includes("typingtest.com");
+
+  if (here && away) {
+    throw new Error("the typing part both measures a run in the page and asks for a screenshot " +
+      "of one taken elsewhere. Those are two answers to the same question and they will " +
+      "disagree — pick one.");
+  }
+  if (!here && !away) {
+    throw new Error("the typing part no longer measures anything or asks for proof of anything. " +
+      "It is the only number on the assessment that is not a multiple choice, so it cannot " +
+      "just be a box.");
   }
 
-  if (/(another|other) (site|website)/i.test(said)) {
-    throw new Error("the assessment card still sends her to another site for the typing: " +
-      '"' + said + '". It is typed on this page and measured by the browser, so the row is ' +
-      "telling her to go and find a test that is already in front of her.");
-  }
-  if (!/type/i.test(said)) {
-    throw new Error("the typing row no longer says she types anything: \"" + said + "\". " +
-      "It is the only description she gets before opening the part.");
+  if (away) {
+    /* Taken elsewhere. The proof is the screenshot, so the part has to ask for
+       it and the row has to warn her she is going somewhere. */
+    if (!page.includes('accept="image/png,image/jpeg"')) {
+      throw new Error("the typing part asks for a screenshot but accepts any file. A result " +
+        "page is a picture, and the bucket only takes png and jpeg — an applicant who picks a " +
+        "pdf is refused by storage with nothing on screen explaining it.");
+    }
+    if (!page.includes('id="a-wpm"') || !page.includes('id="a-acc"')) {
+      throw new Error("the typing part takes a screenshot but not the two numbers off it. " +
+        "score_typing reads typing_wpm and typing_accuracy; a screenshot alone scores nothing.");
+    }
+    if (!/(another|other) site|typingtest/i.test(said)) {
+      throw new Error("the typing test is taken on another site now, and the row does not say " +
+        'so: "' + said + '". It is the only description she gets before opening the part, and ' +
+        "she needs to know she is being sent somewhere before she starts.");
+    }
+    if (!/screenshot|picture/i.test(said)) {
+      throw new Error("the row does not mention the screenshot: \"" + said + "\". Coming back " +
+        "with a picture is the part of this she has to plan for — finding out after the test " +
+        "is finding out too late.");
+    }
+  } else {
+    /* Measured here. The row must not send her somewhere for a test that is
+       already in front of her — the drift this guard was written for. */
+    if (/(another|other) (site|website)/i.test(said)) {
+      throw new Error("the assessment card still sends her to another site for the typing: " +
+        '"' + said + '". It is typed on this page and measured by the browser, so the row is ' +
+        "telling her to go and find a test that is already in front of her.");
+    }
+    if (!/type/i.test(said)) {
+      throw new Error("the typing row no longer says she types anything: \"" + said + "\". " +
+        "It is the only description she gets before opening the part.");
+    }
   }
 
-  /* The connection speed test is the one thing here that genuinely is
-     somewhere else, and it has to stay described that way. */
+  /* The connection speed test is the one thing here that has been somewhere
+     else under every arrangement, and it has to stay described that way. */
   if (!page.includes("speedtest.net")) {
     throw new Error("the connection speed test link is gone from the typing part — that one " +
       "cannot be measured in the browser, and it is what stops somebody starting a client on " +
       "a line that will not hold a call.");
   }
 
-  return "typed and measured in the page, and the row says so";
+  return away
+    ? "taken at typingtest.com, screenshot and both numbers asked for, and the row says so"
+    : "typed and measured in the page, and the row says so";
 });
 
 /* Two pages described the same two interviews and disagreed about who was in
