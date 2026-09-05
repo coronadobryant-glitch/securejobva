@@ -13,7 +13,10 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   score_assessment
---     -> re-run 049-four-things-measured-once-each.sql to restore
+--     -> re-run 049-four-things-measured-once-each.sql to restore,
+--        then 063-the-verdict-does-not-wait.sql
+--   advance_on_assessment
+--     -> re-run 063-the-verdict-does-not-wait.sql to restore
 --   submit_assessment
 --     -> re-run 051-the-clock-and-the-send-button.sql to restore
 --

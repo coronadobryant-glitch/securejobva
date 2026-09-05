@@ -13,7 +13,8 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   score_assessment
---     -> re-run 049-four-things-measured-once-each.sql to restore
+--     -> re-run 049-four-things-measured-once-each.sql to restore,
+--        then 063-the-verdict-does-not-wait.sql
 --
 -- So if you ever run this file again, run every later file it names above,
 -- in number order, straight afterwards. tools/check.mjs keeps this list

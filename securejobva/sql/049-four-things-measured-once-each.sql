@@ -1,3 +1,28 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- The header below says this file is safe to re-run, and on its own it is:
+-- every statement in it is written to be repeatable. What it is not safe to
+-- do is run it AFTER the files that come later, because it defines a function
+-- one of them has since replaced — and `create or replace` does exactly what
+-- it says. Re-running this puts its own version back.
+--
+-- Nothing warns you when that happens. The schema looks perfect and the
+-- behaviour is months old.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   score_assessment
+--     -> re-run 063-the-verdict-does-not-wait.sql to restore
+--
+-- Re-running 049 puts the two human gates back in front of every verdict, so
+-- assessments silently stop being graded until somebody checks them. That is
+-- the old behaviour and it is not a broken one — but it is not the one that
+-- was asked for, and nothing on any screen would say it had returned.
+--
+-- So if you ever run this file again, run every later file it names above,
+-- in number order, straight afterwards. tools/check.mjs keeps this list
+-- honest: a new file that supersedes something here fails the build until
+-- this block names it.
 -- 049 — four things, each measured by something that measures it
 --
 -- Run after: 048
