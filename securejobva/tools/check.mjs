@@ -2568,9 +2568,9 @@ await check("the typing row says where the typing happens", () => {
    page alone; it only shows when they are read together, which is what this
    does. The stage description is the source, because it is the one the
    applicant is shown while it is actually happening. */
-await check("both pages describe the same two interviews", () => {
+await check("both pages describe the same interview", () => {
   if (!existsSync("careers.html") || !existsSync("status.html")) return "pages not built";
-  const stage = read("status.html").match(/"interview",\s*"Two interviews",\s*"([^"]+)"/);
+  const stage = read("status.html").match(/"interview",\s*"Interview",\s*"([^"]+)"/);
   if (!stage) {
     throw new Error("no interview stage description in status.html — renamed? this reads it by name");
   }
