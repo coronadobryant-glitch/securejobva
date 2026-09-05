@@ -245,6 +245,69 @@ await check("no two migrations share a number", () => {
 });
 const sql = sqlFiles.map((f) => read(SQL_DIR + "/" + f)).join("\n");
 
+/* The three figures on an assessment that a person fills in, and that the
+   applicant must not.
+
+   048 granted typing_verified_wpm and typing_verified_accuracy to
+   `authenticated`, directly under a comment saying she may not write what
+   somebody here read. A signed-in applicant IS `authenticated`, and RLS fences
+   rows rather than columns — 045's applicant policy only asks whether the row
+   is hers and unsent — so on the live database she could write both, and
+   written_score with them. Both halves of the gate that stood between an
+   assessment and an interview invitation were columns she could fill in
+   herself. Confirmed by running the query 049 ships, which returned all three.
+
+   A revoke is not the fix, because staff are `authenticated` too and would
+   lose the columns they check proofs into. 064 refuses the write in a trigger
+   that asks has_permission instead, so the grant stays and the guard is what
+   matters — which is exactly the kind of thing that gets dropped in a later
+   rewrite of a trigger nobody remembers the reason for.
+
+   So this reads the two against each other: while those columns are granted to
+   `authenticated`, something has to be refusing the write. */
+await check("the figures a person fills in are not the applicant's to write", () => {
+  const COLUMNS = ["typing_verified_wpm", "typing_verified_accuracy", "written_score"];
+  const granted = COLUMNS.filter((c) => {
+    const at = sql.indexOf(c);
+    if (at < 0) return false;
+    /* Inside a grant to authenticated, rather than merely mentioned. Grants in
+       this schema are one statement, so the nearest `grant update (` before the
+       column and the `to <role>` after it belong together. */
+    const g = sql.lastIndexOf("grant update (", at);
+    if (g < 0) return false;
+    const stmt = sql.slice(g, sql.indexOf(";", at) + 1);
+    return stmt.includes(c) && /to\s+authenticated/.test(stmt);
+  });
+
+  if (!granted.length) return "not granted to authenticated at all — nothing to guard";
+
+  const guard = sql.includes("staff_only_assessment_figures");
+  if (!guard) {
+    throw new Error(granted.join(", ") + " " + (granted.length === 1 ? "is" : "are") +
+      " granted UPDATE to `authenticated`, which is the role a signed-in applicant holds, " +
+      "and nothing in sql/ refuses the write. She can score her own assessment: " +
+      "typing_verified_* satisfies the typing check and written_score is half the english " +
+      "axis every track is gated on. Restore the guard in 064, or revoke the columns and " +
+      "move staff onto an RPC.");
+  }
+
+  /* The guard is only a guard while it asks the permission question. A version
+     that checks a role, or that reverts quietly instead of raising, would pass
+     the line above and protect nobody. */
+  const fn = sql.slice(sql.indexOf("function public.staff_only_assessment_figures"));
+  const body = fn.slice(0, fn.indexOf("$fn$;") + 5);
+  if (!body.includes("has_permission")) {
+    throw new Error("the staff-only guard no longer asks has_permission. That is the only " +
+      "test that separates staff from an applicant here — both hold `authenticated`.");
+  }
+  if (!body.includes("raise exception")) {
+    throw new Error("the staff-only guard no longer raises. A refusal that quietly succeeds " +
+      "leaves no sign it was attempted and teaches whoever tried that nothing is watching.");
+  }
+
+  return granted.length + " staff figures granted broadly, all refused by 064's trigger";
+});
+
 /* 044 gave the database a place to record which migrations have landed, so
    that tools/status.mjs stops being blind to the ones PostgREST cannot see —
    a trigger function, a column granted to nobody. That only works if every
