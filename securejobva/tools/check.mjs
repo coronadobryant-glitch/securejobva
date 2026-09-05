@@ -2267,6 +2267,29 @@ await check("the assessment card counts finished, not touched", async () => {
 
    So the walk drives the real sitLine() against rows shaped the way 063's
    scorer leaves them. */
+/* Her interview, from 062, which shipped with nothing driving it.
+
+   057 solved this shape for placements and test-interview.mjs covers it: two
+   people looking at the same four rows who must never be told different
+   things about them. 062 reused that table for applicants and reversed the
+   parts — we offer, she picks — and the failure is the same one. A row that
+   says "waiting on us" to her while saying "waiting on her" to you is a
+   booking that quietly dies, and neither page looks broken.
+
+   Written after the flow was asked about and found to have zero rows behind
+   it. It caught one thing on its first run: a confirmed interview left
+   Withdraw on the times beside the booked one, directly under the message
+   saying withdraw was off. */
+await check("both sides of her interview tell the same story", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-iv-booking.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours across five states, both pages";
+  } catch (e) {
+    throw new Error("tools/test-iv-booking.mjs failed — run it directly for the detail");
+  }
+});
+
 await check("the admin panel shows the grade the scorer reached", async () => {
   const { execFileSync } = await import("node:child_process");
   try {

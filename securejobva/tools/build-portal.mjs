@@ -4953,7 +4953,13 @@ function ivOffered(a) {
       (v.confirmed_at ? " ivo__s--on" : "") + '">' +
       "<span><b>" + esc(when) + "</b>" +
       '<span class="ivo__st">' + esc(state) + " · " + esc(String(v.minutes || 30)) + " min</span></span>" +
-      (v.confirmed_at
+      /* Once ANY of them is confirmed, none of them carries a button. The
+         test here used to be v.confirmed_at, which quietened only the booked
+         row and left Withdraw sitting on the times beside it — underneath the
+         message saying withdraw was off. Her side already drops the other
+         times entirely once one is booked, so those rows are finished on both
+         sides or on neither. */
+      (confirmed
         ? ""
         : v.chosen_at
           ? '<button class="btn btn--solid ivo__b" type="button" data-ivconfirm="' + esc(v.id) + '">Confirm</button>'
