@@ -3426,6 +3426,43 @@ await check("every portal page says which sign-in it belongs to", () => {
   return seen.join(" ");
 });
 
+/* ── a file holding more than the screen did ───────────────────────────────
+
+   Export CSV and Download CVs act on what the queue is showing. When the
+   queue gained stages, "showing" narrowed and those two did not: the count
+   read 4 of 4 over two visible rows, and Export CSV from an empty Interview
+   stage would have written a file containing all four applicants.
+
+   The count is merely wrong on screen, where you can see it. The file is the
+   dangerous half — it holds people you did not choose and nothing about it
+   looks wrong when you open it, which is the same shape as the export that
+   carried the retired scorecard.
+
+   So both read visibleRows(), and this refuses the older, wider answer. */
+await check("the export and the downloads read what the screen is showing", () => {
+  const js = read("admin.html");
+  const body = (name) => {
+    const at = js.indexOf("function " + name + "(");
+    if (at < 0) throw new Error("admin.html has no " + name);
+    return js.slice(at, at + 900);
+  };
+  if (js.indexOf("function visibleRows()") < 0) {
+    throw new Error("admin.html has no visibleRows() — nothing defines what is on screen");
+  }
+  const csv = body("exportCsv");
+  if (csv.indexOf("visibleRows()") < 0) {
+    throw new Error("exportCsv reads " +
+      (csv.indexOf("shownRows()") >= 0 ? "shownRows()" : "something else") +
+      ", so the file can hold people the stage was not showing");
+  }
+  const cvs = body("downloadCvs");
+  if (cvs.indexOf("visibleRows()") < 0 && cvs.indexOf("shownRows()") >= 0) {
+    throw new Error("the CV download reads shownRows(), so it fetches documents " +
+      "belonging to people not on the screen");
+  }
+  return "export and downloads both read the visible rows";
+});
+
 /* ── a stage with no name ──────────────────────────────────────────────────
 
    The queue rail draws one entry per QUEUE_ORDER stage and titles it from

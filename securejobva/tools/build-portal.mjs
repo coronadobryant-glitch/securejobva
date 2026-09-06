@@ -8085,7 +8085,7 @@ function downloadCvs() {
   /* Flattened here rather than in the loop, so the count in the button and the
      count that is actually fetched can never be two different numbers. */
   var jobs = [];
-  shownRows().forEach(function (a) {
+  visibleRows().forEach(function (a) {
     (a.docs || []).forEach(function (d, i) {
       jobs.push({ app: a, doc: d, name: cvName(a, d, i + 1) });
     });
@@ -8145,7 +8145,7 @@ function downloadCvs() {
 }
 
 function exportCsv() {
-  var rows = shownRows();
+  var rows = visibleRows();
   if (!rows.length) return;
 
   var out = [CSV_COLUMNS.map(function (c) { return csvCell(c[0]); }).join(",")];
@@ -8192,6 +8192,29 @@ function daysAgoLocal(iso) {
   var now = new Date();
   var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   return Math.round((today - then) / 86400000);
+}
+
+/* What the queue is actually showing, which is not the same as what the
+   filters admit.
+
+   shownRows() answers "what passes the search and the filters". Standing on
+   a stage narrows that again, and three things downstream had gone on asking
+   the first question: the count read "4 of 4" over two visible rows, Export
+   CSV on an empty Interview stage would have handed over all four applicants,
+   and Download CVs counted documents belonging to people not on the screen.
+
+   A file that quietly holds more than the screen did is the worse half of
+   that — nothing about it looks wrong when you open it. So the count, the
+   export and the downloads all read from here, and there is no second answer
+   for them to drift towards.
+
+   The overview and an active search both mean the whole queue on purpose:
+   one is about everybody by definition, and the other has already been told
+   to reach across the stages. */
+function visibleRows() {
+  var shown = shownRows();
+  if (STAGE === "" || narrowing()) return shown;
+  return shown.filter(function (a) { return (a.status || "applied") === STAGE; });
 }
 
 function shownRows() {
@@ -8404,7 +8427,7 @@ function grouped(shown, heads) {
 
 function paint() {
   repaintSummaries();
-  var shown = shownRows();
+  var shown = visibleRows();
   document.getElementById("count").textContent =
     shown.length + " of " + ALL.length;
   /* The button says what it will actually fetch, because "Download CVs" over a
@@ -8441,9 +8464,7 @@ function paint() {
   rows.hidden = overview;
   if (overview) { wireSit(rows); return; }
 
-  var here = narrowed ? shown : shown.filter(function (a) {
-    return (a.status || "applied") === STAGE;
-  });
+  var here = shown;
 
   if (here.length) {
     rows.innerHTML = grouped(here, narrowed);
