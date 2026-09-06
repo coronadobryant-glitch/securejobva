@@ -1865,6 +1865,50 @@ await check("the DISC questionnaire holds together", async () => {
 
 /* The CSV is the one place applicant-typed text leaves this system and is
    opened in a program that executes formulas. Both failure modes are silent. */
+/* The export and the screen have to agree about what a score is.
+
+   065 rebuilt the interview scorecard around the three jobs this site offers,
+   and the CSV went on exporting 008's five — english, customer, data_entry,
+   social, bookkeeping out of ten — which nothing writes any more. Five empty
+   columns on every row, beside a scorecard that had been filled in and was
+   nowhere in the file.
+
+   Nothing failed, and nothing could have: an export nobody has run yet is an
+   export that cannot be wrong yet. It was found by reading the deployed page
+   against what the day had changed. This is that reading, kept. */
+await check("the CSV exports the scores the page collects", () => {
+  if (!existsSync("admin.html")) return "page not built";
+  const page = read("admin.html");
+
+  const at = page.indexOf("var CSV_COLUMNS");
+  if (at < 0) throw new Error("no CSV_COLUMNS in admin.html — renamed?");
+  const cols = page.slice(at, page.indexOf("];", at));
+
+  /* Every column the scorecard writes has to leave in the export. */
+  const IV = ["iv_spoken", "iv_setup", "iv_reliability", "iv_tools", "iv_answers",
+              "iv_customer_service", "iv_admin_tasks", "iv_sales_marketing"];
+  const missing = IV.filter((c) => !cols.includes('"' + c + '"'));
+  if (missing.length) {
+    throw new Error("the CSV does not export " + missing.join(", ") +
+      " — the scorecard collects " + IV.length + " numbers and the export would " +
+      "carry " + (IV.length - missing.length) + " of them, which is worse than none " +
+      "because the file looks complete.");
+  }
+
+  /* And nothing it stopped writing may still be a column, or every row exports
+     a blank under a heading that reads like a measurement. */
+  const DEAD = ["score_english", "score_customer", "score_data_entry",
+                "score_social", "score_bookkeeping"];
+  const zombie = DEAD.filter((c) => cols.includes('"' + c + '"'));
+  if (zombie.length) {
+    throw new Error("the CSV still exports " + zombie.join(", ") +
+      ", which 065 stopped writing. Every row would carry an empty column under a " +
+      "heading that reads like a score somebody gave.");
+  }
+
+  return IV.length + " scorecard columns exported, none of 008's five left behind";
+});
+
 await check("CSV escaping holds", async () => {
   const { execFileSync } = await import("node:child_process");
   try {

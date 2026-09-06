@@ -7992,12 +7992,24 @@ var CSV_COLUMNS = [
   ["Data entry (self)", "skill_data_entry"],
   ["Social (self)", "skill_social"],
   ["Bookkeeping (self)", "skill_bookkeeping"],
-  ["English (score)", "score_english"],
-  ["Customer (score)", "score_customer"],
-  ["Data entry (score)", "score_data_entry"],
-  ["Social (score)", "score_social"],
-  ["Bookkeeping (score)", "score_bookkeeping"],
-  ["Average score", "score_avg"],
+  /* The interview scorecard, which 065 rebuilt. The five columns that used to
+     be here — english, customer, data_entry, social, bookkeeping out of ten —
+     are the ones nothing writes any more, so exporting them would have been
+     five empty columns on every row forever, next to a scorecard that had been
+     filled in.
+
+     Found by checking the deployed page against what today changed, rather
+     than by anything failing: an export nobody had run yet is an export that
+     cannot be wrong yet. */
+  ["Spoken English", "iv_spoken"],
+  ["Setup and room", "iv_setup"],
+  ["Reliability", "iv_reliability"],
+  ["Using the tools", "iv_tools"],
+  ["Her answers hold up", "iv_answers"],
+  ["Customer Service (job)", "iv_customer_service"],
+  ["Admin Tasks (job)", "iv_admin_tasks"],
+  ["Sales & Marketing (job)", "iv_sales_marketing"],
+  ["Interview average", "iv_avg"],
   ["Scored by", "scored_by"]
 ];
 
