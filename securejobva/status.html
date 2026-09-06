@@ -906,6 +906,20 @@ body:has(.adm__wrap) main{padding:0}
    screenshot that has to be signed first. Both have to look like the same
    thing, so the button is stripped back to the anchor rather than the anchor
    being dressed up as a button. */
+/* Where she joins. The pair beside Confirm, and the pair on a confirmed row. */
+.ivo__cf{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.ivo__cf input[type=url]{font-family:inherit;font-size:.78rem;padding:.25rem .4rem;
+  border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink);
+  min-width:11rem}
+.ivo__link{margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--line);
+  display:grid;gap:.4rem}
+.ivo__have{font-size:.8rem;color:var(--ink-2);overflow-wrap:anywhere}
+.ivo__have b{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-right:.35rem}
+.ivo__none{font-size:.8rem;color:var(--muted)}
+.ivo__link .ivo__add input[type=url]{font-family:inherit;font-size:.78rem;padding:.25rem .4rem;
+  border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink);
+  flex:1 1 14rem}
 .sit__lnk{font-size:.84rem;color:var(--accent);text-decoration:underline;
   font-family:inherit;background:none;border:0;padding:0;cursor:pointer}
 .sit__lnk[disabled]{cursor:default;opacity:.6}

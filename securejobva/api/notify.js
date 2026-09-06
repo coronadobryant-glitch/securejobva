@@ -332,6 +332,30 @@ const DECIDE = {
     }),
 
 
+    /* The joining details, arriving after the confirmation that promised them.
+       Applicant only: on a placement the client types the link while
+       confirming, so the confirmation carried it and a second mail saying the
+       same thing is how people stop reading the first. */
+    link: (r, p, site) => ({
+      subject: "Where to join your interview — " + slotText(r),
+      text: [
+        "Hi " + firstName(p.name) + ",", "",
+        "Here is where to join your interview on " + slotText(r) + ".",
+        "", "Link: " + (r.meeting_url || ""),
+        "", "That time is in Central. Open " + site + "/status to see it on your own clock.",
+        "", "Join a couple of minutes early so any camera or microphone trouble is not the " +
+        "first thing that happens. If the link does not work, reply to this email.",
+        "", "SecureJobVA"].join("\n"),
+      html: wrap([
+        "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+        "<p>Here is where to join your interview on <b>" + esc(slotText(r)) + "</b>.</p>",
+        "<p><a href=\"" + esc(r.meeting_url || "") + "\">" + esc(r.meeting_url || "") + "</a></p>",
+        "<p>That time is in Central &mdash; your page shows it on your own clock. Join a couple " +
+        "of minutes early so any camera or microphone trouble is not the first thing that " +
+        "happens. If the link does not work, reply to this email.</p>"
+      ], site, "/status", "See your interview")
+    }),
+
     picked: (r, p, site) => ({
       subject: r.other + " picked an interview time",
       text: [

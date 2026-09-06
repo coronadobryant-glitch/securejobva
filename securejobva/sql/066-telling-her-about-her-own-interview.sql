@@ -1,3 +1,19 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the files that come later.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   notify_interview
+--     -> re-run 067-where-she-joins.sql to restore
+--
+-- 066's version has no 'link' moment, so pasting a joining link onto a
+-- confirmed interview stops telling her where to go — and her confirmation
+-- mail has already promised that the details will follow. The link still
+-- lands on the row. Nothing says it did.
+--
+-- tools/check.mjs keeps this list honest.
 -- 066 — telling her about her own interview
 
 -- Run after: 058 (the function this replaces), 062, 065

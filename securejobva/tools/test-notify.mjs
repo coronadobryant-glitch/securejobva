@@ -615,6 +615,38 @@ const herPick = await call(ivHer("picked"));
 is("her pick mails nobody", all.length, 0);
 is("and is not an error", herPick.code, 200);
 
+/* ── the joining link, which the confirmation promised ───────────────────
+   062 gave confirm a url argument and /admin never passed one, so every
+   confirmed interview had meeting_url null and her mail fell through to "we
+   will send the joining details before the day" — which nothing then sent.
+   067 adds the link moment, and this is what it says. */
+all = [];
+const link = await call(ivHer("link", {
+  record: { meeting_url: "https://meet.google.com/abc-defg-hij" }
+}));
+is("a link sent afterwards reaches her", link.code, 200);
+is("and only her", sent.body.to, ["maria@example.com"]);
+is("the subject says what it is and when",
+   sent.body.subject, "Where to join your interview — Tuesday, September 8 at 9:00 AM Central, 30 minutes");
+is("the link is in the text part",
+   sent.body.text.includes("https://meet.google.com/abc-defg-hij"), true);
+is("and clickable in the html part",
+   sent.body.html.includes("href=\"https://meet.google.com/abc-defg-hij\""), true);
+is("it still names the clock", sent.body.text.includes("Central"), true);
+is("and tells her to be early", sent.body.text.includes("couple of minutes early"), true);
+is("exactly one email", all.length, 1);
+
+/* A placement link is not news — the client typed it while confirming, so the
+   confirmation already carried it. 067 does not post the moment for that side;
+   this is the handler agreeing. */
+all = [];
+const plLink = await call(iv("link", {
+  record: { meeting_url: "https://meet.google.com/abc-defg-hij" }
+}));
+is("a placement link mails the assistant, who got it on the confirmation",
+   all.length, 1);
+is("and is not an error", plLink.code, 200);
+
 /* ── the retry rule, which is the whole point of splitting them ── */
 resendStatus = 500;
 is("a failed email to you is retried", (await call(WEEK)).code, 502);

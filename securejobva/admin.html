@@ -906,6 +906,20 @@ body:has(.adm__wrap) main{padding:0}
    screenshot that has to be signed first. Both have to look like the same
    thing, so the button is stripped back to the anchor rather than the anchor
    being dressed up as a button. */
+/* Where she joins. The pair beside Confirm, and the pair on a confirmed row. */
+.ivo__cf{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.ivo__cf input[type=url]{font-family:inherit;font-size:.78rem;padding:.25rem .4rem;
+  border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink);
+  min-width:11rem}
+.ivo__link{margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--line);
+  display:grid;gap:.4rem}
+.ivo__have{font-size:.8rem;color:var(--ink-2);overflow-wrap:anywhere}
+.ivo__have b{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-right:.35rem}
+.ivo__none{font-size:.8rem;color:var(--muted)}
+.ivo__link .ivo__add input[type=url]{font-family:inherit;font-size:.78rem;padding:.25rem .4rem;
+  border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink);
+  flex:1 1 14rem}
 .sit__lnk{font-size:.84rem;color:var(--accent);text-decoration:underline;
   font-family:inherit;background:none;border:0;padding:0;cursor:pointer}
 .sit__lnk[disabled]{cursor:default;opacity:.6}
@@ -2763,7 +2777,11 @@ function ivOffered(a) {
       (confirmed
         ? ""
         : v.chosen_at
-          ? '<button class="btn btn--solid ivo__b" type="button" data-ivconfirm="' + esc(v.id) + '">Confirm</button>'
+          ? '<span class="ivo__cf">' +
+            '<input type="url" data-ivurl maxlength="500" placeholder="Joining link, optional" ' +
+            'aria-label="Where she joins, if you have it yet">' +
+            '<button class="btn btn--solid ivo__b" type="button" data-ivconfirm="' + esc(v.id) + '">Confirm</button>' +
+            "</span>"
           : '<button class="btn btn--ghost ivo__b" type="button" data-ivdrop="' + esc(v.id) + '">Withdraw</button>') +
       "</li>";
   }).join("");
@@ -2774,8 +2792,31 @@ function ivOffered(a) {
     (declined
       ? '<p class="ivo__msg">She said none of these work. Offer a new set.</p>'
       : "") +
+    /* Where she joins. confirm_application_interview has taken a url since 062
+       and this page never passed one, so meeting_url was null on every
+       confirmed interview and her mail always fell back to "we will send the
+       joining details before the day" — which nothing then sent.
+
+       Two places to put it, because the link and the decision do not arrive
+       together. Usually you agree the time first and make the room afterwards,
+       so it can go in with Confirm OR onto a confirmed row later, and adding
+       it later mails her the details that were promised. */
     (confirmed
-      ? '<p class="ivo__msg">Confirmed, and the date is on her row. Withdraw is off ' +
+      ? '<div class="ivo__link">' +
+          (confirmed.meeting_url
+            ? '<span class="ivo__have"><b>Joining link</b> ' +
+              '<a href="' + esc(confirmed.meeting_url) + '" target="_blank" ' +
+              'rel="noopener noreferrer">' + esc(confirmed.meeting_url) + "</a></span>"
+            : '<span class="ivo__none">No joining link yet &mdash; she has been told the ' +
+              "details will follow.</span>") +
+          '<span class="ivo__add">' +
+            '<input type="url" data-ivurl maxlength="500" placeholder="https://meet.google.com/… or a Zoom link" ' +
+            'aria-label="Where she joins the interview">' +
+            '<button class="btn btn--ghost ivo__b" type="button" data-ivlink="' + esc(confirmed.id) + '">' +
+            (confirmed.meeting_url ? "Replace" : "Send link") + "</button>" +
+          "</span>" +
+        "</div>" +
+        '<p class="ivo__msg">Confirmed, and the date is on her row. Withdraw is off ' +
         "&mdash; moving a confirmed interview is a conversation, not a button.</p>"
       : '<span class="ivo__add">' +
         '<input type="datetime-local" data-ivat aria-label="A time to offer her">' +
@@ -6198,8 +6239,31 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
     var ivo = e.target.closest("[data-ivoffer]");
     if (ivo && !ivo.disabled) { ivOffer(ivo); return; }
     var ivc = e.target.closest("[data-ivconfirm]");
-    if (ivc && !ivc.disabled) { ivAct(ivc, "rpc/confirm_application_interview",
-      { slot: ivc.getAttribute("data-ivconfirm") }, "Confirming…"); return; }
+    if (ivc && !ivc.disabled) {
+      /* The link box beside this button, if it was filled in. Read from the
+         same span so two confirmed rows on one screen cannot hand each other
+         the wrong URL. */
+      var cwrap = ivc.closest(".ivo__cf");
+      var curl = cwrap ? cwrap.querySelector("[data-ivurl]") : null;
+      var cval = curl ? String(curl.value || "").trim() : "";
+      ivAct(ivc, "rpc/confirm_application_interview",
+        { slot: ivc.getAttribute("data-ivconfirm"), url: cval || null }, "Confirming…");
+      return;
+    }
+    var ivl = e.target.closest("[data-ivlink]");
+    if (ivl && !ivl.disabled) {
+      var lwrap = ivl.closest(".ivo__add");
+      var lurl = lwrap ? lwrap.querySelector("[data-ivurl]") : null;
+      var lval = lurl ? String(lurl.value || "").trim() : "";
+      if (!lval) {
+        var lerr = ivl.closest(".ivo").querySelector("[data-iverr]");
+        if (lerr) lerr.textContent = "Paste the joining link first.";
+        return;
+      }
+      ivAct(ivl, "rpc/set_application_interview_link",
+        { slot: ivl.getAttribute("data-ivlink"), url: lval }, "Sending…");
+      return;
+    }
     var ivd = e.target.closest("[data-ivdrop]");
     if (ivd && !ivd.disabled) { ivAct(ivd, "rpc/withdraw_application_slot",
       { slot: ivd.getAttribute("data-ivdrop") }, "Withdrawing…"); return; }
