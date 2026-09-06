@@ -777,7 +777,21 @@ const LIB = `
    which is both shorter and predictable. */
 var SB   = "https://hmgravlkatfmerzbozct.supabase.co";
 var ANON = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
-var KEY  = "sjva-session";
+/* Which sign-in slot this page keeps its session in.
+
+   All five portal pages sit on one origin and shared one key, so there was
+   one signed-in person per browser at a time: signing in as an applicant to
+   look at /status took the staff session with it, and signing back in took
+   the applicant one. Three audiences, one slot, and they evicted each other.
+
+   What this does NOT change is who may see what. That is decided in the
+   database from the role on the token — an applicant reaching /admin gets an
+   empty page because Postgres refuses the rows, not because the page hid
+   them. This separates the drawer the key is kept in, not the lock.
+
+   Applicants keep the original name so nobody mid-application is signed out
+   by this; staff and clients sign in once more and then stay. */
+var KEY  = "sjva-session" + (typeof SLOT === "string" && SLOT ? "-" + SLOT : "");
 
 function saveSession(s) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
@@ -1933,6 +1947,10 @@ function shell(o) {
     "<script>",
     "(function () {",
     '  "use strict";',
+    /* Declared before LIB, which reads it to name the session key. A page that
+       forgets it would silently share the applicants' drawer, so check.mjs
+       requires every generated page to carry one. */
+    '  var SLOT = "' + (o.slot || "") + '";',
     LIB,
     "",
     o.script,
@@ -9014,6 +9032,7 @@ start();
 `.trim();
 
 writeFileSync("admin.html", shell({
+  slot: "staff",
   app: true,
   title: "Admin portal — SecureJobVA",
   links: [
@@ -10491,6 +10510,7 @@ const SEATS_CSS = `
 `;
 
 writeFileSync("seats.html", shell({
+  slot: "client",
   title: "Your seats — SecureJobVA",
   links: [
     '        <a href="/">Hiring a VA?</a>',
@@ -10883,6 +10903,7 @@ const PAY_CSS = `
 `;
 
 writeFileSync("pay.html", shell({
+  slot: "client",
   title: "Pay — SecureJobVA",
   links: [
     '        <a href="/seats">Your seats</a>',

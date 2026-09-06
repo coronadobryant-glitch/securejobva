@@ -3388,6 +3388,44 @@ await check("no whole-table UPDATE where the subject writes their own row", () =
   return SUBJECT_WRITES_OWN_ROW.size + " tables — every UPDATE grant names its columns";
 });
 
+/* ── whose drawer this page keeps its key in ────────────────────────────────
+
+   The five portal pages share one origin, so the localStorage key is the
+   only thing separating three audiences. A page that declares no slot lands
+   in the applicants’ drawer — silently, and working perfectly, right up
+   until a staff session evicts an applicant mid-application or the reverse.
+
+   The failure has no symptom at the moment it is introduced, which is why it
+   is worth a check rather than a convention: shell() takes the slot as an
+   option, and an option nobody passes is simply absent. */
+await check("every portal page says which sign-in it belongs to", () => {
+  const WANT = {
+    "status.html": "",       /* applicants keep the original key name */
+    "hub.html":    "",       /* a hired assistant is the same person */
+    "admin.html":  "staff",
+    "seats.html":  "client",
+    "pay.html":    "client"
+  };
+  const seen = [];
+  for (const file of Object.keys(WANT)) {
+    const js = read(file);
+    const mark = "var SLOT = ";
+    const at = js.indexOf(mark);
+    if (at < 0) throw new Error(file + " declares no SLOT, so it shares the applicants’ session");
+    const got = js.slice(at + mark.length, js.indexOf(";", at)).replace(/"/g, "").trim();
+    if (got !== WANT[file]) {
+      throw new Error(file + " is in the " + (got || "applicant") + " slot, wanted " +
+        (WANT[file] || "applicant"));
+    }
+    /* And the key has to actually be built from it. */
+    if (js.indexOf('"sjva-session" + (typeof SLOT') < 0) {
+      throw new Error(file + " does not build its session key from SLOT");
+    }
+    seen.push(file.replace(".html", "") + ":" + (got || "applicant"));
+  }
+  return seen.join(" ");
+});
+
 /* ── a stage with no name ──────────────────────────────────────────────────
 
    The queue rail draws one entry per QUEUE_ORDER stage and titles it from

@@ -1102,6 +1102,7 @@ body:has(.adm__wrap) main{padding:0}
 <script>
 (function () {
   "use strict";
+  var SLOT = "";
 /* ── Supabase sign-in, without the SDK ────────────────────────────────────
    The rest of this site talks to PostgREST with fetch and no dependencies, so
    the portal does the same. Google is reached through Supabase's authorize
@@ -1125,7 +1126,21 @@ body:has(.adm__wrap) main{padding:0}
    which is both shorter and predictable. */
 var SB   = "https://hmgravlkatfmerzbozct.supabase.co";
 var ANON = "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
-var KEY  = "sjva-session";
+/* Which sign-in slot this page keeps its session in.
+
+   All five portal pages sit on one origin and shared one key, so there was
+   one signed-in person per browser at a time: signing in as an applicant to
+   look at /status took the staff session with it, and signing back in took
+   the applicant one. Three audiences, one slot, and they evicted each other.
+
+   What this does NOT change is who may see what. That is decided in the
+   database from the role on the token — an applicant reaching /admin gets an
+   empty page because Postgres refuses the rows, not because the page hid
+   them. This separates the drawer the key is kept in, not the lock.
+
+   Applicants keep the original name so nobody mid-application is signed out
+   by this; staff and clients sign in once more and then stay. */
+var KEY  = "sjva-session" + (typeof SLOT === "string" && SLOT ? "-" + SLOT : "");
 
 function saveSession(s) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
