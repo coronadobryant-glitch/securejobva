@@ -3388,6 +3388,35 @@ await check("no whole-table UPDATE where the subject writes their own row", () =
   return SUBJECT_WRITES_OWN_ROW.size + " tables — every UPDATE grant names its columns";
 });
 
+/* ── a stage with no name ──────────────────────────────────────────────────
+
+   The queue rail draws one entry per QUEUE_ORDER stage and titles it from
+   QUEUE_HEAD. A stage added to the order and not to the headings still gets
+   its entry — titled "undefined", because that is what the lookup returns
+   and esc() will happily print it.
+
+   It is the failure this navigation invites: the two lists sit apart, adding
+   a stage means touching both, and the page does not complain when you touch
+   one. Nothing else would catch it, because the entry is there and the count
+   beside it is right. */
+await check("every queue stage has a heading to be called by", () => {
+  const js = read("admin.html");
+  const grab = (name) => {
+    const at = js.indexOf("var " + name);
+    if (at < 0) throw new Error("admin.html has no " + name);
+    return js.slice(at, js.indexOf(";", at));
+  };
+  const order = [...grab("QUEUE_ORDER").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  const heads = grab("QUEUE_HEAD");
+  if (!order.length) throw new Error("QUEUE_ORDER parsed as empty");
+  const missing = order.filter((k) => heads.indexOf(k + ":") < 0);
+  if (missing.length) {
+    throw new Error("QUEUE_ORDER has " + missing.join(", ") +
+      " with no QUEUE_HEAD entry — the rail would title that stage undefined");
+  }
+  return order.length + " stages, all named";
+});
+
 /* ── a parameter nothing ever passes ─────────────────────────
 
    render() in admin.html grew an eighth parameter, slots, when 062 gave an

@@ -737,6 +737,13 @@ details[open] > .row__sum::after{content:"−"}
 .rail__k{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:#5C769A;padding:.75rem .5rem .25rem}
 @media(max-width:899px){.rail__k{display:none}}
 .rnav{display:flex;align-items:center;gap:.5rem;width:100%;padding:.42rem .9rem;border:0;border-left:2px solid transparent;border-radius:0;background:none;color:#B9C8DE;font:inherit;font-size:.87rem;text-align:left;cursor:pointer}
+.rnav--sub{padding-left:2.1rem;font-size:.83rem}
+.qempty{border:1px dashed var(--line);border-radius:10px;padding:1.6rem 1.2rem;text-align:center;color:var(--muted);font-size:.92rem;background:var(--surface-2)}
+.qempty b{display:block;color:var(--ink-2);font-weight:600;margin-bottom:.2rem}
+.rnav--sub.is-on{border-left-color:#fff}
+.rnav--sub.is-empty{color:#61799C}
+.rnav--sub.is-empty .rnav__n{opacity:.5}
+.rnav--sub.is-on.is-empty{color:var(--accent-ink)}
 @media(max-width:899px){.rnav{width:auto;font-size:.82rem}}
 .rnav:hover{background:rgba(255,255,255,.06);color:#fff}
 .rnav.is-on{background:var(--accent);color:var(--accent-ink);font-weight:600}
@@ -3903,6 +3910,14 @@ function wireTabs() {
       if (p.getAttribute("data-pane") === want) p.removeAttribute("hidden");
       else p.setAttribute("hidden", "");
     });
+    /* The queue's own entries carry a stage as well as a pane. Applications
+       carries an empty one, which is the overview rather than a missing
+       value, so the test is against null and never against truthiness. */
+    var stage = b.getAttribute("data-stage");
+    if (stage !== null) {
+      STAGE = stage;
+      if (typeof paint === "function") paint();
+    }
   });
 }
 
@@ -5931,7 +5946,72 @@ var QUEUE_HEAD = {
   declined:   "Declined"
 };
 
-function grouped(shown) {
+/* Which stage the rail is standing on. "" is the overview, which carries the
+   tiles and the Breakdown because those count the whole queue and belong to
+   none of the stages. */
+var STAGE = "";
+
+/* Whether anything is narrowing the queue right now. It decides one thing:
+   a search has to reach people at every stage, or the queue becomes a place
+   where you must already know somebody’s stage in order to find them,
+   which is worse than the scroll this replaced. */
+function narrowing() {
+  var ids = ["q", "filter", "fskill", "flevel", "fdate"];
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (el && String(el.value || "").trim() !== "") return true;
+  }
+  return false;
+}
+
+/* The counts beside each rail entry, and an entry for any status this list
+   has never heard of. Counted off ALL rather than off what is shown, because
+   a count that moves when you type into the search box is not a count of
+   anything — it is the filter, reported twice. */
+function paintStageCounts() {
+  var by = {};
+  var extra = [];
+  ALL.forEach(function (a) {
+    var k = a.status || "applied";
+    if (QUEUE_ORDER.indexOf(k) < 0 && extra.indexOf(k) < 0) extra.push(k);
+    by[k] = (by[k] || 0) + 1;
+  });
+
+  QUEUE_ORDER.forEach(function (k) {
+    var el = document.getElementById("rn-" + k);
+    if (!el) return;
+    var n = by[k] || 0;
+    el.textContent = String(n);
+    var btn = el.closest("[data-stage]");
+    if (btn) btn.classList.toggle("is-empty", n === 0);
+  });
+
+  var slot = document.getElementById("rn-extra");
+  if (slot) {
+    slot.innerHTML = extra.map(function (k) {
+      return '<button class="rnav rnav--sub" data-tab="apps" data-stage="' + esc(k) +
+        '" type="button">' + esc(LABEL[k] || k) +
+        '<span class="rnav__n">' + (by[k] || 0) + "</span></button>";
+    }).join("");
+  }
+
+  var apps = document.getElementById("tab-apps");
+  if (apps) apps.textContent = ALL.length ? String(ALL.length) : "";
+}
+
+/* The first stage with anybody in it, so the queue never opens on an empty
+   page. Falls back to the overview when nobody has applied at all. */
+function firstBusyStage() {
+  for (var i = 0; i < QUEUE_ORDER.length; i++) {
+    var k = QUEUE_ORDER[i];
+    for (var j = 0; j < ALL.length; j++) {
+      if ((ALL[j].status || "applied") === k) return k;
+    }
+  }
+  return "";
+}
+
+function grouped(shown, heads) {
   var by = {};
   var extra = [];
   shown.forEach(function (a) {
@@ -5943,6 +6023,9 @@ function grouped(shown) {
   return QUEUE_ORDER.concat(extra).map(function (k) {
     var group = by[k];
     if (!group || !group.length) return "";
+    /* No heading when the rail already names the stage you are standing on.
+       Printing it again is the page repeating the navigation back at you. */
+    if (heads === false) return group.map(rowHtml).join("");
     return '<div class="qgrp">' +
       '<h3 class="qgrp__h">' + esc(QUEUE_HEAD[k] || LABEL[k] || k) +
       '<span class="qgrp__n">' + group.length + "</span></h3>" +
@@ -5967,8 +6050,44 @@ function paint() {
     cvBtn.textContent = n ? "Download " + n + " CV" + (n === 1 ? "" : "s") : "No CVs here";
     cvBtn.disabled = !n || CVS_RUNNING;
   }
+  paintStageCounts();
+
+  /* Three states, and only one of them draws the whole queue.
+
+     Overview  the tiles and the Breakdown, which count everybody and so
+               belong to no single stage. No rows.
+     A stage   that stage's rows only, no headings, no tiles.
+     Narrowed  a search reaches every stage, with the headings back on so each
+               hit says where its person is standing.
+
+     The tiles are hidden rather than left up on a stage page: whole-queue
+     figures above a single stage's rows is the confusion this replaced. */
+  var narrowed = narrowing();
+  var overview = !narrowed && STAGE === "";
+  var kpis = document.getElementById("kpis");
+  var stats = document.getElementById("stats-card");
+  if (kpis) kpis.hidden = !overview;
+  if (stats) stats.hidden = !overview;
+
   var rows = document.getElementById("rows");
-  rows.innerHTML = shown.length ? grouped(shown) : '<p class="msg">Nothing matches that.</p>';
+  rows.hidden = overview;
+  if (overview) { wireSit(rows); return; }
+
+  var here = narrowed ? shown : shown.filter(function (a) {
+    return (a.status || "applied") === STAGE;
+  });
+
+  if (here.length) {
+    rows.innerHTML = grouped(here, narrowed);
+  } else if (narrowed) {
+    rows.innerHTML = '<p class="msg">Nothing matches that.</p>';
+  } else {
+    /* An empty stage says so. It used to be drawn as nothing at all, which
+       made "nobody is here" and "you have scrolled past it" identical. */
+    rows.innerHTML = '<div class="qempty"><b>Nobody is at ' +
+      esc((QUEUE_HEAD[STAGE] || LABEL[STAGE] || STAGE).toLowerCase()) + ".</b> " +
+      "When somebody reaches this stage they appear here.</div>";
+  }
   /* Rewired every paint, because the rows are replaced wholesale and the
      listeners go with them. Everything else on a row is delegated from the
      container; the assessment panel has two controls of its own. */
@@ -6210,8 +6329,27 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
       '<span class="rail__me"><span class="who__av">' + esc(email.charAt(0).toUpperCase()) + "</span>" +
         "<span><b>Administrator</b>" + esc(email) + "</span></span>" +
       '<span class="rail__k">The queue</span>' +
-      '<button class="rnav is-on" data-tab="apps" type="button">' + ICON.apps +
+      '<button class="rnav is-on" data-tab="apps" data-stage="" type="button">' + ICON.apps +
         'Applications<span class="rnav__n" id="tab-apps"></span></button>' +
+      /* One entry per stage, nested under Applications above.
+
+         The queue used to be six headings down one scrolling page, which asks
+         you to hold in your head which of them you have already passed. A
+         stage with nobody in it was drawn as nothing at all, so "nobody is at
+         interview" and "I have scrolled past interview" looked identical.
+
+         Every stage is drawn here whether or not anybody is in it, because the
+         count beside it IS the answer to that question, and an entry that
+         appears and disappears cannot be aimed at. */
+      QUEUE_ORDER.map(function (k) {
+        return '<button class="rnav rnav--sub" data-tab="apps" data-stage="' + k +
+          '" type="button">' + esc(QUEUE_HEAD[k]) +
+          '<span class="rnav__n" id="rn-' + k + '"></span></button>';
+      }).join("") +
+      /* Somewhere for a status this list has never heard of. Filled in by
+         paintStageCounts once the rows are known; a row nobody can find is
+         worse than a row in the wrong place. */
+      '<span id="rn-extra"></span>' +
       '<button class="rnav" data-tab="cal" type="button">' + ICON.cal +
         'Interviews<span class="rnav__n" id="tab-cal"></span></button>' +
       '<button class="rnav" data-tab="inbox" type="button">' + ICON.inbox +
@@ -6425,6 +6563,20 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
       return;
     }
   });
+
+  /* Open on the first stage with somebody in it rather than on the overview:
+     the queue is a list of people to deal with, and a page of totals is not
+     the thing you came to do. Nobody applied at all lands on the overview,
+     which then says so with its own zeroes. */
+  STAGE = firstBusyStage();
+  var land = document.querySelector('[data-stage="' + STAGE + '"]');
+  if (land) {
+    document.querySelectorAll("#tabs [data-tab]").forEach(function (x) {
+      x.classList.toggle("is-on", x === land);
+    });
+    var h = document.querySelector(".adm__top h2");
+    if (h) h.textContent = QUEUE_HEAD[STAGE] || "Applications";
+  }
   paint();
 }
 
