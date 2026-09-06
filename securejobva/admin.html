@@ -906,6 +906,18 @@ body:has(.adm__wrap) main{padding:0}
    screenshot that has to be signed first. Both have to look like the same
    thing, so the button is stripped back to the anchor rather than the anchor
    being dressed up as a button. */
+/* The queue's stage headings. Quiet enough not to compete with the rows under
+   them, loud enough to be a place rather than a caption — the mistake the
+   interview scorecard made for weeks. */
+.qgrp{margin-top:1.6rem}
+.qgrp:first-child{margin-top:.4rem}
+.qgrp__h{display:flex;align-items:center;gap:.55rem;margin:0 0 .7rem;
+  font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;
+  text-transform:uppercase;font-weight:600;color:var(--muted)}
+.qgrp__h::after{content:"";flex:1;height:1px;background:var(--line)}
+.qgrp__n{order:1;font-size:.7rem;padding:.1rem .42rem;border-radius:20px;
+  background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+
 /* Where she joins. The pair beside Confirm, and the pair on a confirmed row. */
 .ivo__cf{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
 .ivo__cf input[type=url]{font-family:inherit;font-size:.78rem;padding:.25rem .4rem;
@@ -5811,6 +5823,55 @@ function repaintSummaries() {
   if (can("analytics.view")) drawStats();
 }
 
+/* ── the queue, in stages rather than one list ────────────────────────────
+
+   It was one flat list ordered by who had waited longest, with a pipeline
+   filter above it. That is the right order inside a stage and the wrong shape
+   across them: somebody who applied this morning, somebody sitting exams and
+   somebody with an interview booked need different things done, and they were
+   interleaved by age with nothing but a small pill to tell them apart.
+
+   Every stage is listed in ladder order, and only the ones holding somebody
+   are drawn — an empty heading is a shelf with nothing on it. The count is on
+   the heading because "Assessment 1" answers the question the filter was being
+   used to ask.
+
+   declined is last and separate on purpose: it is not a step on the way
+   anywhere, and putting it after hired keeps the ladder reading downward.
+
+   A status this list does not know about still appears, under its own name,
+   rather than vanishing — the failure mode of grouping is a row nobody can
+   find, and a row nobody can find is worse than a row in the wrong place. */
+var QUEUE_ORDER = ["applied", "assessment", "interview", "approved", "hired", "declined"];
+var QUEUE_HEAD = {
+  applied:    "New applicants",
+  assessment: "Assessment",
+  interview:  "Interview",
+  approved:   "Approved — in training",
+  hired:      "Hired",
+  declined:   "Declined"
+};
+
+function grouped(shown) {
+  var by = {};
+  var extra = [];
+  shown.forEach(function (a) {
+    var k = a.status || "applied";
+    if (QUEUE_ORDER.indexOf(k) < 0 && extra.indexOf(k) < 0) extra.push(k);
+    (by[k] = by[k] || []).push(a);
+  });
+
+  return QUEUE_ORDER.concat(extra).map(function (k) {
+    var group = by[k];
+    if (!group || !group.length) return "";
+    return '<div class="qgrp">' +
+      '<h3 class="qgrp__h">' + esc(QUEUE_HEAD[k] || LABEL[k] || k) +
+      '<span class="qgrp__n">' + group.length + "</span></h3>" +
+      group.map(rowHtml).join("") +
+    "</div>";
+  }).join("");
+}
+
 function paint() {
   repaintSummaries();
   var shown = shownRows();
@@ -5828,8 +5889,7 @@ function paint() {
     cvBtn.disabled = !n || CVS_RUNNING;
   }
   var rows = document.getElementById("rows");
-  rows.innerHTML =
-    shown.length ? shown.map(rowHtml).join("") : '<p class="msg">Nothing matches that.</p>';
+  rows.innerHTML = shown.length ? grouped(shown) : '<p class="msg">Nothing matches that.</p>';
   /* Rewired every paint, because the rows are replaced wholesale and the
      listeners go with them. Everything else on a row is delegated from the
      container; the assessment panel has two controls of its own. */

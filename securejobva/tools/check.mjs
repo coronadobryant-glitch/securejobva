@@ -2275,6 +2275,22 @@ await check("the assessment card counts finished, not touched", async () => {
 
    So the walk drives the real sitLine() against rows shaped the way 063's
    scorer leaves them. */
+/* The queue, split into stages.
+
+   Grouping has one failure mode worth guarding and it is not cosmetic: a row
+   that lands in no group. Nobody notices an applicant who stopped being drawn
+   — the count at the top is computed separately, the filters still work, and
+   the person is simply gone from the screen that decides about them. */
+await check("every applicant lands in a stage, exactly once", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-queue-groups.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, including the stage nobody planned for";
+  } catch (e) {
+    throw new Error("tools/test-queue-groups.mjs failed — run it directly for the detail");
+  }
+});
+
 /* The interview scorecard, which 065 rebuilt around the three jobs this site
    actually offers.
 
