@@ -1,3 +1,23 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the files that come later, because it defines
+-- a function one of them has since replaced.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   notify_interview
+--     -> re-run 066-telling-her-about-her-own-interview.sql to restore
+--
+-- 058's version looks the parties up through placements alone, so an
+-- applicant's interview slot matches nothing, finds no address, and mails
+-- nobody — she is told neither when times are offered nor when one is
+-- confirmed. It does not fail. It returns having sent nothing.
+--
+-- And re-running this file needs the webhook secret pasted in, which 066 does
+-- not, because 066 leaves post_interview_note alone.
+--
+-- tools/check.mjs keeps this list honest.
 -- 058 — telling both sides
 --
 -- Run after: 057

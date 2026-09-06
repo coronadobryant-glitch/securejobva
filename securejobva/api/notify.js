@@ -243,13 +243,20 @@ const STAGE_MAIL = {
       "the strengths test. We will be in touch with the detail.",
     where: "/status", label: "See where you are"
   },
+  /* This mail is sent by the STAGE CHANGE, and the stage can be moved before
+     anybody has offered her a time — which is what happened the first time
+     this ran. It used to say "Some times are waiting on your application page"
+     over a button reading Pick your time, and she followed it to a page that
+     had none. The mail cannot know whether slots exist, so it must not claim
+     they do: it says what is true either way, and her page says which of the
+     two she has arrived at. */
   interview: {
     subject: "Your application — interview next",
     lead: "has moved on to the interview",
     body: "One interview with us, on how you work and on your setup and " +
-      "connection. Some times are waiting on your application page — pick " +
-      "whichever suits you, and tell us if none of them do.",
-    where: "/status", label: "Pick your time"
+      "connection. We will offer you a few times to choose from — they appear " +
+      "on your application page, and you will get an email the moment they do.",
+    where: "/status", label: "Check your schedule"
   },
   approved: {
     subject: "You are through — paid training starts within a week",
@@ -282,7 +289,30 @@ const DECIDE = {
      There is no `arrived` half, which is what keeps that true — the branch in
      decision() that mails you and Bryant cannot be reached from here. */
   interview_slots: {
-    offered: (r, p, site) => ({
+    /* Three sides now, not two. 057 built this for a client and an assistant
+       settling a placement interview between themselves; 062 reused the table
+       for an applicant's interview with us and wired no mail at all, so she
+       was told nothing when times were offered and nothing when one was
+       confirmed. The applicant branch goes to /status and never mentions a
+       client, because on her interview there is not one. */
+    offered: (r, p, site) => (r.side === "applicant" ? {
+      subject: "Your interview — pick a time",
+      text: [
+        "Hi " + firstName(p.name) + ",", "",
+        "We have put some times forward for your interview.",
+        "", "Open " + site + "/status and choose whichever suits you. They are shown on your " +
+        "own clock, with ours underneath.",
+        "", "If none of them work, say so on that page and we will offer others. That is a " +
+        "normal thing to do and it costs you nothing.",
+        "", "SecureJobVA"].join("\n"),
+      html: wrap([
+        "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+        "<p>We have put some times forward for your interview.</p>",
+        "<p>They are shown on your own clock, with ours underneath. If none of them work, say " +
+        "so on that page and we will offer others &mdash; that is a normal thing to do and it " +
+        "costs you nothing.</p>"
+      ], site, "/status", "Check your schedule")
+    } : {
       subject: r.other + " have suggested interview times",
       text: [
         "Hi " + firstName(p.name) + ",", "",
@@ -300,6 +330,7 @@ const DECIDE = {
         "thing to do.</p>"
       ], site, "/hub", "Pick a time")
     }),
+
 
     picked: (r, p, site) => ({
       subject: r.other + " picked an interview time",
@@ -337,6 +368,35 @@ const DECIDE = {
        sent once to a list — they are told different things. `side` is which
        of them this copy is for. */
     confirmed: (r, p, site) => {
+      /* Hers is the one confirmation that is not between two other people, so
+         it names no client and points at her own page. It is also the mail
+         somebody actually asked for: choosing the time in /admin now tells
+         her, which until 066 it did not. */
+      if (r.side === "applicant") {
+        const link = r.meeting_url
+          ? "Where: " + r.meeting_url
+          : "We will send the joining details to this address before the day.";
+        return {
+          subject: "Your interview is set — " + slotText(r),
+          text: [
+            "Hi " + firstName(p.name) + ",", "",
+            "Your interview with SecureJobVA is confirmed for " + slotText(r) + ".",
+            "", link,
+            "", "That time is in Central. Open " + site + "/status to see it on your own clock.",
+            "", "Camera on, somewhere quiet. If you need to move it, reply to this email.",
+            "", "SecureJobVA"].join("\n"),
+          html: wrap([
+            "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+            "<p>Your interview with <b>SecureJobVA</b> is confirmed for <b>" +
+              esc(slotText(r)) + "</b>.</p>",
+            "<p>" + (r.meeting_url
+              ? "Where: <a href=\"" + esc(r.meeting_url) + "\">" + esc(r.meeting_url) + "</a>"
+              : esc(link)) + "</p>",
+            "<p>That time is in Central &mdash; your page shows it on your own clock. Camera " +
+            "on, somewhere quiet. If you need to move it, reply to this email.</p>"
+          ], site, "/status", "See your interview")
+        };
+      }
       const mine = r.side === "assistant";
       const where = mine ? "/hub" : "/seats";
       const link = r.meeting_url
@@ -679,6 +739,19 @@ async function decision(body, res, env) {
      being retried for the rest of its life. */
   if (!shape) {
     return res.status(200).json({ skipped: String(body.table) + "/" + String(body.event) });
+  }
+
+  /* Her picking a time, or declining every one, tells nobody by mail. On a
+     placement those two moments go to the client, who is waiting on somebody
+     else; on her interview the other party is us, and /admin already shows her
+     pick as a Confirm button on the row in front of the person who acts on it.
+     Mailing ourselves about our own queue is how a queue stops being read.
+
+     066 does not post these, so this is the second lock rather than the first
+     — and it is the one that holds if anybody ever posts the payload by hand. */
+  if (body.table === "interview_slots" && record.side === "applicant" &&
+      (body.event === "picked" || body.event === "declined")) {
+    return res.status(200).json({ skipped: "interview_slots/" + body.event + " (applicant)" });
   }
 
   if (body.event === "arrived") {

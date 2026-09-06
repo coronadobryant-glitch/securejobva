@@ -329,8 +329,23 @@ is("the interview email says one, not two",
   sent.body.text.includes("One interview with us"), true);
 is("and the subject says one too",
   sent.body.subject, "Your application — interview next");
-is("and it sends her somewhere to act, not somewhere to read",
-  sent.body.text.includes("pick") || sent.body.text.includes("Pick"), true);
+/* This used to require the word "pick", because the mail said "Some times are
+   waiting on your application page — pick whichever suits you" over a button
+   reading Pick your time. The mail is sent by the STAGE CHANGE and the stage
+   can be moved before any slot exists, so that sentence was a promise the
+   sender could not keep — and the first person ever moved to interview
+   followed the button to a page with no times on it.
+
+   So the assertion is inverted. The stage mail must NOT claim times are
+   already there; it must say they are coming and that she will be told. What
+   it may promise is a page, which always exists. */
+is("it does not claim times are already waiting",
+  /times are waiting|waiting on your application page/i.test(sent.body.text), false);
+is("it says they are coming instead",
+  sent.body.text.includes("We will offer you a few times"), true);
+is("and promises the mail that follows, which 066 makes real",
+  sent.body.text.includes("you will get an email the moment they do"), true);
+is("and still sends her to her own page", sent.body.text.includes("/status"), true);
 is("and nothing in it still says two",
   /two interviews|There are two/i.test(sent.body.subject + " " + sent.body.text), false);
 
@@ -547,6 +562,58 @@ const ivStaff = await call(iv("arrived"));
 is("there is no staff copy of an interview", all.length, 0);
 is("and asking for one is skipped", ivStaff.code, 200);
 is("by name", ivStaff.body.skipped, "interview_slots/arrived");
+
+/* ── her own interview, with us ──────────────────────────────────────────
+   062 reused this table for an applicant and wired no mail at all: 058's
+   trigger looks the parties up through placements, an applicant's slot has no
+   placement, the lookup matched nothing and it returned having sent nothing.
+   It never failed — there is nothing wrong with a slot that has no placement,
+   it is simply the other kind. 066 routes those rows; these are the two mails
+   that reach her, and the third side api/notify.js now branches on. */
+const ivHer = (event, over) => iv(event, Object.assign({
+  person: { name: "Maria Santos", email: "maria@example.com" },
+  record: Object.assign({ side: "applicant", other: "SecureJobVA" },
+                        (over && over.record) || {})
+}, over && over.person ? { person: over.person } : {}));
+
+all = [];
+const hers = await call(ivHer("offered"));
+is("times offered reach the applicant", hers.code, 200);
+is("and only her", sent.body.to, ["maria@example.com"]);
+is("the subject says what it is about", sent.body.subject, "Your interview — pick a time");
+is("she is sent to her own page, not the assistant portal",
+   sent.body.text.includes("/status"), true);
+is("and never to /hub, which is not hers", sent.body.text.includes("/hub"), false);
+is("no client is invented for an interview that has none",
+   /client/i.test(sent.body.text), false);
+is("and she is told she may refuse them", sent.body.text.includes("none of them work"), true);
+is("exactly one email", all.length, 1);
+
+all = [];
+const set = await call(ivHer("confirmed"));
+is("confirming in /admin tells her", set.code, 200);
+is("with the time in the subject",
+   sent.body.subject.startsWith("Your interview is set — "), true);
+is("and the date in it", sent.body.subject.includes("September 8"), true);
+is("it names the clock the time is in", sent.body.text.includes("Central"), true);
+is("and where to see it on hers", sent.body.text.includes("/status"), true);
+is("it says how the joining details arrive when there is no link",
+   sent.body.text.includes("joining details"), true);
+is("exactly one email", all.length, 1);
+
+all = [];
+await call(ivHer("confirmed", { record: { meeting_url: "https://meet.example/xyz" } }));
+is("a meeting link is given when there is one",
+   sent.body.text.includes("https://meet.example/xyz"), true);
+
+/* Her picking one, and her declining, tell nobody by mail: /admin already
+   shows the pick as a Confirm button on the row in front of the person who
+   acts on it. Mailing ourselves about our own queue is how a queue stops
+   being read. */
+all = [];
+const herPick = await call(ivHer("picked"));
+is("her pick mails nobody", all.length, 0);
+is("and is not an error", herPick.code, 200);
 
 /* ── the retry rule, which is the whole point of splitting them ── */
 resendStatus = 500;
