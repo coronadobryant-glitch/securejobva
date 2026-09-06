@@ -1,3 +1,24 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the file that comes later.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   reschedule_application_interview
+--     -> re-run 071-a-time-a-person-would-write.sql to restore
+--
+-- 070's version zero-pads both times in the note and puts Central only after
+-- the second, where it can be read as qualifying that one alone — in a note
+-- whose whole job is to say which of two times is which. The move itself is
+-- identical; only the note is worse.
+--
+-- 070 also defines notify_interview, which 071 does NOT touch. Re-running
+-- 070 is the right thing to do if that trigger ever needs restoring; run
+-- 071 after it to get the note wording back.
+--
+-- tools/check.mjs keeps this list honest.
+
 -- 070 — moving an interview
 
 -- Run after: 069 (the function this replaces), 062, 068

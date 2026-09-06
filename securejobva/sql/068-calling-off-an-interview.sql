@@ -1,3 +1,19 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the file that comes later.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   cancel_application_interview
+--     -> re-run 071-a-time-a-person-would-write.sql to restore
+--
+-- 068's version zero-pads the note it writes, so a cancellation reads
+-- "was Fri 06 Sep 02:00 PM" rather than the time a person would write. The
+-- cancellation itself is identical; only the note is worse.
+--
+-- tools/check.mjs keeps this list honest.
+
 -- 068 — calling off an interview
 
 -- Run after: 062 (the functions), 058 (post_interview_note), 022 (the notes)
