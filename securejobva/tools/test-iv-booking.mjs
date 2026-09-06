@@ -82,9 +82,10 @@ const slot = (id, at, over) => Object.assign({
   chosen_at: null, confirmed_at: null, declined_at: null, meeting_url: null
 }, over || {});
 
-function both(slots, tz) {
+function both(slots, tz, status) {
   her.set(tz || "Asia/Manila");
-  const a = { id: "a1", name: "Maria Santos", slots: slots };
+  const a = { id: "a1", name: "Maria Santos", slots: slots,
+              status: status === undefined ? "interview" : status };
   return { h: her.card(a), u: us.card(a) };
 }
 
@@ -95,13 +96,33 @@ const has = (s, t) => s.indexOf(t) > -1;
    this is the only one of these five that has ever actually existed. */
 console.log("\n  Before anything is offered");
 {
+  /* Moved to interview with no slot yet. 031's mail goes out on the stage
+     change and says times are waiting on her page, so this is the state the
+     mail describes — and it used to render nothing at all, which is how the
+     first person through followed Pick your time to a page with no interview
+     on it. */
   const v = both([]);
-  ok("she is shown no interview card at all", v.h, "",
-     "an empty card would ask her to pick from nothing");
+  ok("she is told the times are coming rather than shown nothing",
+     has(v.h, "Times coming"), true);
+  ok("and that nothing is owed by her yet", has(v.h, "nothing to do until then"), true);
+  ok("and it answers the email that sent her here",
+     has(v.h, "if your email said times were waiting"), true);
+  ok("with nothing to pick, because there is nothing", has(v.h, "data-slot"), false);
+  ok("and no way to decline times she has not seen", has(v.h, "data-none"), false);
+
   ok("and we are shown the block, so there is somewhere to offer from",
      has(v.u, "Times offered"), true);
   ok("with a box to offer one", has(v.u, "data-ivoffer"), true);
   ok("and nothing listed yet", has(v.u, "ivo__l"), false);
+}
+{
+  /* Before she is moved, the card must stay away entirely: an applicant at
+     assessment being told her interview times are coming is the same lie in
+     the other direction. */
+  const v = both([], null, "assessment");
+  ok("somebody not yet at interview is shown no card", v.h, "");
+  const w = both([], null, "applied");
+  ok("nor is somebody who has only applied", w.h, "");
 }
 
 /* ── offered, and she has not picked ─────────────────────────────────── */

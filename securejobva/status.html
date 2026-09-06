@@ -2230,7 +2230,34 @@ function ivCard(a) {
   var slots = (a.slots || []).slice().sort(function (x, y) {
     return new Date(x.starts_at) - new Date(y.starts_at);
   });
-  if (!slots.length) return "";
+
+  /* ── moved to interview before anybody offered her a time ────────────────
+
+     031's interview mail says "Some times are waiting on your application
+     page — pick whichever suits you", over a button reading Pick your time.
+     It is sent by the stage change, and the stage can be changed before any
+     slot exists — which is what happened the first time anybody used this.
+
+     Returning "" here meant she followed that button to a page with no
+     interview card on it at all. Not an empty one: nothing. The mail asserted
+     something the page then declined to mention, and the only person who could
+     tell it was a timing problem rather than a broken account was us.
+
+     So the card exists from the moment she is at interview. It says the true
+     thing — the times are coming and she does not owe us anything yet — which
+     costs nothing when the slots arrive an hour later and is the difference
+     between waiting and being ignored. */
+  if (!slots.length) {
+    if (a.status !== "interview") return "";
+    return '<div class="card">' +
+      '<div class="row__top"><span><span class="row__n">Your interview</span>' +
+      '<span class="row__meta"> &middot; with us, camera on</span></span>' +
+      '<span class="pill pill--assessment">Times coming</span></div>' +
+      '<p class="msg" style="margin:1rem 0 0">One interview with us &mdash; how you work, and a ' +
+      "check of your machine and connection. <b>We are picking times to offer you.</b> They will " +
+      "appear here and you choose whichever suits you, so there is nothing to do until then " +
+      "&mdash; if your email said times were waiting, they are on their way.</p></div>";
+  }
 
   var confirmed = null;
   var chosen = null;
