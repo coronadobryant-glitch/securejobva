@@ -3518,6 +3518,42 @@ await check("every function the portal calls is one the SQL defines", () => {
   return wanted.size + " functions, all defined and granted";
 });
 
+/* ── a refusal nobody can read ─────────────────────────────────────────────
+
+   The interview functions raise sentences on purpose — "she has not picked
+   that one", "that one is confirmed — cancel it with her, not from here" —
+   and /admin shows what comes back rather than replacing it with something
+   generic. That was the intent, stated in a comment since 062.
+
+   The panel printed e.message, which is PostgREST's entire JSON body, so what
+   reached the screen was {"code":"P0001",...,"message":"..."} — the sentence
+   present, wrapped in machinery, in a box about four words wide.
+
+   why() unwraps it and is called from thirty-odd other places. This one was
+   missed, and nothing noticed because an error path is the last thing anybody
+   drives on purpose. */
+await check("the interview panel shows the refusal, not the JSON around it", () => {
+  const js = read("admin.html");
+  const at = js.indexOf("function ivAct(");
+  if (at < 0) throw new Error("admin.html has no ivAct()");
+  /* Matched to the closing brace rather than a byte count. The first version
+     of this check took a fixed 2200-character window and failed the moment a
+     comment was added above the line it was looking for — a guard that moves
+     when the code around it does is a guard that will be deleted. */
+  let depth = 0, i = js.indexOf("{", at), end = -1;
+  for (; i < js.length; i++) {
+    if (js[i] === "{") depth++;
+    else if (js[i] === "}") { depth--; if (!depth) { end = i; break; } }
+  }
+  if (end < 0) throw new Error("ivAct() has unbalanced braces in admin.html");
+  const body = js.slice(at, end);
+  if (body.indexOf("why(e)") < 0) {
+    throw new Error("ivAct does not pass its error through why(), so a refusal " +
+      "reaches the screen as a JSON body rather than the sentence inside it");
+  }
+  return "refusals are unwrapped";
+});
+
 /* ── a stage with no name ──────────────────────────────────────────────────
 
    The queue rail draws one entry per QUEUE_ORDER stage and titles it from

@@ -2814,8 +2814,19 @@ function ivAct(btn, fn, body, saying, errEl) {
     .catch(function (e) {
       btn.disabled = false;
       btn.textContent = was;
-      var m = String((e && e.message) || "");
-      if (err) err.textContent = m && m !== "signed out" ? m : "That did not save. Try again.";
+      /* Through why(), which unwraps PostgREST's body to the sentence inside.
+
+         This used to print e.message, which IS the whole body, so every one of
+         these functions' carefully written refusals reached the screen as
+
+           {"code":"P0001","details":null,"hint":null,
+            "message":"that is the time it is already at"}
+
+         The comment further up already said these were sentences meant to be
+         read, and had said so since 062. Nothing read them. why() has existed
+         the whole time and is called from thirty-odd other places; this was
+         one of the few that did not. */
+      if (err) err.textContent = why(e);
     });
 }
 /* Moving a booked interview to a time we have decided.
