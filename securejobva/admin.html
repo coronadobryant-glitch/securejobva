@@ -463,6 +463,35 @@ img{max-width:100%}
 
 .rows{display:grid;gap:.8rem}
 .row{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.05rem 1.15rem}
+/* Shut by default. The summary is the whole row when closed, so it takes the
+   click and shows a pointer; the marker is replaced with one that reads as an
+   affordance rather than a bullet. An open row is lifted slightly so the one
+   you are working in is obvious in a column of shut ones. */
+.row + .row{margin-top:.6rem}
+.row__sum{cursor:pointer;list-style:none;position:relative;padding-right:1.6rem}
+.row__sum::-webkit-details-marker{display:none}
+.row__sum::after{content:"+";position:absolute;right:.1rem;top:0;
+  font-family:"IBM Plex Mono",monospace;font-size:1rem;color:var(--muted);line-height:1.2}
+/* The minus character itself, not a CSS numeric escape. A backslash-2212 in
+   here is an octal escape to JavaScript and the generator stops parsing —
+   including when it is only being described in a comment, which is how this
+   line was written twice. Same family as the backslashes halved on the way in:
+   anything written into a file that writes a file has to survive the trip. */
+details[open] > .row__sum::after{content:"−"}
+.row__sum:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+.row[open]{border-color:var(--accent-soft);box-shadow:var(--shadow)}
+/* What a shut row still has to tell you. The scorecard spent weeks proving
+   that a thing you cannot see is a thing nobody does, so every reason to open
+   a row is printed on the outside of it. */
+.row__flags{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}
+.row__f{font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.06em;
+  text-transform:uppercase;font-weight:600;padding:.14rem .4rem;border-radius:4px;
+  background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.row__f--stop{background:#FDECEE;color:#A11B2B;border-color:#F2C6CC}
+.row__f--warn{background:var(--signal);color:var(--signal-ink);border-color:var(--signal)}
+.row__f--ok{background:#E9F7EF;color:#0B6B3A;border-color:#BFE3CE}
+:root[data-theme="dark"] .row__f--stop{background:#2A1116;color:#FF9AA6;border-color:#4E2028}
+:root[data-theme="dark"] .row__f--ok{background:#0D2419;color:#63D69B;border-color:#1D4430}
 .row__top{display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:baseline;justify-content:space-between}
 .row__n{font-weight:700}
 .row__meta{font-size:.85rem;color:var(--muted)}
@@ -2746,6 +2775,9 @@ function ivAct(btn, fn, body, saying, errEl) {
       if (fresh) rec.interview_at = fresh.interview_at;
       var tmp = document.createElement("div");
       tmp.innerHTML = rowHtml(rec);
+      /* Open state travels with the node, so it has to be carried over — you
+         are always inside a row when you press these. */
+      if (row.open) tmp.firstChild.open = true;
       row.replaceWith(tmp.firstChild);
       /* The tab beside this one counts interviews with no date, interviews
          nobody scored and now interviews booked before the assessment. A
@@ -2882,8 +2914,40 @@ function rowHtml(a) {
       "</div>";
   }
 
+  /* ── shut by default, and the summary has to earn that ──────────────────
+
+     A row is about two screens tall: the working style, the scorecard, the
+     socials, the stage controls, the times offered and the notes. Four
+     applicants is fine. Forty is a scroll nobody reads, and the queue is
+     meant to be read.
+
+     So it collapses. The whole risk of that is the one the interview
+     scorecard demonstrated for weeks — a shut thing is an invisible thing —
+     so the summary carries every reason you would have opened it: what stage
+     she is at, whether she has been waiting, whether she has been graded, and
+     whether her interview is booked. Nothing that needs doing is only visible
+     inside.
+
+     A <details> rather than a class toggle, so it works before any script
+     runs, keyboard opens it, and the browser's own find-in-page can reach the
+     text inside a shut one. */
+  var flags = "";
+  if (a.is_ghosted) flags += '<span class="row__f row__f--stop">no reply</span>';
+  if (a.interview_unresolved) flags += '<span class="row__f row__f--warn">interview not written up</span>';
+  if (a.sit && a.sit.submitted_at && a.sit.verdict === "passed") {
+    flags += '<span class="row__f row__f--ok">passed</span>';
+  } else if (a.sit && a.sit.submitted_at && a.sit.verdict === "below_line") {
+    flags += '<span class="row__f row__f--stop">below the line</span>';
+  } else if (a.status === "assessment" && (!a.sit || !a.sit.submitted_at)) {
+    flags += '<span class="row__f">exams not sent</span>';
+  }
+  if (a.status === "interview" && !a.interview_at) {
+    flags += '<span class="row__f row__f--warn">no time arranged</span>';
+  }
+
   return (
-    '<div class="row" data-id="' + esc(a.id) + '">' +
+    '<details class="row" data-id="' + esc(a.id) + '">' +
+      '<summary class="row__sum">' +
       '<div class="row__top">' +
         "<span>" +
           '<span class="row__n">' + esc(a.name || "(no name)") + "</span> " +
@@ -2894,6 +2958,8 @@ function rowHtml(a) {
       '<div class="row__tags">' + esc(tracks) + " &middot; " + esc(a.experience || "?") +
         (a.region ? " &middot; " + esc(a.region) : "") +
         " &middot; applied " + esc(when(a.created_at)) + "</div>" +
+      (flags ? '<div class="row__flags">' + flags + "</div>" : "") +
+      "</summary>" +
       skillLine(a) +
       discLine(a) +
       sitLine(a) +
@@ -2902,7 +2968,7 @@ function rowHtml(a) {
       scoreLine(a) +
       social +
       ctl +
-    "</div>"
+    "</details>"
   );
 }
 
@@ -5801,6 +5867,7 @@ function addNote(row) {
       var tmp = document.createElement("div");
       tmp.innerHTML = rowHtml(rec);
       var next = tmp.firstChild;
+      if (row.open) next.open = true;
       row.replaceWith(next);
       /* Same as in save(): the row holding ok has just been replaced, so the
          confirmation has to be aimed at the row that is now on the page. */
@@ -6030,6 +6097,11 @@ function save(row) {
       var tmp = document.createElement("div");
       tmp.innerHTML = fresh;
       var next = tmp.firstChild;
+      /* The row is a <details> now, so its open state lives on the node and
+         goes with the node it replaces. Carried across, or every save shuts
+         the row you were working in and you reopen it to see whether the save
+         worked. */
+      if (row.open) next.open = true;
       row.replaceWith(next);
       /* ok was found inside the row we have just thrown away, so writing to it
          now writes to a node the page no longer contains. That is why "Mark
