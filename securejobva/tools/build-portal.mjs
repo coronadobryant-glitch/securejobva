@@ -8828,10 +8828,25 @@ function start() {
             "typing_wpm,typing_accuracy,typing_proof,connection_proof," +
             "typing_verified_wpm,typing_verified_accuracy,typing_verified_by," +
             "written_reply,written_score,scenario_answers")
+          .catch(function () { return []; }),
+        /* The times offered for an interview, and which one she picked.
+
+           render() has taken these since 062 and attached them to every row,
+           and nothing ever fetched them or passed them in: the parameter sat
+           undefined, the slots-or-empty fallback swallowed it, and every panel
+           drew as "nothing offered yet" — which is a state that reads as true.
+
+           What that cost: an interview offered in one page session vanished on
+           the next load, her pick with it, so Confirm was reachable only in the
+           tick after Offer was pressed. ivAct's own refetch was the only thing
+           in the page that ever loaded a slot. */
+        api("interview_slots?select=id,application_id,starts_at,minutes,offered_by," +
+            "chosen_at,confirmed_at,declined_at,meeting_url&order=starts_at")
           .catch(function () { return []; })
       ];
       return Promise.all(jobs).then(function (r) {
-        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || [], r[4] || [], r[5] || []);
+        render(claims.email, r[0] || [], r[1] || [], r[2] || [], r[3] || [], r[4] || [], r[5] || [],
+               r[6] || []);
       });
     })
     .catch(function (e) {

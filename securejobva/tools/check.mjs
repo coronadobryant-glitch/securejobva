@@ -3388,6 +3388,92 @@ await check("no whole-table UPDATE where the subject writes their own row", () =
   return SUBJECT_WRITES_OWN_ROW.size + " tables — every UPDATE grant names its columns";
 });
 
+/* ── a parameter nothing ever passes ─────────────────────────
+
+   render() in admin.html grew an eighth parameter, slots, when 062 gave an
+   applicant her own interview. The attachment loop underneath it was written
+   too. The call site was not, and neither was the fetch, so the argument was
+   undefined on every load and the fallback beside it turned that into an
+   empty list without complaining.
+
+   Every panel then drew as "no times offered yet" — a state that reads as
+   perfectly true — so an interview offered in one page session was gone on
+   the next load, and her pick with it. Confirm was reachable only in the
+   same tick as Offer.
+
+   Nothing failed. The renderer has its own suite and passes it, because the
+   suite builds the row object itself and hands the slots straight in: it
+   drives the function, never the wiring that fills it.
+
+   So this counts. A function that declares more than its caller passes is a
+   half-landed change, and the missing end is the one nobody looks at. */
+function declaredParams(js, name) {
+  const at = js.indexOf("function " + name + "(");
+  if (at < 0) return null;
+  const open = js.indexOf("(", at);
+  const inner = js.slice(open + 1, js.indexOf(")", open));
+  return inner.trim() ? inner.split(",").length : 0;
+}
+/* Scanned rather than matched. A regular expression built as a string in
+   this file has to survive being written into it, and the first two
+   attempts here arrived with their backslashes halved — the same trip that
+   has now eaten an escape seven times in three days. indexOf cannot be
+   mangled on the way in. */
+function callArgs(js, name) {
+  const counts = [];
+  const needle = name + "(";
+  let from = 0, at;
+  while ((at = js.indexOf(needle, from)) >= 0) {
+    from = at + needle.length;
+    const before = js.slice(Math.max(0, at - 9), at);
+    /* The declaration itself, and any longer identifier ending in this name. */
+    if (before.endsWith("function ")) continue;
+    const prev = at ? js[at - 1] : " ";
+    if (/[A-Za-z0-9_$.]/.test(prev)) continue;
+    let i = from, depth = 1, args = 1, empty = true;
+    for (; i < js.length && depth > 0; i++) {
+      const c = js[i];
+      if (c === "(" || c === "[") depth++;
+      else if (c === ")" || c === "]") { depth--; if (!depth) break; }
+      else if (c === "," && depth === 1) args++;
+      if (depth === 1 && c !== "," && c.trim()) empty = false;
+    }
+    counts.push(empty ? 0 : args);
+  }
+  return counts;
+}
+await check("no generated page calls render with fewer arguments than it declares", () => {
+  const seen = [];
+  for (const file of ["status.html", "admin.html", "hub.html"]) {
+    const js = read(file);
+    const want = declaredParams(js, "render");
+    if (want === null) continue;
+    const got = callArgs(js, "render");
+    if (!got.length) throw new Error(file + ": render is declared and never called");
+    const best = Math.max(...got);
+    if (best < want) {
+      throw new Error(file + ": render declares " + want + " parameters and the fullest call " +
+        "passes " + best + " — parameter " + (best + 1) + " is undefined on every load");
+    }
+    seen.push(file.replace(".html", "") + " " + best + "/" + want);
+  }
+  return seen.join(", ");
+});
+
+/* The other half of the same bug: the argument can be passed and still carry
+   nothing, if the fetch above it was never added to the list. */
+await check("the admin queue fetches the interview times it draws", () => {
+  const js = read("admin.html");
+  /* A plain substring, not a regular expression. Every escape written into
+     this file has to survive being written, and two of them did not. */
+  const wanted = "interview_slots?select=id,application_id";
+  if (js.indexOf(wanted) < 0) {
+    throw new Error("admin.html draws a Times offered panel and never fetches interview_slots " +
+      "on load — the panel can only fill after an Offer in the same page session");
+  }
+  return "interview_slots is loaded with the queue";
+});
+
 /* ── built output ────────────────────────────────────────────────────────── */
 
 console.log("\ndist\n");
