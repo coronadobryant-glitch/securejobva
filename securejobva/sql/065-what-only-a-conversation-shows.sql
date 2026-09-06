@@ -29,7 +29,7 @@
 -- WHAT AN INTERVIEW IS ACTUALLY FOR HERE
 -- ==========================================================================
 --
--- The four things below are the ones nothing else in this product can see. The
+-- The five things below are the ones nothing else in this product can see. The
 -- assessment cannot, the screenshots cannot, and the speed test cannot:
 --
 --   spoken English    The assessment tests WRITTEN english — eight multiple
@@ -45,6 +45,14 @@
 --   reliability       Whether she came on time, gave notice, and turned up
 --                     ready. is_ghosted already tracks the same instinct on
 --                     the queue; this is the interview's half of it.
+--
+--   tools             Whether she can use software. Not the room and not the
+--                     hardware — those are 'setup' — but learning a client's
+--                     CRM, living in a spreadsheet, and fixing her own problem
+--                     at six in the morning with nobody to ask. For somebody
+--                     working alone in another country it is the difference
+--                     between a person you manage and a person you hand things
+--                     to, and nothing in this product has asked about it.
 --
 --   own answers       status.html says it in the comment on the paste guard:
 --                     "the real defence is the interviewer asking her about
@@ -82,12 +90,13 @@ end
 $pre$;
 
 -- ==========================================================================
--- THE FOUR A CONVERSATION SHOWS
+-- THE FIVE A CONVERSATION SHOWS
 -- ==========================================================================
 
 alter table public.application_tracking add column if not exists iv_spoken      smallint;
 alter table public.application_tracking add column if not exists iv_setup       smallint;
 alter table public.application_tracking add column if not exists iv_reliability smallint;
+alter table public.application_tracking add column if not exists iv_tools       smallint;
 alter table public.application_tracking add column if not exists iv_answers     smallint;
 
 -- ==========================================================================
@@ -110,6 +119,7 @@ alter table public.application_tracking add constraint application_tracking_iv_v
   (iv_spoken           is null or iv_spoken           between 1 and 5) and
   (iv_setup            is null or iv_setup            between 1 and 5) and
   (iv_reliability      is null or iv_reliability      between 1 and 5) and
+  (iv_tools            is null or iv_tools            between 1 and 5) and
   (iv_answers          is null or iv_answers          between 1 and 5) and
   (iv_customer_service is null or iv_customer_service between 1 and 5) and
   (iv_admin_tasks      is null or iv_admin_tasks      between 1 and 5) and
@@ -147,6 +157,7 @@ begin
   if new.iv_spoken           is distinct from old.iv_spoken
   or new.iv_setup            is distinct from old.iv_setup
   or new.iv_reliability      is distinct from old.iv_reliability
+  or new.iv_tools            is distinct from old.iv_tools
   or new.iv_answers          is distinct from old.iv_answers
   or new.iv_customer_service is distinct from old.iv_customer_service
   or new.iv_admin_tasks      is distinct from old.iv_admin_tasks
@@ -186,7 +197,7 @@ create trigger application_tracking_stamp_scorer
 -- scores here precisely so a 2 out of 5 about somebody cannot reach them
 -- through a web page — so this grant reaches staff and nobody else.
 
-grant update (iv_spoken, iv_setup, iv_reliability, iv_answers,
+grant update (iv_spoken, iv_setup, iv_reliability, iv_tools, iv_answers,
               iv_customer_service, iv_admin_tasks, iv_sales_marketing)
   on public.application_tracking to authenticated;
 
@@ -238,6 +249,7 @@ select
   t.iv_spoken,
   t.iv_setup,
   t.iv_reliability,
+  t.iv_tools,
   t.iv_answers,
   t.iv_customer_service,
   t.iv_admin_tasks,
@@ -251,7 +263,7 @@ select
     where v is not null) as score_avg,
 
   (select round(avg(v)::numeric, 1)
-     from unnest(array[t.iv_spoken, t.iv_setup, t.iv_reliability, t.iv_answers,
+     from unnest(array[t.iv_spoken, t.iv_setup, t.iv_reliability, t.iv_tools, t.iv_answers,
                        t.iv_customer_service, t.iv_admin_tasks, t.iv_sales_marketing]) as v
     where v is not null) as iv_avg,
 
@@ -277,6 +289,7 @@ select
      and t.iv_spoken is null
      and t.iv_setup is null
      and t.iv_reliability is null
+     and t.iv_tools is null
      and t.iv_answers is null
      and t.iv_customer_service is null
      and t.iv_admin_tasks is null
@@ -303,7 +316,7 @@ select coalesce((
 from pg_class c
 where c.relname = 'application_queue';
 
--- Eight rows: the seven new columns and iv_avg.
+-- Nine rows: the eight new columns and iv_avg.
 select column_name
 from information_schema.columns
 where table_schema = 'public'

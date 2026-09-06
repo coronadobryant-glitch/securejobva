@@ -2290,7 +2290,7 @@ await check("the scorecard asks about the jobs this site offers", async () => {
   const { execFileSync } = await import("node:child_process");
   try {
     const out = execFileSync(process.execPath, ["tools/test-scorecard.mjs"], { stdio: "pipe" }).toString();
-    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, four from the call and one per job";
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, five from the call and one per job";
   } catch (e) {
     throw new Error("tools/test-scorecard.mjs failed — run it directly for the detail");
   }
