@@ -638,6 +638,7 @@ details[open] > .row__sum::after{content:"−"}
 .cal__today{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:var(--signal);color:var(--signal-ink);padding:.16rem .4rem;border-radius:4px}
 .cal__row{display:grid;grid-template-columns:5rem 1fr;gap:.3rem .8rem;padding:.5rem .7rem;background:var(--surface-2);border-radius:7px;margin-bottom:.35rem}
 .cal__t{font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--ink-2)}
+.cal__nolink{color:var(--muted);font-style:italic}
 .cal__n{font-weight:600;font-size:.92rem}
 .cal__w{grid-column:2;font-size:.78rem;color:var(--muted)}
 .tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.2rem;border-bottom:1px solid var(--line)}
@@ -3862,7 +3863,26 @@ function drawCalendar() {
             })) + "</span>" +
             '<span class="cal__n">' + esc(a.name || a.email) + "</span>" +
             '<span class="cal__w">' + esc((a.tracks || []).join(" + ")) +
-              (a.interviewer ? " &middot; " + esc(a.interviewer) : "") + "</span>" +
+              (a.interviewer ? " &middot; " + esc(a.interviewer) : "") +
+              /* Where to join, on the screen you open to join.
+
+                 This is the page you look at on the morning of an interview,
+                 and the link was three clicks away in another tab: back to
+                 Applications, find her row, open it, scroll to the panel. The
+                 link is on the confirmed slot and the slot is already on the
+                 row, so there was nothing to fetch — only nobody had asked
+                 for it here.
+
+                 A booking with no link says so, because five minutes before
+                 the call is a bad time to discover it was never sent. */
+              (function () {
+                var v = (a.slots || []).filter(function (x) { return x.confirmed_at; })[0];
+                if (v && v.meeting_url) {
+                  return ' &middot; <a href="' + esc(v.meeting_url) + '" target="_blank" ' +
+                    'rel="noopener noreferrer">Join</a>';
+                }
+                return ' &middot; <span class="cal__nolink">no joining link</span>';
+              })() + "</span>" +
           "</div>";
         }).join("") +
       "</div>"
