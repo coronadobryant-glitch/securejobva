@@ -1,3 +1,22 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the files that come later, because it defines
+-- a function one of them has since replaced — and `create or replace` does
+-- exactly what it says.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   stamp_scorer
+--     -> re-run 065-what-only-a-conversation-shows.sql to restore
+--
+-- 008's version of stamp_scorer watches only its own five columns, so putting
+-- it back means an interview scored on the 065 scorecard stamps nobody: the
+-- scores save, scored_by stays null, and the row says an interview happened
+-- that nobody will admit to. Nothing on any screen would look broken.
+--
+-- tools/check.mjs keeps this list honest: a new file that supersedes something
+-- here fails the build until this block names it.
 -- 008 — interviewer scores, 1 to 10
 --
 -- Run after: 007

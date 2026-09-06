@@ -1,3 +1,22 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the files that come later, because it defines
+-- a view that later files have widened.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   application_queue
+--     -> re-run 065-what-only-a-conversation-shows.sql to restore
+--
+-- This version predates the interview scorecard from 065 and the two columns
+-- 061 put back, so /admin's scorecard and its experience column go blank.
+--
+-- The rows are untouched either way — the columns live on application_tracking
+-- and applications. It is the view, and therefore every screen reading it,
+-- that goes backwards, and nothing fails while it does.
+--
+-- tools/check.mjs keeps this list honest.
 -- 023 — when the interview is
 --
 -- Run after: 022

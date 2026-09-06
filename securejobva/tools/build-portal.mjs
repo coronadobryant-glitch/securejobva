@@ -228,6 +228,30 @@ const PAGE_CSS = `
   letter-spacing:.09em;text-transform:uppercase;font-weight:600;
   padding:.2rem .45rem;border-radius:4px;background:var(--surface-2);color:var(--muted);
 }
+/* The interview scorecard. It used to be a bare <details> styled at .8rem in
+   --muted with the disclosure triangle removed, which read as a caption on the
+   row above it rather than as somewhere to type — it was walked past for weeks
+   by the person who asked for it. It is a bordered block with a heading now,
+   the same as Times offered beside it, and it is always open: the applicant
+   who needs typing into is exactly the one the old version collapsed itself
+   for. */
+.ivs{margin-top:.7rem;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface-2);padding:.9rem 1rem}
+.ivs__h{display:block;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.ivs__avg{color:var(--accent-deep);font-size:.8rem}
+.ivs__none{opacity:.85}
+.ivs__by{font-size:.72rem;text-transform:none;letter-spacing:0}
+.ivs__for{display:block;font-size:.8rem;color:var(--ink-2);margin:.3rem 0 .8rem}
+.ivs__g{display:grid;gap:.5rem}
+@media(min-width:760px){.ivs__g{grid-template-columns:repeat(2,1fr);gap:.5rem 1rem}}
+.ivs__r{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.6rem;
+  padding:.35rem .5rem;border-radius:7px;background:var(--paper);
+  border:1px solid var(--line)}
+.ivs__k{display:block;font-weight:700;font-size:.84rem}
+.ivs__d{display:block;font-size:.74rem;color:var(--muted);line-height:1.35}
+.ivs__r select{font-family:inherit;font-size:.8rem;padding:.2rem .3rem;
+  border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink)}
 .scores{margin-top:.6rem;border-top:1px dashed var(--line);padding-top:.55rem}
 .scores summary{cursor:pointer;font-size:.8rem;color:var(--muted);list-style:none}
 .scores summary::-webkit-details-marker{display:none}
@@ -4513,38 +4537,102 @@ function socialLink(s) {
 /* Self-rating and interviewer score side by side, because the gap between
    them is the useful part. An unscored skill shows a dash, never a 0: nobody
    has judged it yet, and 0 is a judgement. */
+/* ── the interview scorecard ──────────────────────────────────────────────
+
+   008 asked for five numbers out of ten: english, customer, data_entry,
+   social and bookkeeping. Three things were wrong with that at once, and 065
+   is the migration that answers them.
+
+   It asked about work nobody applies for. There is no Bookkeeping track and
+   no Social Media track — the site offers three jobs — so two of the five
+   boxes were about a different business.
+
+   It re-marked what a machine had already marked better. Since 049 the
+   assessment scores english, customer, detail and sales off her actual
+   answers before anybody speaks to her, and the panel two rows up shows them.
+   Typing english out of ten again after a call is a second, worse opinion of
+   the same thing.
+
+   And it had no anchors, so nobody's 7 meant what anybody else's 7 meant —
+   including the same person's 7 a month later. Five points with written
+   anchors is the standard for a scorecard; ten compresses at the top, which is
+   exactly the half of the scale a hiring decision happens in.
+
+   So this asks for the four things a conversation is the only way to see, and
+   then one score per job she actually applied for. The anchors live in the
+   interviewer's own page rather than here, because they are prose. */
+var IV_CONVERSATION = [
+  ["iv_spoken", "Spoken English",
+   "The exams test written English. This is the only place anybody hears her."],
+  ["iv_setup", "Setup and room",
+   "Camera, headset, background, noise. The speed test proves bandwidth and nothing else."],
+  ["iv_reliability", "Reliability",
+   "On time, gave notice, turned up ready."],
+  ["iv_answers", "Her answers hold up",
+   "Ask about two of her own. The written reply and the typing are both things she supplied."]
+];
+
+/* Keyed by the track exactly as /careers writes it, because that is what lands
+   in applications.tracks. A fourth job is a line here and a column in 065. */
+var IV_JOBS = {
+  "Customer Service":  "iv_customer_service",
+  "Admin Tasks":       "iv_admin_tasks",
+  "Sales & Marketing": "iv_sales_marketing"
+};
+
+var IV_ANCHOR = ["", "1 · not close", "2 · below", "3 · workable", "4 · strong", "5 · outstanding"];
+
+function ivPick(col, label, have) {
+  var opts = ['<option value="">&mdash;</option>'];
+  for (var n = 1; n <= 5; n++) {
+    opts.push('<option value="' + n + '"' + (Number(have) === n ? " selected" : "") + ">" +
+      IV_ANCHOR[n] + "</option>");
+  }
+  return '<select data-score="' + esc(col) + '" aria-label="' + esc(label) +
+    ', 1 to 5">' + opts.join("") + "</select>";
+}
+
 function scoreLine(a) {
   if (!can("applications.edit")) return "";
-  var rows = SKILLS.map(function (k) {
-    var col = k[0].replace("skill_", "score_");
-    var have = a[col];
-    var opts = ['<option value="">&mdash;</option>'];
-    for (var n = 1; n <= 10; n++) {
-      opts.push('<option value="' + n + '"' + (Number(have) === n ? " selected" : "") + ">" + n + "</option>");
-    }
-    return (
-      '<label class="scr">' +
-        '<span class="scr__k">' + esc(k[1]) + "</span>" +
-        '<span class="scr__claim">' +
-          (a[k[0]] ? esc(LEVEL_LABEL[a[k[0]]] || a[k[0]]) : "not stated") +
-        "</span>" +
-        '<select data-score="' + esc(col) + '" aria-label="' +
-          esc(k[1]) + ' score out of 10">' + opts.join("") + "</select>" +
-      "</label>"
-    );
+
+  var conv = IV_CONVERSATION.map(function (k) {
+    return '<label class="ivs__r">' +
+      '<span><span class="ivs__k">' + esc(k[1]) + "</span>" +
+      '<span class="ivs__d">' + esc(k[2]) + "</span></span>" +
+      ivPick(k[0], k[1], a[k[0]]) +
+    "</label>";
+  }).join("");
+
+  /* Only the jobs she applied for. tracks is what she ticked; track is the
+     single column from before it existed, and rows written then still only
+     have that one — the same fallback the header uses. */
+  var picked = (a.tracks && a.tracks.length) ? a.tracks : (a.track ? [a.track] : []);
+  var jobs = picked.filter(function (t) { return IV_JOBS[t]; });
+
+  var jobRows = jobs.map(function (t) {
+    return '<label class="ivs__r">' +
+      '<span><span class="ivs__k">' + esc(t) + "</span>" +
+      '<span class="ivs__d">Could you put her on this tomorrow?</span></span>' +
+      ivPick(IV_JOBS[t], t, a[IV_JOBS[t]]) +
+    "</label>";
   }).join("");
 
   return (
-    '<details class="scores"' + (a.score_avg ? " open" : "") + ">" +
-      "<summary>Interview scores" +
-        (a.score_avg
-          ? ' <b class="scr__avg">' + esc(a.score_avg) + "/10 avg</b>"
-          : ' <span class="scr__none">not scored</span>') +
-        (a.scored_by ? ' <span class="scr__by">' + esc(a.scored_by) + "</span>" : "") +
-      "</summary>" +
-      '<p class="scr__hint">Their own rating on the left, your 1&ndash;10 on the right. Leave blank for anything you did not assess.</p>' +
-      '<div class="scrgrid">' + rows + "</div>" +
-    "</details>"
+    '<div class="ivs">' +
+      '<span class="ivs__h">Interview scores' +
+        (a.iv_avg ? ' <b class="ivs__avg">' + esc(a.iv_avg) + "/5</b>"
+                  : ' <span class="ivs__none">not scored</span>') +
+        (a.scored_by ? ' <span class="ivs__by">' + esc(a.scored_by) + "</span>" : "") +
+      "</span>" +
+      '<span class="ivs__for">' +
+        (jobs.length
+          ? "What only the call shows, then the " + (jobs.length === 1 ? "job" : "jobs") +
+            " she applied for &mdash; <b>" + esc(jobs.join("</b> and <b>")) + "</b>."
+          : "What only the call shows. She ticked no track this site offers, so there is " +
+            "no job row to score.") +
+      "</span>" +
+      '<div class="ivs__g">' + conv + jobRows + "</div>" +
+    "</div>"
   );
 }
 

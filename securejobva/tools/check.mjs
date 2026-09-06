@@ -1508,13 +1508,21 @@ await check("hiding an element actually hides it", () => {
 await check("a superseded migration says which file undoes it", () => {
   const MARK = "-- DO NOT RE-RUN THIS FILE ON ITS OWN";
 
-  /* Which file most recently defines each function. */
+  /* Which file most recently defines each function — and each view, which this
+     used to ignore.
+
+     A view is superseded exactly the way a function is, and the damage is the
+     same shape: 065 widened application_queue with the interview scorecard's
+     columns, and re-running 061 afterwards drops and recreates it without
+     them. The numbers stay in application_tracking and the screen simply stops
+     being able to see them, on every row at once, with nothing failing. That
+     is the same silence the block exists to break. */
   const latest = new Map();
   const defs = new Map();
   for (const f of sqlFiles) {
     const body = read(SQL_DIR + "/" + f);
     const names = [...body.matchAll(
-      /create\s+or\s+replace\s+function\s+public\.([a-z_]+)\s*\(/gi)].map((m) => m[1]);
+      /create\s+or\s+replace\s+(?:function|view)\s+public\.([a-z_]+)/gi)].map((m) => m[1]);
     defs.set(f, [...new Set(names)]);
     for (const n of names) latest.set(n, f);
   }
@@ -2267,6 +2275,27 @@ await check("the assessment card counts finished, not touched", async () => {
 
    So the walk drives the real sitLine() against rows shaped the way 063's
    scorer leaves them. */
+/* The interview scorecard, which 065 rebuilt around the three jobs this site
+   actually offers.
+
+   008's version asked for five numbers out of ten — english, customer,
+   data_entry, social, bookkeeping — written before tracks existed and never
+   joined to them. It asked every applicant about bookkeeping, which no track
+   leads to; it re-marked english, which 049 already scores off her real
+   answers; and it had no anchors, so nobody's 7 meant anybody else's.
+
+   None of that failed. It rendered, it saved, and the numbers were real
+   numbers about the wrong things. */
+await check("the scorecard asks about the jobs this site offers", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-scorecard.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, four from the call and one per job";
+  } catch (e) {
+    throw new Error("tools/test-scorecard.mjs failed — run it directly for the detail");
+  }
+});
+
 /* Her interview, from 062, which shipped with nothing driving it.
 
    057 solved this shape for placements and test-interview.mjs covers it: two

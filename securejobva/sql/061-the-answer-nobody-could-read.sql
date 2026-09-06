@@ -1,3 +1,21 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the files that come later, because it drops
+-- and recreates a view one of them has since widened.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   application_queue
+--     -> re-run 065-what-only-a-conversation-shows.sql to restore
+--
+-- 061's version of the view has none of the iv_ columns, so /admin's interview
+-- scorecard reads undefined for every box and quietly renders itself empty on
+-- every row — including the ones already scored. The numbers are still in
+-- application_tracking; the screen simply stops being able to see them.
+--
+-- tools/check.mjs keeps this list honest: a new file that supersedes something
+-- here fails the build until this block names it.
 -- 061 — the answer nobody could read
 --
 -- Run after: 060
