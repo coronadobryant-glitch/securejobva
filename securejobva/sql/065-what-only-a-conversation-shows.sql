@@ -235,6 +235,17 @@ select
   a.skill_data_entry,
   a.skill_social,
   a.skill_bookkeeping,
+
+  -- What she says she has to work with. 061 left these out on the grounds that
+  -- the page did not read them, which was true and is the wrong way round: the
+  -- page could not read them, so nobody ever saw what every applicant is asked
+  -- to tick. One of the four has ticked no equipment at all and has the slowest
+  -- line of the lot, and his row has never mentioned it.
+  --
+  -- They are her claim rather than a measurement, which is exactly why they
+  -- belong beside the setup score: that score is somebody checking this.
+  a.kit,
+  a.speed,
   t.pipeline,
   t.last_contacted_at,
   t.contacted_by,
@@ -316,7 +327,8 @@ select coalesce((
 from pg_class c
 where c.relname = 'application_queue';
 
--- Nine rows: the eight new columns and iv_avg.
+-- Nine rows: the eight new columns and iv_avg. kit and speed are checked
+-- separately below.
 select column_name
 from information_schema.columns
 where table_schema = 'public'
@@ -333,5 +345,10 @@ where table_name = 'application_tracking'
   and grantee = 'authenticated'
   and privilege_type = 'UPDATE'
 order by column_name;
+
+-- And what she says she has to work with, which no screen has ever shown.
+select name, speed, kit
+from public.application_queue
+order by created_at;
 
 insert into public.schema_migrations (n) values (65) on conflict (n) do nothing;

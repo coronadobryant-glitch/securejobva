@@ -498,7 +498,16 @@ img{max-width:100%}
 .ivs__avg{color:var(--accent-deep);font-size:.8rem}
 .ivs__none{opacity:.85}
 .ivs__by{font-size:.72rem;text-transform:none;letter-spacing:0}
-.ivs__for{display:block;font-size:.8rem;color:var(--ink-2);margin:.3rem 0 .8rem}
+.ivs__for{display:block;font-size:.8rem;color:var(--ink-2);margin:.3rem 0 .5rem}
+/* Her claim, not a score — quieter than the boxes, and it says so in the label
+   rather than by being hard to read. */
+.ivs__kit{display:block;font-size:.78rem;color:var(--muted);margin:0 0 .8rem;
+  padding:.4rem .55rem;border-radius:6px;background:var(--paper);
+  border:1px dashed var(--line)}
+.ivs__kit b{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-2);margin-right:.35rem}
+.ivs__kit em{font-style:normal;color:var(--signal-ink);background:var(--signal);
+  padding:.05em .3em;border-radius:3px}
 .ivs__g{display:grid;gap:.5rem}
 @media(min-width:760px){.ivs__g{grid-template-columns:repeat(2,1fr);gap:.5rem 1rem}}
 .ivs__r{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.6rem;

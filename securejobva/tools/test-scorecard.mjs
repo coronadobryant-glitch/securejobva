@@ -58,7 +58,7 @@ function grabVar(name) {
 
 const make = (allowed) => new Function("esc", "can",
   ["IV_CONVERSATION", "IV_JOBS", "IV_ANCHOR"].map(grabVar).join("\n") + "\n" +
-  ["ivPick", "scoreLine"].map(grab).join("\n") +
+  ["kitLine", "ivPick", "scoreLine"].map(grab).join("\n") +
   "\nreturn scoreLine;"
 )((s) => String(s === null || s === undefined ? "" : s), () => allowed);
 
@@ -162,6 +162,39 @@ console.log("\n  The heading");
   const one = Object.assign({ iv_spoken: 4 }, kirze);
   is("a score already given comes back selected",
      has(scoreLine(one), '<option value="4" selected'), true);
+}
+
+/* ── what she says she has to work with ──────────────────────────────────
+   Collected on the apply form since the beginning and shown nowhere until
+   065 put kit and speed into the queue view. 061 left them out because
+   nothing read them, and nothing read them because they were not there. */
+console.log("\n  Her own claim about her kit");
+{
+  const h = scoreLine(Object.assign({
+    speed: "50 Mbps or more",
+    kit: ["Computer meets the specs", "Noise-canceling headset", "HD webcam"]
+  }, kirze));
+  is("her connection speed is shown", has(h, "50 Mbps or more"), true);
+  is("and everything she ticked", has(h, "Noise-canceling headset"), true);
+  is("labelled as her word rather than a measurement", has(h, "She says"), true);
+  is("and it is not scored", count(h, "data-score="), 6);
+}
+{
+  /* bryant, exactly as he is in the database. */
+  const h = scoreLine({ tracks: ["Customer Service", "Admin Tasks"],
+                        speed: "25 to 50 Mbps", kit: [] });
+  is("an empty kit list is called out rather than left blank",
+     has(h, "no equipment ticked"), true);
+  is("and his slower line is still shown", has(h, "25 to 50 Mbps"), true);
+}
+{
+  const h = scoreLine(kirze);
+  is("an applicant who was never asked shows no claim line", has(h, "She says"), false);
+}
+{
+  const h = scoreLine(Object.assign({ speed: "50 Mbps or more" }, kirze));
+  is("speed without kit still shows", has(h, "50 Mbps or more"), true);
+  is("and says the equipment is missing", has(h, "no equipment ticked"), true);
 }
 
 /* ── the rows that predate tracks[] ──────────────────────────────────────── */

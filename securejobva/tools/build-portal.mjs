@@ -242,7 +242,16 @@ const PAGE_CSS = `
 .ivs__avg{color:var(--accent-deep);font-size:.8rem}
 .ivs__none{opacity:.85}
 .ivs__by{font-size:.72rem;text-transform:none;letter-spacing:0}
-.ivs__for{display:block;font-size:.8rem;color:var(--ink-2);margin:.3rem 0 .8rem}
+.ivs__for{display:block;font-size:.8rem;color:var(--ink-2);margin:.3rem 0 .5rem}
+/* Her claim, not a score — quieter than the boxes, and it says so in the label
+   rather than by being hard to read. */
+.ivs__kit{display:block;font-size:.78rem;color:var(--muted);margin:0 0 .8rem;
+  padding:.4rem .55rem;border-radius:6px;background:var(--paper);
+  border:1px dashed var(--line)}
+.ivs__kit b{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-2);margin-right:.35rem}
+.ivs__kit em{font-style:normal;color:var(--signal-ink);background:var(--signal);
+  padding:.05em .3em;border-radius:3px}
 .ivs__g{display:grid;gap:.5rem}
 @media(min-width:760px){.ivs__g{grid-template-columns:repeat(2,1fr);gap:.5rem 1rem}}
 .ivs__r{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.6rem;
@@ -4584,6 +4593,20 @@ var IV_JOBS = {
 
 var IV_ANCHOR = ["", "1 · not close", "2 · below", "3 · workable", "4 · strong", "5 · outstanding"];
 
+/* Nothing here is scored. It is what she ticked on the apply form, printed so
+   that the setup score below it is you checking a claim rather than forming an
+   impression — and so that an empty kit list is visible BEFORE the call rather
+   than discovered during it. */
+function kitLine(a) {
+  var kit = (a.kit && a.kit.length) ? a.kit : null;
+  var speed = a.speed || null;
+  if (!kit && !speed) return "";
+  return '<span class="ivs__kit"><b>She says</b> ' +
+    (speed ? esc(speed) : "no connection speed given") + " &middot; " +
+    (kit ? esc(kit.join(", ")) : "<em>no equipment ticked</em>") +
+    "</span>";
+}
+
 function ivPick(col, label, have) {
   var opts = ['<option value="">&mdash;</option>'];
   for (var n = 1; n <= 5; n++) {
@@ -4633,6 +4656,13 @@ function scoreLine(a) {
           : "What only the call shows. She ticked no track this site offers, so there is " +
             "no job row to score.") +
       "</span>" +
+
+      /* Her own claim about what she has to work with, which until 065 reached
+         no screen at all — 061 left kit and speed out of the queue view because
+         nothing read them, and nothing read them because they were not there.
+         It sits above the setup score rather than anywhere else on the row,
+         because scoring the setup is the act of checking this. */
+      kitLine(a) +
       '<div class="ivs__g">' + conv + jobRows + "</div>" +
     "</div>"
   );
