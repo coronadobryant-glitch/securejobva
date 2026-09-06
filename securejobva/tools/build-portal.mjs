@@ -4651,8 +4651,12 @@ function scoreLine(a) {
       "</span>" +
       '<span class="ivs__for">' +
         (jobs.length
+          /* Each name escaped on its own and THEN joined with the markup.
+             Joining first and escaping the result escapes the tags too, and
+             they print as literal </b> and <b> in the middle of the sentence —
+             which is exactly what shipped and what opening the page showed. */
           ? "What only the call shows, then the " + (jobs.length === 1 ? "job" : "jobs") +
-            " she applied for &mdash; <b>" + esc(jobs.join("</b> and <b>")) + "</b>."
+            " she applied for &mdash; <b>" + jobs.map(esc).join("</b> and <b>") + "</b>."
           : "What only the call shows. She ticked no track this site offers, so there is " +
             "no job row to score.") +
       "</span>" +

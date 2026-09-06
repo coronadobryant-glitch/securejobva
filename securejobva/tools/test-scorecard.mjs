@@ -110,6 +110,11 @@ console.log("\n  Only the jobs she applied for");
   is("seven rows in total, five plus his two jobs", count(h, "data-score="), 7);
   is("and the block says which jobs it is scoring",
      has(h, "Customer Service</b> and <b>Admin Tasks"), true);
+  /* The first version escaped the join rather than the names, so the sentence
+     printed "Customer Service&lt;/b&gt; and &lt;b&gt;Admin Tasks" on the live
+     page — bold markup as visible text, in the one sentence on the block that
+     names the person's jobs. */
+  is("and does not print the markup as words", has(h, "&lt;/b&gt;"), false);
 }
 {
   const h = scoreLine(kirze);
