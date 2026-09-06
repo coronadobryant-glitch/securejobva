@@ -8,7 +8,8 @@
 --
 --   notify_interview
 --     -> re-run 066-telling-her-about-her-own-interview.sql, then
---        067-where-she-joins.sql, to restore
+--        067-where-she-joins.sql, then
+--        069-one-set-one-email.sql, to restore
 --
 -- 058's version looks the parties up through placements alone, so an
 -- applicant's interview slot matches nothing, finds no address, and mails

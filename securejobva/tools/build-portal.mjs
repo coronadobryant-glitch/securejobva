@@ -2115,14 +2115,26 @@ function ivCard(a) {
   var declined = !confirmed && !chosen && live.length &&
     live.every(function (v) { return !!v.declined_at; });
 
-  /* Her zone, then ours. Both, always — one of the two is the one she is
-     going to get wrong. */
+  /* Her zone, then ours — where ours says anything she does not already know.
+
+     This used to build the second line itself and print Central always, on the
+     reasoning that one of the two clocks is the one she will get wrong. True
+     for an applicant in Manila. For one already on Central it rendered the
+     same time twice, one above the other:
+
+       Wed, Sep 9 · 10:00 AM
+       Wed, Sep 9 · 10:00 AM Central · 30 min
+
+     slotAlso was written for exactly that and says so in its own comment —
+     "9:00 AM · 9:00 AM Central is noise rather than help" — and this function
+     was not using it. Two answers to one question, disagreeing in their own
+     comments, and the wrong one on screen.
+
+     Only visible to a reader already on Central, which is why nobody caught
+     it: every applicant in the queue is somewhere else. */
   function twoZones(v) {
-    var mine = slotLabel(v.starts_at);
-    var ours = slotDay(v.starts_at, CENTRAL) + " · " + slotClock(v.starts_at, CENTRAL);
-    return '<span><b>' + esc(mine) + "</b>" +
-      '<span class="iv__alt">' + esc(ours) + " Central · " +
-      esc(String(v.minutes || 30)) + " min</span></span>";
+    return '<span><b>' + esc(slotLabel(v.starts_at)) + "</b>" +
+      '<span class="iv__alt">' + esc(slotAlso(v.starts_at, v.minutes || 30)) + "</span></span>";
   }
 
   var head =
@@ -2152,8 +2164,12 @@ function ivCard(a) {
   }
 
   return '<div class="card">' + head +
+    /* The instruction stops once it has been followed. The badge above already
+       says "Waiting on us"; telling her to pick underneath it is the card
+       disagreeing with its own heading. */
     '<p class="msg" style="margin:1rem 0 0">One interview with us &mdash; how you work, and a ' +
-    "check of your machine and connection. Pick whichever time suits you.</p>" +
+    "check of your machine and connection." +
+    (chosen ? "" : " Pick whichever time suits you.") + "</p>" +
     '<ol class="iv">' + live.map(function (v) {
       var on = !!v.chosen_at;
       return '<li class="iv__s' + (on ? " iv__s--on" : "") + '">' + twoZones(v) +
@@ -2207,6 +2223,26 @@ function wireIv(a) {
   if (none) {
     none.addEventListener("click", function () {
       if (busy) return;
+
+      /* Two presses. This turns down every time offered, she cannot undo it,
+         and nothing tells us she did it except an alert on a tab we might not
+         open today — so she waits on a new set that nobody knows to send.
+
+         The written part learned this the same way: one press on the wrong
+         control ended the reply for good. A misclick here costs her days. */
+      if (none.getAttribute("data-armed") !== "1") {
+        none.setAttribute("data-armed", "1");
+        none.textContent = "Yes, none of them work";
+        var w = document.getElementById("iv-err");
+        if (w) {
+          w.style.display = "";
+          w.className = "msg";
+          w.textContent = "This turns down all of the times above and asks for a new set. " +
+            "If one of them could work, pick it instead.";
+        }
+        return;
+      }
+
       busy = true;
       none.disabled = true;
       none.textContent = "Telling them…";
@@ -5362,7 +5398,27 @@ function rowHtml(a) {
     flags += '<span class="row__f">exams not sent</span>';
   }
   if (a.status === "interview" && !a.interview_at) {
-    flags += '<span class="row__f row__f--warn">no time arranged</span>';
+    /* interview_at is only written on a confirm, so this one test used to
+       cover four different situations and print the same three words for all
+       of them: nothing offered, times up and waiting on her, she has picked
+       and is waiting on YOU, and she has turned the whole set down.
+
+       The middle two are the ones that matter. A pick is the most actionable
+       state in this flow — somebody is waiting on a press that takes a second
+       — and from a shut row it was indistinguishable from having done nothing
+       at all. That is precisely what these badges exist to prevent. */
+    var spent = (a.slots || []).filter(function (v) { return !v.confirmed_at; });
+    var live = spent.filter(function (v) { return !v.declined_at; });
+    var picked = live.filter(function (v) { return v.chosen_at; }).length;
+    if (picked) {
+      flags += '<span class="row__f row__f--stop">she picked a time</span>';
+    } else if (spent.length && !live.length) {
+      flags += '<span class="row__f row__f--stop">none of those worked</span>';
+    } else if (live.length) {
+      flags += '<span class="row__f">times offered</span>';
+    } else {
+      flags += '<span class="row__f row__f--warn">no time arranged</span>';
+    }
   }
 
   return (

@@ -6,7 +6,8 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   notify_interview
---     -> re-run 067-where-she-joins.sql to restore
+--     -> re-run 067-where-she-joins.sql, then 069-one-set-one-email.sql,
+--        to restore
 --
 -- 066's version has no 'link' moment, so pasting a joining link onto a
 -- confirmed interview stops telling her where to go — and her confirmation

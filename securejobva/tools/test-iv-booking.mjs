@@ -45,7 +45,10 @@ function grab(html, name, file) {
 const esc = (s) => String(s === null || s === undefined ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const SHARED = ["tzOpts", "browserTz", "slotDay", "slotClock", "slotLabel"];
+/* slotAlso joined this list when ivCard started using it instead of building
+   the second clock itself. A lifted slice takes its callees with it or it
+   throws, and a throw here reads like a broken test rather than a real one. */
+const SHARED = ["tzOpts", "browserTz", "slotDay", "slotClock", "slotLabel", "slotAlso"];
 
 /* Her side. MY_TZ is hers; CENTRAL is ours, and the card prints both because
    one of the two is the one she is going to get wrong. */

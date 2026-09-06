@@ -1,3 +1,20 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the file that comes later.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   notify_interview
+--     -> re-run 069-one-set-one-email.sql to restore
+--
+-- 067's version posts 'offered' for every row inserted, so putting up a set
+-- of three times sends her three identical emails inside a minute, all
+-- pointing at the same page. The times still land. She is just told about
+-- them once per row instead of once per set.
+--
+-- tools/check.mjs keeps this list honest.
+
 -- 067 — where she joins
 
 -- Run after: 062, 066 (the function this replaces)

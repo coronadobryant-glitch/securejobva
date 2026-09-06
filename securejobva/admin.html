@@ -3009,7 +3009,27 @@ function rowHtml(a) {
     flags += '<span class="row__f">exams not sent</span>';
   }
   if (a.status === "interview" && !a.interview_at) {
-    flags += '<span class="row__f row__f--warn">no time arranged</span>';
+    /* interview_at is only written on a confirm, so this one test used to
+       cover four different situations and print the same three words for all
+       of them: nothing offered, times up and waiting on her, she has picked
+       and is waiting on YOU, and she has turned the whole set down.
+
+       The middle two are the ones that matter. A pick is the most actionable
+       state in this flow — somebody is waiting on a press that takes a second
+       — and from a shut row it was indistinguishable from having done nothing
+       at all. That is precisely what these badges exist to prevent. */
+    var spent = (a.slots || []).filter(function (v) { return !v.confirmed_at; });
+    var live = spent.filter(function (v) { return !v.declined_at; });
+    var picked = live.filter(function (v) { return v.chosen_at; }).length;
+    if (picked) {
+      flags += '<span class="row__f row__f--stop">she picked a time</span>';
+    } else if (spent.length && !live.length) {
+      flags += '<span class="row__f row__f--stop">none of those worked</span>';
+    } else if (live.length) {
+      flags += '<span class="row__f">times offered</span>';
+    } else {
+      flags += '<span class="row__f row__f--warn">no time arranged</span>';
+    }
   }
 
   return (
