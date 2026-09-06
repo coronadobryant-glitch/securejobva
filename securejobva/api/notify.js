@@ -356,6 +356,33 @@ const DECIDE = {
       ], site, "/status", "See your interview")
     }),
 
+    /* Calling one off. Applicant only: on a placement the two parties settle
+       it between themselves and there is no equivalent moment.
+
+       It is the one message in this flow that is bad news, so it says the one
+       useful thing straight away — new times are coming, she does not have to
+       do anything — rather than leading with an apology and making her read
+       to the end to find out whether she has lost the job. She has not. */
+    cancelled: (r, p, site) => ({
+      subject: "Your interview on " + slotText(r) + " is cancelled",
+      text: [
+        "Hi " + firstName(p.name) + ",", "",
+        "We have had to cancel your interview on " + slotText(r) + ". Sorry for the change.",
+        "", "This is not a decision about your application — we will send new times shortly " +
+        "and you pick whichever suits you. There is nothing for you to do until then.",
+        "", "If that link was in your calendar, it will not work now.",
+        "", "SecureJobVA"].join("\n"),
+      html: wrap([
+        "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+        "<p>We have had to cancel your interview on <b>" + esc(slotText(r)) +
+        "</b>. Sorry for the change.</p>",
+        "<p><b>This is not a decision about your application.</b> We will send new times " +
+        "shortly and you pick whichever suits you — there is nothing for you to do " +
+        "until then.</p>",
+        "<p>If that link was in your calendar, it will not work now.</p>"
+      ], site, "/status", "See your application")
+    }),
+
     picked: (r, p, site) => ({
       subject: r.other + " picked an interview time",
       text: [

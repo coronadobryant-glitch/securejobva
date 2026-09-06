@@ -737,6 +737,8 @@ details[open] > .row__sum::after{content:"−"}
 .rail__k{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:#5C769A;padding:.75rem .5rem .25rem}
 @media(max-width:899px){.rail__k{display:none}}
 .rnav{display:flex;align-items:center;gap:.5rem;width:100%;padding:.42rem .9rem;border:0;border-left:2px solid transparent;border-radius:0;background:none;color:#B9C8DE;font:inherit;font-size:.87rem;text-align:left;cursor:pointer}
+.ivo__off{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;padding-top:.6rem;border-top:1px solid var(--line)}
+.ivo__off input{flex:1;min-width:11rem;border:1px solid var(--line);border-radius:6px;padding:.4rem .6rem;font:inherit;font-size:.85rem;background:var(--surface);color:var(--ink)}
 .rnav--sub{padding-left:2.1rem;font-size:.83rem}
 .qempty{border:1px dashed var(--line);border-radius:10px;padding:1.6rem 1.2rem;text-align:center;color:var(--muted);font-size:.92rem;background:var(--surface-2)}
 .qempty b{display:block;color:var(--ink-2);font-weight:600;margin-bottom:.2rem}
@@ -2814,6 +2816,38 @@ function ivAct(btn, fn, body, saying, errEl) {
       if (err) err.textContent = m && m !== "signed out" ? m : "That did not save. Try again.";
     });
 }
+/* Calling off a booked interview.
+
+   Two presses, for the same reason the written part learned to ask: this
+   mails her, drops the booking and cannot be undone, and one stray click on
+   a row somebody was reading is not consent. The first press only arms it,
+   and says what the second one will do.
+
+   The reason goes to the note log and never into her email. She is told the
+   interview is off and that new times are coming, which is what she needs;
+   "clash with a client call" is for whoever opens her row in three weeks. */
+function ivCancel(btn) {
+  var wrap = btn.closest(".ivo");
+  var err = wrap ? wrap.querySelector("[data-iverr]") : null;
+
+  if (btn.getAttribute("data-armed") !== "1") {
+    btn.setAttribute("data-armed", "1");
+    btn.textContent = "Press again to cancel it";
+    btn.className = "btn btn--solid ivo__b";
+    if (err) {
+      err.textContent = "This emails her that it is off, takes the time off the books " +
+        "and frees her to be offered another. There is no undo.";
+    }
+    return;
+  }
+
+  var why = wrap ? wrap.querySelector("[data-ivwhy]") : null;
+  var text = why && why.value ? why.value.slice(0, 500) : null;
+  ivAct(btn, "rpc/cancel_application_interview",
+    { slot: btn.getAttribute("data-ivcancel"), why: text },
+    "Cancelling…", err);
+}
+
 function ivOffered(a) {
   var slots = (a.slots || []).slice().sort(function (x, y) {
     return new Date(x.starts_at) - new Date(y.starts_at);
@@ -2883,7 +2917,18 @@ function ivOffered(a) {
           "</span>" +
         "</div>" +
         '<p class="ivo__msg">Confirmed, and the date is on her row. Withdraw is off ' +
-        "&mdash; moving a confirmed interview is a conversation, not a button.</p>"
+        "&mdash; a booked time is changed with her, not behind her.</p>" +
+        /* And then, once it has been. Until 068 the sentence above was the end
+           of the road: after the conversation there was nothing that could
+           take the time off the books, offer another, or stop her seeing a
+           Join button for a meeting nobody would be at. */
+        '<div class="ivo__off">' +
+          '<input type="text" data-ivwhy maxlength="500" ' +
+            'placeholder="Why, in a few words &mdash; for the notes, not for her" ' +
+            'aria-label="Why this interview is being cancelled">' +
+          '<button class="btn btn--ghost ivo__b" type="button" data-ivcancel="' +
+            esc(confirmed.id) + '">Cancel this interview</button>' +
+        "</div>"
       : '<span class="ivo__add">' +
         '<input type="datetime-local" data-ivat aria-label="A time to offer her">' +
         '<button class="btn btn--ghost ivo__b" type="button" data-ivoffer="' + esc(a.id) + '">Offer</button>' +
@@ -6583,6 +6628,8 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
       return;
     }
     var ivd = e.target.closest("[data-ivdrop]");
+    var ivx = e.target.closest("[data-ivcancel]");
+    if (ivx && !ivx.disabled) { ivCancel(ivx); return; }
     if (ivd && !ivd.disabled) { ivAct(ivd, "rpc/withdraw_application_slot",
       { slot: ivd.getAttribute("data-ivdrop") }, "Withdrawing…"); return; }
     var add = e.target.closest("[data-note-add]");

@@ -3463,6 +3463,61 @@ await check("the export and the downloads read what the screen is showing", () =
   return "export and downloads both read the visible rows";
 });
 
+/* ── a function the page calls and the database has never heard of ─────────
+
+   Every write in the portal goes through a function — the pages are granted
+   no insert or update on the tables that matter. So a button is only as real
+   as the function behind it, and the two live in different files: the call is
+   in tools/build-portal.mjs, the function is in a migration.
+
+   Nothing connected them. A name that drifted, or a call written before the
+   migration was, gives a button that looks entirely normal and answers 404
+   the first time somebody presses it — and the first time is usually in front
+   of the person it was written for.
+
+   This does not prove the migration has been RUN. It proves the function was
+   at least written and granted, which is the half that can be checked from
+   the repo. tools/status.mjs asks the live database the other half. */
+await check("every function the portal calls is one the SQL defines", () => {
+  const pages = ["status.html", "admin.html", "hub.html", "seats.html", "pay.html"];
+  const sqlAll = sqlFiles.map((n) => read(SQL_DIR + "/" + n)).join("\n");
+  const wanted = new Set();
+  for (const p of pages) {
+    /* Scanned, not matched. Every escape written into this file has to
+       survive being written into it, and this one did not: the regex arrived
+       with its slash unescaped and closed itself early. Eighth time in three
+       days. indexOf cannot be mangled on the way in. */
+    const js = read(p);
+    const mark = "rpc/";
+    let from = 0, at;
+    while ((at = js.indexOf(mark, from)) >= 0) {
+      from = at + mark.length;
+      let end = from;
+      while (end < js.length && /[a-z0-9_]/.test(js[end])) end++;
+      if (end > from) wanted.add(js.slice(from, end));
+    }
+  }
+  if (!wanted.size) throw new Error("no rpc calls found at all — the scan is broken");
+
+  const missing = [];
+  const ungranted = [];
+  for (const fn of wanted) {
+    if (sqlAll.indexOf("function public." + fn + "(") < 0) { missing.push(fn); continue; }
+    if (sqlAll.indexOf("grant execute on function public." + fn + "(") < 0) {
+      ungranted.push(fn);
+    }
+  }
+  if (missing.length) {
+    throw new Error("the portal calls " + missing.join(", ") +
+      " and no migration defines it — that button answers 404");
+  }
+  if (ungranted.length) {
+    throw new Error(ungranted.join(", ") + " is defined and never granted, so every " +
+      "call is refused as permission denied");
+  }
+  return wanted.size + " functions, all defined and granted";
+});
+
 /* ── a stage with no name ──────────────────────────────────────────────────
 
    The queue rail draws one entry per QUEUE_ORDER stage and titles it from
