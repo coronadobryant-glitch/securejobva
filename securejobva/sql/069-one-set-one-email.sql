@@ -1,3 +1,21 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the file that comes later.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   notify_interview
+--     -> re-run 070-moving-an-interview.sql to restore. That file defines
+--        notify_interview in full, carrying 066, 067 and 069 forward, so it
+--        is the only one needed however long this chain gets.
+--
+-- 069's version has no 'moved' moment, so moving a confirmed interview to a
+-- new time stops telling her it moved. The time still changes on the row and
+-- on her page. She is simply never told, and turns up for the old one.
+--
+-- tools/check.mjs keeps this list honest.
+
 -- 069 — one set of times, one email
 
 -- Run after: 067 (the function this replaces)

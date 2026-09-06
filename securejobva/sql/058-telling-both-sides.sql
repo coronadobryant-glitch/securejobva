@@ -7,9 +7,9 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   notify_interview
---     -> re-run 066-telling-her-about-her-own-interview.sql, then
---        067-where-she-joins.sql, then
---        069-one-set-one-email.sql, to restore
+--     -> re-run 070-moving-an-interview.sql to restore. That file defines
+--        notify_interview in full, carrying 066, 067 and 069 forward, so it
+--        is the only one needed however long this chain gets.
 --
 -- 058's version looks the parties up through placements alone, so an
 -- applicant's interview slot matches nothing, finds no address, and mails

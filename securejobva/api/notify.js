@@ -363,6 +363,40 @@ const DECIDE = {
        useful thing straight away — new times are coming, she does not have to
        do anything — rather than leading with an apology and making her read
        to the end to find out whether she has lost the job. She has not. */
+    /* The time moved on an interview she has already been told is happening.
+
+       It leads with the new time and the word still, because the subject line
+       alone will make her think it is off. That is the whole difference
+       between this message and the one below it, and getting it wrong costs
+       somebody an afternoon of thinking she has been dropped.
+
+       The link rides along: a move that also changed the room is one piece of
+       news, and 058 already refuses to send the same fact twice. */
+    moved: (r, p, site) => ({
+      subject: "Your interview has moved to " + slotText(r),
+      text: [
+        "Hi " + firstName(p.name) + ",", "",
+        "Your interview is still going ahead — we have had to move it, and it is now " +
+        slotText(r) + ".",
+        "", "That time is in Central. Open " + site + "/status to see it on your own clock.",
+        "", (r.meeting_url ? "Where to join: " + r.meeting_url : ""),
+        "", "Nothing is needed from you. If that new time does not work, reply to this " +
+        "email and we will find another.",
+        "", "SecureJobVA"].join("\n"),
+      html: wrap([
+        "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
+        "<p><b>Your interview is still going ahead.</b> We have had to move it, and it is " +
+        "now <b>" + esc(slotText(r)) + "</b>.</p>",
+        (r.meeting_url
+          ? "<p>Where to join: <a href=\"" + esc(r.meeting_url) + "\">" +
+            esc(r.meeting_url) + "</a></p>"
+          : ""),
+        "<p>That time is in Central &mdash; your page shows it on your own clock. Nothing is " +
+        "needed from you. If the new time does not work, reply to this email and we will " +
+        "find another.</p>"
+      ], site, "/status", "See your interview")
+    }),
+
     cancelled: (r, p, site) => ({
       subject: "Your interview on " + slotText(r) + " is cancelled",
       text: [

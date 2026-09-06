@@ -6,7 +6,9 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   notify_interview
---     -> re-run 069-one-set-one-email.sql to restore
+--     -> re-run 070-moving-an-interview.sql to restore. That file defines
+--        notify_interview in full, carrying 066, 067 and 069 forward, so it
+--        is the only one needed however long this chain gets.
 --
 -- 067's version posts 'offered' for every row inserted, so putting up a set
 -- of three times sends her three identical emails inside a minute, all

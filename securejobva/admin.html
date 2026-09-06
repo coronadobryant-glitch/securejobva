@@ -739,6 +739,7 @@ details[open] > .row__sum::after{content:"−"}
 @media(max-width:899px){.rail__k{display:none}}
 .rnav{display:flex;align-items:center;gap:.5rem;width:100%;padding:.42rem .9rem;border:0;border-left:2px solid transparent;border-radius:0;background:none;color:#B9C8DE;font:inherit;font-size:.87rem;text-align:left;cursor:pointer}
 .ivo__off{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;padding-top:.6rem;border-top:1px solid var(--line)}
+.ivo__off input[type="datetime-local"]{flex:0 0 auto;min-width:0}
 .ivo__off input{flex:1;min-width:11rem;border:1px solid var(--line);border-radius:6px;padding:.4rem .6rem;font:inherit;font-size:.85rem;background:var(--surface);color:var(--ink)}
 .rnav--sub{padding-left:2.1rem;font-size:.83rem}
 .qempty{border:1px dashed var(--line);border-radius:10px;padding:1.6rem 1.2rem;text-align:center;color:var(--muted);font-size:.92rem;background:var(--surface-2)}
@@ -2817,6 +2818,36 @@ function ivAct(btn, fn, body, saying, errEl) {
       if (err) err.textContent = m && m !== "signed out" ? m : "That did not save. Try again.";
     });
 }
+/* Moving a booked interview to a time we have decided.
+
+   One press, not two. The date box is the confirmation: an empty one does
+   nothing and says so, and nobody fills in a date and time by accident. That
+   is the difference from cancelling, which is one click away from a mistake
+   somebody cannot take back.
+
+   The reason box below is shared with cancelling and read by both, so a move
+   can be explained in the notes the same way. */
+function ivResched(btn) {
+  var wrap = btn.closest(".ivo");
+  var at = wrap ? wrap.querySelector("[data-ivmove]") : null;
+  var err = wrap ? wrap.querySelector("[data-iverr]") : null;
+  var say = function (m) { if (err) err.textContent = m; };
+  say("");
+
+  if (!at || !at.value) { say("Pick the new time first."); return; }
+  var when = new Date(at.value);
+  if (isNaN(when)) { say("That is not a time."); return; }
+
+  /* Same conversion the offer box does: a datetime-local is local to this
+     browser and the function takes an absolute moment. */
+  var why = wrap ? wrap.querySelector("[data-ivwhy]") : null;
+  ivAct(btn, "rpc/reschedule_application_interview",
+    { slot: btn.getAttribute("data-ivresched"),
+      at_time: when.toISOString(),
+      why: why && why.value ? why.value.slice(0, 500) : null },
+    "Moving…", err);
+}
+
 /* Calling off a booked interview.
 
    Two presses, for the same reason the written part learned to ask: this
@@ -2923,6 +2954,20 @@ function ivOffered(a) {
            of the road: after the conversation there was nothing that could
            take the time off the books, offer another, or stop her seeing a
            Join button for a meeting nobody would be at. */
+        /* Moving it, which is the ordinary case and so comes first.
+
+           The conversation almost always ends with a time already agreed —
+           "Wednesday is no good, can we do Thursday at eleven" — and at that
+           point offering her a fresh set to choose from asks a question she
+           has already answered, and puts her interview back into an undecided
+           state while she replies. Cancelling is for when there is no new time
+           yet; this is for when there is. */
+        '<div class="ivo__off">' +
+          '<input type="datetime-local" data-ivmove ' +
+            'aria-label="Move this interview to">' +
+          '<button class="btn btn--ghost ivo__b" type="button" data-ivresched="' +
+            esc(confirmed.id) + '">Move it</button>' +
+        "</div>" +
         '<div class="ivo__off">' +
           '<input type="text" data-ivwhy maxlength="500" ' +
             'placeholder="Why, in a few words &mdash; for the notes, not for her" ' +
@@ -6668,6 +6713,8 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
       return;
     }
     var ivd = e.target.closest("[data-ivdrop]");
+    var ivm = e.target.closest("[data-ivresched]");
+    if (ivm && !ivm.disabled) { ivResched(ivm); return; }
     var ivx = e.target.closest("[data-ivcancel]");
     if (ivx && !ivx.disabled) { ivCancel(ivx); return; }
     if (ivd && !ivd.disabled) { ivAct(ivd, "rpc/withdraw_application_slot",
