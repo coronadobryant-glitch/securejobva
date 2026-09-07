@@ -168,6 +168,35 @@ single dashboard toggle away from being untrue, and nothing in this repo would
 change when it happened. Nothing it does writes a row — the insert probe names
 a column that does not exist on purpose. Worth running on a schedule.
 
+**The paying half — `node tools/walk-paying.mjs`.** The one tool here that
+writes rows, and the reason it exists is that on 7 September 2026 every table
+on that half was empty: no client had ever been created, no assistant had ever
+been placed, no week had ever been worked, nothing had ever been paid. Phases 5
+to 11 had never run once. `simulate.mjs` walks the same ground offline and
+cannot walk this part of it — it hands the render functions rows it builds
+itself, which tests a renderer and not the wiring that fills it, and that is
+exactly the gap the interview flow fell through in `623137d`.
+
+Run bare it reads whatever is on the paying half and checks it holds together:
+every placement points at a client that exists and has a billing rate, every
+week sits on the assistant its placement names, every week starts on a Monday,
+nobody is paid more than they are billed, and no payment settles a week
+belonging to a different business. Run with `--go` it creates a client,
+places somebody, works two weeks — a trial and a chargeable one — sends them,
+approves them, takes a payment, and presses every refusal on the way past,
+then removes all of it in a `finally` and says out loud whether the removal
+worked rather than assuming it did.
+
+`--go` is a flag rather than the default for two reasons. It writes to the
+database that serves the site. And it is not quiet: moving a placement and
+deciding a week both notify the assistant, so it sends about five real emails,
+which is deliberate — a walk that silenced its own mail would not be walking
+the half of this a person actually sees. It says whose inbox it is about to
+fill before it fills it, borrows an assistant who is already hired rather than
+inventing and then erasing a person, and refuses rather than clearing anybody
+else's placement out of the way. Point it at a test account with
+`--as=<address>`.
+
 ## Notifications
 
 An application, a seat request or a contact message sends one email to whoever
