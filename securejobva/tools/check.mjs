@@ -3783,6 +3783,98 @@ await check("the admin queue fetches the interview times it draws", () => {
   return "interview_slots is loaded with the queue";
 });
 
+/* Two forms and a constraint, all three deciding the same thing.
+
+   073 put the address rule in the database because it only lived in the two
+   forms, and the public key does not fill in forms. The risk it creates is the
+   one every doubled rule creates: careers.html loosens its regular expression,
+   nobody touches the SQL, and the form now accepts an address the database
+   will refuse — which reaches the applicant as a 400 with a constraint name in
+   it, at the end of a nine-step application, and there is no second attempt
+   that helps because the form thinks the address is fine.
+
+   So the three are held to the same characters rather than to the same idea.
+   Compared as a plain substring: this file has eaten an escape seven times in
+   three days, and a regular expression describing a regular expression is two
+   trips for every backslash. */
+await check("the address rule is one rule, in all three places", () => {
+  const RULE = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$";
+  const where = [
+    ["careers.html", "the apply form"],
+    ["index.html", "the seat request form"],
+    ["sql/073-an-application-needs-an-address.sql", "the constraint"]
+  ];
+  const without = where.filter(([f]) => read(f).indexOf(RULE) < 0);
+  if (without.length) {
+    throw new Error(without.map(([f, what]) => what + " (" + f + ")").join(" and ") +
+      " no longer carries the same address rule as the others — a form and a " +
+      "constraint that disagree reject a real applicant at the last step");
+  }
+  return where.length + " agree, character for character";
+});
+
+/* status and the stamp beside it move together, or the stamp is a lie.
+
+   applications.status_changed_at has no trigger behind it. 003 gives it a
+   default and nothing has touched it since: it is maintained entirely by
+   convention, in four places — the dropdown in /admin, 045 and 063's
+   advance_on_assessment, and the rewind in cleanup-test-data.sql. All four
+   honour it today, which is exactly why this is worth pinning down: it is
+   correct by four separate memories rather than by anything that would notice.
+
+   Found by moving an application through three stages from a script and
+   watching "Last updated" stay on yesterday. Nothing in the product does
+   that — but the stamp is what /status shows an applicant as the date their
+   application last moved, and what 031's decline mail reads to tell somebody
+   the date they may apply again. A fifth writer that forgets it does not
+   break anything visibly; it tells one person the wrong date, once, in an
+   email about being turned down. */
+await check("nothing moves an application's status without stamping it", () => {
+  const offenders = [];
+
+  /* The SQL half. Statements, not files — a file may update the table twice
+     and only one of them touch status. Split on the semicolon that ends each
+     statement, which is enough here because none of these carry one inside a
+     string. */
+  for (const f of readdirSync("sql").filter((f) => f.endsWith(".sql"))) {
+    const sql = read("sql/" + f);
+    for (const stmt of sql.split(";")) {
+      const at = stmt.indexOf("update public.applications");
+      if (at < 0) continue;
+      const body = stmt.slice(at);
+      /* `set status =` and not `status` anywhere: 004 updates this table to
+         claim rows for a user_id and says the word status nowhere near it. */
+      if (body.indexOf("set status") < 0) continue;
+      if (body.indexOf("status_changed_at") < 0) offenders.push(f);
+    }
+  }
+
+  /* And the page half, read out of the built file rather than the builder,
+     because the built file is what runs. Every PATCH aimed at an application
+     that carries a status has to carry the stamp with it. */
+  const js = read("admin.html");
+  const needle = 'api("applications?id=eq."';
+  let from = 0, at, patches = 0;
+  while ((at = js.indexOf(needle, from)) >= 0) {
+    from = at + needle.length;
+    const call = js.slice(at, at + 400);
+    if (call.indexOf("PATCH") < 0 || call.indexOf("status:") < 0) continue;
+    patches++;
+    if (call.indexOf("status_changed_at") < 0) offenders.push("admin.html");
+  }
+  if (!patches) {
+    throw new Error("admin.html no longer PATCHes an application's status at all — " +
+      "either the queue dropdown has moved or this check is looking in the wrong place");
+  }
+
+  if (offenders.length) {
+    throw new Error([...new Set(offenders)].join(", ") + " moves an application's status " +
+      "and leaves status_changed_at where it was — /status will show the old date, and a " +
+      "decline mail will offer a reapply date worked out from it");
+  }
+  return "every writer stamps it";
+});
+
 /* ── built output ────────────────────────────────────────────────────────── */
 
 console.log("\ndist\n");
