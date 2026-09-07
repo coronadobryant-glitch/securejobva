@@ -2364,6 +2364,20 @@ var IV_JOBS = {
 
 var IV_ANCHOR = ["", "1 · not close", "2 · below", "3 · workable", "4 · strong", "5 · outstanding"];
 
+/* Every column the scorecard writes, in one place. The queue view averages
+   exactly these into iv_avg, and the page has to agree with it: two lists of
+   score columns is how a scored interview goes on counting as unscored. */
+var IV_COLS = IV_CONVERSATION.map(function (k) { return k[0]; })
+  .concat(Object.keys(IV_JOBS).map(function (k) { return IV_JOBS[k]; }));
+
+/* Scored at all, under either scorecard. 008's five and 065's eight both
+   count, because a row scored in August is still a row somebody scored. */
+function hasScore(a) {
+  var iv = a.iv_avg, old = a.score_avg;
+  return (iv !== null && iv !== undefined && iv !== "") ||
+         (old !== null && old !== undefined && old !== "");
+}
+
 /* Nothing here is scored. It is what she ticked on the apply form, printed so
    that the setup score below it is you checking a claim rather than forming an
    impression — and so that an empty kit list is visible BEFORE the call rather
@@ -3807,8 +3821,14 @@ function drawCalendar() {
     .sort(function (x, y) { return new Date(x.interview_at) - new Date(y.interview_at); });
 
   /* Three things that are worth interrupting for. */
+  /* Computed here rather than read off interview_unresolved, for two reasons.
+     The view's flag is right — 065 widened it to both scorecards deliberately
+     — but it only refreshes on a load, so scoring somebody left them sitting
+     in Needs attention until a reload. And the clause that used to sit beside
+     it tested score_avg alone, which under 065 is null however carefully the
+     interview was scored, so a scored interview never stopped being flagged. */
   var unresolved = past.filter(function (a) {
-    return a.interview_unresolved || (a.pipeline === "interviewed" && !a.score_avg);
+    return a.pipeline === "interviewed" && !hasScore(a);
   });
   var atInterviewNoDate = ALL.filter(function (a) {
     var live = (a.slots || []).filter(function (v) { return !v.declined_at; });
@@ -6034,7 +6054,9 @@ function shownRows() {
       var w = days(a.waiting_since);
       if (!(a.is_ghosted || (w !== null && w >= 7 && !a.response_received))) return false;
     } else if (st === "__unscored") {
-      if (a.pipeline !== "interviewed" || a.score_avg) return false;
+      /* Either scorecard counts. Testing score_avg alone put every interview
+         scored under 065 back into "not yet scored". */
+      if (a.pipeline !== "interviewed" || hasScore(a)) return false;
     } else if (st && a.pipeline !== st) {
       return false;
     }
@@ -6374,8 +6396,17 @@ function save(row) {
         if (t.last_contacted_at) rec.contacted_by = ME;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
         if ("interview_at" in t) rec.interview_at = t.interview_at;
-        SKILLS.forEach(function (k) {
-          var col = k[0].replace("skill_", "score_");
+        /* Every score column that was sent, read off the row rather than off
+           a list. It used to walk SKILLS and rewrite the five score_ columns
+           008 defined, so the eight iv_ columns 065 added were saved to the
+           database and never put back on the local row.
+
+           The row is redrawn from that row immediately afterwards, so the
+           scores you had just typed were read back from a stale object and
+           the selects went to blank. The save had worked. The screen said it
+           had not, which is the one thing a screen must not say. */
+        row.querySelectorAll("[data-score]").forEach(function (el) {
+          var col = el.getAttribute("data-score");
           if (col in t) rec[col] = t[col];
         });
       }));
@@ -6408,12 +6439,20 @@ function save(row) {
     if (rec) {
       /* Recompute the average locally rather than refetching: the row is about
          to be redrawn and a stale header under a changed score reads as a bug. */
-      var got = SKILLS.map(function (k) { return rec[k[0].replace("skill_", "score_")]; })
+      var mean = function (cols) {
+        var got = cols.map(function (c) { return rec[c]; })
                       .filter(function (v) { return v !== null && v !== undefined && v !== ""; })
                       .map(Number);
-      rec.score_avg = got.length
-        ? String(Math.round((got.reduce(function (x, y) { return x + y; }, 0) / got.length) * 10) / 10)
-        : null;
+        return got.length
+          ? String(Math.round((got.reduce(function (x, y) { return x + y; }, 0) / got.length) * 10) / 10)
+          : null;
+      };
+      rec.score_avg = mean(SKILLS.map(function (k) { return k[0].replace("skill_", "score_"); }));
+      /* And the one the header actually prints. Only score_avg was recomputed
+         here, so the average above a freshly scored interview stayed at
+         whatever it was before — blank, the first time anybody scored one.
+         The comment above says a stale header reads as a bug. It was right. */
+      rec.iv_avg = mean(IV_COLS);
       var fresh = rowHtml(rec);
       var tmp = document.createElement("div");
       tmp.innerHTML = fresh;

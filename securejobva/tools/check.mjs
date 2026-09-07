@@ -3593,6 +3593,81 @@ await check("a signed document link keeps the storage path", () => {
   return seen.join(", ");
 });
 
+/* ── two lists of the same score columns ──────────────────────────────────
+
+   The queue view averages the scorecard columns into iv_avg. The page keeps
+   its own list of those columns to redraw a row after a save. Two lists, two
+   files, and nothing between them.
+
+   065 added eight columns to the view and the card. The page went on walking
+   008's five, so the eight were written to the database and never put back
+   on the local row — and the row is redrawn from that row, so the scores you
+   had just typed came back blank. The save had worked; the screen said it
+   had not.
+
+   A fourth job is a line in IV_JOBS and a column in the view. This is what
+   notices when it is only one of the two. */
+await check("the page and the view score the same columns", () => {
+  const js = read("admin.html");
+  const grab = (mark, stop) => {
+    const at = js.indexOf(mark);
+    if (at < 0) throw new Error("admin.html has no " + mark);
+    return js.slice(at, js.indexOf(stop, at));
+  };
+  const names = (text) => {
+    const out = [];
+    let from = 0, at;
+    while ((at = text.indexOf("iv_", from)) >= 0) {
+      let end = at;
+      while (end < text.length && /[a-z0-9_]/.test(text[end])) end++;
+      const n = text.slice(at, end);
+      if (n !== "iv_avg" && out.indexOf(n) < 0) out.push(n);
+      from = end;
+    }
+    return out.sort();
+  };
+
+  const page = names(grab("var IV_CONVERSATION", "var IV_ANCHOR"));
+  const sqlAll = sqlFiles.map((n) => read(SQL_DIR + "/" + n)).join(";");
+  const avgAt = sqlAll.lastIndexOf("as iv_avg");
+  if (avgAt < 0) throw new Error("no iv_avg in any migration");
+  const view = names(sqlAll.slice(sqlAll.lastIndexOf("unnest(array[", avgAt), avgAt));
+
+  const missingFromView = page.filter((c) => view.indexOf(c) < 0);
+  const missingFromPage = view.filter((c) => page.indexOf(c) < 0);
+  if (missingFromView.length) {
+    throw new Error("the card scores " + missingFromView.join(", ") +
+      " and iv_avg does not average it — that score never reaches the header");
+  }
+  if (missingFromPage.length) {
+    throw new Error("iv_avg averages " + missingFromPage.join(", ") +
+      " and the card never asks for it — the average is over a box nobody fills");
+  }
+  return page.length + " columns, card and view agree";
+});
+
+/* And the half that put them on the row. */
+await check("a saved score is put back on the row it was typed into", () => {
+  const js = read("admin.html");
+  const at = js.indexOf("function save(row)");
+  if (at < 0) throw new Error("admin.html has no save()");
+  let depth = 0, i = js.indexOf("{", at), end = -1;
+  for (; i < js.length; i++) {
+    if (js[i] === "{") depth++;
+    else if (js[i] === "}") { depth--; if (!depth) { end = i; break; } }
+  }
+  const body = js.slice(at, end);
+  if (body.indexOf('querySelectorAll("[data-score]")') < 0) {
+    throw new Error("save() does not write its scores back off the row’s own " +
+      "controls, so a column the page does not know about is saved and then lost");
+  }
+  if (body.indexOf("rec.iv_avg = ") < 0) {
+    throw new Error("save() does not recompute iv_avg, which is the average the " +
+      "header prints — it would stay at whatever it was before the score");
+  }
+  return "scores and the average both go back on the row";
+});
+
 /* ── a stage with no name ──────────────────────────────────────────────────
 
    The queue rail draws one entry per QUEUE_ORDER stage and titles it from

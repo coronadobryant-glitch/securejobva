@@ -29,6 +29,22 @@ const to = html.indexOf("\nfunction ", from + 10);
 if (to < 0) throw new Error("could not find the end of drawCalendar");
 const src = html.slice(from, to);
 
+/* drawCalendar calls hasScore, so the slice has to bring it along. A lifted
+   slice takes its callees with it or it throws, and a throw here reads like a
+   broken test rather than a real finding — which is the fourth time in two
+   days that this has cost a few minutes. */
+function lift(name) {
+  const at = html.indexOf("function " + name + "(");
+  if (at < 0) throw new Error("no " + name + "() in admin.html");
+  let depth = 0, i = html.indexOf("{", at);
+  for (; i < html.length; i++) {
+    if (html[i] === "{") depth++;
+    else if (html[i] === "}") { depth--; if (!depth) return html.slice(at, i + 1); }
+  }
+  throw new Error("unbalanced " + name + " in admin.html");
+}
+const deps = lift("hasScore");
+
 /* A page with the two elements it reaches for. */
 const el = (id) => ({ id, textContent: "", innerHTML: "" });
 const box = el("cal-card");
@@ -45,7 +61,8 @@ const past = (h) => new Date(Date.now() - h * HOUR).toISOString();
 function draw(ALL) {
   box.innerHTML = "";
   badge.textContent = "";
-  new Function("document", "ALL", "esc", "CLIENTS", "IV_STATE", src + "; drawCalendar();")
+  new Function("document", "ALL", "esc", "CLIENTS", "IV_STATE",
+    deps + ";" + src + "; drawCalendar();")
     (document, ALL, esc, [], []);
   return { html: box.innerHTML, badge: badge.textContent };
 }
