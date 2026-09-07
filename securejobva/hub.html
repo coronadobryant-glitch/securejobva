@@ -1607,7 +1607,20 @@ function signDoc(path) {
     return r.json();
   }).then(function (j) {
     if (!j || !j.signedURL) throw new Error("no link came back");
-    return SB + j.signedURL;
+    /* storageBase(), not SB. Storage answers under /storage/v1 and the URL it
+       hands back is relative to that, so pasting it onto the project host
+       alone gives .../object/sign/... with the /storage/v1 missing — a 404,
+       in a new tab, every time.
+
+       The request three lines up was always built with storageBase(). Only
+       the reply was not, so the two halves of the same function disagreed
+       about where storage lives.
+
+       This has been broken since 013 and could not be seen: opening a
+       document requires a document, application_documents held none until
+       today, and the panel has sat there the whole time with nothing in it.
+       Same for 048's typing screenshot, which opens through here too. */
+    return storageBase() + j.signedURL;
   });
   });
 }

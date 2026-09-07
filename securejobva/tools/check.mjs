@@ -3554,6 +3554,45 @@ await check("the interview panel shows the refusal, not the JSON around it", () 
   return "refusals are unwrapped";
 });
 
+/* ── a signed link that resolves ───────────────────────────────────────────
+
+   signDoc asks storage for a link and hands it to window.open. The request
+   goes to storageBase(), which is the project host plus /storage/v1. What
+   comes back is relative to that same base — "/object/sign/..." — so the
+   reply has to be pasted onto the same base the request used.
+
+   It was pasted onto SB, the bare project host, which drops /storage/v1 and
+   gives a 404 in a new tab. Two halves of one function disagreeing about
+   where storage lives.
+
+   Unseeable since 013: opening a document requires a document, and
+   application_documents held none until an orphaned CV was reattached to the
+   application it belonged to. The panel had been there the whole time with
+   nothing to open, and so had 048's typing screenshot, which opens through
+   the same function.
+
+   Checked in every generated page, because signDoc lives in the shared LIB
+   and one page rebuilt from a different generator would take the old form
+   with it. */
+await check("a signed document link keeps the storage path", () => {
+  const seen = [];
+  for (const file of ["status.html", "admin.html", "hub.html", "seats.html", "pay.html"]) {
+    const js = read(file);
+    if (js.indexOf("function signDoc(") < 0) continue;
+    if (js.indexOf("return SB + j.signedURL") >= 0) {
+      throw new Error(file + ": signDoc returns SB + signedURL, which drops /storage/v1 " +
+        "and opens a 404 in a new tab");
+    }
+    if (js.indexOf("return storageBase() + j.signedURL") < 0) {
+      throw new Error(file + ": signDoc does not build its link from storageBase(), " +
+        "so it may not match the base the request was sent to");
+    }
+    seen.push(file.replace(".html", ""));
+  }
+  if (!seen.length) throw new Error("no page defines signDoc — the scan is broken");
+  return seen.join(", ");
+});
+
 /* ── a stage with no name ──────────────────────────────────────────────────
 
    The queue rail draws one entry per QUEUE_ORDER stage and titles it from
