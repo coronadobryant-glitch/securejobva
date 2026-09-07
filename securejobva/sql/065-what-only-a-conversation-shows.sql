@@ -1,3 +1,24 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the file that comes later.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   stamp_scorer
+--     -> re-run 072-erasing-a-scorecard-unsigns-it.sql to restore
+--
+-- 065's version stamps scored_by on any change to a score column, including
+-- the change that clears the last one. Erasing a scorecard then signs it:
+-- every box empty, and a line underneath saying who scored it. 050 already
+-- handled that for the written mark; 065 copied the stamp and not the
+-- erasure.
+--
+-- The view and the columns this file adds are not affected, and nothing
+-- replaces them.
+--
+-- tools/check.mjs keeps this list honest.
+
 -- 065 — scoring the interview on what only a conversation shows
 
 -- Run after: 061 (the view this replaces), 063, 064

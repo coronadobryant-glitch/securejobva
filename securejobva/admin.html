@@ -6394,6 +6394,13 @@ function save(row) {
            this is what it will have written. It is a label until the next
            load, and the next load reads the real one. */
         if (t.last_contacted_at) rec.contacted_by = ME;
+        /* Same trick for who scored the interview, and for the same reason.
+           The database stamps scored_by from the token whenever a score moves,
+           so it is not sent — but the row is redrawn from rec straight after,
+           and rec has never heard of it. The name appeared only on the next
+           load, which on a card whose whole point is "somebody sat in that
+           call and formed a view" is the wrong moment to be anonymous. */
+        if (row.querySelector("[data-score]")) rec.scored_by = ME;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
         if ("interview_at" in t) rec.interview_at = t.interview_at;
         /* Every score column that was sent, read off the row rather than off

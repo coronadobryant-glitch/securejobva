@@ -8,7 +8,14 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   stamp_scorer
---     -> re-run 065-what-only-a-conversation-shows.sql to restore
+--     -> re-run 072-erasing-a-scorecard-unsigns-it.sql to restore. That
+--        file defines stamp_scorer in full, carrying 065 forward, so it is
+--        the only one needed.
+--
+--   application_queue
+--     -> re-run 065-what-only-a-conversation-shows.sql to restore. 008's
+--        view knows nothing of the interview scorecard, so iv_avg goes and
+--        the header above every scorecard goes blank with it.
 --
 -- 008's version of stamp_scorer watches only its own five columns, so putting
 -- it back means an interview scored on the 065 scorecard stamps nobody: the
