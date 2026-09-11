@@ -1863,6 +1863,39 @@ await check("status names who is being billed", async () => {
   }
 });
 
+/* These files tell you which other file to open, and that instruction is only
+   as good as the name in it. walk-paying.mjs spent a commit pointing at
+   cleanup-test-data.sql for a stray business, which is the file for a stray
+   applicant — right shape, wrong half, and nothing said so because a sentence
+   in a console.log is not checked by anything.
+
+   .local.sql is skipped: those are the filled-in copies carrying the real
+   WEBHOOK_SECRET, they are gitignored on purpose, and a migration naming its
+   own is naming something that should not be in the repo. */
+await check("every file these tools name actually exists", () => {
+  const where = [
+    ...readdirSync("tools").filter((f) => /\.(mjs|js)$/.test(f)).map((f) => "tools/" + f),
+    ...readdirSync("sql").filter((f) => /\.sql$/.test(f)).map((f) => "sql/" + f),
+    ...readdirSync(".").filter((f) => /\.html$/.test(f))
+  ];
+  const re = /\b(?:tools|sql|api)\/[A-Za-z0-9._-]+\.(?:mjs|sql|js|ts)\b/g;
+
+  const seen = new Map();
+  for (const f of where) {
+    for (const ref of readFileSync(f, "utf8").match(re) || []) {
+      if (ref.endsWith(".local.sql")) continue;
+      if (!seen.has(ref)) seen.set(ref, f);
+    }
+  }
+
+  const gone = [...seen].filter(([ref]) => !existsSync(ref));
+  if (gone.length) {
+    throw new Error(gone.map(([ref, f]) => ref + " (named in " + f + ")").join(", ") +
+      " — named but not there");
+  }
+  return seen.size + " references, all present";
+});
+
 /* The questionnaire is asked by careers.html and scored by sql/021, and both
    are generated from tools/disc-items.mjs. If they ever drift, nothing errors
    — every applicant simply gets a wrong profile. tools/test-disc.mjs

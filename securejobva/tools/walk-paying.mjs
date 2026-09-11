@@ -706,7 +706,9 @@ if (SWEEP) {
   if (!left) {
     console.log("\n  Nothing to sweep — no ledger, so no run was killed part-way.");
     console.log("  Rows left by something other than this tool are not its to guess at;");
-    console.log("  sql/cleanup-test-data.sql is how those come out, by an id you pick.\n");
+    console.log("  sql/cleanup-paying-half.sql is how those come out, by an id you pick,");
+    console.log("  and its first step says which were written by a script and which by");
+    console.log("  a person. A test applicant is the other file, cleanup-test-data.sql.\n");
   } else {
     await sweep(left);
   }
