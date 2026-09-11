@@ -18,6 +18,7 @@
  *
  *   node tools/walk-paying.mjs          reads what is there and checks it holds
  *   node tools/walk-paying.mjs --go     writes a client and walks the whole thing
+ *   node tools/walk-paying.mjs --sweep  removes what a killed run left behind
  *
  * ==========================================================================
  * WHAT IT WILL AND WILL NOT TOUCH
@@ -43,8 +44,36 @@
  * own mail would be quietly not testing the half of this that a person sees.
  * Borrow a test account, not somebody's real one. It says whose inbox it is
  * about to fill, and waits for --go to mean it.
+ *
+ * ==========================================================================
+ * WHY THE CLEANUP IS NOT ONLY A finally
+ * ==========================================================================
+ *
+ * A finally runs when the block throws. It does not run when the process is
+ * killed — Ctrl-C, a closed terminal, or the libuv assertion this hits on
+ * Windows when a fetch is in flight as the process goes down:
+ *
+ *     Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), win/async.c
+ *
+ * That is an abort, not an exception. Nothing after it runs, and what the walk
+ * had made by then stays made: a fake client with a LIVE placement on it,
+ * which placements_one_live_idx then blocks the borrowed assistant from being
+ * placed for real behind.
+ *
+ * So what it made is written to disk as it makes it, not remembered only in a
+ * variable that dies with the process. The file is the answer to "what is out
+ * there", and it outlives any way of stopping this short of deleting it:
+ *
+ *   - every row is appended to tools/.walk-made.json the moment it exists
+ *   - the finally still tears down first, and clears the file when it is sure
+ *   - a file still sitting there next run means the last run was killed, and
+ *     every mode says so loudly rather than walking past it
+ *   - --sweep removes exactly what it names, by id, and nothing else
+ *
+ * --go refuses to start while one is stranded. Walking again on top of it
+ * would strand two, and the second would be harder to tell from the first.
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 
 /* ── where to talk to, and as whom ───────────────────────────────────────── */
 
@@ -63,6 +92,7 @@ const SERVICE = fromEnv("SUPABASE_SERVICE_ROLE_KEY");
 const asArg = process.argv.find((a) => a.startsWith("--as="));
 const BORROW = asArg ? asArg.slice(5) : "glogin959@gmail.com";
 const GO = process.argv.includes("--go");
+const SWEEP = process.argv.includes("--sweep");
 
 if (!URL_BASE || !SERVICE) {
   console.log("\n  no service role key here — run this where .env.local is\n");
@@ -90,6 +120,47 @@ async function api(path, opt = {}) {
     throw e;
   }
   return j;
+}
+
+/* ── what is out there, written down rather than remembered ──────────────── */
+
+/* Next to the tool rather than in a temp folder, because the whole point is
+   that somebody can find it after the run that wrote it is gone. Ignored by
+   git: it is the state of one machine's last run, not of the project. */
+const LEDGER = new URL("./.walk-made.json", import.meta.url);
+
+/* Written synchronously, and after every single creation rather than at the
+   end of a phase. An async write is a write that can still be in flight when
+   the process aborts, and a ledger that is one row behind what exists is a
+   ledger that strands exactly the row nobody knows about. */
+function remember(made) {
+  try {
+    writeFileSync(LEDGER, JSON.stringify({ at: new Date().toISOString(), made }, null, 2));
+  } catch (e) {
+    /* Said out loud and not thrown. Failing to write the note is not a reason
+       to abandon a walk, but it does mean the safety net is not there, and
+       somebody should hear that while they can still decide to stop. */
+    console.log("      COULD NOT WRITE THE LEDGER: " + e.message);
+    console.log("      A kill from here leaves rows nothing will find. Ctrl-C now if that matters.");
+  }
+}
+
+function forget() {
+  try { if (existsSync(LEDGER)) unlinkSync(LEDGER); } catch { /* nothing to do about it */ }
+}
+
+function stranded() {
+  if (!existsSync(LEDGER)) return null;
+  try {
+    const j = JSON.parse(readFileSync(LEDGER, "utf8"));
+    return j && j.made ? j : null;
+  } catch {
+    /* A half-written file is still evidence that a run was killed, so this
+       does not shrug it off — it just cannot say what is out there. */
+    console.log("\n  tools/.walk-made.json is there but unreadable. Something was killed");
+    console.log("  mid-write. Look at the paying half by hand before walking again.\n");
+    return null;
+  }
 }
 
 /* ── saying what happened ────────────────────────────────────────────────── */
@@ -129,7 +200,21 @@ const money = (cents) => "$" + (cents / 100).toFixed(2);
 const hoursOf = (w) => (w.timesheet_days || []).reduce((s, d) => s + Number(d.hours || 0), 0);
 
 async function readHalf() {
-  const [clients, places, bill, pay, weeks, paid, settled] = await Promise.all([
+  /* allSettled rather than all, and not for tidiness.
+   *
+   * Promise.all rejects the moment one of these does and hands control back
+   * while the other six are still in the air. They then reject into nobody,
+   * which is an unhandled rejection each, and exiting with fetches still open
+   * is what aborts the process:
+   *
+   *     Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), win/async.c
+   *
+   * That abort is the one that skips a finally and strands a live placement.
+   * So every one of them is waited out and every rejection is looked at, and
+   * only then is the first failure thrown — by which point there is nothing
+   * left in flight for the exit to trip over. One bad key used to take the
+   * whole process down sideways; now it is one sentence and an exit code. */
+  const done = await Promise.allSettled([
     api("clients?select=id,name"),
     api("placements?select=id,client_id,application_id,status,started_on,hours_per_week,trial_weeks"),
     api("placement_billing?select=placement_id,rate"),
@@ -138,6 +223,13 @@ async function readHalf() {
     api("client_payments?select=id,client_id,amount_cents,paid_on,method"),
     api("client_payment_weeks?select=payment_id,timesheet_id")
   ]);
+
+  /* The first failure, not a summary of all of them. Seven copies of the same
+     401 is noise, and they are all the same 401 — one key, one refusal. */
+  const broke = done.find((d) => d.status === "rejected");
+  if (broke) throw broke.reason;
+
+  const [clients, places, bill, pay, weeks, paid, settled] = done.map((d) => d.value);
   return { clients, places, bill, pay, weeks, paid, settled };
 }
 
@@ -290,6 +382,11 @@ async function walk() {
       method: "POST", headers: { Prefer: "return=representation" },
       body: { name: "walk — " + new Date().toISOString().slice(0, 19) }
     }))[0];
+    /* Before the contact row, not after. client_private is a child of this and
+       cascades with it, so the id of the parent is the only thing a sweep
+       actually needs — and between these two lines is where a kill costs the
+       least if the ledger is already written. */
+    remember(made);
     say("created", made.client.name);
     await api("client_private", {
       method: "POST", headers: { Prefer: "return=minimal" },
@@ -309,6 +406,10 @@ async function walk() {
         started_on: weeks[0], hours_per_week: 40, trial_weeks: 1
       }
     }))[0];
+    /* The live one. This is the row that costs somebody something if it is
+       stranded — placements_one_live_idx is unique on application_id, so until
+       it goes the borrowed assistant cannot be placed for real. */
+    remember(made);
     await api("placement_billing", { method: "POST", headers: { Prefer: "return=minimal" },
       body: { placement_id: made.place.id, rate: 7.75 } });
     await api("placement_pay", { method: "POST", headers: { Prefer: "return=minimal" },
@@ -330,9 +431,11 @@ async function walk() {
     act("The trial week — worked, sent, approved");
     made.weeks.push(await oneWeek(who.id, made.place.id, weeks[0],
       [8, 8, 8, 8, 8], true));
+    remember(made);
     act("The first chargeable week");
     made.weeks.push(await oneWeek(who.id, made.place.id, weeks[1],
       [8, 8, 8, 8, 7.5], false));
+    remember(made);
 
     act("What the weeks refuse");
     const tuesday = isoOf(new Date(new Date(weeks[1] + "T00:00:00Z").getTime() + 86400000));
@@ -372,6 +475,7 @@ async function walk() {
       body: { client_id: made.client.id, amount_cents: b.cents, paid_on: isoOf(new Date()),
               method: "bank_transfer", reference: "walk" }
     }))[0];
+    remember(made);
     await api("client_payment_weeks", { method: "POST", headers: { Prefer: "return=minimal" },
       body: { payment_id: made.payment.id, timesheet_id: made.weeks[1] } });
 
@@ -464,9 +568,10 @@ async function oneWeek(appId, placeId, monday, hours, trial) {
    delete that stops working the day somebody adds a restrict. */
 async function teardown(made) {
   const gone = [];
+  let failed = 0;
   const drop = async (what, path) => {
     try { await api(path, { method: "DELETE", headers: { Prefer: "return=minimal" } }); gone.push(what); }
-    catch (e) { console.log("      COULD NOT REMOVE " + what + ": " + e.message); bad++; }
+    catch (e) { console.log("      COULD NOT REMOVE " + what + ": " + e.message); bad++; failed++; }
   };
   if (made.payment) {
     await drop("the settlement", "client_payment_weeks?payment_id=eq." + made.payment.id);
@@ -494,24 +599,158 @@ async function teardown(made) {
     const left = await api("clients?id=eq." + made.client.id + "&select=id");
     ok("the walk's client is gone", left.length === 0,
       left.length ? "STILL THERE — remove it by hand: " + made.client.id : undefined);
+    if (left.length) failed++;
   }
+
+  /* The note goes only when there is nothing left for it to point at. A
+     teardown that clears the ledger on its way out regardless would throw away
+     the only record of the rows it just failed to delete — which is the exact
+     situation the ledger exists for. */
+  if (failed) {
+    console.log("\n      Some of it is still there. The ledger is kept, so:");
+    console.log("        node tools/walk-paying.mjs --sweep");
+  } else {
+    forget();
+  }
+}
+
+/* ── clearing up after a run that was killed ─────────────────────────────── */
+
+/* Reads the ledger and removes exactly what it names. It is teardown with the
+   list coming off disk instead of out of a live variable — the same deletes,
+   in the same order, by the same ids. Nothing here searches for rows that look
+   like the walk's: a sweep that matched on a name would be free to delete a
+   real client somebody happened to name badly. */
+async function sweep(note) {
+  act("Clearing up after the run of " + note.at.slice(0, 19).replace("T", " "));
+  const m = note.made;
+  say("client", m.client ? m.client.id : "none");
+  say("placement", m.place ? m.place.id : "none");
+  say("weeks", m.weeks && m.weeks.length ? String(m.weeks.length) : "none");
+  say("payment", m.payment ? m.payment.id : "none");
+  await teardown({
+    client: m.client || null,
+    place: m.place || null,
+    weeks: m.weeks || [],
+    payment: m.payment || null
+  });
+}
+
+/* ── when it cannot get through ──────────────────────────────────────────── */
+
+/* A throw that reaches the top of a module is an unhandled rejection, and Node
+ * on Windows does not merely print it — with a fetch still in flight as it
+ * tears down, it aborts:
+ *
+ *     Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), win/async.c
+ *
+ * That abort is the whole problem. It is not an exception, so no finally runs
+ * behind it, and a walk killed that way leaves its client and its live
+ * placement sitting in the database. The ledger above exists to survive it;
+ * this exists so it does not happen in the first place.
+ *
+ * So nothing is allowed to reach the top. What comes out instead is the
+ * sentence PostgREST actually said — 3b11f5a is where printing the body rather
+ * than the sentence reached a person — and a status, and an exit code.
+ */
+async function fell(e) {
+  console.log("\n  it could not get through\n");
+  if (e && e.status) say(String(e.status), e.message);
+  else console.log("      " + (e && e.message ? e.message : String(e)));
+
+  /* 401 is worth a sentence of its own because it reads like a mistake in the
+     key and usually is not. "JWT issued at future" is Supabase's clock
+     disagreeing with the token by a second or two, and it clears on its own —
+     the useful thing to know is that nothing was written, not the stack. */
+  if (e && e.status === 401) {
+    console.log("      Supabase refused the key. Nothing was written.");
+    if (/future|expired/i.test(e.message || "")) {
+      console.log("      This one is a clock, not a wrong key. Run it again.");
+    }
+  }
+
+  /* The ledger is read again here rather than trusted from startup, because
+     the run may have made something after that check and the whole point is to
+     name what is out there now. */
+  const now = stranded();
+  if (now) {
+    console.log("\n      A run made rows and they are still there:");
+    console.log("        node tools/walk-paying.mjs --sweep");
+  }
+  console.log();
+
+  /* exitCode, never exit(). process.exit() goes immediately, and a fetch that
+     has only just rejected still has a socket undici is closing behind it —
+     exiting into that is the abort this whole function exists to avoid, which
+     is a thing worth finding out by having written exit() here first and
+     watched it abort anyway. Setting the code lets the loop drain and lets
+     Node leave on its own, which it can: undici unrefs an idle socket. */
+  process.exitCode = 1;
 }
 
 /* ── go ──────────────────────────────────────────────────────────────────── */
 
 console.log("\nthe paying half — " + URL_BASE.replace(/^https?:\/\//, ""));
 
-if (GO) {
+/* Read before anything else, because it changes what every mode should do. */
+const left = stranded();
+
+/* Set by the catch, and the only thing that decides whether the closing line
+   is printed. "the paying half holds" after a run that could not read it would
+   be a lie told by a tool whose whole job is saying what is actually there. */
+let brokeDown = false;
+
+try {
+
+if (SWEEP) {
+  if (!left) {
+    console.log("\n  Nothing to sweep — no ledger, so no run was killed part-way.");
+    console.log("  Rows left by something other than this tool are not its to guess at;");
+    console.log("  sql/cleanup-test-data.sql is how those come out, by an id you pick.\n");
+  } else {
+    await sweep(left);
+  }
+} else if (GO) {
+  /* Refused rather than warned. Walking on top of a stranded run strands two,
+     and the second is then hard to tell from the first — which is how one fake
+     client becomes a pair nobody can safely delete by eye. */
+  if (left) {
+    console.log("\n  The last run was killed before it put anything back, and what it");
+    console.log("  made is still there. Walking again would place a second fake client");
+    console.log("  on top of the first. Clear that one up first:");
+    console.log("\n    node tools/walk-paying.mjs --sweep\n");
+    brokeDown = true;
+    process.exitCode = 1;
+  } else {
   console.log("\n  Writing. This sends about five real emails to " + BORROW + ",");
   console.log("  because moving a placement and deciding a week both notify the");
   console.log("  assistant, and a walk that silenced its own mail would not be");
   console.log("  walking the half of this a person sees.");
   await walk();
+  }
 } else {
   await look();
+  if (left) {
+    /* Said after the read, not instead of it. The numbers above are the real
+       state of the database and worth seeing; this says how much of it is not
+       supposed to be there. */
+    console.log("\n  A run on " + left.at.slice(0, 19).replace("T", " ") + " was killed before it");
+    console.log("  put anything back, so some of what is counted above is its leftovers.");
+    console.log("  Remove them with:  node tools/walk-paying.mjs --sweep");
+  }
   console.log("\n  Read-only. --go writes a client and walks the whole thing," +
     "\n  and says whose inbox it will fill before it does.");
 }
 
-console.log("\n" + (bad ? "  " + bad + " FAILED\n" : "  the paying half holds\n"));
-process.exit(bad ? 1 : 0);
+} catch (e) {
+  /* Every mode is inside this, including --go. A throw during the walk has
+     already run its finally on the way past — that part was never broken; what
+     was broken is what happened after, once nothing was left to catch it. */
+  brokeDown = true;
+  await fell(e);
+}
+
+if (!brokeDown) {
+  console.log("\n" + (bad ? "  " + bad + " FAILED\n" : "  the paying half holds\n"));
+  process.exitCode = bad ? 1 : 0;
+}

@@ -4,6 +4,11 @@ node_modules/
 .vercel
 .env*
 
+# What tools/walk-paying.mjs --go has made and not yet put back. The state of
+# one machine's last run, not of the project — and if it is here at all, it
+# means that run was killed and there are rows waiting for --sweep.
+tools/.walk-made.json
+
 # Filled-in copies of migrations, carrying the real WEBHOOK_SECRET.
 # They exist so the version with the secret in it is the one sitting next to
 # the version without, instead of in a temp folder nobody looks in.
