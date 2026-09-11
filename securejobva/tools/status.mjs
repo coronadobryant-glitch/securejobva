@@ -122,6 +122,28 @@ try {
   line(got.length === need.length ? "ok" : "warn", "security headers", got.length + "/" + need.length);
 } catch {}
 
+/* The verdict on its own, named and reading nothing but its arguments, so
+   tools/test-deploy-verdict.mjs can drive all four of its answers. Only one of
+   them can happen on any given day, and the one that matters most — production
+   is behind — is the one you would otherwise never see until the day it was
+   true and you needed it to be right. */
+function deployVerdict(shipped, built, here, behind, seen) {
+  /* A warn and not a fail. Production carries no stamp until the first deploy
+     after build.mjs started writing one, and calling that a failure would cry
+     wolf for a reason nobody can act on except by deploying. */
+  if (!shipped) {
+    return { state: "warn",
+             note: "no build stamp on the live page — deploy once to start stamping" + seen };
+  }
+  if (shipped === here) {
+    return { state: "ok", note: shipped + ", built " + built + seen };
+  }
+  return { state: "fail",
+           note: "live is " + shipped + ", local is " + here +
+                 (behind ? " — " + behind + " commit(s) behind" : " — not a commit this clone has") +
+                 ", deploy" + seen };
+}
+
 /* Is what is deployed what is committed?
  *
  * This used to ask for "/?cb=" + Math.floor(1e9 * 0.7), which is not a cache
@@ -146,13 +168,33 @@ try {
   const r = await fetch(SITE + "/");
   const live = await r.text();
   const local = readFileSync("dist/index.html", "utf8");
-  const marker = "Math.round(h * CFG.rate)";
   const age = r.headers.get("age");
   const from = (r.headers.get("x-vercel-cache") || "").toLowerCase();
   const seen = age ? ", edge copy " + age + "s old" : from ? ", " + from : "";
 
-  line(live.includes(marker) ? "ok" : "fail", "deployed build is current",
-    (live.includes(marker) ? "the weekly fix is live" : "production is behind — deploy") + seen);
+  /* build.mjs stamps the commit into every page. This used to look for one
+     hardcoded string instead — "Math.round(h * CFG.rate)", the shape of a fix
+     that shipped in August — which answers whether THAT change is live and,
+     once it is, answers yes forever. A build six months stale passed it as
+     happily as one from this morning. The stamp changes every build, so it
+     answers the question the line has always claimed to. */
+  const stamp = (live.match(/<meta name="build" content="([^"]+)"/) || [])[1];
+  const shipped = stamp ? stamp.split(" ")[0] : null;
+  const built = stamp ? stamp.split(" ")[1] : null;
+  const here = execFileSync("git", ["rev-parse", "--short=7", "HEAD"]).toString().trim();
+
+  /* How far behind, when the commit is one this clone knows. It may not be: a
+     deploy from another branch, or from a commit never fetched here. */
+  let behind = null;
+  if (shipped && shipped !== here) {
+    try {
+      behind = execFileSync("git", ["rev-list", "--count", shipped + "..HEAD"],
+        { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    } catch {}
+  }
+
+  const v = deployVerdict(shipped, built, here, behind, seen);
+  line(v.state, "deployed build is current", v.note);
   /* Within a twentieth, not equal — dist/ is what was built here and the live
      copy has been through the CDN. The note prints both so a drift that stays
      under the tolerance is still visible to somebody reading. */

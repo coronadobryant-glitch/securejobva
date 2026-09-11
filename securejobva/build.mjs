@@ -8,6 +8,7 @@
 
    Run: node build.mjs   Deploy: the dist/ folder. */
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 /* Must match the host Vercel serves as Production, not the one that redirects
    to it. Vercel is www-primary: securejobva.com 308s to www.securejobva.com. A
@@ -15,6 +16,29 @@ import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
    which splits the ranking signal. Flip this back if the apex is ever made
    primary in Vercel -> Domains. */
 const SITE = "https://www.securejobva.com";
+
+/* Which commit this build came from, stamped into every page.
+ *
+ * status.mjs used to answer "is what is deployed what is committed?" by
+ * looking for one hardcoded string — "Math.round(h * CFG.rate)", the shape of
+ * a fix that shipped in August. That answers whether THAT change is live, and
+ * once it is, it answers yes forever: a build six months stale passes it just
+ * as happily as one from this morning.
+ *
+ * A stamp that changes every build is the thing that question actually needs.
+ * Vercel sets VERCEL_GIT_COMMIT_SHA during its build; git answers here. If
+ * neither can say — a tarball, a detached checkout with no git — it stamps
+ * "unknown" rather than guessing, and status.mjs says so rather than passing.
+ *
+ * dist/ is gitignored, so a stamp that changes every build dirties nothing. */
+const BUILD_SHA = (() => {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7);
+  try {
+    return execFileSync("git", ["rev-parse", "--short=7", "HEAD"], { stdio: ["ignore", "pipe", "ignore"] })
+      .toString().trim() || "unknown";
+  } catch { return "unknown"; }
+})();
+const BUILD_AT = new Date().toISOString().replace(/\.\d+Z$/, "Z");
 
 const PAGES = [
   {
@@ -249,6 +273,7 @@ function build(page) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="build" content="${BUILD_SHA} ${BUILD_AT}">
 <meta name="description" content="${page.description}">
 <link rel="canonical" href="${url}">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">

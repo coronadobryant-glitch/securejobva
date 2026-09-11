@@ -1863,6 +1863,19 @@ await check("status names who is being billed", async () => {
   }
 });
 
+/* The line that says whether production is running what you committed. Only
+   one of its four answers can happen on a given day, and "production is
+   behind" is the one nobody sees until the day it is true. */
+await check("the deploy verdict reads right", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-deploy-verdict.mjs"], { stdio: "pipe" });
+    return "13 checks";
+  } catch (e) {
+    throw new Error("tools/test-deploy-verdict.mjs failed — run it directly");
+  }
+});
+
 /* These files tell you which other file to open, and that instruction is only
    as good as the name in it. walk-paying.mjs spent a commit pointing at
    cleanup-test-data.sql for a stray business, which is the file for a stray
