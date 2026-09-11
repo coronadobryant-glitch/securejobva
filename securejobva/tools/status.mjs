@@ -400,6 +400,62 @@ if (!SERVICE) {
   }
 }
 
+/* ── who is actually being billed ────────────────────────────────────────────
+
+   Named, not counted. Between 7 and 11 September a business called "Northwind
+   Test Co" sat on this half with a placement still ongoing, two approved weeks
+   and $306.13 against it — test data left behind by a run that was killed, and
+   nobody saw it for four days because nothing routinely looked. Counts would
+   not have helped: "clients 1" reads as progress. The name is what gives it
+   away, so the name is what gets printed.
+
+   Read with the service key, because the anon key is denied all of this by
+   design — which is the whole reason the section above it can only ask whether
+   a table is locked. No row is written and nothing here ever fails: a client
+   with money against them is the point of the business, not a fault. It is
+   here to be read by somebody who knows which businesses are real. */
+
+head("the paying half");
+
+if (!SERVICE) {
+  line("warn", "who is being billed", "no service role key here — run this where .env.local is");
+} else {
+  const payH = { apikey: SERVICE, Authorization: "Bearer " + SERVICE };
+  const grab = async (p) => {
+    try {
+      const r = await fetch(B + "/" + p, { headers: payH });
+      return r.ok ? await r.json() : null;
+    } catch { return null; }
+  };
+
+  const [firms, places, weeks, paid] = await Promise.all([
+    grab("clients?select=id,name&order=name"),
+    grab("placements?select=id,client_id,status"),
+    grab("timesheets?select=id,status"),
+    grab("client_payments?select=id,client_id,amount_cents")
+  ]);
+
+  if (!firms || !places || !weeks || !paid) {
+    line("warn", "who is being billed", "the paying half could not be read");
+  } else if (!firms.length) {
+    line("ok", "nobody is being billed yet", "no client, no placement, no week, no payment");
+  } else {
+    for (const f of firms) {
+      const mine = places.filter((p) => p.client_id === f.id);
+      const live = mine.filter((p) => p.status !== "ended").length;
+      const cents = paid.filter((p) => p.client_id === f.id)
+        .reduce((s, p) => s + Number(p.amount_cents || 0), 0);
+      line("ok", f.name,
+        live + " live placement(s), $" + (cents / 100).toFixed(2) + " recorded paid");
+    }
+    line("ok", "weeks", weeks.length + " total, " +
+      weeks.filter((w) => w.status === "approved").length + " approved");
+    console.log("");
+    console.log("  Every business above should be one you recognise. If one is not, it is");
+    console.log("  test data: node tools/walk-paying.mjs --sweep, or sql/cleanup-test-data.sql.");
+  }
+}
+
 /* ── what cannot be checked from here ────────────────────────────────────── */
 
 head("needs a signed-in session");
