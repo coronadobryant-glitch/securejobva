@@ -415,6 +415,38 @@ if (!SERVICE) {
    with money against them is the point of the business, not a fault. It is
    here to be read by somebody who knows which businesses are real. */
 
+/* Named and pulled out so tools/test-paying-status.mjs can drive it with rows
+   shaped like the ones Northwind actually left. The live half is empty again,
+   so against the real database this only ever renders "nobody is being billed
+   yet" — which is the half of it that cannot be wrong. Nothing in here reads
+   anything but its own arguments, so the test can lift it out by source text
+   the way test-billing.mjs lifts billingBlock() out of /seats. */
+function payingLines(firms, places, weeks, paid) {
+  if (!firms || !places || !weeks || !paid) {
+    return [{ state: "warn", what: "who is being billed",
+              note: "the paying half could not be read" }];
+  }
+  if (!firms.length) {
+    return [{ state: "ok", what: "nobody is being billed yet",
+              note: "no client, no placement, no week, no payment" }];
+  }
+  const out = firms.map(function (f) {
+    /* An ended placement is history, not a live one. A business that finished
+       with somebody months ago should not read as still having them. */
+    const live = places.filter((p) => p.client_id === f.id && p.status !== "ended").length;
+    /* Summed, because a client pays more than once and showing only the last
+       one would understate what has come in — the mistake /seats made. */
+    const cents = paid.filter((p) => p.client_id === f.id)
+      .reduce((s, p) => s + Number(p.amount_cents || 0), 0);
+    return { state: "ok", what: f.name,
+             note: live + " live placement(s), $" + (cents / 100).toFixed(2) + " recorded paid" };
+  });
+  out.push({ state: "ok", what: "weeks",
+             note: weeks.length + " total, " +
+                   weeks.filter((w) => w.status === "approved").length + " approved" });
+  return out;
+}
+
 head("the paying half");
 
 if (!SERVICE) {
@@ -435,24 +467,12 @@ if (!SERVICE) {
     grab("client_payments?select=id,client_id,amount_cents")
   ]);
 
-  if (!firms || !places || !weeks || !paid) {
-    line("warn", "who is being billed", "the paying half could not be read");
-  } else if (!firms.length) {
-    line("ok", "nobody is being billed yet", "no client, no placement, no week, no payment");
-  } else {
-    for (const f of firms) {
-      const mine = places.filter((p) => p.client_id === f.id);
-      const live = mine.filter((p) => p.status !== "ended").length;
-      const cents = paid.filter((p) => p.client_id === f.id)
-        .reduce((s, p) => s + Number(p.amount_cents || 0), 0);
-      line("ok", f.name,
-        live + " live placement(s), $" + (cents / 100).toFixed(2) + " recorded paid");
-    }
-    line("ok", "weeks", weeks.length + " total, " +
-      weeks.filter((w) => w.status === "approved").length + " approved");
+  for (const r of payingLines(firms, places, weeks, paid)) line(r.state, r.what, r.note);
+
+  if (firms && firms.length) {
     console.log("");
     console.log("  Every business above should be one you recognise. If one is not, it is");
-    console.log("  test data: node tools/walk-paying.mjs --sweep, or sql/cleanup-test-data.sql.");
+    console.log("  test data: node tools/walk-paying.mjs --sweep, or sql/cleanup-paying-half.sql.");
   }
 }
 

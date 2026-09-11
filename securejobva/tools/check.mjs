@@ -1849,6 +1849,20 @@ await check("admin saves what changed and nothing else", async () => {
   }
 });
 
+/* status.mjs names every business being billed, because a fake one sat on the
+   paying half for four days and counts read as progress. The half is empty
+   again, so the branch that would have caught it renders nowhere — this is
+   the only thing that runs it. */
+await check("status names who is being billed", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, ["tools/test-paying-status.mjs"], { stdio: "pipe" });
+    return "14 checks";
+  } catch (e) {
+    throw new Error("tools/test-paying-status.mjs failed — run it directly");
+  }
+});
+
 /* The questionnaire is asked by careers.html and scored by sql/021, and both
    are generated from tools/disc-items.mjs. If they ever drift, nothing errors
    — every applicant simply gets a wrong profile. tools/test-disc.mjs
