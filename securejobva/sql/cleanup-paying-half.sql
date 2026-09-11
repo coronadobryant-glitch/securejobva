@@ -24,6 +24,37 @@
 -- weeks and $306.13 recorded against it, and nothing knew it was there.
 --
 -- ==========================================================================
+-- HOW FAR THIS HAS BEEN CHECKED — read before trusting it
+-- ==========================================================================
+--
+-- It has never been executed. There is no psql on the machine it was written
+-- on, PostgREST does not run arbitrary SQL, and the service role key is a REST
+-- key rather than a database password, so there was no way to run it.
+--
+-- What was done instead, on 11 September 2026:
+--
+--   Parsed with the real Postgres grammar (libpg-query, the server's own
+--   parser). Well formed both as it ships — 3 statements, all SELECT — and
+--   with the removal block uncommented, which adds the DO. Parsing it armed
+--   was the point: the block somebody will one day arm is the block nobody
+--   had checked.
+--
+--   Every table and column it names asked of the live database and confirmed
+--   present: clients, client_private, placements, placement_billing,
+--   placement_pay, timesheets, timesheet_days, client_payments,
+--   client_payment_weeks, deletion_log, applications. A wrong column is the
+--   realistic failure for SQL nobody has run.
+--
+--   The delete order mirrors teardown() in tools/walk-paying.mjs, which HAS
+--   run end to end against this database — most recently 11 September, when
+--   it created a client, placed somebody, worked two weeks, took a payment
+--   and removed all eleven rows again.
+--
+-- What none of that proves is the plpgsql inside the DO block, which the outer
+-- grammar sees only as a quoted string. Arm it on a row you can afford to be
+-- wrong about first, and read step 3 rather than assuming.
+--
+-- ==========================================================================
 -- TELLING A SCRIPT'S ROWS FROM A PERSON'S
 -- ==========================================================================
 --
