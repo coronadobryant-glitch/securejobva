@@ -104,7 +104,11 @@ try {
 
 head("live site");
 for (const [path, want] of [["/", 200], ["/careers", 200], ["/status", 200], ["/admin", 200],
-                            ["/careers.html", 308], ["/apply", 308], ["/nope-" + Math.floor(1e9 * 0.5), 404]]) {
+                            /* A literal, not Math.floor(1e9 * 0.5), which is the constant
+                               500000000 and only looked random. Any path that does not
+                               exist answers this question, and one that reads the same
+                               every run is one you can diff against yesterday's output. */
+                            ["/careers.html", 308], ["/apply", 308], ["/nope-no-such-page", 404]]) {
   try {
     const r = await fetch(SITE + path, { redirect: "manual" });
     line(r.status === want ? "ok" : "fail", "GET " + path, r.status + (r.status === want ? "" : " (wanted " + want + ")"));
@@ -118,15 +122,42 @@ try {
   line(got.length === need.length ? "ok" : "warn", "security headers", got.length + "/" + need.length);
 } catch {}
 
-/* Is what is deployed what is committed? */
+/* Is what is deployed what is committed?
+ *
+ * This used to ask for "/?cb=" + Math.floor(1e9 * 0.7), which is not a cache
+ * buster. It is the constant 700000000 — the same URL every run, written to
+ * look like Math.random() and never checked because the answer came back right
+ * anyway. It came in with this file on 26 August, the day of the nine-hour
+ * invisible outage, in the tool written to make sure that did not happen twice.
+ *
+ * Removed rather than fixed, because a working cache buster is not available
+ * here either: asked for this page with a random query string, with cache:
+ * "no-store", with Cache-Control: no-cache and with Pragma, the edge answers
+ * x-vercel-cache: HIT every time and at the same age. Vercel does not vary its
+ * cache key on the query string, and nothing a client sends makes it refetch.
+ * A constant that pretends to be random implies a protection that is not there
+ * and cannot be, which is worse than no protection at all.
+ *
+ * What actually makes this check honest is that Vercel purges the edge on
+ * deploy. So the age of the copy is the thing worth seeing: if this check ever
+ * disagrees with what you just shipped, an age older than the deploy is the
+ * reason, and it is now on screen rather than needing to be guessed at. */
 try {
-  const live = await (await fetch(SITE + "/?cb=" + Math.floor(1e9 * 0.7))).text();
+  const r = await fetch(SITE + "/");
+  const live = await r.text();
   const local = readFileSync("dist/index.html", "utf8");
   const marker = "Math.round(h * CFG.rate)";
+  const age = r.headers.get("age");
+  const from = (r.headers.get("x-vercel-cache") || "").toLowerCase();
+  const seen = age ? ", edge copy " + age + "s old" : from ? ", " + from : "";
+
   line(live.includes(marker) ? "ok" : "fail", "deployed build is current",
-    live.includes(marker) ? "the weekly fix is live" : "production is behind — deploy");
+    (live.includes(marker) ? "the weekly fix is live" : "production is behind — deploy") + seen);
+  /* Within a twentieth, not equal — dist/ is what was built here and the live
+     copy has been through the CDN. The note prints both so a drift that stays
+     under the tolerance is still visible to somebody reading. */
   line(Math.abs(live.length - local.length) < live.length * 0.05 ? "ok" : "warn",
-    "deployed size matches local", live.length + " vs " + local.length + " bytes");
+    "deployed size within 5% of local", live.length + " vs " + local.length + " bytes");
 } catch { line("warn", "deployed build", "could not compare"); }
 
 /* ── the migrations ──────────────────────────────────────────────────────── */
