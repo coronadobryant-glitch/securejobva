@@ -1,0 +1,8 @@
+{
+  "name": "securejobva-repo-root",
+  "private": true,
+  "description": "The one dev dependency for securejobva/tools/check-cleanup.mjs, which parses sql/cleanup-paying-half.sql with Postgres's own grammar. It lives here rather than in securejobva/ because this is the repo root and because Vercel's Root Directory is securejobva/ — a package.json in there would put an npm install into a build that vercel.json defines as `node build.mjs`, with no dependencies. Nothing in dist/ comes from this file.",
+  "dependencies": {
+    "libpg-query": "^18.1.4"
+  }
+}

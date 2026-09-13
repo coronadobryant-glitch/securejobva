@@ -31,28 +31,47 @@
 -- on, PostgREST does not run arbitrary SQL, and the service role key is a REST
 -- key rather than a database password, so there was no way to run it.
 --
--- What was done instead, on 11 September 2026:
+-- What was done instead. `node tools/check-cleanup.mjs` does all of it that
+-- can be repeated, in one run and without touching the database:
 --
 --   Parsed with the real Postgres grammar (libpg-query, the server's own
---   parser). Well formed both as it ships — 3 statements, all SELECT — and
---   with the removal block uncommented, which adds the DO. Parsing it armed
---   was the point: the block somebody will one day arm is the block nobody
---   had checked.
+--   parser). Well formed as it ships — 3 statements, all SELECT.
 --
---   Every table and column it names asked of the live database and confirmed
---   present: clients, client_private, placements, placement_billing,
---   placement_pay, timesheets, timesheet_days, client_payments,
---   client_payment_weeks, deletion_log, applications. A wrong column is the
---   realistic failure for SQL nobody has run.
+--   And, on 12 September, the removal block compiled as plpgsql, which the
+--   first pass could not do. To the outer SQL grammar a plpgsql body is one
+--   quoted string, so `end if` left off, a keyword misspelt, or a RAISE with
+--   more % than arguments all parse clean through it. libpg-query 18 exposes
+--   the server's own plpgsql compiler — the thing that would reject this at
+--   the moment you pasted it — and the block passes. Five deliberately broken
+--   copies go through the same call on every run, because a checker that
+--   cannot fail says "ok" about a file it never read.
+--
+--   Every statement the block runs (11 of them) and every expression between
+--   them (8) pulled back out of the compiled tree and parsed as SQL. plpgsql
+--   holds both as text until they first execute, so nothing else reads them
+--   before the day somebody arms this.
+--
+--   Every table and column it names asked of the live database on
+--   11 September and confirmed present: clients, client_private, placements,
+--   placement_billing, placement_pay, timesheets, timesheet_days,
+--   client_payments, client_payment_weeks, deletion_log, applications. A
+--   wrong column is the realistic failure for SQL nobody has run, and it is
+--   the one thing above that no parser can see.
 --
 --   The delete order mirrors teardown() in tools/walk-paying.mjs, which HAS
 --   run end to end against this database — most recently 11 September, when
 --   it created a client, placed somebody, worked two weeks, took a payment
---   and removed all eleven rows again.
+--   and removed all eleven rows again. With one difference: teardown() also
+--   removes placement_billing and placement_pay by hand, and step 2 lets them
+--   cascade. Both are `on delete cascade` (032-clients-and-placements.sql:154
+--   and :160), so step 2 is right — it is just the one place this file leans
+--   on a cascade after telling you not to.
 --
--- What none of that proves is the plpgsql inside the DO block, which the outer
--- grammar sees only as a quoted string. Arm it on a row you can afford to be
--- wrong about first, and read step 3 rather than assuming.
+-- What none of that proves is that it runs. An identifier that exists nowhere
+-- is still left for the SQL engine to resolve at execution — `if no_such_var
+-- is null` compiles happily — and no trigger, permission or foreign key has
+-- been exercised by any of it. Arm it on a row you can afford to be wrong
+-- about first, and read step 3 rather than assuming.
 --
 -- ==========================================================================
 -- TELLING A SCRIPT'S ROWS FROM A PERSON'S
