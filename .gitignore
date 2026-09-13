@@ -1,0 +1,29 @@
+# This repository's root is the home directory, C:\Users\David, because the
+# first `git init` ran there rather than in the project folder. The project is
+# securejobva/, and every tracked file is under it apart from the 32-byte
+# README GitHub made with the repo, this file, and the two npm files below.
+#
+# So: ignore everything at the root, then name back what belongs to the
+# project. Without this, `git status` lists the whole home directory —
+# NTUSER.DAT, AppData, Downloads, the browser profiles, the other projects —
+# exits non-zero on the Windows junctions it cannot read, and `git add -A`
+# from anywhere would stage all of it for two public remotes.
+#
+# package.json and package-lock.json are here rather than in securejobva/
+# because Vercel's Root Directory is securejobva/, and a package.json in there
+# would add an npm install to a build vercel.json defines as `node build.mjs`
+# with no dependencies. They pin the one dev dependency that
+# securejobva/tools/check-cleanup.mjs needs; tracked, because otherwise a
+# fresh clone has no record that it needs libpg-query at all, and that tool is
+# the only thing that has ever read the removal block in
+# sql/cleanup-paying-half.sql. node_modules/ stays ignored by the /* above.
+#
+# securejobva/.gitignore still does its own work inside the project; this file
+# only decides what git looks at in the first place.
+/*
+
+!/securejobva/
+!/README.md
+!/.gitignore
+!/package.json
+!/package-lock.json
