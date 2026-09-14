@@ -27,9 +27,15 @@
 -- HOW FAR THIS HAS BEEN CHECKED — read before trusting it
 -- ==========================================================================
 --
--- It has never been executed. There is no psql on the machine it was written
--- on, PostgREST does not run arbitrary SQL, and the service role key is a REST
--- key rather than a database password, so there was no way to run it.
+-- It has been executed once — 14 September 2026, armed on a throwaway client
+-- with no children, by way of sql/rehearse-cleanup.sql. That is one pass and
+-- not a proof; what it settled and what it left untouched is at the end of
+-- this section, and the rehearsal file carries the long version.
+--
+-- It cannot be run from the machine it was written on. There is no psql
+-- there, PostgREST does not run arbitrary SQL, and the service role key is a
+-- REST key rather than a database password. It runs where you paste it, in
+-- the Supabase SQL editor, which is where that pass happened.
 --
 -- What was done instead. `node tools/check-cleanup.mjs` does all of it that
 -- can be repeated, in one run and without touching the database:
@@ -67,11 +73,32 @@
 --   and :160), so step 2 is right — it is just the one place this file leans
 --   on a cascade after telling you not to.
 --
--- What none of that proves is that it runs. An identifier that exists nowhere
--- is still left for the SQL engine to resolve at execution — `if no_such_var
--- is null` compiles happily — and no trigger, permission or foreign key has
--- been exercised by any of it. Arm it on a row you can afford to be wrong
--- about first, and read step 3 rather than assuming.
+-- What none of that proved was that it RUNS. An identifier that exists
+-- nowhere is still left for the SQL engine to resolve at execution — `if
+-- no_such_var is null` compiles happily — and until 14 September no trigger,
+-- permission or foreign key had been exercised by any of it.
+--
+-- One pass has now closed part of that gap. Armed on a bare client and run in
+-- the SQL editor: the by_id guard passed, the `who` lookup resolved, all
+-- seven deletes executed against real tables, and 060's before-delete trigger
+-- fired. Rehearsal clients went 1 to 0, and deletion_log gained the matching
+-- row.
+--
+-- Two things that pass did NOT touch, and a green reading must not be taken
+-- for them:
+--
+--   The delete ORDER. Six of the seven deletes matched zero rows, so nothing
+--   exercised the one constraint the order exists for — 033's plain reference
+--   on timesheets.placement_id, which raises rather than half-working.
+--   Testing it needs children, and children need a placement, and a placement
+--   sends mail.
+--
+--   The RLS policies. 060 grants the delete to authenticated behind "staff
+--   remove a client", and the SQL editor runs as a role that bypasses
+--   row-level security. removed_by = 'somebody' on that log row is the tell.
+--
+-- So it still goes on a row you can afford to be wrong about first, and you
+-- still read step 3 rather than assuming.
 --
 -- ==========================================================================
 -- TELLING A SCRIPT'S ROWS FROM A PERSON'S

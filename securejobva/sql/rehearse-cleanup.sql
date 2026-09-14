@@ -9,16 +9,22 @@
 -- ==========================================================================
 --
 -- sql/cleanup-paying-half.sql holds a block that removes a business and
--- everything billed through it. As of 13 September 2026 it has been parsed
+-- everything billed through it. As of 13 September 2026 it had been parsed
 -- with the server's own SQL grammar, compiled with the server's own plpgsql
 -- compiler, and had all eleven of its statements and eight of its expressions
--- pulled back out of the tree and parsed — and it has still never been run.
+-- pulled back out of the tree and parsed — and it had still never been run.
 --
 -- Those are different things. An identifier that exists nowhere compiles
 -- happily, because plpgsql leaves unknown names for the SQL engine to resolve
 -- at execution; `if no_such_var is null` passes every check in
--- tools/check-cleanup.mjs. No trigger, permission or foreign key has been
+-- tools/check-cleanup.mjs. No trigger, permission or foreign key had been
 -- exercised by any of it.
+--
+-- It was run here on 14 September 2026, once, against the client step A
+-- makes. WHAT ONE PASS PROVES below is therefore a record now and not a
+-- forecast, and it is annotated as such. Run this file the same way again
+-- whenever the block changes — step A inserts a fresh client every time, so
+-- there is nothing to reset.
 --
 -- It cannot be run from the machine it was written on: no psql there,
 -- PostgREST does not run arbitrary SQL, and the service role key is a REST key
@@ -71,14 +77,20 @@
 -- WHAT ONE PASS PROVES, AND WHAT IT DOES NOT
 -- ==========================================================================
 --
--- Proves, and nothing else could:
+-- Proved on 14 September 2026, and nothing else could have:
 --
---   the block RUNS rather than merely compiling — the by_id guard, the
---   `who` lookup, all seven deletes executing against real tables, the
---   raise notice formatting its four arguments, and the deletion_log
---   trigger firing.
+--   the block RUNS rather than merely compiling — the by_id guard passed,
+--   the `who` lookup resolved, all seven deletes executed against real
+--   tables, the raise notice executed without error, and the deletion_log
+--   trigger fired. Step C read back 0 rehearsal clients, against 1 before,
+--   and a deletion_log row whose subject_id was the id step A returned.
 --
--- Does not prove, and a green pass must not be read as though it did:
+--   One caveat on the notice: the Supabase SQL editor reports "Success. No
+--   rows returned" and does not surface NOTICE output at all, so the
+--   statement is known to have run and its text is not known to have been
+--   formatted. Step C is the witness that matters, which is why it exists.
+--
+-- Did not prove, and a green pass must not be read as though it did:
 --
 --   The delete ORDER. Six of the seven deletes match zero rows here, so
 --   nothing exercises the one constraint the order exists for: 033 gave
@@ -117,10 +129,10 @@ returning id, name;
 -- Open sql/cleanup-paying-half.sql and make two edits to its step 2:
 --
 --   delete the `/*` line just above `do $do$`, and the `*/` just below
---   `$do$;`                                          (lines 147 and 210)
+--   `$do$;`                                          (lines 174 and 237)
 --
 --   set the declaration that reads
---     by_id constant uuid := null;                   (line 151)
+--     by_id constant uuid := null;                   (line 178)
 --   to the id step A returned.
 --
 -- Then run that block, and put the two comment markers back afterwards.
@@ -132,10 +144,23 @@ returning id, name;
 -- against a stale duplicate would be a rehearsal of the wrong thing, which is
 -- worse than none. There is one block, and this file points at it.
 --
--- Expect, on success:
+-- Expect, on success, exactly this and nothing more:
+--
+--   Success. No rows returned
+--
+-- The block's last statement is
 --
 --   NOTICE:  Removed REHEARSAL — safe to delete — 0 placement(s),
 --            0 week(s), 0 payment(s). No email sent.
+--
+-- and you will not see it. The Supabase SQL editor discards NOTICE output,
+-- so the one line the block writes for a human to read is the one line the
+-- place it runs will not show. Do not read its absence as a failure, and do
+-- not read "Success" as the deletion having happened — that is step C.
+--
+-- The editor also stops on the way in with "Potential issue detected: this
+-- query includes destructive operations". That prompt is correct and you
+-- confirm it.
 
 -- ==========================================================================
 -- C. READ IT BACK — "it did not error" is not "it did the thing"

@@ -2,11 +2,17 @@
  * part of it that is commented out.
  *
  * That block is the reason this exists. It deletes a business and everything
- * billed through it, it ships disarmed inside /* ... *\/, and it has never been
- * executed — there is no psql on this machine, PostgREST does not run arbitrary
+ * billed through it, it ships disarmed inside /* ... *\/, and it cannot be run
+ * from this machine — there is no psql here, PostgREST does not run arbitrary
  * SQL, and the service role key is a REST key rather than a database password.
- * So the one statement in the file that can do damage is the one statement
- * nothing had ever read.
+ * So the one statement in the file that can do damage was, for a long while,
+ * the one statement nothing had ever read.
+ *
+ * It was executed once, on 14 September 2026, in the Supabase SQL editor,
+ * armed on a throwaway client by way of sql/rehearse-cleanup.sql. That pass
+ * settled that it runs; it did not exercise the delete order or the RLS
+ * policies, and both files say so at length. Nothing here reruns it — this
+ * tool still never touches the database.
  *
  * It was parsed once, on 11 September, with the SQL grammar. That is weaker
  * than it sounds. To the outer grammar a plpgsql body is a quoted string, so
@@ -236,9 +242,11 @@ async function main() {
 
   console.log("\n" + (failed
     ? "  " + failed + " FAILED"
-    : "  the block is well formed as SQL and as plpgsql. It still has never been\n" +
-      "  run: this proves it will not be rejected at the paste, not that it does\n" +
-      "  the right thing. Arm it on a row you can afford to be wrong about."));
+    : "  the block is well formed as SQL and as plpgsql. This proves it will not\n" +
+      "  be rejected at the paste, not that it does the right thing — nothing\n" +
+      "  here runs it. One pass on 14 September 2026 showed that it runs, on a\n" +
+      "  bare client; the delete order and the RLS policies are still untested.\n" +
+      "  Arm it on a row you can afford to be wrong about."));
   return failed ? 1 : 0;
 }
 
