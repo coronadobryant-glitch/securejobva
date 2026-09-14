@@ -44,10 +44,28 @@
 -- it. That is exactly what went wrong with "Northwind Test Co" between 7 and
 -- 11 September, deliberately this time.
 --
--- A client with no children costs none of that. public.clients needs only a
--- name; everything else defaults. No placement means no notify trigger, so it
--- reaches nobody's inbox. And clients_log_deletion (060) is a before-delete
--- trigger on clients, so removing it still writes the deletion_log row.
+-- A client with no children costs none of that. No placement means no notify
+-- trigger, so it reaches nobody's inbox. And clients_log_deletion (060) is a
+-- before-delete trigger on clients, so removing it still writes the
+-- deletion_log row.
+--
+-- Name ONLY, and nothing else. public.clients is id, name, created_at — that
+-- is the whole table. 032 created it with contact_name, contact_email,
+-- billing_cycle and notes as well, and 039 moved all four into
+-- client_private and dropped them from clients, so that an assistant-facing
+-- view could not reach a client's contact details. Reading the create table
+-- in 032 and stopping there gives you four columns that have not existed
+-- since 039.
+--
+-- This is not a hypothetical. The first run of step A, on 14 September 2026,
+-- named notes and came back
+--
+--   ERROR:  42703: column "notes" of relation "clients" does not exist
+--
+-- which is the failure its sibling file predicts in as many words: a wrong
+-- column is the realistic failure for SQL nobody has run, and it is the one
+-- thing no parser can see. The rehearsal caught it on the rehearsal, which
+-- is what a rehearsal is for. Nothing was written by that attempt.
 --
 -- ==========================================================================
 -- WHAT ONE PASS PROVES, AND WHAT IT DOES NOT
@@ -87,9 +105,8 @@
 -- Copy the id out of the result. Step B takes an id, not a name.
 
 /*
-insert into public.clients (name, notes)
-values ('REHEARSAL — safe to delete',
-        'Made once to arm step 2 of cleanup-paying-half.sql. No placement, no week, no payment.')
+insert into public.clients (name)
+values ('REHEARSAL — safe to delete')
 returning id, name;
 */
 
