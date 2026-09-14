@@ -30,6 +30,11 @@
  * its exit code to the one line at the bottom instead, which sets
  * process.exitCode and lets the process end on its own.
  *
+ * It also guards sql/rehearse-cleanup.sql, the file that says how to run the
+ * block once against a client with no children. That file ships a mutation
+ * behind the same markers, so it gets the same two questions: well formed,
+ * and inert until somebody arms it.
+ *
  * Nothing here touches the network, git or the database. Static grammar only:
  * it cannot tell you a column exists, only that the SQL naming it is
  * well formed.
@@ -189,6 +194,45 @@ async function main() {
   const ghost = parses(block.replace("if by_id is null", "if no_such_var is null"), true);
   ok("an undeclared variable is NOT caught, as expected", ghost.ok,
     "runtime resolves it; static grammar cannot");
+
+/* ── the file that points back at this one ───────────────────────────────── */
+
+/* rehearse-cleanup.sql is how the block above gets run once, against a client
+   with no children. It carries no plpgsql of its own on purpose — a second
+   copy of the block is a copy that drifts, and this tool reads only the
+   original — but it does ship a mutation behind the same /* ... *\/ markers,
+   so it gets the same two questions the file above gets: well formed, and
+   inert until somebody arms it. */
+
+  const REHEARSAL = "sql/rehearse-cleanup.sql";
+  console.log("\n  " + REHEARSAL);
+
+  let reh = null;
+  try { reh = readFileSync(REHEARSAL, "utf8"); } catch { /* reported below */ }
+
+  if (reh === null) {
+    ok("is there", false,
+      "missing — step B of it is the only written record of how to arm the block");
+  } else {
+    const rp = parses(reh, false);
+    ok("parses", rp.ok, rp.why);
+
+    const rk = (rp.tree?.stmts || []).map((s) => Object.keys(s.stmt || {})[0]);
+    ok("changes nothing as it ships — " + rk.length + " statements, all SELECT",
+      rk.length > 0 && rk.every((k) => k === "SelectStmt"), rk.join(", ") || "none");
+
+    /* Its step A says to arm it by deleting the two markers. Doing exactly
+       that here is the only way to know the instruction still matches the
+       file it describes. */
+    const armed2 = reh.replace("/*\ninsert", "insert")
+                      .replace("returning id, name;\n*/", "returning id, name;");
+    const ra = parses(armed2, false);
+    const rak = (ra.tree?.stmts || []).map((s) => Object.keys(s.stmt || {})[0]);
+    ok("and its step A arms to an insert when the two markers go",
+      ra.ok && armed2 !== reh && rak[0] === "InsertStmt",
+      ra.why || (armed2 === reh ? "the markers it names are not there" : rak.join(", ")));
+  }
+
 
   console.log("\n" + (failed
     ? "  " + failed + " FAILED"
