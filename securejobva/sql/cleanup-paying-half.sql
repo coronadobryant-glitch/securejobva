@@ -90,8 +90,10 @@
 --   The delete ORDER. Six of the seven deletes matched zero rows, so nothing
 --   exercised the one constraint the order exists for — 033's plain reference
 --   on timesheets.placement_id, which raises rather than half-working.
---   Testing it needs children, and children need a placement, and a placement
---   sends mail.
+--   sql/rehearse-delete-order.sql exists to close this, by building a
+--   placement with a week on it and deleting it both ways round inside a
+--   transaction that ends by raising. As of this writing that file has been
+--   compiled but not run, so the order is still argued rather than proved.
 --
 --   The RLS policies. 060 grants the delete to authenticated behind "staff
 --   remove a client", and the SQL editor runs as a role that bypasses

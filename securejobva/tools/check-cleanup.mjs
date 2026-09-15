@@ -36,10 +36,17 @@
  * its exit code to the one line at the bottom instead, which sets
  * process.exitCode and lets the process end on its own.
  *
- * It also guards sql/rehearse-cleanup.sql, the file that says how to run the
- * block once against a client with no children. That file ships a mutation
- * behind the same markers, so it gets the same two questions: well formed,
- * and inert until somebody arms it.
+ * It also guards the two files that run it. sql/rehearse-cleanup.sql says how
+ * to run the block once against a client with no children; it ships a mutation
+ * behind the same markers, so it gets the same two questions: well formed, and
+ * inert until somebody arms it.
+ *
+ * sql/rehearse-delete-order.sql is the one that tests the ORDER, by building a
+ * placement with a week hanging off it and deleting it both ways round inside
+ * a transaction it ends by raising. It gets four more questions, because it is
+ * the only file here that ships a mutation switched ON — a probe insert whose
+ * safety is entirely the BEGIN and ROLLBACK around it — and because its own
+ * plpgsql has never been executed either.
  *
  * Nothing here touches the network, git or the database. Static grammar only:
  * it cannot tell you a column exists, only that the SQL naming it is
@@ -237,6 +244,87 @@ async function main() {
     ok("and its step A arms to an insert when the two markers go",
       ra.ok && armed2 !== reh && rak[0] === "InsertStmt",
       ra.why || (armed2 === reh ? "the markers it names are not there" : rak.join(", ")));
+  }
+
+
+/* ── the file that proves the order the block deletes in ─────────────────── */
+
+/* rehearse-delete-order.sql builds a placement with a week hanging off it and
+   deletes it both ways round, inside a transaction it ends by RAISING. Unlike
+   the rehearsal above it carries plpgsql of its own — it has to, because the
+   thing under test is an ordering that only a live foreign key can judge — so
+   it gets the plpgsql compiler as well as the grammar.
+
+   Its shipped form is the interesting one. It is the only file here that
+   ships a mutation switched ON: step 1 inserts a client to find out whether
+   this editor honours rollback at all. That is safe only for as long as the
+   insert stays bracketed by BEGIN and ROLLBACK, so that is asserted rather
+   than assumed. */
+
+  const ORDER = "sql/rehearse-delete-order.sql";
+  console.log("\n  " + ORDER);
+
+  let ord = null;
+  try { ord = readFileSync(ORDER, "utf8"); } catch { /* reported below */ }
+
+  if (ord === null) {
+    ok("is there", false,
+      "missing — it is the only argument that the delete order is necessary");
+  } else {
+    const op = parses(ord, false);
+    ok("parses", op.ok, op.why);
+
+    const stmts = (op.tree?.stmts || []).map((s) => s.stmt || {});
+    const kinds = stmts.map((s) => Object.keys(s)[0]);
+    const trans = stmts.map((s) => s.TransactionStmt?.kind).filter(Boolean);
+
+    /* The probe's insert must sit between a BEGIN and a ROLLBACK, and there
+       must be no other mutation anywhere in the shipped file. */
+    const iAt = kinds.indexOf("InsertStmt");
+    const bracketed =
+      iAt > 0 &&
+      kinds[iAt - 1] === "TransactionStmt" &&
+      kinds[iAt + 1] === "TransactionStmt" &&
+      /BEGIN|START/.test(String(stmts[iAt - 1].TransactionStmt?.kind)) &&
+      /ROLLBACK/.test(String(stmts[iAt + 1].TransactionStmt?.kind));
+    ok("the one mutation it ships is bracketed by BEGIN and ROLLBACK",
+      bracketed, trans.join(", ") || "no transaction control at all");
+
+    ok("and it ships nothing else that writes — " + kinds.length + " statements",
+      kinds.filter((k) => !["SelectStmt", "TransactionStmt", "InsertStmt"].includes(k)).length === 0 &&
+      kinds.filter((k) => k === "InsertStmt").length === 1,
+      kinds.join(", ") || "none");
+
+    /* Step 2 arms the same way its siblings do. Perform the instruction. */
+    const armed3 = ord.replace("/*\ndo $do$", "do $do$")
+                      .replace("$do$;\n*/", "$do$;");
+    const oa = parses(armed3, false);
+    const oak = (oa.tree?.stmts || []).map((s) => Object.keys(s.stmt || {})[0]);
+    ok("and its step 2 arms to a DO block when the two markers go",
+      oa.ok && armed3 !== ord && oak.includes("DoStmt"),
+      oa.why || (armed3 === ord ? "the markers it names are not there" : oak.join(", ")));
+
+    /* The block inside it has never been executed either, so the compiler is
+       the only thing standing between it and a syntax error discovered at the
+       paste — the same gap 12 September closed for the file above. */
+    const oblock = armed3.slice(armed3.indexOf("do $do$"),
+                               armed3.indexOf("$do$;") + "$do$;".length);
+    const oc = parses(oblock, true);
+    ok("its plpgsql compiles", oc.ok, oc.why);
+
+    /* It must always end by raising, or a careless run commits the graph it
+       built — a client left holding a live placement, which is the failure
+       the whole file is shaped to avoid. */
+    /* Bound to the success path specifically. An earlier `raise exception` on
+       a failure path satisfies "contains a raise" while the block still falls
+       off the end and commits, so the match has to reach from the keyword to
+       the message it carries, with nothing but whitespace between them. */
+    const proves = /raise\s+exception\s+'ORDER PROVED/.test(oblock);
+    const commits = /^\s*(commit|end\s+transaction)\s*;/im.test(oblock);
+    ok("its success path raises rather than returning",
+      proves && !commits,
+      proves ? (commits ? "it commits somewhere" : "ORDER PROVED is the message of a RAISE EXCEPTION")
+             : "ORDER PROVED is not raised — the block can reach its end and commit");
   }
 
 

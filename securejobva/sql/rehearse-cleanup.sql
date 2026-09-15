@@ -97,8 +97,15 @@
 --   timesheets.placement_id a plain reference with no cascade and no set
 --   null, so a placement with a week still pointing at it cannot be
 --   deleted at all. Getting that wrong raises rather than half-working —
---   which is the good case, and it is still untested. Testing it needs
---   children, and children need a placement, and a placement sends mail.
+--   which is the good case, and this file does not test it.
+--
+--   It said, until 14 September, that testing it needs children, children
+--   need a placement, and a placement sends mail. The last step of that is
+--   false: notify_decision calls net.http_post, and pg_net queues into a
+--   table rather than sending, so the queue row rolls back with everything
+--   else. sql/rehearse-delete-order.sql is built on that and does test the
+--   order. It is a separate file because it needs a placement and this one
+--   deliberately has none.
 --
 --   The RLS policies. 060 grants delete on clients and placements to
 --   authenticated behind "staff remove a client", but the SQL editor runs
