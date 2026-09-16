@@ -23,13 +23,30 @@
 --
 -- That reasoning is wrong, and this file is the argument that it is wrong.
 --
--- A placement does not send mail. notify_decision (035, after insert on
--- placements) calls net.http_post, and pg_net QUEUES rather than sends —
--- 031 says so in as many words, at the point where it explains why the call
--- is wrapped in its own begin/exception. Queueing is an insert into a table
--- in the net schema. It is transactional like any other insert. A background
--- worker reads that table afterwards, and under MVCC it cannot see a row
--- that has not committed.
+-- A placement does not send mail. Three triggers fire on the placements
+-- insert and only one of them can post: notify_decision (035) calls
+-- net.http_post, invite_the_client (040) returns before its post because the
+-- client this file builds has no client_private.contact_email, and
+-- adopt_orphan_weeks (046) only touches rows. pg_net QUEUES rather than
+-- sends — 031 says so in as many words, at the point where it explains why
+-- the call is wrapped in its own begin/exception. Queueing is an insert into
+-- a table in the net schema. It is transactional like any other insert. A
+-- background worker reads that table afterwards, and under MVCC it cannot
+-- see a row that has not committed.
+--
+-- The insert to be careful about is therefore not the placement at all. It is
+-- the APPLICATION, which step 2 also has to make, because notify-applications
+-- (028) is a Supabase Database Webhook: a trigger on
+-- supabase_functions.http_request rather than a direct net.http_post. That
+-- shim is pg_net-backed in Supabase's own implementation, so the same
+-- argument should carry — but nothing in this repository establishes it.
+-- 031's section "WHY THIS DOES NOT USE A DATABASE WEBHOOK" discusses what the
+-- shim posts and never says whether it is transactional, and no other file
+-- takes it up.
+--
+-- So the queue count at the end of step 2 is not an annotation. It is the
+-- only check this file has on the one sender whose mechanism is unproven,
+-- and it is sharp enough to predict. The numbers are listed below.
 --
 -- So: do the whole thing inside one transaction, and end the transaction by
 -- rolling it back. The placement is created, the trigger fires, the queue row
@@ -91,10 +108,29 @@
 --   row-level security. Nothing here tests who is allowed to do it, only that
 --   the order is right when somebody does.
 --
---   that no mail was sent. It proves the queue row was rolled back, which is
---   the mechanism. The witness would be an inbox, and a quiet inbox is also
---   what a broken notify path looks like, so absence proves little either
---   way. The reasoning above is the argument; the queue count is the check.
+--   that no mail was sent. It proves the queue rows were rolled back, which
+--   is the mechanism. The witness would be an inbox, and a quiet inbox is
+--   also what a broken notify path looks like, so absence proves little
+--   either way. The reasoning above is the argument; the queue count is the
+--   check, and it is precise enough to be written down in advance:
+--
+--     2   both senders queued through pg_net, the Database Webhook shim
+--         included, and both rolled back. This is the expected result, and
+--         it closes the question 031 left open.
+--
+--     1   only notify_decision queued. The shim did NOT go through pg_net,
+--         which means the application insert sent mail for real. STOP, and
+--         say so, before running anything else here.
+--
+--     3   something queued that this file does not account for. Find out
+--         what before trusting the rest of the run.
+--
+--     0   notify_decision did not queue either. The notify path is broken,
+--         independently of anything under test here.
+--
+--   A -1 on either side means the net schema was not readable from this role,
+--   and then there is no check — only the argument. On 15 September 2026 it
+--   was readable from the SQL editor and the queue stood at 0.
 --
 -- ==========================================================================
 -- 1. THE ROLLBACK PROBE — live, harmless, and the gate for step 2
@@ -169,13 +205,26 @@ begin
   -- An application is required: placements.application_id is not null. 073
   -- requires a deliverable-looking address on every one, so it gets one that
   -- is syntactically valid and belongs to nobody.
+  --
+  -- This is the insert that fires notify-applications (028), the Database
+  -- Webhook, and so the one the argument above is really about. Four other
+  -- triggers fire with it and none of them send: one_application_per_person
+  -- (027) dedupes on lower(email), throttle_intake (047) returns immediately
+  -- because caller_ip() is null outside a PostgREST request, and
+  -- mirror_application_name (041) and track_new_application (005) write child
+  -- rows which the closing delete takes back with it — every foreign key into
+  -- applications is on delete cascade.
   insert into public.applications (name, email)
   values ('ORDER TEST — rolled back', 'order-test@example.invalid')
   returning id into a_id;
 
   -- 'trial' rather than 'matched', because 033's trigger only attaches a week
-  -- to a placement that is trial, ongoing or ended. This insert fires
-  -- notify_decision; the post it queues dies with this transaction.
+  -- to a placement that is trial, ongoing or ended. It also keeps
+  -- notify_decision's own guard satisfied — that posts for matched, trial and
+  -- ongoing — so this insert queues exactly one post, and the post dies with
+  -- this transaction. invite_the_client (040) fires here too and queues
+  -- nothing: the client above has no client_private row, so its contact_email
+  -- is null and it returns early.
   insert into public.placements (application_id, client_id, status, started_on, hours_per_week)
   values (a_id, c_id, 'trial', monday, 40)
   returning id into p_id;
