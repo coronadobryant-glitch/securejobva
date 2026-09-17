@@ -54,6 +54,52 @@ export function walk(html, fn) {
   }).join("");
 }
 
+/* ── the words a page builds after it has loaded ──────────────────────────
+
+   walk() above never enters a script block, on purpose: a JS literal may be a
+   selector, a class name, or a track name the database reads in English. But
+   both step forms write their own sentences — the counter, every validation
+   message, the confirmation — and those were reaching /es in English while the
+   markup around them was Spanish.
+
+   So those sentences go through say() in the page, and this is the one place
+   that knows how to find them. Adjacent literals joined by + are one key: a
+   sentence too long for a line is still one sentence, and it is the whole
+   sentence that gets translated, never half of it.
+
+   say(freed) and any other non-literal argument is invisible here, which is
+   the intended reading — a key that is computed is not a key this can promise
+   a translation for, so the page passes say() its literals instead. */
+const SAY = /\bsay\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)/g;
+
+function joinLiterals(src) {
+  let out = "";
+  for (const m of src.matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
+    out += m[1].replace(/\\(.)/g, (whole, c) =>
+      c === "n" ? "\n" : c === "t" ? "\t" : c);
+  }
+  return out;
+}
+
+export function sayKeys(html) {
+  const keys = [];
+  for (const r of regions(html)) {
+    if (r.open || !/^<script/i.test(r.s)) continue;
+    for (const m of r.s.matchAll(SAY)) keys.push(joinLiterals(m[1]));
+  }
+  return keys;
+}
+
+/* The pages that build sentences at runtime. Kept beside PAGES so that adding
+   a Spanish page without asking this question is hard to do by accident. */
+export const SAY_PAGES = ["index.html", "careers.html"];
+
+/* Keys say() is handed as a variable rather than a literal, so sayKeys() is
+   blind to them by construction. Only two, both from the DISC tick that gives
+   way: say(freed), where freed is "most" or "least". Listed here so that the
+   builder still ships them and the guard does not call them stale. */
+export const SAY_COMPUTED = ["most", "least"];
+
 export const PAGES = [
   ["index.html",    "es/index.html",    "/es",          "/"],
   ["careers.html",  "es/careers.html",  "/es/careers",  "/careers"],

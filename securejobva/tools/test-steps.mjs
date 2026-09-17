@@ -34,6 +34,25 @@ function el() {
   };
 }
 
+/* Both step forms put the words they build at runtime through say(), so that
+   build-es.mjs can replace them for /es. On the English page say() returns its
+   argument, so nothing below changes — but the lifted code calls it, so it has
+   to be lifted too. Taken from the page rather than stubbed, so that a change
+   to say() is a change these assertions see. */
+function shim(html) {
+  const lift = (n) => {
+    const at = html.indexOf("function " + n + "(");
+    if (at < 0) throw new Error("say() shim: " + n + "() not found");
+    let d = 0, i = html.indexOf("{", at);
+    for (; i < html.length; i++) {
+      if (html[i] === "{") d++;
+      else if (html[i] === "}") { d--; if (!d) return html.slice(at, i + 1); }
+    }
+    throw new Error("unbalanced " + n);
+  };
+  return "var SAYS = {};\n" + lift("say") + "\n" + lift("sayList") + "\n";
+}
+
 function harness(file) {
   const html = readFileSync(file, "utf8");
   const from = html.indexOf("  function show(n) {");
@@ -52,7 +71,7 @@ function harness(file) {
 
   const show = new Function(
     "steps", "rail", "LAST", "count", "next", "back", "form", "setAt", "getAt",
-    src.replace(/\bat = n;/, "setAt(n);") + "\n return show;"
+    shim(html) + src.replace(/\bat = n;/, "setAt(n);") + "\n return show;"
   )(steps, rail, LAST, count, next, back, form, (n) => { at = n; }, () => at);
 
   return { show, steps, rail, count, next, LAST, at: () => at };
@@ -151,7 +170,7 @@ for (const file of ["index.html", "careers.html"]) {
     const errBox = { textContent: "" };
     const document = { getElementById: (id) => (id === "err-skills" ? errBox : null) };
     const fn = new Function("form", "document", "clearErrors",
-      listSrc + "\n" + src + "\nreturn validSkills();");
+      shim(html) + listSrc + "\n" + src + "\nreturn validSkills();");
     const ok = fn(form, document, () => {});
     return { ok, errBox, form };
   }

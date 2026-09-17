@@ -20,7 +20,7 @@
 
    Run: node tools/build-es.mjs   (then node build.mjs to wrap them into dist/) */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { walk, PAGES } from "./lib-seg.mjs";
+import { walk, PAGES, sayKeys, SAY_PAGES, SAY_COMPUTED } from "./lib-seg.mjs";
 
 /* --check verifies without writing. tools/check.mjs runs it that way, and
    that is not a nicety: the first version wrote the pages and the two guards
@@ -34,6 +34,32 @@ import { walk, PAGES } from "./lib-seg.mjs";
 const CHECK = process.argv.includes("--check");
 
 const DICT = JSON.parse(readFileSync("es/strings.json", "utf8"));
+
+/* The other half of the translation: what the two step forms write after the
+   page has loaded. walk() cannot reach it, because it never steps inside a
+   script block — see lib-seg.mjs for why that is the right default and why
+   this is the exception rather than a loosening of it. */
+const SAYS = JSON.parse(readFileSync("es/runtime.json", "utf8"));
+
+/* Every {placeholder} in the English has to survive into the Spanish, or a
+   sentence quietly loses the number it was built to carry. Word order is free;
+   the set is not. */
+function placeholders(s) {
+  return [...String(s).matchAll(/[{]([a-zA-Z]+)[}]/g)].map((m) => m[1]).sort().join(",");
+}
+
+/* Swaps the page's empty SAYS for the Spanish one. A literal replacement of a
+   line the page declares for exactly this purpose, rather than anything that
+   has to understand JavaScript. */
+function plantSays(html, out, keys) {
+  const anchor = "var SAYS = {};";
+  if (html.split(anchor).length - 1 !== 1) {
+    throw new Error(out + ": expected exactly one " + JSON.stringify(anchor) + " to replace");
+  }
+  const mine = {};
+  for (const k of keys) mine[k] = SAYS[k];
+  return html.replace(anchor, "var SAYS = " + JSON.stringify(mine, null, 0) + ";");
+}
 
 /* The language link is the one thing that must not be translated but must
    change: on an English page it points at the Spanish one, and on the Spanish
@@ -105,7 +131,24 @@ for (const [src, out, , backTo] of PAGES) {
     continue;
   }
 
-  const flipped = flipToggle(translated, backTo);
+  /* The runtime half. walk() left every say() key untouched, because they sit
+     in a script block, so the English sentences are still there to be looked
+     up — and "var SAYS = {};" is still there to be swapped. */
+  let sayed = translated;
+  if (SAY_PAGES.includes(src)) {
+    const keys = [...new Set(sayKeys(readFileSync(src, "utf8")).concat(SAY_COMPUTED))];
+    const noRuntime = keys.filter((k) => typeof SAYS[k] !== "string" || !SAYS[k]);
+    const drifted = keys.filter((k) =>
+      typeof SAYS[k] === "string" && SAYS[k] && placeholders(k) !== placeholders(SAYS[k]));
+    if (noRuntime.length || drifted.length) {
+      bad++;
+      report.push({ src, out, pct, done, total, missing: [], runtime: noRuntime, drifted });
+      continue;
+    }
+    sayed = plantSays(translated, out, keys);
+  }
+
+  const flipped = flipToggle(sayed, backTo);
   if (!flipped.ok) {
     bad++;
     report.push({ src, out, pct, done, total, missing: [], noToggle: true });
@@ -137,6 +180,21 @@ for (const r of report) {
   if (r.written) { console.log(head + "  ->  " + r.out); continue; }
   if (r.ok) { console.log(head + "  matches what the generator produces"); continue; }
   if (r.noToggle) { console.log(head + "  NOT WRITTEN — no language link in the nav"); continue; }
+  if (r.runtime || r.drifted) {
+    if (r.runtime.length) {
+      console.log(head + "  NOT WRITTEN — " + r.runtime.length +
+        " sentence(s) the page builds at runtime have no translation in es/runtime.json:");
+      for (const m of r.runtime.slice(0, 6)) {
+        console.log("      " + JSON.stringify(m.length > 88 ? m.slice(0, 88) + "…" : m));
+      }
+      if (r.runtime.length > 6) console.log("      … and " + (r.runtime.length - 6) + " more");
+    }
+    for (const m of r.drifted) {
+      console.log(head + "  NOT WRITTEN — placeholders differ between the English and the Spanish:");
+      console.log("      " + JSON.stringify(m.length > 88 ? m.slice(0, 88) + "…" : m));
+    }
+    continue;
+  }
   if (r.stale) { console.log(head + "  STALE — " + r.out + " " + r.stale); continue; }
   console.log(head + "  NOT WRITTEN — " + r.missing.length + " without a translation:");
   for (const m of r.missing.slice(0, 6)) {

@@ -1796,6 +1796,42 @@ html{scroll-behavior:smooth}
 </dialog>
 
 <script>
+/* ── the words this page builds after it has loaded ───────────────────────
+
+   tools/build-es.mjs translates the static half of this page by walking text
+   nodes, and it deliberately never steps inside a script block: a literal may
+   be a selector, a class name, or a track name the database reads in English.
+   lib-seg.mjs carries that warning, and "Customer service" is one of them.
+
+   The dialog writes its own sentences, though, so every one of them reached
+   /es/careers in English — the step counter, every validation message, the
+   confirmation at the end. A form that is Spanish until you get something
+   wrong is worse than one that never pretended.
+
+   So they come through say(). SAYS is empty here and is replaced wholesale by
+   build-es.mjs when it writes the Spanish page, which is why the English page
+   is byte-for-byte what it was: a key with no entry returns its own English.
+
+   The key IS the English sentence, the way es/strings.json already works, so
+   there is one thing to read and nothing to keep in step. Values arrive as
+   {named} placeholders rather than by concatenation, because "Group " + n +
+   " is not finished" cannot be put into Spanish a fragment at a time. */
+var SAYS = {};
+function say(en, vars) {
+  var s = Object.prototype.hasOwnProperty.call(SAYS, en) ? SAYS[en] : en;
+  if (!vars) return s;
+  return s.replace(/[{]([a-zA-Z]+)[}]/g, function (m, k) {
+    return Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m;
+  });
+}
+
+/* "a, b and c" — the joiner is a word, so it is translated with the rest
+   rather than being assumed to be the English one. */
+function sayList(items) {
+  if (items.length < 2) return items.join("");
+  return items.slice(0, -1).join(", ") + say(" and ") + items[items.length - 1];
+}
+
 /* Mobile menu */
 (function () {
   var btn = document.getElementById("navtog");
@@ -1975,7 +2011,7 @@ html{scroll-behavior:smooth}
       var block = slot ? slot.closest(".skill") : null;
       var answered = !!form.querySelector("[name=" + name + "]:checked");
       if (block) block.classList.toggle("is-bad", !answered);
-      if (slot) slot.textContent = answered ? "" : "Pick one.";
+      if (slot) slot.textContent = answered ? "" : say("Pick one.");
       if (!answered) {
         missing.push(SKILLS[i][1]);
         if (!first) first = block;
@@ -1985,11 +2021,9 @@ html{scroll-behavior:smooth}
     var err = document.getElementById("err-skills");
     if (err) {
       err.textContent = missing.length === 1
-        ? "One rating is missing: " + missing[0] + "."
-        : missing.length + " ratings are missing: " +
-          (missing.length > 2
-            ? missing.slice(0, -1).join(", ") + " and " + missing[missing.length - 1]
-            : missing.join(" and ")) + ".";
+        ? say("One rating is missing: {what}.", { what: missing[0] })
+        : say("{n} ratings are missing: {list}.",
+              { n: missing.length, list: sayList(missing) });
     }
     if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
     return false;
@@ -2004,10 +2038,10 @@ html{scroll-behavior:smooth}
       var m = discPick("m", g);
       var l = discPick("l", g);
       var msg = "";
-      if (m === null && l === null) msg = "Tick one word as most like you and one as least.";
-      else if (m === null) msg = "Still needs a most.";
-      else if (l === null) msg = "Still needs a least.";
-      else if (m === l) msg = "The same word cannot be both.";
+      if (m === null && l === null) msg = say("Tick one word as most like you and one as least.");
+      else if (m === null) msg = say("Still needs a most.");
+      else if (l === null) msg = say("Still needs a least.");
+      else if (m === l) msg = say("The same word cannot be both.");
       box.classList.toggle("is-bad", !!msg);
       box.querySelector("[data-disc-err]").textContent = msg;
       if (msg) { unfinished.push(g + 1); if (!first) first = box; }
@@ -2021,12 +2055,9 @@ html{scroll-behavior:smooth}
        numbers on each group's own legend, so a person can go straight to it. */
     document.getElementById("err-disc").textContent =
       unfinished.length === 1
-        ? "Group " + unfinished[0] + " is not finished — it is marked below."
-        : unfinished.length + " groups are not finished: " +
-          (unfinished.length > 2
-            ? unfinished.slice(0, -1).join(", ") + " and " + unfinished[unfinished.length - 1]
-            : unfinished.join(" and ")) +
-          ". Each one is marked below.";
+        ? say("Group {n} is not finished — it is marked below.", { n: unfinished[0] })
+        : say("{n} groups are not finished: {list}. Each one is marked below.",
+              { n: unfinished.length, list: sayList(unfinished) });
     if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
     return false;
   }
@@ -2054,9 +2085,10 @@ html{scroll-behavior:smooth}
     if (box) {
       box.classList.remove("is-bad");
       var row = t.closest(".disc__w");
-      var word = row && row.querySelector(".disc__t") ? row.querySelector(".disc__t").textContent : "That word";
+      var word = row && row.querySelector(".disc__t") ? row.querySelector(".disc__t").textContent : say("That word");
       box.querySelector("[data-disc-err]").textContent = freed
-        ? "“" + word + "” cannot be both. Pick a different word as " + freed + "."
+        ? say("“{word}” cannot be both. Pick a different word as {which}.",
+              { word: word, which: say(freed) })
         : "";
     }
     document.getElementById("err-disc").textContent = "";
@@ -2113,22 +2145,22 @@ html{scroll-behavior:smooth}
       var okTrack = picked("track").length > 0;
       var okExp = picked("exp").length > 0;
       document.getElementById("err-track").textContent =
-        okTrack ? "" : "Choose at least one track you are applying for.";
+        okTrack ? "" : say("Choose at least one track you are applying for.");
       /* Says that a short answer is a fine answer. Taking the default away
          without this invites everybody to round themselves up, which would be
          a worse problem than the one it fixes: the site hires on the exams and
          trains from scratch, so under a year genuinely costs nothing. */
       document.getElementById("err-exp").textContent =
-        okExp ? "" : "How long have you done this kind of work? Under a year is fine — we train from scratch.";
+        okExp ? "" : say("How long have you done this kind of work? Under a year is fine — we train from scratch.");
       return okTrack && okExp;
     }
     if (step === 1) {
       var okShift = picked("shift").length > 0;
       var okSpeed = picked("speed").length > 0;
       document.getElementById("err-shift").textContent =
-        okShift ? "" : "Pick at least one shift you can hold — it decides which seats we can match you to.";
+        okShift ? "" : say("Pick at least one shift you can hold — it decides which seats we can match you to.");
       document.getElementById("err-speed").textContent =
-        okSpeed ? "" : "Pick the speed you actually get — run a test on the connection you would work on.";
+        okSpeed ? "" : say("Pick the speed you actually get — run a test on the connection you would work on.");
       return okShift && okSpeed;
     }
     if (step === 4) return validDisc();
@@ -2138,11 +2170,11 @@ html{scroll-behavior:smooth}
       var country = document.getElementById("ap-country");
       var mail = document.getElementById("ap-email");
       var phone = document.getElementById("ap-phone");
-      var ok = mark(name, name.value.trim() ? "" : "We need your full name.");
-      ok = mark(country, country.value.trim() ? "" : "Which country do you work from?") && ok;
+      var ok = mark(name, name.value.trim() ? "" : say("We need your full name."));
+      ok = mark(country, country.value.trim() ? "" : say("Which country do you work from?")) && ok;
       ok = mark(mail, /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail.value.trim())
-        ? "" : "Check this address — every update goes here.") && ok;
-      ok = mark(phone, phone.value.trim() ? "" : "A number we can reach you on for the interview.") && ok;
+        ? "" : say("Check this address — every update goes here.")) && ok;
+      ok = mark(phone, phone.value.trim() ? "" : say("A number we can reach you on for the interview.")) && ok;
       if (!ok) {
         var bad = form.querySelector(".is-bad input");
         if (bad) bad.focus();
@@ -2243,19 +2275,19 @@ html{scroll-behavior:smooth}
 
   function finish(mode, d) {
     document.getElementById("apply-recap").innerHTML =
-      row("Careers", esc((d.tracks || []).join(", "))) +
-      row("Shifts", esc((d.shifts || []).join(", "))) +
-      row("Based in", esc(d.country)) +
-      row("Experience", esc(d.experience)) +
-      (discAnswers() ? row("Working style", "answered — we score it, not you") : "");
+      row(say("Careers"), esc((d.tracks || []).join(", "))) +
+      row(say("Shifts"), esc((d.shifts || []).join(", "))) +
+      row(say("Based in"), esc(d.country)) +
+      row(say("Experience"), esc(d.experience)) +
+      (discAnswers() ? row(say("Working style"), say("answered — we score it, not you")) : "");
 
     var actions = document.getElementById("apply-actions");
     if (mode === "sent") {
-      document.getElementById("apply-done-h").textContent = "Application in.";
+      document.getElementById("apply-done-h").textContent = say("Application in.");
       document.getElementById("apply-done-p").textContent =
-        "We have it, and a confirmation is on its way to " + d.email +
-        ". A person reads every application and answers either way, usually within three working days. " +
-        "You can watch where it has got to on your own page.";
+        say("We have it, and a confirmation is on its way to {email}. A person reads every " +
+            "application and answers either way, usually within three working days. You can " +
+            "watch where it has got to on your own page.", { email: d.email });
       /* The only way out of this screen used to be back to the marketing page,
          which is the one place somebody who has just applied has no more use
          for. Their own page is the thing they now have — it shows the stage
@@ -2266,16 +2298,16 @@ html{scroll-behavior:smooth}
          perfectly reasonable thing to want, and it is what the close control
          above already does. This only changes which of the two is the offer. */
       actions.innerHTML =
-        "<a class=\"btn btn--solid\" href=\"/status\">See your application</a>" +
-        "<a class=\"btn btn--ghost\" href=\"#requirements\" id=\"apply-close2\">Back to the page</a>";
+        "<a class=\"btn btn--solid\" href=\"/status\">" + say("See your application") + "</a>" +
+        "<a class=\"btn btn--ghost\" href=\"#requirements\" id=\"apply-close2\">" + say("Back to the page") + "</a>";
     } else {
-      document.getElementById("apply-done-h").textContent = "One tap left.";
+      document.getElementById("apply-done-h").textContent = say("One tap left.");
       document.getElementById("apply-done-p").textContent =
-        "Your application is written and ready — send it and we reply either way.";
+        say("Your application is written and ready — send it and we reply either way.");
       var href = "mailto:" + CFG.email +
         "?subject=" + encodeURIComponent("Application — " + d.tracks.join(" / ") + " — " + d.name) +
         "&body=" + encodeURIComponent(letter(d));
-      actions.innerHTML = "<a class=\"btn btn--solid\" href=\"" + href + "\">Send the application</a>";
+      actions.innerHTML = "<a class=\"btn btn--solid\" href=\"" + href + "\">" + say("Send the application") + "</a>";
     }
 
     foot.setAttribute("hidden", "");
@@ -2336,8 +2368,8 @@ html{scroll-behavior:smooth}
 
   function fileProblem(f) {
     if (!f) return "";
-    if (f.size > MAX_BYTES) return "That file is over 10 MB. Send a link instead, or a smaller scan.";
-    if (OK_TYPES.indexOf(f.type) < 0) return "PDF, Word or an image, please.";
+    if (f.size > MAX_BYTES) return say("That file is over 10 MB. Send a link instead, or a smaller scan.");
+    if (OK_TYPES.indexOf(f.type) < 0) return say("PDF, Word or an image, please.");
     return "";
   }
 
@@ -2510,7 +2542,7 @@ html{scroll-behavior:smooth}
        clicks, and the Enter handler calls next.click(). */
     next.disabled = true;
     next.setAttribute("aria-busy", "true");
-    next.textContent = "Sending…";
+    next.textContent = say("Sending…");
 
     /* One immediate retry covers the ordinary case — a dropped connection, a
        cold function — without making anyone sit through a real backoff. */
@@ -2533,23 +2565,24 @@ html{scroll-behavior:smooth}
          do about it, which is either sign in or come back on a date. */
       if (v && v.refused) {
         finish("handoff", d);
-        document.getElementById("apply-done-h").textContent = "We already have you.";
+        document.getElementById("apply-done-h").textContent = say("We already have you.");
         document.getElementById("apply-done-p").textContent = v.refused;
         document.getElementById("apply-actions").innerHTML =
-          '<a class="btn btn--solid" href="/status">Your application</a>';
+          '<a class="btn btn--solid" href="/status">' + say("Your application") + '</a>';
         return;
       }
       park(d);
       finish("handoff", d);
       document.getElementById("err-apply").textContent =
-        "That did not send, so we saved it and will keep trying. Use the email button below to reach us now.";
+        say("That did not send, so we saved it and will keep trying. Use the email " +
+            "button below to reach us now.");
     })["catch"](function () {
       park(d);
       finish("handoff", d);
     }).then(function () {
       next.disabled = false;
       next.removeAttribute("aria-busy");
-      next.textContent = "Send it";
+      next.textContent = say("Send it");
     });
   }
 
@@ -2571,8 +2604,8 @@ html{scroll-behavior:smooth}
       if (k <= n) { r.setAttribute("data-on", ""); } else { r.removeAttribute("data-on"); }
     });
     if (n < LAST) {
-      count.textContent = "Step " + (n + 1) + " of " + LAST;
-      next.textContent = n === LAST - 1 ? "Send it" : "Continue";
+      count.textContent = say("Step {n} of {last}", { n: n + 1, last: LAST });
+      next.textContent = n === LAST - 1 ? say("Send it") : say("Continue");
       if (n === 0) { back.setAttribute("hidden", ""); } else { back.removeAttribute("hidden"); }
     }
     form.scrollTop = 0;
@@ -2699,8 +2732,9 @@ html{scroll-behavior:smooth}
     info.textContent = bad
       ? bad
       : f
-        ? f.name + " — " + Math.max(1, Math.round(f.size / 1024)) + " KB, ready to send"
-        : "Up to 10 MB. A photo of a printed CV is fine.";
+        ? say("{name} — {kb} KB, ready to send",
+              { name: f.name, kb: Math.max(1, Math.round(f.size / 1024)) })
+        : say("Up to 10 MB. A photo of a printed CV is fine.");
   });
 
   /* An error that outlives the thing it is about is the form calling somebody
@@ -2827,7 +2861,7 @@ html{scroll-behavior:smooth}
       if (!a) return;
       var addr = a.getAttribute("href").slice(7).split("?")[0];
       copy(addr).then(
-        function () { toast("Copied  " + addr); },
+        function () { toast(say("Copied  {what}", { what: addr })); },
         function () { toast(addr); }
       );
     });

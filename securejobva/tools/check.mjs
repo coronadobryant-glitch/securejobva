@@ -2683,6 +2683,36 @@ await check("every Spanish page is a complete translation", async () => {
   }
 });
 
+/* The sentences the two step forms build after they have loaded. build-es.mjs
+   refuses to write a page whose say() keys are not all translated, and the
+   check above carries that refusal into the build — so what is left to guard
+   here is the other direction: an entry in es/runtime.json that no page asks
+   for any more.
+
+   That matters because a stale key is indistinguishable from a working one by
+   reading the file. Rename a sentence in careers.html and the old Spanish sits
+   there looking translated while the new English ships untranslated — and the
+   count would still say every key has a value, because the key it now needs is
+   simply not in the list. This is the check that notices. */
+await check("every runtime translation is still asked for", async () => {
+  if (!existsSync("es/runtime.json")) return "no runtime translations yet";
+  const { sayKeys, SAY_PAGES, SAY_COMPUTED } = await import("./lib-seg.mjs");
+  const dict = JSON.parse(read("es/runtime.json"));
+  const used = new Set(SAY_COMPUTED);
+  for (const p of SAY_PAGES) for (const k of sayKeys(read(p))) used.add(k);
+
+  /* Keys starting with "_" are the notes and the section rules in the file,
+     not sentences anything looks up. No English sentence starts with one. */
+  const stale = Object.keys(dict).filter((k) => k[0] !== "_" && !used.has(k));
+  if (stale.length) {
+    throw new Error(stale.length + " translation(s) no page asks for — a renamed " +
+      "sentence leaves the old one looking fine: " +
+      stale.slice(0, 3).map((s) => JSON.stringify(s.slice(0, 48))).join(", ") +
+      (stale.length > 3 ? " and " + (stale.length - 3) + " more" : ""));
+  }
+  return used.size + " sentences, all of them still in the pages";
+});
+
 /* The two versions have to point at each other. A language link that only goes
    one way is a page somebody can reach and not leave, and hreflang that is not
    reciprocal is ignored by search engines entirely — so the Spanish page would

@@ -178,6 +178,14 @@ function load(form) {
   };
   const src = [
     "var DISC_N = form.querySelectorAll('[data-disc-g]').length;",
+    /* The dialog's own sentences go through say() now, so they can be
+       translated for /es/careers. On the English page it returns its argument,
+       so nothing asserted here changes — but the lifted code calls it, so it
+       has to come too. Lifted rather than stubbed: a change to say() is a
+       change these assertions see. */
+    "var SAYS = {};",
+    grab("say"),
+    grab("sayList"),
     grab("discPick"),
     grab("discAnswers"),
     grab("validDisc"),
@@ -286,6 +294,7 @@ check("a tick that gives way says so", () => {
 
   const errBox = { textContent: "" };
   const run = new Function("form", "document", "e",
+    "var SAYS = {};\n" + grab("say") + "\n" + grab("sayList") + "\n" +
     listener.replace(/\bvar t = e\.target;/, "var t = e.target;"));
   const doc = { getElementById: (id) => (id === "err-disc" ? errBox : null) };
 

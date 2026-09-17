@@ -1279,6 +1279,42 @@ function forwardAuthFragment(loc) {
     });
 })();
 
+/* ── the words this page builds after it has loaded ───────────────────────
+
+   tools/build-es.mjs translates the static half of this page by walking text
+   nodes, and it deliberately never steps inside a script block: a literal may
+   be a selector, a class name, or a track name the database reads in English.
+   lib-seg.mjs carries that warning, and "Customer service" is one of them.
+
+   The dialog writes its own sentences, though, so every one of them reached
+   /es/careers in English — the step counter, every validation message, the
+   confirmation at the end. A form that is Spanish until you get something
+   wrong is worse than one that never pretended.
+
+   So they come through say(). SAYS is empty here and is replaced wholesale by
+   build-es.mjs when it writes the Spanish page, which is why the English page
+   is byte-for-byte what it was: a key with no entry returns its own English.
+
+   The key IS the English sentence, the way es/strings.json already works, so
+   there is one thing to read and nothing to keep in step. Values arrive as
+   {named} placeholders rather than by concatenation, because "Group " + n +
+   " is not finished" cannot be put into Spanish a fragment at a time. */
+var SAYS = {};
+function say(en, vars) {
+  var s = Object.prototype.hasOwnProperty.call(SAYS, en) ? SAYS[en] : en;
+  if (!vars) return s;
+  return s.replace(/[{]([a-zA-Z]+)[}]/g, function (m, k) {
+    return Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m;
+  });
+}
+
+/* "a, b and c" — the joiner is a word, so it is translated with the rest
+   rather than being assumed to be the English one. */
+function sayList(items) {
+  if (items.length < 2) return items.join("");
+  return items.slice(0, -1).join(", ") + say(" and ") + items[items.length - 1];
+}
+
 /* Mobile menu */
 (function () {
   var btn = document.getElementById("navtog");
@@ -1638,23 +1674,23 @@ function forwardAuthFragment(loc) {
     if (step === 0) {
       if (picked("seat").length) return true;
       document.getElementById("err-seat").textContent =
-        "Pick at least one seat so we know who to shortlist.";
+        say("Pick at least one seat so we know who to shortlist.");
       return false;
     }
     if (step === 1) {
       if (picked("block").length) return true;
       document.getElementById("err-block").textContent =
-        "Choose a block — it decides the shift we hire for.";
+        say("Choose a block — it decides the shift we hire for.");
       return false;
     }
     if (step === 2) {
       var name = document.getElementById("in-name");
       var co = document.getElementById("in-co");
       var mail = document.getElementById("in-email");
-      var ok = mark(name, name.value.trim() ? "" : "We need a name for the intro email.");
-      ok = mark(co, co.value.trim() ? "" : "Which company is this for?") && ok;
+      var ok = mark(name, name.value.trim() ? "" : say("We need a name for the intro email."));
+      ok = mark(co, co.value.trim() ? "" : say("Which company is this for?")) && ok;
       ok = mark(mail, /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail.value.trim())
-        ? "" : "Check this address — the shortlist goes here.") && ok;
+        ? "" : say("Check this address — the shortlist goes here.")) && ok;
       if (!ok) {
         var bad = form.querySelector(".is-bad input");
         if (bad) bad.focus();
@@ -1721,29 +1757,30 @@ function forwardAuthFragment(loc) {
     var actions = document.getElementById("done-actions");
 
     document.getElementById("done-recap").innerHTML =
-      row("Seat", esc((d.seats || []).join(", "))) +
-      row("Cover", esc((d.blocks || []).join(", ")) + " &middot; " + esc(d.timezone)) +
-      row("Hours", d.hours + " a week") +
-      row("Estimate", money(d.weekly) + " / week", true);
+      row(say("Seat"), esc((d.seats || []).join(", "))) +
+      row(say("Cover"), esc((d.blocks || []).join(", ")) + " &middot; " + esc(d.timezone)) +
+      row(say("Hours"), say("{n} a week", { n: d.hours })) +
+      row(say("Estimate"), say("{money} / week", { money: money(d.weekly) }), true);
 
     if (mode === "sent") {
-      document.getElementById("done-h").textContent = "We have it.";
+      document.getElementById("done-h").textContent = say("We have it.");
       document.getElementById("done-p").textContent =
-        "A shortlist for " + d.company + " lands in " + d.email + " within one working day.";
+        say("A shortlist for {company} lands in {email} within one working day.",
+            { company: d.company, email: d.email });
       actions.innerHTML = CFG.scheduler
-        ? "<a class=\"btn btn--solid\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">Pick your time</a>"
-        : "<a class=\"btn btn--ghost\" href=\"mailto:" + CFG.email + "\">Email us directly</a>";
+        ? "<a class=\"btn btn--solid\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">" + say("Pick your time") + "</a>"
+        : "<a class=\"btn btn--ghost\" href=\"mailto:" + CFG.email + "\">" + say("Email us directly") + "</a>";
     } else {
-      document.getElementById("done-h").textContent = "One tap left.";
+      document.getElementById("done-h").textContent = say("One tap left.");
       document.getElementById("done-p").textContent =
-        "Your email is written and ready — send it and we reply the same working day.";
+        say("Your email is written and ready — send it and we reply the same working day.");
       var href = "mailto:" + CFG.email +
         "?subject=" + encodeURIComponent("Seat request — " + d.company) +
         "&body=" + encodeURIComponent(letter(d));
       actions.innerHTML =
-        "<a class=\"btn btn--solid\" href=\"" + href + "\">Send the email</a>" +
+        "<a class=\"btn btn--solid\" href=\"" + href + "\">" + say("Send the email") + "</a>" +
         (CFG.scheduler
-          ? "<a class=\"btn btn--ghost\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">Or pick a time</a>"
+          ? "<a class=\"btn btn--ghost\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">" + say("Or pick a time") + "</a>"
           : "");
     }
 
@@ -1874,7 +1911,7 @@ function forwardAuthFragment(loc) {
        sent in the first place. */
     next.disabled = true;
     next.setAttribute("aria-busy", "true");
-    next.textContent = "Sending…";
+    next.textContent = say("Sending…");
 
     /* One immediate retry covers the ordinary case — a dropped connection, a
        cold function — without making anyone sit through a real backoff. */
@@ -1888,21 +1925,22 @@ function forwardAuthFragment(loc) {
          somebody genuinely caught by a limit meant for a script. */
       if (v && v.refused) {
         finish("handoff", d);
-        document.getElementById("done-h").textContent = "One moment.";
+        document.getElementById("done-h").textContent = say("One moment.");
         document.getElementById("done-p").textContent = v.refused;
         return;
       }
       park(d);
       finish("handoff", d);
       document.getElementById("err-send").textContent =
-        "That did not send, so we saved it and will keep trying. Use the email button below to reach us now.";
+        say("That did not send, so we saved it and will keep trying. Use the email " +
+            "button below to reach us now.");
     })["catch"](function () {
       park(d);
       finish("handoff", d);
     }).then(function () {
       next.disabled = false;
       next.removeAttribute("aria-busy");
-      next.textContent = "Send it";
+      next.textContent = say("Send it");
     });
   }
 
@@ -1924,8 +1962,8 @@ function forwardAuthFragment(loc) {
       if (k <= n) { r.setAttribute("data-on", ""); } else { r.removeAttribute("data-on"); }
     });
     if (n < LAST) {
-      count.textContent = "Step " + (n + 1) + " of " + LAST;
-      next.textContent = n === LAST - 1 ? "Send it" : "Continue";
+      count.textContent = say("Step {n} of {last}", { n: n + 1, last: LAST });
+      next.textContent = n === LAST - 1 ? say("Send it") : say("Continue");
       if (n === 0) { back.setAttribute("hidden", ""); } else { back.removeAttribute("hidden"); }
     }
     form.scrollTop = 0;
