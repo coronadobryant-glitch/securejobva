@@ -1179,6 +1179,41 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* The client portal keeps its session in a slot of its own (seats.html sets
+   SLOT = "client"), so sending somebody there hands them a page that cannot
+   see they are signed in: the sign-in card, with no explanation, having
+   clicked nothing. The slots exist so three audiences stop evicting each
+   other — not so that this page's own redirect can land on a wall.
+
+   So put the same token in the client drawer before going, which is exactly
+   what signing in again at /seats would have put there. It grants nothing:
+   the lock is the signature on the token and Postgres checks it either way.
+
+   The one thing that must not be overwritten is a LIVE session belonging to
+   somebody else, because that is the eviction the slots were added to stop.
+   An expired one is already spent, so it is fair game. When we will not
+   overwrite, this returns false and the caller stays here and offers the link
+   instead, which is still better than the wall. */
+function handToClientSlot() {
+  var s = loadSession();
+  if (!s || !s.access_token) return false;
+  var mine = readToken(s.access_token);
+  if (!mine || !mine.email) return false;
+
+  var raw = null;
+  try { raw = localStorage.getItem("sjva-session-client"); } catch (e) { return false; }
+  if (raw) {
+    var theirs = null;
+    try { theirs = JSON.parse(raw); } catch (e) { theirs = null; }
+    var t = theirs && theirs.access_token ? readToken(theirs.access_token) : null;
+    if (t && t.email && t.email !== mine.email && t.exp && t.exp * 1000 > Date.now()) return false;
+  }
+
+  try { localStorage.setItem("sjva-session-client", JSON.stringify(s)); }
+  catch (e) { return false; }
+  return true;
+}
+
 /* ── whose rows are these? ────────────────────────────────────
 
    Every portal page below asks the database for its rows and, until now, took
@@ -3516,12 +3551,30 @@ function render(user, apps) {
   }
 
   if (!apps.length && BUSINESS) {
-    /* A client with no application is sent to their own page. Carrying the
+    /* A client with no application belongs on their own page. Carrying the
        message with them, because the hash has already been cleared by the
        read above and a redirect would otherwise be the third place this
-       error goes to die. */
-    location.replace("/seats" +
-      (AUTH_ERR ? "#error_description=" + encodeURIComponent(AUTH_ERR) : ""));
+       error goes to die.
+
+       Only go if the session can go too. handToClientSlot() refuses when the
+       client drawer holds somebody else who is still signed in; forwarding
+       then would show them a sign-in card they did not ask for, so the banner
+       and its link below are the honest answer instead. */
+    if (handToClientSlot()) {
+      location.replace("/seats" +
+        (AUTH_ERR ? "#error_description=" + encodeURIComponent(AUTH_ERR) : ""));
+      return;
+    }
+
+    lead.textContent = "Signed in as " + user.email + ".";
+    view(who + staffBanner() +
+      '<div class="card">' +
+        '<div class="note note--warn"><b>Somebody else is signed in to the seats page</b> ' +
+        "in this browser. Open it and sign in as " + esc(user.email) +
+        " to see the seats you have asked us for.</div>" +
+        '<p style="margin-top:1.2rem"><a class="btn btn--solid" href="/seats">Go to your seats</a></p>' +
+      "</div>");
+    document.getElementById("out").addEventListener("click", signOut);
     return;
   }
 
