@@ -15,6 +15,8 @@
    dangerous credential in the project stays out of a function that is reachable
    from the internet. */
 
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+
 const RESEND = "https://api.resend.com/emails";
 
 /* Which tables are worth an email, and how each one reads. Anything not listed
@@ -88,11 +90,36 @@ function list(v) {
    applicant forwarding it to somebody should not be able to give the wrong
    impression of where they stand. Only applications get one: the seats and
    contact forms promise nothing, and inventing a message nobody was told to
-   expect is a different decision from keeping this one. */
+   expect is a different decision from keeping this one.
+
+   WHAT IT MAY REPEAT BACK, AND WHAT IT MAY NOT
+
+   This is the one email in the file whose address and contents both come from
+   a stranger. Anybody holding the publishable key can insert an application —
+   that is what the form does — so anybody could put a victim's address in the
+   email field and a sentence of their own in the track, and this used to mail
+   the victim "We have your application for <their sentence>", signed by our
+   domain. A phishing line with a link in it, delivered by us.
+
+   So nothing typed goes back out verbatim. The track is named only when it is
+   one of the three this site offers, spelled exactly as the form's checkboxes
+   send it (091 now refuses anything else on insert; older rows may still hold
+   it). The first name goes through firstName(), which only lets through
+   something shaped like a name. Anything else falls back to wording that
+   carries no input at all. */
+const TRACKS = ["Customer Service", "Sales & Marketing", "Admin Tasks"];
+
+function knownTracks(r) {
+  const all = Array.isArray(r.tracks) ? r.tracks : (r.track ? [r.track] : []);
+  const seen = [];
+  for (const t of all) if (TRACKS.indexOf(t) !== -1 && seen.indexOf(t) === -1) seen.push(t);
+  return seen.join(", ");
+}
+
 const CONFIRM = {
   applications: (r, site) => {
-    const first = String(r.name || "").trim().split(/\s+/)[0] || "there";
-    const what = list(r.tracks) || r.track || "";
+    const first = firstName(r.name);
+    const what = knownTracks(r);
 
     const body = [
       "Hi " + first + ",",
@@ -129,9 +156,35 @@ const CONFIRM = {
   }
 };
 
+/* Quotes as well as brackets. Several callers put the result inside a
+   double-quoted href, and escaping only & < > let a meeting link carrying a
+   " close the attribute and add one of its own — a style that restyled part
+   of an email we sign. A tag could never be closed, but an attribute is
+   enough to make our mail say something we did not write. */
 function esc(s) {
   return String(s === null || s === undefined ? "" : s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/* A joining link, as the HTML part shows it.
+
+   Only http and https become a link, and the address is put back together by
+   the URL parser rather than passed through as typed, so what lands in the
+   href is something a browser already agrees is one web address. 081 now
+   refuses anything else on the way in; rows written before it are why this
+   still checks. A value that fails is shown as text, which is still enough
+   for somebody to copy, and is never clickable. */
+function linkHtml(u) {
+  const raw = String(u || "").trim();
+  let href = "";
+  try {
+    const p = new URL(raw);
+    if (p.protocol === "http:" || p.protocol === "https:") href = p.href;
+  } catch (e) { href = ""; }
+  return href
+    ? '<a href="' + esc(href) + '">' + esc(raw) + "</a>"
+    : esc(raw);
 }
 
 /* ── decisions, in both directions ────────────────────────────────────────
@@ -176,8 +229,18 @@ function hoursText(n) {
   return (Math.round(v * 100) / 100).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+/* The first word of a name, when it looks like one.
+
+   Every greeting here starts "Hi <first word of what they typed>", and the
+   name field is free text from a public form. A first word of
+   "evil.example/verify" or "www.evil.example" would put a link in the first
+   line of a message we sign, so only letters (any alphabet, with their
+   accents), apostrophes and hyphens get through, at a length a name has.
+   Anything else becomes "there", which is how these already greet somebody
+   who left the name empty. */
 function firstName(s) {
-  return String(s || "").trim().split(/\s+/)[0] || "there";
+  const w = String(s || "").trim().split(/\s+/)[0] || "";
+  return /^[\p{L}\p{M}'’-]{1,40}$/u.test(w) ? w : "there";
 }
 
 /* An interview time, for an email.
@@ -208,10 +271,15 @@ function slotText(r) {
   return when + " Central" + (mins ? ", " + mins + " minutes" : "");
 }
 
+/* Anything that is not a plain yyyy-mm-dd comes back empty, and every caller
+   leaves the date out of its sentence when it does. "paid on NaN undefined"
+   in a receipt is worse than a receipt that does not say the day. */
 function fullDate(iso) {
   const p = String(iso || "").split("-");
   if (p.length !== 3) return "";
-  return Number(p[2]) + " " + MONTH[Number(p[1]) - 1] + " " + p[0];
+  const d = Number(p[2]), m = Number(p[1]);
+  if (!d || !m || m > 12 || !/^\d{4}$/.test(p[0])) return "";
+  return d + " " + MONTH[m - 1] + " " + p[0];
 }
 
 /* A button and a closing line, since most of these end the same way. `where`
@@ -349,7 +417,7 @@ const DECIDE = {
       html: wrap([
         "<p>" + esc("Hi " + firstName(p.name) + ",") + "</p>",
         "<p>Here is where to join your interview on <b>" + esc(slotText(r)) + "</b>.</p>",
-        "<p><a href=\"" + esc(r.meeting_url || "") + "\">" + esc(r.meeting_url || "") + "</a></p>",
+        "<p>" + linkHtml(r.meeting_url) + "</p>",
         "<p>That time is in Central &mdash; your page shows it on your own clock. Join a couple " +
         "of minutes early so any camera or microphone trouble is not the first thing that " +
         "happens. If the link does not work, reply to this email.</p>"
@@ -388,8 +456,7 @@ const DECIDE = {
         "<p><b>Your interview is still going ahead.</b> We have had to move it, and it is " +
         "now <b>" + esc(slotText(r)) + "</b>.</p>",
         (r.meeting_url
-          ? "<p>Where to join: <a href=\"" + esc(r.meeting_url) + "\">" +
-            esc(r.meeting_url) + "</a></p>"
+          ? "<p>Where to join: " + linkHtml(r.meeting_url) + "</p>"
           : ""),
         "<p>That time is in Central &mdash; your page shows it on your own clock. Nothing is " +
         "needed from you. If the new time does not work, reply to this email and we will " +
@@ -475,7 +542,7 @@ const DECIDE = {
             "<p>Your interview with <b>SecureJobVA</b> is confirmed for <b>" +
               esc(slotText(r)) + "</b>.</p>",
             "<p>" + (r.meeting_url
-              ? "Where: <a href=\"" + esc(r.meeting_url) + "\">" + esc(r.meeting_url) + "</a>"
+              ? "Where: " + linkHtml(r.meeting_url)
               : esc(link)) + "</p>",
             "<p>That time is in Central &mdash; your page shows it on your own clock. Camera " +
             "on, somewhere quiet. If you need to move it, reply to this email.</p>"
@@ -505,7 +572,7 @@ const DECIDE = {
           "<p>Your interview with <b>" + esc(r.other) + "</b> is confirmed for <b>" +
             esc(slotText(r)) + "</b>.</p>",
           "<p>" + (r.meeting_url
-            ? "Where: <a href=\"" + esc(r.meeting_url) + "\">" + esc(r.meeting_url) + "</a>"
+            ? "Where: " + linkHtml(r.meeting_url)
             : esc(link)) + "</p>",
           "<p>" + esc(mine
             ? "That time is in Central, which is the client's clock. Open your portal to see " +
@@ -763,8 +830,63 @@ const DECIDE = {
         ], site, "/hub", "See your leave")
       };
     }
+  },
+
+  /* ── a payment, recorded ────────────────────────────────────────────────
+     sql/093. Money comes in by bank transfer, Wise, PayPal and the rest, and
+     /pay records it after the fact — nothing here takes a card. Until this, a
+     client who paid heard nothing back unless they opened /pay and looked for
+     the line, which is not what anybody expects after sending money.
+
+     So this says what was recorded and where the statement is, and nothing
+     more: no due date, no balance, no promise about refunds. The balance
+     depends on weeks this payload does not carry, and a receipt that guessed
+     at it would be the one email a client keeps and quotes back. It goes to
+     the contact on the client's record and to nobody else, once. */
+  client_payments: {
+    recorded: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name) + ",";
+      const amount = money(r.amount_cents);
+      const on = fullDate(r.paid_on);
+      const how = PAY_METHOD[r.method] || "";
+      const ref = String(r.reference || "").trim();
+      const from = String(r.business || "").trim();
+      const line = "We have recorded a payment" + (from ? " from " + from : "") +
+        " of " + amount + (on ? ", paid on " + on : "") + (how ? " by " + how : "") +
+        (ref ? ", reference " + ref : "") + ".";
+      return {
+        subject: "Payment received — " + amount,
+        text: [hi, "", line, "",
+          "Your statement is at " + site + "/pay.", "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>" + esc(line) + "</p>"
+        ], site, "/pay", "See your statement")
+      };
+    }
   }
 };
+
+/* The method as a person would say it. The keys are the values /pay stores;
+   one not listed here is left out of the sentence rather than printed raw.
+   "other" is left out on purpose too: "paid by other" says nothing, and a
+   receipt that reads oddly is one that gets questioned. */
+const PAY_METHOD = {
+  bank_transfer: "bank transfer", wise: "Wise", paypal: "PayPal",
+  card: "card", cheque: "cheque", cash: "cash"
+};
+
+/* Cents to dollars, with thousands grouped by hand — toLocaleString would
+   make the figure in a receipt depend on the machine that happens to run it,
+   the same reason dayText() spells out its months. */
+function money(cents) {
+  const c = Math.round(Number(cents || 0));
+  const neg = c < 0;
+  const abs = Math.abs(c);
+  const whole = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const part = String(abs % 100).padStart(2, "0");
+  return (neg ? "-" : "") + "$" + whole + "." + part;
+}
 
 /* Plain text alongside the HTML. A notification that arrives unreadable on a
    phone with images off is a notification that gets ignored. */
@@ -793,35 +915,186 @@ function render(kind, row, site) {
   return { text, html };
 }
 
-/* One place that talks to Resend, so the from address and the auth header are
-   written once rather than three times. Returns whether it landed; the caller
-   decides what that means. */
-async function send(env, msg) {
-  const r = await fetch(RESEND, {
-    method: "POST",
-    headers: { Authorization: "Bearer " + env.key, "Content-Type": "application/json" },
-    body: JSON.stringify(Object.assign({ from: "SecureJobVA <" + env.from + ">" }, msg))
-  }).catch(() => null);
-  return !!(r && r.ok);
+/* ── getting it to Resend ─────────────────────────────────────────────────
+   NOTHING OUTSIDE THIS FILE RETRIES A SEND.
+
+   This file used to say that answering 502 told Supabase to retry, and built
+   its rules around a retry loop: the staff alert "must be retried until it
+   lands", the applicant's copy must never decide the status code or it would
+   mail you the same application forever. None of that loop exists. Every
+   caller is a pg_net call from a trigger — supabase_functions.http_request in
+   021 and 028, net.http_post in 031, 040, 058 and 093 — and pg_net fires once,
+   writes whatever came back into net._http_response, and moves on. A 502 from
+   here was never a request for another try. It was the email, lost.
+
+   So the one retry there is happens here, inside this request:
+
+     - A refusal that looks like the reply_to address (400 or 422 while one
+       was set) goes again once without it. The reply address is typed by
+       whoever filled in the form, and a typo in it must not cost the staff
+       alert — staff lose a reply button, not the message.
+     - A refusal that looks temporary (Resend down, rate-limited, the network
+       gone: 5xx, 429 or no answer at all) goes again once after a short
+       pause. Enough for a blip. An outage longer than a second is not fixed
+       here, and nothing pretends it is.
+
+   And a send that still fails is made visible rather than retried: it is
+   logged to the function log with the table, the event and the row id —
+   enough to find the row in /admin and act on it by hand — and the staff
+   alert's failure still answers 502, which is what lands in
+   net._http_response for anybody who looks there. No address goes into the
+   log: the row id finds the person, and a log is not where their email
+   should live.
+
+   A real queue — an outbox table and a scheduled job that re-sends what is
+   still unsent — is the fix that makes an outage survivable. It needs a
+   table, a cron and every notify trigger rewritten, so it is not in this
+   file, and this comment is here so nobody assumes it already exists. */
+
+/* The same rule 073 holds applications and seat requests to, and 092 holds
+   contact messages to: something, an @, something, a dot, two or more. An
+   address that fails it is not sent to and is not offered as a reply_to. */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function address(v) {
+  const s = String(v || "").trim();
+  return EMAIL.test(s) ? s : "";
+}
+
+const PAUSE_MS = 800;
+const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+/* Resend's refusals sometimes quote the address they refused. The log keeps
+   the reason and loses the address. */
+function redact(s) {
+  return String(s || "").replace(/[^\s@"'<>,;:]+@[^\s@"'<>,;:]+/g, "<address>").slice(0, 300);
+}
+
+async function attempt(env, msg, key) {
+  try {
+    const r = await fetch(RESEND, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + env.key,
+        "Content-Type": "application/json",
+        "Idempotency-Key": key
+      },
+      body: JSON.stringify(Object.assign({ from: "SecureJobVA <" + env.from + ">" }, msg))
+    });
+    if (r.ok) return { ok: true, status: r.status };
+    const detail = await r.text().catch(() => "");
+    return { ok: false, status: r.status, detail: detail };
+  } catch (e) {
+    return { ok: false, status: 0, detail: String(e && e.message ? e.message : e) };
+  }
+}
+
+/* The name Resend is given for one email, so that sending it twice sends it
+   once.
+
+   The pause-and-retry below goes again after no answer, a 429 or a 5xx, and
+   none of those proves the first try was turned away. A connection that
+   drops after Resend took the message looks exactly like one that dropped
+   before; so does a 502 from something in between. Without a key the retry
+   would be a second copy of the same email, and for a receipt that is the
+   worst thing it could be — 093 says why: a second receipt for the same
+   money is how a client comes to believe they paid twice. With one, Resend
+   answers the second request with the first one's result and sends nothing.
+
+   The key is made fresh for every call to send(), not built from the row
+   alone. The only repeats this is meant to catch happen inside this one
+   request — pg_net never asks twice (see the note above) — and a key made
+   of the table, the event and the row id would also swallow a real second
+   email: an application moved to interview, back, and to interview again
+   inside the 24 hours Resend remembers a key would tell her once. The
+   table, event, row and who it is for go in front anyway, so a key seen in
+   Resend's log says what it was for. Never the address, for the same reason
+   the log line below leaves it out.
+
+   Resend refuses a key it has seen with a different body (409), so the send
+   without reply_to below is a different email and gets a key of its own.
+   A 409 because the first try is still being worked on when the retry
+   arrives comes back as a failure and is logged as one — with its status,
+   so whoever reads the log knows that one may in fact have gone. */
+function sendKey(what) {
+  const w = what || {};
+  return [w.table, w.event, w.id, w.to, randomUUID()]
+    .map((v) => String(v == null ? "-" : v).replace(/[^\w.-]/g, "_").slice(0, 40))
+    .join(":");
+}
+
+/* One place that talks to Resend, so the from address, the auth header and
+   the retry rules above are written once. `what` names the send for the log
+   if it fails. Returns the outcome; the caller decides what it means. */
+async function send(env, msg, what) {
+  let m = msg;
+  let key = sendKey(what);
+  let r = await attempt(env, m, key);
+
+  if (!r.ok && m.reply_to && (r.status === 400 || r.status === 422)) {
+    m = Object.assign({}, m);
+    delete m.reply_to;
+    key = key + ":noreply";
+    r = await attempt(env, m, key);
+  }
+
+  /* The same key as the try it repeats: if that one went through, Resend
+     drops this one. */
+  if (!r.ok && (r.status === 0 || r.status === 429 || r.status >= 500)) {
+    await wait(PAUSE_MS);
+    r = await attempt(env, m, key);
+  }
+
+  if (!r.ok) {
+    console.error("[notify] NOT DELIVERED " + JSON.stringify(Object.assign({}, what, {
+      status: r.status, detail: redact(r.detail)
+    })));
+  }
+  return r;
+}
+
+/* The shared secret, compared in constant time.
+
+   `!==` on two strings stops at the first character that differs, so how
+   long a wrong guess takes to be refused says how much of it was right.
+   Over the internet that is a faint signal, but it costs one line to remove.
+   Both sides are hashed first because timingSafeEqual refuses buffers of
+   different lengths, and refusing early on length would leak the length. */
+function sameSecret(given, expected) {
+  const a = createHash("sha256").update(String(given || "")).digest();
+  const b = createHash("sha256").update(String(expected)).digest();
+  return timingSafeEqual(a, b);
+}
+
+/* The staff addresses, or a refusal naming what is missing. Asked for only on
+   the paths that mail staff: an applicant's stage change, an assistant's
+   approved week or a client's receipt never uses NOTIFY_TO, and used to be
+   refused along with everything else the moment it went missing. */
+function staffOr500(env, res) {
+  if (env.to.length) return true;
+  res.status(500).json({ error: "NOTIFY_TO is not set" });
+  return false;
 }
 
 /* A decision, and which way it is going is the whole difference.
 
-   `arrived` goes to you and Bryant, and its failure must be retried — it is
-   the one holding somebody's answer, so its status code decides the response
-   exactly as an application's does.
+   `arrived` goes to you and Bryant. Its failure answers 502, the one status
+   code in this file that means an email was lost — see the note on send()
+   for what does and does not happen next.
 
-   `decided` goes to the assistant and is attempted once. Same rule the
-   applicant confirmation already follows: a dead address costs one missing
-   email, and never a webhook that mails the same decision forever. */
+   Everything else goes to the one person it is about, and its outcome is
+   reported in the body of a 200. A dead address there is that person's
+   missing email, not a fault in the endpoint, and folding it into the status
+   code would make a real outage harder to see among them. */
 async function decision(body, res, env) {
   const shapes = DECIDE[body.table];
   const shape = shapes && shapes[body.event];
   const person = body.person || {};
   const record = body.record || {};
+  const what = { table: String(body.table), event: String(body.event), id: record.id || null };
 
-  /* A status nobody asked to hear about is ignored quietly, and 200 stops it
-     being retried for the rest of its life. */
+  /* A status nobody asked to hear about is ignored quietly, with a 200, so
+     net._http_response does not fill with errors that are not errors. */
   if (!shape) {
     return res.status(200).json({ skipped: String(body.table) + "/" + String(body.event) });
   }
@@ -839,26 +1112,39 @@ async function decision(body, res, env) {
     return res.status(200).json({ skipped: "interview_slots/" + body.event + " (applicant)" });
   }
 
+  /* The joining link on its own is applicant-only, as the template says: on a
+     placement the client types the link while confirming, so the assistant's
+     confirmation already carried it, and 067 posts `link` for the applicant
+     side alone. The template also points at /status, which is not an
+     assistant's page. This is the second lock on that, for the same reason
+     as the one above. */
+  if (body.table === "interview_slots" && body.event === "link" && record.side !== "applicant") {
+    return res.status(200).json({ skipped: "interview_slots/link (" + String(record.side) + ")" });
+  }
+
   if (body.event === "arrived") {
+    if (!staffOr500(env, res)) return;
     const m = shape(record, person, env.site);
     /* Rendered through the same function the other three notifications use, so
        there is one table style and not a second one drifting away from it. */
     const { text, html } = render({ lines: () => m.lines, where: m.where }, record, env.site);
-    const landed = await send(env, {
+    const out = await send(env, {
       to: env.to,
-      reply_to: person.email || undefined,
+      reply_to: address(person.email) || undefined,
       subject: m.subject,
       text, html
-    });
-    if (!landed) {
-      return res.status(502).json({ error: "resend refused", table: body.table });
+    }, Object.assign({ to: "staff" }, what));
+    if (!out.ok) {
+      return res.status(502).json({
+        error: "resend refused", status: out.status, table: body.table, detail: redact(out.detail)
+      });
     }
     return res.status(200).json({ sent: env.to.length, table: body.table, event: "arrived" });
   }
 
-  const who = String(person.email || "").trim();
-  if (!who.includes("@")) {
-    return res.status(200).json({ sent: 0, table: body.table, event: "decided", told: false });
+  const who = address(person.email);
+  if (!who) {
+    return res.status(200).json({ sent: 0, table: body.table, event: body.event, told: false });
   }
 
   const m = shape(record, person, env.site);
@@ -869,9 +1155,10 @@ async function decision(body, res, env) {
     return res.status(200).json({ skipped: String(body.table) + "/" + String(record.status) });
   }
 
-  const told = await send(env, { to: [who], subject: m.subject, text: m.text, html: m.html });
+  const out = await send(env, { to: [who], subject: m.subject, text: m.text, html: m.html },
+    Object.assign({ to: "person" }, what));
   return res.status(200).json({
-    sent: told ? 1 : 0, table: body.table, event: "decided", told
+    sent: out.ok ? 1 : 0, table: body.table, event: body.event, told: out.ok
   });
 }
 
@@ -888,86 +1175,94 @@ export default async function handler(req, res) {
   if (!expected) {
     return res.status(500).json({ error: "WEBHOOK_SECRET is not set" });
   }
-  if (req.headers["x-webhook-secret"] !== expected) {
+  if (!sameSecret(req.headers["x-webhook-secret"], expected)) {
     return res.status(401).json({ error: "bad secret" });
   }
 
+  /* Every send needs the key. NOTIFY_TO is only needed by the sends that go
+     to staff, so it is checked there, not here. */
   const key = process.env.RESEND_API_KEY;
   const to = (process.env.NOTIFY_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
   const from = process.env.RESEND_FROM || "support@securejobva.com";
   const site = process.env.SITE_URL || "https://www.securejobva.com";
-  if (!key || !to.length) {
-    return res.status(500).json({ error: "RESEND_API_KEY or NOTIFY_TO is not set" });
+  if (!key) {
+    return res.status(500).json({ error: "RESEND_API_KEY is not set" });
   }
+  const env = { key, to, from, site };
 
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  /* A body that is not JSON is the caller's mistake, and says so with a 400
+     rather than crashing the function into a stack trace and a 500. */
+  let body;
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  } catch (e) {
+    return res.status(400).json({ error: "bad json" });
+  }
+  if (!body || typeof body !== "object") {
+    return res.status(400).json({ error: "bad json" });
+  }
 
   /* A decision from 031 rather than a row landing. Handled first because it is
      the one shape that is not a Supabase webhook and does not look like one. */
   if (body.type === "STATUS") {
-    return decision(body, res, { key, to, from, site });
+    return decision(body, res, env);
   }
 
   const kind = KINDS[body.table];
 
-  /* Not an error. A webhook on a table nobody asked to hear about should be
-     ignored quietly, and answering 200 stops Supabase retrying it forever. */
+  /* Not an error. A webhook on a table nobody asked to hear about is ignored
+     quietly, with a 200, so it does not read as a failure where it is logged. */
   if (!kind || body.type !== "INSERT" || !body.record) {
     return res.status(200).json({ skipped: body.table || "unknown" });
   }
 
+  if (!staffOr500(env, res)) return;
+
+  const what = { table: String(body.table), event: "insert", id: body.record.id || null };
   const { text, html } = render(kind, body.record, site);
 
-  const r = await fetch(RESEND, {
-    method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: "SecureJobVA <" + from + ">",
-      to,
-      /* So hitting reply reaches the person, not the mailbox. */
-      reply_to: body.record.email || undefined,
-      subject: kind.subject(body.record),
-      text,
-      html
-    })
-  });
+  const out = await send(env, {
+    to,
+    /* So hitting reply reaches the person, not the mailbox — when what they
+       typed is an address. When it is not, the alert goes without one. */
+    reply_to: address(body.record.email) || undefined,
+    subject: kind.subject(body.record),
+    text,
+    html
+  }, Object.assign({ to: "staff" }, what));
 
-  if (!r.ok) {
-    const detail = await r.text().catch(() => "");
-    /* Non-2xx tells Supabase to retry, which is what you want: a Resend outage
-       should delay the email, not lose it. */
-    return res.status(502).json({ error: "resend refused", detail: detail.slice(0, 300) });
+  if (!out.ok) {
+    /* Not a retry request — nothing retries (see send()). The 502 is what
+       net._http_response keeps, and the log line is what finds the row. */
+    return res.status(502).json({
+      error: "resend refused", status: out.status, table: body.table, detail: redact(out.detail)
+    });
   }
 
   /* ── then the applicant's own copy ───────────────────────────────────────
-     Second, and deliberately not allowed to change the answer. A retry is
-     driven by the status code, so if this send decided it, one applicant
-     mistyping their address would put the whole webhook in a retry loop —
-     mailing you about the same application over and over while never reaching
-     them. Costly in the wrong direction.
+     Second, and never allowed to change the answer. The status code reports
+     the email to you, which is the one holding somebody's reply; one
+     applicant mistyping their address is their missing confirmation, and it
+     is reported in the body, not folded into a 502 that would read as the
+     staff alert failing.
 
-     So the failure that matters is the one to you: that is the one that must
-     be retried until it lands, because it is the one holding somebody's reply.
-     This one is attempted once, its outcome is reported, and it never turns a
-     delivered notification into a repeated one. */
+     The address has to pass the same rule as everything else here. And what
+     the email says is built from values this file controls — see CONFIRM —
+     because the address and the text both come from whoever filled in the
+     form. */
   const theirs = CONFIRM[body.table];
-  const applicant = String(body.record.email || "").trim();
-  if (!theirs || !applicant.includes("@")) {
+  const applicant = address(body.record.email);
+  if (!theirs || !applicant) {
     return res.status(200).json({ sent: to.length, table: body.table, confirmed: false });
   }
 
   const c = theirs(body.record, site);
-  const sentToThem = await fetch(RESEND, {
-    method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: "SecureJobVA <" + from + ">",
-      to: [applicant],
-      subject: c.subject,
-      text: c.text,
-      html: c.html
-    })
-  }).then((x) => x.ok).catch(() => false);
+  const mine = await send(env, {
+    to: [applicant],
+    subject: c.subject,
+    text: c.text,
+    html: c.html
+  }, Object.assign({ to: "applicant" }, what));
 
-  return res.status(200).json({ sent: to.length, table: body.table, confirmed: sentToThem });
+  return res.status(200).json({ sent: to.length, table: body.table, confirmed: mine.ok });
 }

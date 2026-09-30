@@ -1,86 +1,173 @@
 -- verify — read-only. Paste this any time; it changes nothing.
 --
--- What you want to see:
---   seat_requests      rls_enabled = true,  policies = a
---   applications       rls_enabled = true,  policies = a,r,w
---   admins             rls_enabled = true,  policies = none
---   application_notes  rls_enabled = true,  policies = a,r,w
+-- Rewritten after the 29 September checkup (N49). The version before described
+-- the database as it was around 012: it expected anon to hold INSERT on the
+-- whole applications table (046 made that a column list), authenticated to
+-- hold INSERT on it (it never has), leave_requests to grant decided_at and
+-- decided_by (050 revoked both), and it listed every trigger on three tables
+-- under "the webhooks", so the one row that mattered sat among a dozen that
+-- passed trivially. Output that never matches its own expectations teaches
+-- whoever runs it to stop reading it. Each section below says what it should
+-- print today, and what a different answer means.
 --
---   anon           INSERT           <- exactly this, nothing more
---   authenticated  INSERT,SELECT,UPDATE
+-- What has landed is a different question, answered by schema_migrations:
 --
--- anon showing anything beyond INSERT means the applicant list is readable.
--- Fix it before doing anything else.
+--   select n, landed_at from public.schema_migrations order by n desc limit 5;
+--
+-- If the top number is below 074, the "status guard" section below will
+-- report the guard missing, and that is the finding it is there for.
 
 -- --------------------------------------------------------------------------
--- Check it worked
+-- 1. Row level security is on everywhere
 -- --------------------------------------------------------------------------
--- Both rows must say rls_enabled = true and list exactly one INSERT policy.
+--
+-- Every table in public. EMPTY is the pass. A table here is readable and
+-- writable by anybody the grants allow, with no policy asked at all.
 
-select c.relname as table,
-       c.relrowsecurity as rls_enabled,
-       coalesce(string_agg(p.polcmd::text, ','), 'none') as policies
+select c.relname as table_without_rls
 from pg_class c
-left join pg_policy p on p.polrelid = c.oid
-where c.relname in ('seat_requests', 'applications')
-group by c.relname, c.relrowsecurity;
-
-
--- --------------------------------------------------------------------------
--- Check it worked
--- --------------------------------------------------------------------------
---
--- applications should show rls_enabled = true with three policies: the
--- original public INSERT, the owner-or-admin SELECT and the admin UPDATE.
--- admins must show rls_enabled = true and NO policies at all.
-
-select c.relname as table_name,
-       c.relrowsecurity as rls_enabled,
-       coalesce(string_agg(p.polcmd::text, ',' order by p.polcmd::text), 'none') as policies
-from pg_class c
-left join pg_policy p on p.polrelid = c.oid
-where c.relname in ('seat_requests', 'applications', 'admins', 'application_notes')
-group by c.relname, c.relrowsecurity
+where c.relnamespace = 'public'::regnamespace
+  and c.relkind = 'r'
+  and not c.relrowsecurity
 order by c.relname;
 
--- anon must still be able to do exactly one thing to applications: insert.
-select grantee, string_agg(privilege_type, ',' order by privilege_type) as privileges
-from information_schema.role_table_grants
-where table_name = 'applications' and grantee in ('anon', 'authenticated')
-group by grantee;
-
-
 -- --------------------------------------------------------------------------
--- The notify webhooks
+-- 2. What anon holds on whole tables
 -- --------------------------------------------------------------------------
 --
--- Three rows, one per form. secret_filled must be true on all three: a trigger
--- still carrying the __WEBHOOK_SECRET__ placeholder fires, collects a 401 from
--- api/notify.js, and sends nothing — which from the outside is indistinguishable
--- from having no webhook at all. The secret itself is never printed.
+-- anon is the key in the page source. Expect exactly two rows:
+--
+--   application_socials  INSERT      004 — the apply form's social handles
+--   seat_requests        INSERT      001 — the booking form
+--
+-- Everything else anon may do is column by column (section 3). A SELECT,
+-- UPDATE, DELETE or TRUNCATE here is the applicant list, or the money, open to
+-- the internet. Fix it before doing anything else.
 
-select c.relname as table_name,
-       t.tgname as webhook,
-       pg_get_triggerdef(t.oid) not like '%\_\_WEBHOOK\_SECRET\_\_%' as secret_filled,
-       pg_get_triggerdef(t.oid) like '%api/notify%' as points_at_notify
+select table_name, string_agg(privilege_type, ', ' order by privilege_type) as privileges
+from information_schema.role_table_grants
+where grantee = 'anon' and table_schema = 'public'
+group by table_name
+order by table_name;
+
+-- --------------------------------------------------------------------------
+-- 3. What anon holds column by column
+-- --------------------------------------------------------------------------
+--
+-- Expect these, and no others:
+--
+--   applications          INSERT  the apply form's fields (046), plus
+--                                 adult_confirmed and privacy_consent_text (084)
+--                                 — and NOT status, user_id, privacy_consent_at
+--   application_disc      INSERT  application_id, answers                (025)
+--   application_documents INSERT  application_id, bytes, content_type,
+--                                 filename, path                         (013)
+--   contact_messages      INSERT  email, message, name, page, phone, reason (010)
+--   client_logos          SELECT  id, image_url, link, name, sort_order,
+--                                 visible             (015, declared public)
+--   schema_migrations     SELECT  n                   (044, declared public)
+--
+-- A SELECT on any other table is a publication. status or user_id on the
+-- applications INSERT is somebody filing themselves as hired (046's finding).
+
+select table_name, privilege_type,
+       string_agg(column_name, ', ' order by column_name) as columns
+from information_schema.column_privileges
+where grantee = 'anon' and table_schema = 'public'
+group by table_name, privilege_type
+order by table_name, privilege_type;
+
+-- --------------------------------------------------------------------------
+-- 4. The status guard (074)
+-- --------------------------------------------------------------------------
+--
+-- authenticated holds UPDATE on applications.status and status_changed_at
+-- (020), because staff are authenticated too — and so is every applicant.
+-- The column grant cannot tell them apart; the trigger does. Expect two rows,
+-- is_security_definer = false on both. No rows means an applicant can set her
+-- own stage to hired. true means the guard lets everybody through (it reads
+-- current_user, which a definer function replaces with its owner).
+
+select c.relname as table_name, t.tgname, p.prosecdef as is_security_definer
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+join pg_proc p on p.oid = t.tgfoid
+where t.tgname in ('applications_status_is_staffs', 'seat_requests_status_is_staffs')
+order by c.relname;
+
+-- The columns a signed-in session may UPDATE on applications. Expect status
+-- and status_changed_at (staff, fenced by the trigger above), payout_method
+-- (026), and the fourteen from 006: availability, cv, has_equipment, note,
+-- phone, posting_consent, posting_consent_at, posting_consent_text, region,
+-- skill_bookkeeping, skill_customer, skill_data_entry, skill_english,
+-- skill_social. email, user_id, name and tracks must NOT appear.
+
+select string_agg(column_name, ', ' order by column_name) as authenticated_can_update
+from information_schema.column_privileges
+where table_name = 'applications'
+  and grantee = 'authenticated'
+  and privilege_type = 'UPDATE';
+
+-- --------------------------------------------------------------------------
+-- 5. Will anything actually be emailed
+-- --------------------------------------------------------------------------
+--
+-- The one check here that matters most, on its own so it cannot be missed.
+-- Email leaves this database two ways, and each carries the webhook secret:
+--
+--   a trigger calling supabase_functions.http_request   019/021/028 — the
+--       secret is in the trigger definition
+--   a function calling net.http_post                    031, 035, 036, 037,
+--       040, 058, 066–070, 093 — the secret is in the function body
+--
+-- EMPTY is the pass for both queries. A row means that trigger or function
+-- still carries the __WEBHOOK_SECRET__ placeholder: it fires, api/notify (or
+-- api/invite) answers 401, and nothing is sent — which from outside looks
+-- exactly like having no webhook at all. The secret itself is never printed.
+
+select c.relname as table_name, t.tgname as webhook_still_on_placeholder
 from pg_trigger t
 join pg_class c on c.oid = t.tgrelid
 where not t.tgisinternal
-  and c.relname in ('applications', 'seat_requests', 'contact_messages')
+  and pg_get_triggerdef(t.oid) like '%http_request%'
+  and pg_get_triggerdef(t.oid) like '%\_\_WEBHOOK\_SECRET\_\_%'
 order by c.relname;
 
+select p.proname as function_still_on_placeholder
+from pg_proc p
+where p.pronamespace = 'public'::regnamespace
+  and p.prosrc like '%http_post%'
+  and p.prosrc like '%\_\_WEBHOOK\_SECRET\_\_%'
+order by p.proname;
+
+-- And that the webhooks exist at all: one row per trigger that posts. Expect
+-- thirteen — notify-applications and notify-application-status on
+-- applications, notify-seat-requests, notify-contact-messages,
+-- notify-timesheet-status, notify-leave-asked and notify-leave-decided,
+-- notify-placement-made, notify-placement-status and placement_invites_the_client
+-- on placements, notify-swap-asked, notify-interview, and (from 093)
+-- notify-payment-receipt on client_payments. A missing one is a message that
+-- has quietly stopped being sent.
+
+select c.relname as table_name, t.tgname as trigger_name
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+where not t.tgisinternal
+  and (t.tgname like 'notify%' or t.tgname = 'placement_invites_the_client')
+order by c.relname, t.tgname;
 
 -- --------------------------------------------------------------------------
--- The hub tables
+-- 6. The hub tables, column by column
 -- --------------------------------------------------------------------------
 --
--- 026 grants INSERT and UPDATE on these by COLUMN, so role_table_grants shows
--- only SELECT and looks alarmingly bare. That view lists table-level privileges
--- and nothing else; the column ones are here. Expect:
+-- role_table_grants shows only SELECT on these and looks bare; the writes are
+-- column grants. Expect:
 --
 --   leave_requests  INSERT  application_id, ends_on, reason, starts_on
---   leave_requests  UPDATE  decided_at, decided_by, status
+--   leave_requests  UPDATE  status          (050 took decided_at/decided_by:
+--                                            the trigger stamps them)
 --   notices         INSERT  body, created_by, pinned, published_at, title
+--                           (created_by is overwritten from the token — 083)
 --   notices         UPDATE  body, pinned, published_at, title
 --
 -- anon must not appear at all.
@@ -93,7 +180,30 @@ where table_name in ('leave_requests', 'notices')
 group by table_name, grantee, privilege_type
 order by table_name, privilege_type;
 
--- And the fifth rung, which is what opens /hub at all.
-select pg_get_constraintdef(oid) as status_constraint
+-- --------------------------------------------------------------------------
+-- 7. The six stages
+-- --------------------------------------------------------------------------
+--
+-- One constraint, 038's, listing applied, assessment, interview, approved,
+-- hired, declined. Two rows here means an old constraint survived beside it
+-- and is vetoing something nobody is looking at.
+
+select conname, pg_get_constraintdef(oid) as definition
 from pg_constraint
-where conname = 'applications_status_check';
+where conrelid = 'public.applications'::regclass
+  and pg_get_constraintdef(oid) like '%status%'
+  and contype = 'c';
+
+-- --------------------------------------------------------------------------
+-- 8. Views run as the caller
+-- --------------------------------------------------------------------------
+--
+-- Every view in public must say security_invoker=true. A view without it runs
+-- as its owner and ignores every policy underneath it. EMPTY is the pass.
+
+select c.relname as view_running_as_owner
+from pg_class c
+where c.relnamespace = 'public'::regnamespace
+  and c.relkind = 'v'
+  and not coalesce(c.reloptions::text[] @> array['security_invoker=true'], false)
+order by c.relname;

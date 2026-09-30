@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -282,13 +323,16 @@ img{max-width:100%}
 .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
 .opt__box{
   width:18px;height:18px;flex:none;margin-top:.18rem;
-  border:1.5px solid var(--line);border-radius:5px;background:var(--surface);
+  border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
 .opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
 .opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
+/* --muted on the tinted ground of a picked option is 4.10:1, under the 4.5
+   small text needs, so the description darkens with the pick. */
+.opt:has(input:checked) .opt__d,.opt.is-on .opt__d{color:var(--ink-2)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 /* ---------- portal ---------- */
@@ -1265,6 +1309,41 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* The client portal keeps its session in a slot of its own (seats.html sets
+   SLOT = "client"), so sending somebody there hands them a page that cannot
+   see they are signed in: the sign-in card, with no explanation, having
+   clicked nothing. The slots exist so three audiences stop evicting each
+   other — not so that this page's own redirect can land on a wall.
+
+   So put the same token in the client drawer before going, which is exactly
+   what signing in again at /seats would have put there. It grants nothing:
+   the lock is the signature on the token and Postgres checks it either way.
+
+   The one thing that must not be overwritten is a LIVE session belonging to
+   somebody else, because that is the eviction the slots were added to stop.
+   An expired one is already spent, so it is fair game. When we will not
+   overwrite, this returns false and the caller stays here and offers the link
+   instead, which is still better than the wall. */
+function handToClientSlot() {
+  var s = loadSession();
+  if (!s || !s.access_token) return false;
+  var mine = readToken(s.access_token);
+  if (!mine || !mine.email) return false;
+
+  var raw = null;
+  try { raw = localStorage.getItem("sjva-session-client"); } catch (e) { return false; }
+  if (raw) {
+    var theirs = null;
+    try { theirs = JSON.parse(raw); } catch (e) { theirs = null; }
+    var t = theirs && theirs.access_token ? readToken(theirs.access_token) : null;
+    if (t && t.email && t.email !== mine.email && t.exp && t.exp * 1000 > Date.now()) return false;
+  }
+
+  try { localStorage.setItem("sjva-session-client", JSON.stringify(s)); }
+  catch (e) { return false; }
+  return true;
+}
+
 /* ── whose rows are these? ────────────────────────────────────
 
    Every portal page below asks the database for its rows and, until now, took
@@ -1687,6 +1766,71 @@ function api(path, opts) {
   }
 }
 
+/* The sentence the database meant for her, when it refused on purpose.
+
+   A deliberate refusal in sql/ raises with a hint that starts "sjva-" and a
+   message written for the person reading it — "that time has already passed",
+   "that is not a link". api() throws the raw PostgREST body, so without this
+   every one of them arrived as "That did not save. Check your connection",
+   which sends her off to fix a connection that was never the problem.
+
+   Anything else — a dropped connection, a 500, a refusal nobody wrote words
+   for — gives back "", and the caller says what it always said. */
+function ourWords(e) {
+  var t = String((e && e.message) || e || "");
+  try {
+    var j = JSON.parse(t);
+    if (j && j.message && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0) return String(j.message);
+  } catch (x) {}
+  return "";
+}
+
+/* The server's clock, as an offset from this device's.
+
+   A part's deadline is the server's opening time plus its minutes, and the
+   page used to hold that against Date.now() — this device's clock. A laptop
+   running 25 minutes fast therefore opened a 20-minute part already over, and
+   the page closed it on the spot with nothing in it. She could not reopen it.
+   The database (sql/078) judges the deadline by its own clock, so the page has
+   to judge by the same one or the two will disagree about when she ran out.
+
+   rpc/server_time (sql/078) answers with now(). The offset is the difference,
+   read once per part opened rather than trusted from the first page load, so
+   a clock corrected halfway through is caught at the next part. If the call
+   fails — 078 not pasted, a blip — the offset stays where it was, which is 0
+   the first time: exactly the old behaviour, and no worse than before.
+
+   The same clock serves the two interview pages. On /hub it decides which
+   interview times have already passed, and it has to agree with sql/082,
+   which refuses a pick by the database's own now(): a phone clock a few
+   minutes out would otherwise offer a time the database then refuses, or hide
+   one it would still take. On /seats it decides whether the interview card is
+   still in play and whether a time the client is about to offer is in the
+   past, at the same moment /hub decides it for the assistant. Both read the
+   offset once as they load; if that fails the offset stays 0, which is exactly
+   how the pages behaved before.
+
+   It lives here, once, because this block is the same on all five pages. It
+   used to be pasted into three of them with three different comments, and the
+   generator can only write one. */
+var SKEW = 0;
+
+function serverNow() {
+  return Date.now() + SKEW;
+}
+
+function syncClock() {
+  var sent = Date.now();
+  return api("rpc/server_time", { method: "POST", body: {} })
+    .then(function (iso) {
+      var t = Date.parse(iso);
+      if (isNaN(t)) return;
+      /* Half the round trip, so a slow answer is not read as a slow clock. */
+      SKEW = t - Math.round((sent + Date.now()) / 2);
+    })
+    .catch(function () {});
+}
+
 /* Storage lives beside PostgREST on the same project. */
 function storageBase() {
   return SB + "/storage/v1";
@@ -1730,19 +1874,42 @@ function signDoc(path) {
   });
 }
 
+/* Three things this used to get wrong, all found the same afternoon.
+
+   A second click while the first was still signing opened the file twice, so
+   a button that is already busy is left alone.
+
+   The tab was opened after the signing request came back, which is no longer
+   "in the click" as far as a popup blocker is concerned. Safari refuses that
+   without a word, so on an iPhone the button said "Opening…", then went back
+   to the filename, and nothing ever opened. The tab is now opened blank while
+   the click is still happening and pointed at the file when the link arrives.
+   It is opened without "noopener" only because that makes window.open hand
+   back null, and there would be nothing to point; the opener is cut by hand
+   straight after, which is the same protection.
+
+   And a failure put the label back at once: the last .then ran after the
+   .catch and found the button still disabled, so "Could not open" was
+   replaced before anybody could read it. Only success puts the label back
+   now; a failure waits its 2.2 seconds as it was always meant to. */
 function openDoc(btn) {
+  if (btn.disabled) return;
   var path = btn.getAttribute("data-doc");
   var was = btn.textContent;
+  var tab = null;
+  try { tab = window.open("", "_blank"); } catch (e) { tab = null; }
+  if (tab) { try { tab.opener = null; } catch (e) {} }
   btn.disabled = true;
   btn.textContent = "Opening…";
   signDoc(path).then(function (url) {
-    window.open(url, "_blank", "noopener");
-  }).catch(function (e) {
+    if (tab && !tab.closed) tab.location.href = url;
+    else window.open(url, "_blank", "noopener");
+    btn.textContent = was;
+    btn.disabled = false;
+  }, function (e) {
+    if (tab && !tab.closed) { try { tab.close(); } catch (x) {} }
     btn.textContent = e.message === "signed out" ? "Signed out" : "Could not open";
     setTimeout(function () { btn.textContent = was; btn.disabled = false; }, 2200);
-    return;
-  }).then(function () {
-    if (btn.disabled) { btn.textContent = was; btn.disabled = false; }
   });
 }
 
@@ -2047,14 +2214,24 @@ function wireTz() {
 
     /* Upsert by hand: one row per user, and whether it exists yet depends on
        whether they have ever opened this card. Prefer resolution=merge-duplicates
-       makes the first save and the tenth the same request. */
+       makes the first save and the tenth the same request.
+
+       No user_id in the body. PostgREST turns every column it is sent into
+       the SET list of ON CONFLICT DO UPDATE, and Postgres wants UPDATE
+       permission on each of them before it looks for a conflict at all, even
+       on a first save that never conflicts. 059 grants update on time_zone
+       only, so sending user_id asked to update user_id, which nobody may, and
+       every save came back a 42501, "permission denied for table
+       user_settings", with nothing ever stored. sql/080
+       gives the column a default of auth.uid(), so the row is still hers
+       without the page naming her, and the policy pins it either way. */
     api("user_settings", {
       method: "POST",
       headers: {
         Prefer: "resolution=merge-duplicates,return=minimal",
         "Content-Profile": "public"
       },
-      body: { user_id: MY_USER, time_zone: pick }
+      body: { time_zone: pick }
     }).then(function () {
       MY_TZ = pick;
       tzFlash(ok, "Saved");
@@ -2169,6 +2346,28 @@ function slotState(slots) {
          : live.length ? "waiting_on_assistant"
          : "not_started"
   };
+}
+
+/* When a declined applicant may apply again: three months after the decline,
+   the rule sql/027 and 075 enforce (status_changed_at + interval '3 months').
+
+   075 took the date out of the refusal the careers form shows, because that
+   form answers anybody who types an address, and the date told a stranger who
+   had been turned down and when. This page only ever shows her own
+   application, so the date moves here, where it is hers to see.
+
+   Month arithmetic the way Postgres does it, in UTC: the same day three months
+   on, or the last day of that month when it is shorter. setMonth rolls over
+   instead — 30 November plus three would be 2 March, not 28 February — so the
+   day is clamped by hand. Null when there is nothing to count from. */
+function againFrom(a) {
+  var t = Date.parse((a && (a.status_changed_at || a.created_at)) || "");
+  if (isNaN(t)) return null;
+  var d = new Date(t);
+  var y = d.getUTCFullYear(), m = d.getUTCMonth() + 3, day = d.getUTCDate();
+  var last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(day, last),
+    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()));
 }
 
 function when(iso) {
@@ -2339,6 +2538,9 @@ var C_WEEKS = [];
 var C_NAMES = [];
 var C_PAID = [];
 var C_SETTLED = {};
+/* 085. The database's own sum of approved, paid and left to pay, across every
+   week this business has ever had. Null until that file is pasted. */
+var C_BALANCE = null;
 var C_WEEK_LIMIT = 260;
 var C_TRUNCATED = false;
 var C_COMPANY = "";
@@ -2381,7 +2583,23 @@ function cWeekLabel(iso) {
    hours that could not be priced. A week with no rate on its placement is
    deliberately left OUT of the money and counted separately — quoting a total
    that silently omits somebody's hours is a bug this page has already been
-   through once. */
+   through once.
+
+   Each week's hours come in three kinds since sql/085, and a week can hold
+   all three: billable, free because they fall inside the trial, and outside —
+   worked before the placement started or after it ended, so not this
+   client's to pay for. The database decides which is which, a day at a time,
+   and hands the answer over as w.charge (see loadClient). A week without one
+   — every week, until 085 is pasted — is counted the way it always was:
+   trial_week decides the whole week and every hour on it is the placement's,
+   which is also exactly how 085 itself counts every week that existed before
+   it ran.
+
+   Money is in whole cents from the line up. Each line is rounded once, and
+   the week and the bill are sums of those — so the lines a client adds up by
+   hand come to the total printed under them. It used to round the lines for
+   display and add up the unrounded products, and three lines of 7.25 h at
+   $7.75 showed $56.19 each over a total of $168.56. */
 function cBill() {
   var nameOf = {};
   C_NAMES.forEach(function (n) { if (n.name) nameOf[n.application_id] = n.name; });
@@ -2390,54 +2608,129 @@ function cBill() {
   C_PLACE.forEach(function (p) { placeById[p.id] = p; });
 
   var byWeek = {}, unpriced = 0, missingRate = false;
-  var hours = 0, freeHours = 0, people = {};
+  var hours = 0, freeHours = 0, outsideHours = 0, people = {};
 
   C_WEEKS.forEach(function (w) {
     if (w.status !== "approved") return;
     var p = placeById[w.placement_id];
     if (!p) return;
-    var h = cHours(w);
-    if (!h) return;
     var rate = C_RATE[p.id];
-    if (rate === undefined && !w.trial_week) { missingRate = true; unpriced += h; return; }
+    var c = w.charge;
+    var free, billed, outside, cents;
+    if (c) {
+      free = Number(c.hours_free || 0);
+      billed = Number(c.hours_billable || 0);
+      outside = Number(c.hours_outside || 0);
+      /* The view's own rate, because it is the one its amount was worked out
+         with. Null there means the rate is not readable or not set, and the
+         view has priced those hours at nothing — so they are unpriced here
+         too, not billed at a guess. */
+      rate = c.rate === null || c.rate === undefined ? undefined : Number(c.rate);
+      cents = Number(c.amount_cents || 0);
+    } else {
+      var h = cHours(w);
+      free = w.trial_week ? h : 0;
+      billed = w.trial_week ? 0 : h;
+      outside = 0;
+      cents = rate === undefined ? 0 : Math.round(billed * rate * 100);
+    }
+    if (billed && rate === undefined) {
+      missingRate = true;
+      unpriced += billed;
+      billed = 0;
+      cents = 0;
+    }
+    if (!free && !billed && !outside) return;
+
     people[p.application_id] = true;
-    if (w.trial_week) { freeHours += h; } else { hours += h; }
-    byWeek[w.week_starts_on] = byWeek[w.week_starts_on] || [];
-    byWeek[w.week_starts_on].push({
-      id: w.id,
-      who: nameOf[p.application_id] || "your assistant",
-      hours: h,
-      rate: rate,
-      free: !!w.trial_week,
-      settled: !!C_SETTLED[w.id]
-    });
+    hours += billed;
+    freeHours += free;
+    outsideHours += outside;
+    var who = nameOf[p.application_id] || "your assistant";
+    var settled = !!C_SETTLED[w.id];
+    var lines = byWeek[w.week_starts_on] = byWeek[w.week_starts_on] || [];
+    if (billed) {
+      lines.push({ id: w.id, who: who, hours: billed, rate: rate, cents: cents,
+                   free: false, outside: false, settled: settled });
+    }
+    if (free) {
+      lines.push({ id: w.id, who: who, hours: free, rate: rate, cents: 0,
+                   free: true, outside: false, settled: settled });
+    }
+    /* Shown rather than dropped, for the same reason the trial is: a client
+       who adds up the hours on the week and finds some missing from the bill
+       has been handed a puzzle. These are named, and named as not theirs. */
+    if (outside) {
+      lines.push({ id: w.id, who: who, hours: outside, rate: rate, cents: 0,
+                   free: false, outside: true, settled: settled });
+    }
   });
 
   /* Sorted as strings, which for an ISO date is the same as sorting by date
      and does not build 260 Date objects to find out. Newest first, because the
      week somebody is about to pay for is the one they came to look at. */
   var order = Object.keys(byWeek).sort().reverse();
-  var grand = 0;
+  var grandCents = 0;
   var weeks = order.map(function (wk) {
-    var lines = byWeek[wk], total = 0, settled = lines.length > 0;
+    var lines = byWeek[wk], cents = 0, settled = lines.length > 0;
     lines.forEach(function (l) {
-      if (!l.free) total += l.hours * l.rate;
-      if (!l.free && !l.settled) settled = false;
+      if (l.free || l.outside) return;
+      cents += l.cents;
+      if (!l.settled) settled = false;
     });
-    grand += total;
-    return { week: wk, lines: lines, total: total, settled: settled };
+    grandCents += cents;
+    return { week: wk, lines: lines, total: cents / 100, cents: cents, settled: settled };
   });
+
+  /* What is owed comes from the database when it can say, because it can see
+     every approved week and the page can only see the newest few hundred
+     timesheets. The weeks above are still what is listed; only the three
+     figures under them are taken from the whole. Without 085 they are worked
+     out from what is in hand, as before.
+
+     Read through typeof because the harnesses in tools/ lift this function
+     out on its own, into a scope that has never heard of C_BALANCE. */
+  var server = (typeof C_BALANCE !== "undefined" && C_BALANCE) || null;
+  var paidCents = server ? server.paid : cPaidCents();
+  var approvedCents = server ? server.approved : grandCents;
+  var owedCents = server ? server.balance : grandCents - paidCents;
 
   return {
     weeks: weeks,
-    grand: grand,
+    grand: grandCents / 100,
+    grandCents: grandCents,
+    approvedCents: approvedCents,
+    paidCents: paidCents,
+    owedCents: owedCents,
+    whole: !!server,
     hours: hours,
     freeHours: freeHours,
+    outsideHours: outsideHours,
     people: Object.keys(people).length,
     oldest: order.length ? order[order.length - 1] : null,
     unpriced: unpriced,
     missingRate: missingRate
   };
+}
+
+/* 085's rpc/client_balances, narrowed to the clients this address is the
+   contact for. It answers every client to staff, and a role opening this page
+   is not every client — the same reason MY_CLIENTS narrows everything else.
+
+   Null when the function is not there, or when it has nothing on this
+   business: the bill then falls back to adding up the weeks in hand rather
+   than printing a zero it was never actually told. */
+function cBalance(rows) {
+  if (!rows || !rows.length) return null;
+  var out = { approved: 0, paid: 0, balance: 0 }, any = false;
+  for (var i = 0; i < rows.length; i++) {
+    if (!MY_CLIENTS[rows[i].client_id]) continue;
+    any = true;
+    out.approved += Number(rows[i].approved_cents || 0);
+    out.paid += Number(rows[i].paid_cents || 0);
+    out.balance += Number(rows[i].balance_cents || 0);
+  }
+  return any ? out : null;
 }
 
 /* What has actually been paid, and therefore what is actually left.
@@ -2452,9 +2745,9 @@ function cPaidCents() {
   return t;
 }
 
-/* In cents throughout, and only converted for display. The approved side is a
-   product of numeric hours and a numeric rate, so it is rounded to the cent
-   once, here, rather than drifting a fraction at a time through a subtraction. */
+/* In cents throughout, and only converted for display. Kept for anything that
+   still has only the grand total in hand; the pages themselves read
+   cBill().owedCents, which knows about the whole ledger when 085 is there. */
 function cOwedCents(grand) {
   return Math.round(Number(grand) * 100) - cPaidCents();
 }
@@ -2469,8 +2762,14 @@ var C_PAY_METHOD = {
    The one number somebody came here for, and the only place on the site it is
    rendered large. Everything under it is the working. */
 function dueCard(bill) {
-  var owed = cOwedCents(bill.grand);
-  var paid = cPaidCents();
+  /* From cBill, which takes them from the whole ledger when 085 is there.
+     This figure used to be the newest 260 timesheets' approved hours less
+     every payment ever made, and once a business passed 260 timesheets — a
+     year, with five assistants — each old paid week fell out of the first
+     half while its payment stayed in the second, and Due now read low, or
+     read as a credit. */
+  var owed = bill.owedCents;
+  var paid = bill.paidCents;
 
   return '<div class="card">' +
     "<h2>Due now</h2>" +
@@ -2503,6 +2802,12 @@ function dueCard(bill) {
               '<span class="due__v">' + esc(cNum(bill.freeHours)) + " h</span>" +
             "</div>"
           : "") +
+        (bill.outsideHours
+          ? "<div>" +
+              '<span class="due__k">Outside their dates</span>' +
+              '<span class="due__v">' + esc(cNum(bill.outsideHours)) + " h, not billed to you</span>" +
+            "</div>"
+          : "") +
         (paid
           ? "<div>" +
               '<span class="due__k">Paid so far</span>' +
@@ -2520,6 +2825,18 @@ function dueCard(bill) {
     (owed < 0
       ? '<div class="note"><b>You are ' + esc(cCents(-owed)) + " ahead.</b> " +
         "That sits against the weeks still to come, so there is nothing to pay right now.</div>"
+      : "") +
+    /* Next to the figure, not only at the foot of the breakdown. The note used
+       to appear under the weeks card alone, so the big number at the top of
+       the page carried its horizon nowhere a client would look. */
+    (C_TRUNCATED
+      ? '<p class="msg">' +
+        (bill.whole
+          ? "This figure includes every week you have approved. The breakdown below lists the " +
+            "most recent " + C_WEEK_LIMIT + " timesheets."
+          : "This figure is worked out from the most recent " + C_WEEK_LIMIT + " timesheets on " +
+            "file, and older approved weeks are not in it. Write to support for the full history.") +
+        "</p>"
       : "") +
   "</div>";
 }
@@ -2587,37 +2904,46 @@ function weeksCard(bill) {
       return '<div class="bill__ln">' +
         '<span class="bill__who">' + esc(l.who) + "</span>" +
         '<span class="bill__h">' + esc(cNum(l.hours)) + " h" +
-          (l.free ? "" : " &times; " + esc(cMoney(l.rate))) + "</span>" +
-        '<span class="bill__amt' + (l.free ? " bill__free" : "") + '">' +
-          (l.free ? "free &mdash; trial" : esc(cMoney(l.hours * l.rate))) + "</span>" +
+          (l.outside ? " outside their dates"
+            : l.free ? "" : " &times; " + esc(cMoney(l.rate))) + "</span>" +
+        '<span class="bill__amt' + (l.free || l.outside ? " bill__free" : "") + '">' +
+          (l.outside ? "not billed to you"
+            : l.free ? "free &mdash; trial" : esc(cCents(l.cents))) + "</span>" +
       "</div>";
     }).join("");
     return '<div class="bill__wk">' +
       '<div class="bill__wkh"><span class="bill__wkn">Week of ' + esc(cWeekLabel(wk.week)) + "</span>" +
-      (wk.settled && wk.total ? '<span class="bill__paid">paid</span>' : "") +
-      '<span class="bill__wkt">' + esc(cMoney(wk.total)) + "</span></div>" +
+      (wk.settled && wk.cents ? '<span class="bill__paid">paid</span>' : "") +
+      '<span class="bill__wkt">' + esc(cCents(wk.cents)) + "</span></div>" +
       body +
     "</div>";
   }).join("");
 
-  var paid = cPaidCents();
+  var paid = bill.paidCents;
+  var owed = bill.owedCents;
 
   return '<div class="card">' +
     "<h2>What you are paying for</h2>" +
-    '<p class="msg" style="margin-top:0">Every assistant, week by week. Trial weeks are ours to cover.</p>' +
+    '<p class="msg" style="margin-top:0">Every assistant, week by week. The trial is ours to cover.</p>' +
     '<div class="bill">' + rows + "</div>" +
     (paid
       ? '<div class="bill__tot bill__tot--sub"><span class="bill__totl">Total approved</span>' +
-        '<span class="bill__totv">' + esc(cMoney(bill.grand)) + "</span></div>" +
+        '<span class="bill__totv">' + esc(cCents(bill.approvedCents)) + "</span></div>" +
         '<div class="bill__tot bill__tot--sub"><span class="bill__totl">Paid</span>' +
         '<span class="bill__totv bill__totv--paid">&minus;&nbsp;' + esc(cCents(paid)) + "</span></div>"
       : "") +
+    /* Never below zero. A credit is named on the Due now card above; printed
+       here as "$-12.00" under Left to pay it read as a fault in the bill. */
     '<div class="bill__tot"><span class="bill__totl">' +
       (paid ? "Left to pay" : "Total approved, not yet paid") + "</span>" +
-    '<span class="bill__totv">' + esc(cCents(cOwedCents(bill.grand))) + "</span></div>" +
+    '<span class="bill__totv">' + esc(cCents(owed < 0 ? 0 : owed)) + "</span></div>" +
     (C_TRUNCATED
-      ? '<p class="msg">This covers the most recent ' + C_WEEK_LIMIT +
-        " weeks on file. Write to support for anything older.</p>"
+      ? '<p class="msg">The weeks listed are the most recent ' + C_WEEK_LIMIT +
+        " timesheets on file. " +
+        (bill.whole
+          ? "The totals above include every approved week, listed or not."
+          : "Older approved weeks are not in the totals above either.") +
+        " Write to support for anything older.</p>"
       : "") +
   "</div>";
 }
@@ -2706,7 +3032,7 @@ function start() {
         "trial_weeks&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,trial_week," +
-        "timesheet_days(worked_on,hours)&order=week_starts_on.desc&limit=" + C_WEEK_LIMIT),
+        "timesheet_days(worked_on,hours)&status=neq.draft&order=week_starts_on.desc,id.desc&limit=" + C_WEEK_LIMIT),
     api("application_public?select=application_id,name"),
     /* Both wrapped, because a database without 055 pasted should show this
        page with an empty receipts panel rather than an error. The figure above
@@ -2720,7 +3046,19 @@ function start() {
     api("seat_requests?select=company,email&order=created_at.desc&limit=1")
       .catch(function () { return []; }),
     /* The same question loadClient asks, for the same reason. */
-    api("client_private?select=client_id,contact_email").catch(function () { return []; })
+    api("client_private?select=client_id,contact_email").catch(function () { return []; }),
+    /* 085, read exactly as /seats reads it — see loadClient there for the
+       whole of why, and for why the two reads share a filter and end their
+       order on the row's own id. What each week costs, a day at a time, and what is left
+       to pay across every week there has ever been. Null, not [], when the
+       database does not have them yet, so the bill falls back to the old
+       arithmetic instead of reading "nothing" as "nothing owed". */
+    api("timesheet_charges?select=timesheet_id,placement_id,client_id,week_starts_on,status," +
+        "billed_by_day,rate,hours_worked,hours_free,hours_billable,hours_outside,amount_cents" +
+        "&status=neq.draft&order=week_starts_on.desc,timesheet_id.desc&limit=" + C_WEEK_LIMIT)
+      .catch(function () { return null; }),
+    api("rpc/client_balances", { method: "POST", body: {} })
+      .catch(function () { return null; })
   ]).then(function (r) {
     MY_CLIENTS = myClientIds(r[7]);
     C_PLACE = (r[0] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });
@@ -2729,7 +3067,13 @@ function start() {
     C_RATE = {};
     (r[1] || []).forEach(function (b) { C_RATE[b.placement_id] = Number(b.rate); });
     var rawWeeks = r[2] || [];
-    C_WEEKS = rawWeeks.filter(function (w) { return onMine[w.placement_id]; });
+    /* Never a draft: it is the assistant's until she sends it (087 says the
+       same from the database). */
+    C_WEEKS = rawWeeks.filter(function (w) { return onMine[w.placement_id] && w.status !== "draft"; });
+    var charged = {};
+    (r[8] || []).forEach(function (c) { charged[c.timesheet_id] = c; });
+    C_WEEKS.forEach(function (w) { if (charged[w.id]) w.charge = charged[w.id]; });
+    C_BALANCE = cBalance(r[9]);
     C_TRUNCATED = rawWeeks.length >= C_WEEK_LIMIT;
     C_NAMES = r[3] || [];
     C_PAID = (r[4] || []).filter(function (p) { return MY_CLIENTS[p.client_id]; });

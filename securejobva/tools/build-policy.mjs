@@ -9,9 +9,13 @@
    sections are written from what is already promised, and cited.
 
    The third — whether a placed assistant is a contractor of the Client, of us,
-   or an employee — is genuinely unresolved, and the Site's own copy pulls both
-   ways: careers.html asks for "the legal right to work as an independent
-   contractor" and also says training is paid "on our payroll". That is a
+   or an employee — is genuinely unresolved, and the Site's own copy used to
+   pull both ways: careers.html asks for "the legal right to work as an
+   independent contractor", while it said training was paid "on our payroll"
+   and the home page promised clients "payroll, benefits" and "we manage the
+   employment". Those are gone (30 Sep) — both pages now say the assistant is
+   contracted and paid through us — which stops the copy contradicting itself
+   without settling the question. That is a
    question for an accountant and an attorney, not for a build script, so it is
    marked on the page as under review rather than answered with a guess.
 
@@ -30,7 +34,10 @@ const { fonts: FONTS, css: TOKENS_TO_NAV, themeScript: THEME_SCRIPT,
 const SECTIONS = "";
 const FOOTER_CSS = "";
 
-const UPDATED = "26 August 2026";
+/* Moved on 30 Sep 2026: the privacy policy now names its service providers
+   and says what browser storage holds, and the terms and refund policy no
+   longer promise a card and deposit that nothing takes. */
+const UPDATED = "30 September 2026";
 
 const CSS = `
 /* ---------- policy ---------- */
@@ -78,12 +85,29 @@ const CSS = `
 .cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
 .cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .cform label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
-.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
+/* --muted, not --line, for the same reason as the two dialogs: --line on white
+   is 1.23:1, and the edge of a text box needs 3:1 to be findable at all. */
+.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--muted);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
 .cform textarea{min-height:8rem;resize:vertical}
 .cform input:focus-visible,.cform select:focus-visible,.cform textarea:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
 .cform .err{color:#B3261E;font-size:.85rem;margin:.15rem 0 0;min-height:1.1em}
 :root[data-theme="dark"] .cform .err{color:#F2B8B5}
 @media(min-width:560px){.cform__two{display:grid;grid-template-columns:1fr 1fr;gap:0 .9rem}}
+/* The agree box. The markup is the .opt pattern from the two dialogs, but its
+   rules never came with it — they sit after the hero marker in careers.html,
+   outside what lib-chrome.mjs lifts — so the page showed a raw checkbox, a
+   tick that was always visible, and the whole label forced into the
+   uppercase mono of .cform label. These are those rules, scoped to the form. */
+.cform label.opt{display:flex;align-items:flex-start;gap:.7rem;position:relative;cursor:pointer;font-family:inherit;font-size:.95rem;letter-spacing:0;text-transform:none;color:var(--ink);margin-bottom:.25rem}
+.cform .opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.cform .opt__box{width:18px;height:18px;flex:none;margin-top:.15rem;border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);display:grid;place-items:center;color:var(--accent-ink)}
+.cform .opt__box svg{opacity:0;transition:opacity .12s ease}
+.cform .opt input:checked ~ .opt__box{background:var(--accent);border-color:var(--accent)}
+.cform .opt input:checked ~ .opt__box svg{opacity:1}
+.cform .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
+.cform .opt__t{display:block;font-weight:600;line-height:1.35}
+.cform .opt__d{display:block;font-size:.85rem;color:var(--ink-2);margin-top:.15rem}
+.cform .opt__d a{color:var(--accent)}
 .cform__ok{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.15rem 1.3rem}
 .contact__at{display:grid;gap:.8rem;margin:1.4rem 0 2.2rem}
 .contact__row{display:flex;flex-wrap:wrap;gap:.5rem 1rem;padding-bottom:.7rem;border-bottom:1px solid var(--line)}
@@ -113,14 +137,42 @@ function shell(o) {
     BRAND_SVG,
     '        <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>',
     "      </a>",
+    /* The links, the sign-in and the language switch all used to sit inside
+       .nav__links, which the shared stylesheet hides below 900px — and these
+       pages had no menu button to stand in for it. On a phone the header was
+       the logo and nothing else: no Sign in, no Careers, and a Spanish reader
+       who landed on /privacy had no way to /es/privacy at all. The home and
+       careers pages already had the answer, so this is theirs: the language
+       switch lives in .nav__tools, which never hides, beside a menu button
+       that opens the same links in .mobnav. One language link, not two —
+       build-es.mjs flips the first one it finds and would leave a second
+       offering Spanish to a Spanish reader. */
     '      <nav class="nav__links">',
     '        <a href="/">Hiring a VA?</a>',
     '        <a href="/careers">Careers</a>',
     '        <a href="/contact">Contact</a>',
     '        <a class="nav__signin" href="/status">Sign in</a>',
+    "      </nav>",
+    '      <div class="nav__tools">',
+    '        <button class="navtog" id="navtog" type="button" aria-expanded="false" aria-controls="mobnav" aria-label="Menu">',
+    '          <svg class="i-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">',
+    '            <path d="M4 7h16M4 12h16M4 17h16"></path>',
+    "          </svg>",
+    '          <svg class="i-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">',
+    '            <path d="M6 6l12 12M18 6L6 18"></path>',
+    "          </svg>",
+    "        </button>",
     '        <a class="langtog" id="langtog" href="' + o.es + '" hreflang="es" ' +
       'lang="es" aria-label="Ver esta página en español">ES</a>',
-    "      </nav>",
+    "      </div>",
+    "    </div>",
+    "  </div>",
+    '  <div class="mobnav" id="mobnav" hidden>',
+    '    <div class="wrap mobnav__in">',
+    '      <a href="/">Hiring a VA?</a>',
+    '      <a href="/careers">Careers</a>',
+    '      <a href="/contact">Contact</a>',
+    '      <a class="nav__signin" href="/status">Sign in</a>',
     "    </div>",
     "  </div>",
     "</header>",
@@ -134,10 +186,40 @@ function shell(o) {
     "</main>",
     "",
     FOOTER,
+    NAV_SCRIPT,
     o.script || "",
     ""
   ].join(nl);
 }
+
+/* The menu button above, wired the way careers.html wires its own: open and
+   shut on the button, shut on a link, on Escape, and when the window grows
+   past the width where the links are back in the bar. */
+const NAV_SCRIPT = [
+  "<script>",
+  "(function () {",
+  '  var btn = document.getElementById("navtog");',
+  '  var panel = document.getElementById("mobnav");',
+  "  if (!btn || !panel) return;",
+  "  function setOpen(open) {",
+  '    btn.setAttribute("aria-expanded", open ? "true" : "false");',
+  '    if (open) { panel.removeAttribute("hidden"); } else { panel.setAttribute("hidden", ""); }',
+  "  }",
+  '  btn.addEventListener("click", function () {',
+  '    setOpen(btn.getAttribute("aria-expanded") !== "true");',
+  "  });",
+  '  panel.addEventListener("click", function (e) {',
+  '    if (e.target.closest("a")) setOpen(false);',
+  "  });",
+  '  window.addEventListener("resize", function () {',
+  "    if (window.innerWidth >= 900) setOpen(false);",
+  "  });",
+  '  document.addEventListener("keydown", function (e) {',
+  '    if (e.key === "Escape") setOpen(false);',
+  "  });",
+  "})();",
+  "</script>"
+].join(nl);
 
 /* One footer, defined here and injected into every page by build.mjs, so a new
    policy link is added once rather than five times. */
@@ -188,7 +270,12 @@ const PRIVACY = [
   "        <li><b>Account information</b> &mdash; name, email, phone number, and a password. Passwords are stored only as a one-way hash; nobody here can read yours, including us.</li>",
   "        <li><b>Applicant information</b> &mdash; work history, skills, availability, location, equipment and internet access, and anything you submit during the application.</li>",
   "        <li><b>Social media information</b> &mdash; if you choose to give us profile links or connect an account, we may access profile information and public activity within the scope that platform grants. We ask for the minimum needed to review an application, and connecting is optional.</li>",
-  "        <li><b>Payment information</b> &mdash; handled by third-party payment processors. Full card and bank numbers are never stored on our servers.</li>",
+  /* This said payments were "handled by third-party payment processors". There
+     is no processor: clients pay by bank transfer or a similar method arranged
+     with us, off the Site, and staff record each payment by hand when it
+     arrives (pay.html lists what was recorded; it takes no payment itself). A
+     privacy policy has to describe what actually happens to the data. */
+  "        <li><b>Payment information</b> &mdash; the Site does not take payments. Clients pay by bank transfer or another method arranged with us, and when a payment arrives a member of our staff records its date, amount, method and any reference you gave it, so it appears on your statement. We do not ask for or store card or bank account numbers.</li>",
   "        <li><b>Usage data</b> &mdash; pages visited, device and browser type, and IP address, collected automatically.</li>",
   "      </ul>",
 
@@ -204,8 +291,23 @@ const PRIVACY = [
   '      <h2 id="p4">4. How we share it</h2>',
   "      <ul>",
   "        <li>With prospective clients reviewing applicants, as part of hiring.</li>",
-  "        <li>With service providers who help us run the Site &mdash; hosting, payment processing, email delivery &mdash; under confidentiality obligations.</li>",
+  "        <li>With the service providers below, who run parts of the Site for us.</li>",
   "        <li>Where required by law, subpoena or legal process.</li>",
+  "      </ul>",
+  /* Named, because "service providers" tells nobody where their data is.
+     These are the ones the code actually calls: the database and sign-in
+     (Supabase), the host and its functions (Vercel), outgoing mail (Resend),
+     the support mailbox (Zoho, the domain's MX), and Google — for the fonts
+     every page loads from fonts.googleapis.com, and for "Sign in with
+     Google" on the portal pages. "Payment processing" is gone from the list
+     because there is none; see section 2. */
+  "      <p>The service providers we use, and what each one does:</p>",
+  "      <ul>",
+  "        <li><b>Supabase</b> &mdash; hosts our database, sign-in and file storage. Applications, accounts, uploaded CVs, timesheets and billing records are stored with Supabase.</li>",
+  "        <li><b>Vercel</b> &mdash; hosts the Site and runs the small server functions that send our notification emails, so every page request passes through Vercel.</li>",
+  "        <li><b>Resend</b> &mdash; delivers the emails the Site sends, such as application confirmations, updates and account invitations. It receives the address and the content of each email.</li>",
+  "        <li><b>Zoho</b> &mdash; hosts our support@securejobva.com mailbox, so anything you email us is stored there.</li>",
+  "        <li><b>Google</b> &mdash; serves the typefaces the Site uses, so your browser requests them from Google, which receives your IP address and browser details when a page loads. If you choose to sign in with Google, Google also confirms your identity and passes us your name and email address.</li>",
   "      </ul>",
 
   '      <h2 id="p5">5. Security</h2>',
@@ -222,7 +324,18 @@ const PRIVACY = [
   "      <p>Depending on where you live, you may have the right to see, correct or delete your personal information. Some of that you can do yourself: signing in at <a href=\"/status\">your application page</a> lets you read and update what you sent us. For anything else, write to <a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>",
 
   '      <h2 id="p9">9. Cookies</h2>',
-  "      <p>The Site uses browser storage to keep you signed in and to remember whether you prefer the light or dark theme. You can clear or block it in your browser settings, though signing in will stop working if you do.</p>",
+  /* This used to say storage was only for sign-in and the theme. The two
+     forms also keep a draft of what is typed into them — name, email, phone,
+     notes — and park a submission that failed to send for up to seven days,
+     re-sending it on later visits (QUEUE_TTL in index.html and careers.html).
+     On a shared computer that matters, so it is said, with what to do. */
+  "      <p>The Site keeps a few things in your browser&rsquo;s own storage, on the device you are using:</p>",
+  "      <ul>",
+  "        <li>Your sign-in, so you stay signed in, and whether you prefer the light or dark theme.</li>",
+  "        <li>A draft of the application or seat request form while you fill it in, including the contact details you type, so nothing is lost if the page closes. The draft is removed once the form has been sent.</li>",
+  "        <li>If a form fails to send, a copy of it, which the Site tries to send again on your next visits. It is deleted after seven days whether or not it went.</li>",
+  "      </ul>",
+  "      <p>On a shared or public computer, clear this site&rsquo;s data in your browser settings when you finish. You can also block browser storage entirely, though signing in and saving drafts will stop working if you do.</p>",
 
   '      <h2 id="p10">10. Children</h2>',
   "      <p>The Site is not intended for anyone under 18, and we do not knowingly collect information from minors.</p>",
@@ -285,7 +398,11 @@ const TERMS = [
   '      <h2 id="t9">9. Fees</h2>',
   "      <p><b>Applicants are never charged.</b> There is no fee to apply, to be listed, to be assessed, or to be placed, and we do not take a percentage of what you are paid. If anyone asks you to pay us for any of those things, it did not come from us &mdash; tell us at <a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>",
   "      <p><b>Clients</b> pay a flat hourly rate for hours worked, quoted before the seat starts and billed weekly. There is no setup fee, no recruiting fee, and no markup added afterwards. The current rate and what it includes are on the <a href=\"/#pricing\">pricing section</a> of the home page; the rate quoted to you on your first call is the rate you are billed.</p>",
-  "      <p>The first week of a new seat is not charged. A card and a deposit are set up before it starts so the seat can begin on the day it is approved. Billing begins in the second week.</p>",
+  /* This promised "a card and a deposit are set up before it starts". Nothing
+     takes a card or a deposit: /pay records payments made off the Site, after
+     the hours are billed. The billing that does happen is the one the Refund
+     Policy already describes in its section 4, so this says the same. */
+  "      <p>The first week of a new seat is not charged. Billing begins in the second week, weekly and in arrears: each bill covers hours already worked, at the rate quoted to you.</p>",
 
   '      <h2 id="t10">10. Intellectual property</h2>',
   "      <p>Everything on the Site except content submitted by users belongs to Secure Job VA and may not be copied or reproduced without permission.</p>",
@@ -313,13 +430,18 @@ const REFUNDS = [
   "      <h1>Refund Policy</h1>",
   '      <p class="doc__meta">Last updated ' + UPDATED + "</p>",
 
-  "      <p>This policy covers fees paid by Clients. It does not apply to Applicants, who are never charged anything &mdash; see section 5.</p>",
+  /* Section 6, not 5: 5 is "When we will not refund", and the applicant
+     section is the one after it. */
+  "      <p>This policy covers fees paid by Clients. It does not apply to Applicants, who are never charged anything &mdash; see section 6.</p>",
 
+  /* The card and deposit are gone from sections 1 and 2 for the same reason
+     as in the Terms: nothing takes either, and billing is weekly in arrears,
+     which is what section 4 below already says. */
   '      <h2 id="r1">1. The free first week</h2>',
-  "      <p>A new seat&rsquo;s first week is not billed. If you decide during that week that the fit is wrong, you are not charged for the hours worked and there is nothing to refund. A card and a deposit are set up before the week begins so the seat can start on the day you approve it; the deposit is applied to your first billed week, or returned if you do not continue.</p>",
+  "      <p>A new seat&rsquo;s first week is not billed. If you decide during that week that the fit is wrong, you are not charged for the hours worked and there is nothing to refund. Billing begins in the second week, for hours already worked.</p>",
 
   '      <h2 id="r2">2. If the seat never starts</h2>',
-  "      <p>If a seat does not begin work on the agreed start date and the reason is ours &mdash; we could not staff it, or the assistant withdrew &mdash; anything you have paid toward it is refunded in full, including the deposit. There is nothing to argue about: no work happened.</p>",
+  "      <p>If a seat does not begin work on the agreed start date and the reason is ours &mdash; we could not staff it, or the assistant withdrew &mdash; anything you have paid toward it is refunded in full. There is nothing to argue about: no work happened.</p>",
   "      <p>If the delay is yours &mdash; a change of plan, a project put back &mdash; tell us and we will hold the seat or release it. Nothing is billed for hours nobody worked either way.</p>",
 
   '      <h2 id="r3">3. Replacement, or a refund, at your choice</h2>',
@@ -369,19 +491,19 @@ const CONTACT = [
   '        <div class="cform__two">',
   '          <div class="fld">',
   '            <label for="c-name">Full name</label>',
-  '            <input id="c-name" name="name" type="text" autocomplete="name">',
+  '            <input id="c-name" name="name" type="text" autocomplete="name" maxlength="200">',
   '            <p class="err" data-for="c-name" aria-live="polite"></p>',
   "          </div>",
   '          <div class="fld">',
   '            <label for="c-email">Email address</label>',
-  '            <input id="c-email" name="email" type="email" autocomplete="email" spellcheck="false">',
+  '            <input id="c-email" name="email" type="email" autocomplete="email" spellcheck="false" maxlength="320">',
   '            <p class="err" data-for="c-email" aria-live="polite"></p>',
   "          </div>",
   "        </div>",
   '        <div class="cform__two">',
   '          <div class="fld">',
   '            <label for="c-phone">Phone <em>&mdash; optional</em></label>',
-  '            <input id="c-phone" name="phone" type="tel" autocomplete="tel">',
+  '            <input id="c-phone" name="phone" type="tel" autocomplete="tel" maxlength="60">',
   "          </div>",
   '          <div class="fld">',
   '            <label for="c-reason">Reason for contact</label>',
@@ -396,7 +518,7 @@ const CONTACT = [
   "        </div>",
   '        <div class="fld">',
   '          <label for="c-message">Message</label>',
-  '          <textarea id="c-message" name="message" placeholder="What can we help with?"></textarea>',
+  '          <textarea id="c-message" name="message" maxlength="5000" placeholder="What can we help with?"></textarea>',
   '          <p class="err" data-for="c-message" aria-live="polite"></p>',
   "        </div>",
   '        <label class="opt" style="margin-bottom:1rem">',
@@ -407,93 +529,184 @@ const CONTACT = [
   "        </label>",
   '        <p class="err" data-for="c-agree" aria-live="polite"></p>',
   '        <button class="btn btn--solid" id="c-send" type="submit">Send message</button>',
+  '        <p class="err" data-for="c-send" aria-live="polite" style="margin-top:.5rem"></p>',
   '        <p class="doc__meta" style="margin:1rem 0 0;text-transform:none;letter-spacing:0;font-family:inherit;font-size:.85rem">By sending this you agree to be contacted about your inquiry at the email or phone number above. We answer within one to two business days.</p>',
   "      </form>",
   '      <div id="c-done" hidden></div>'
 ].join(nl);
 
-const CONTACT_SCRIPT = [
-  "<script>",
-  "(function () {",
-  '  "use strict";',
-  "",
-  "  /* Same shape as the two intake forms: post to PostgREST, and if that fails",
-  "     fall back to a written email rather than losing the message. */",
-  '  var ENDPOINT = "https://hmgravlkatfmerzbozct.supabase.co/rest/v1/contact_messages";',
-  "  var HEADERS = {",
-  '    "apikey": "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",',
-  '    "Authorization": "Bearer sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",',
-  '    "Content-Type": "application/json",',
-  '    "Prefer": "return=minimal"',
-  "  };",
-  "",
-  '  var form = document.getElementById("cform");',
-  '  var done = document.getElementById("c-done");',
-  "  if (!form) return;",
-  "",
-  "  function val(id) {",
-  "    var el = document.getElementById(id);",
-  '    return el ? el.value.trim() : "";',
-  "  }",
-  "  function fail(id, msg) {",
-  '    var p = form.querySelector(\'[data-for="\' + id + \'"]\');',
-  '    if (p) p.textContent = msg || "";',
-  "    return !msg;",
-  "  }",
-  "  function clear() {",
-  '    Array.prototype.forEach.call(form.querySelectorAll(".err"), function (p) { p.textContent = ""; });',
-  "  }",
-  "",
-  '  form.addEventListener("submit", function (e) {',
-  "    e.preventDefault();",
-  "    clear();",
-  "",
-  "    var ok = true;",
-  '    if (!val("c-name")) ok = fail("c-name", "Tell us your name.") && ok;',
-  '    var em = val("c-email");',
-  '    if (!em || em.indexOf("@") < 1 || em.indexOf(".") < 0) {',
-  '      ok = fail("c-email", "We need an address we can reply to.") && ok;',
-  "    }",
-  '    if (!val("c-message")) ok = fail("c-message", "Tell us what you need.") && ok;',
-  '    if (!document.getElementById("c-agree").checked) {',
-  '      ok = fail("c-agree", "Please agree to the Terms and Privacy Policy.") && ok;',
-  "    }",
-  "    if (!ok) return;",
-  "",
-  "    var d = {",
-  '      name: val("c-name"),',
-  '      email: em,',
-  '      phone: val("c-phone") || null,',
-  '      reason: val("c-reason"),',
-  '      message: val("c-message"),',
-  "      page: location.href",
-  "    };",
-  "",
-  '    var btn = document.getElementById("c-send");',
-  "    btn.disabled = true;",
-  '    btn.textContent = "Sending\\u2026";',
-  "",
-  "    fetch(ENDPOINT, { method: \"POST\", headers: HEADERS, body: JSON.stringify(d) })",
-  "      .then(function (r) { return r.ok; })",
-  '      ["catch"](function () { return false; })',
-  "      .then(function (sent) {",
-  '        form.setAttribute("hidden", "");',
-  '        done.removeAttribute("hidden");',
-  "        done.innerHTML = sent",
-  '          ? \'<div class="cform__ok"><b>Message sent.</b> We answer within one to two business days, at \' +',
-  "            d.email.replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\") + \".</div>\"",
-  "          /* Not lost: the message is written into an email the visitor sends",
-  "             themselves, which works even when our database does not. */",
-  '          : \'<div class="cform__ok"><b>That did not send.</b> Your message is ready to email instead &mdash; \' +',
-  '            \'<a href="mailto:support@securejobva.com?subject=\' +',
-  "            encodeURIComponent(d.reason + \" — \" + d.name) +",
-  '            \'&body=\' + encodeURIComponent(d.message + \"\\n\\n\" + d.name + \"\\n\" + d.email + (d.phone ? \"\\n\" + d.phone : \"\")) +',
-  '            \'">send it now</a>.</div>\';',
-  "      });",
-  "  });",
-  "})();",
-  "</script>"
-].join(nl);
+/* The contact form's script. Written as one raw template rather than a list of
+   quoted lines, because it now carries say() sentences that tools/lib-seg.mjs
+   reads out of the page by pattern, and a sentence split across two quoted
+   generator lines is one escaped quote away from reaching the page as
+   something the pattern cannot see. Nothing in it uses a backtick or ${. */
+const CONTACT_SCRIPT = String.raw`<script>
+/* ── the words this page builds after it has loaded ───────────────────────
+   The same arrangement as careers.html and index.html: SAYS is empty here and
+   tools/build-es.mjs replaces it wholesale when it writes /es/contact, so the
+   English page is untouched and the Spanish one says its own validation
+   messages and results. /es/contact used to answer a Spanish form with "Tell
+   us your name." and "Message sent." — contact.html was not one of the pages
+   that went through say(). The key IS the English sentence. */
+var SAYS = {};
+function say(en, vars) {
+  var s = Object.prototype.hasOwnProperty.call(SAYS, en) ? SAYS[en] : en;
+  if (!vars) return s;
+  return s.replace(/[{]([a-zA-Z]+)[}]/g, function (m, k) {
+    return Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m;
+  });
+}
+
+/* Unused on this page, and here so the page has the same pair as the other
+   two: tools/test-es-runtime.mjs lifts say() and sayList() together out of
+   every page that builds sentences. */
+function sayList(items) {
+  if (items.length < 2) return items.join("");
+  return items.slice(0, -1).join(", ") + say(" and ") + items[items.length - 1];
+}
+
+(function () {
+  "use strict";
+
+  /* Same shape as the two intake forms: post to PostgREST, and if that fails
+     fall back to a written email rather than losing the message. */
+  var ENDPOINT = "https://hmgravlkatfmerzbozct.supabase.co/rest/v1/contact_messages";
+  var HEADERS = {
+    "apikey": "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
+    "Authorization": "Bearer sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal"
+  };
+
+  var form = document.getElementById("cform");
+  var done = document.getElementById("c-done");
+  if (!form) return;
+
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : "";
+  }
+  function fail(id, msg) {
+    var p = form.querySelector('[data-for="' + id + '"]');
+    if (p) p.textContent = msg || "";
+    return !msg;
+  }
+  function clear() {
+    Array.prototype.forEach.call(form.querySelectorAll(".err"), function (p) { p.textContent = ""; });
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  /* The rule is the database's own, character for character: sql/073 checks
+     it on the two intake tables and sql/092 on this one. It used to be "an @
+     after the first character and a dot anywhere", which let juan.perez@gmail
+     through — and that address then went out as the reply-to on the staff
+     notification, where Resend refused the whole email over it. */
+  var ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  var btn = document.getElementById("c-send");
+  function ready() {
+    btn.disabled = false;
+    btn.textContent = say("Send message");
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    clear();
+
+    var ok = true;
+    if (!val("c-name")) ok = fail("c-name", say("Tell us your name.")) && ok;
+    var em = val("c-email");
+    if (!ADDRESS.test(em)) {
+      ok = fail("c-email", say("We need an address we can reply to.")) && ok;
+    }
+    if (!val("c-message")) ok = fail("c-message", say("Tell us what you need.")) && ok;
+    if (!document.getElementById("c-agree").checked) {
+      ok = fail("c-agree", say("Please agree to the Terms and Privacy Policy.")) && ok;
+    }
+    if (!ok) return;
+
+    var d = {
+      name: val("c-name"),
+      email: em,
+      phone: val("c-phone") || null,
+      reason: val("c-reason"),
+      message: val("c-message"),
+      /* contact_messages_sane caps page at 500, and a long query string from
+         an ad link used to take the whole message down with it. */
+      page: location.href.slice(0, 500)
+    };
+
+    btn.disabled = true;
+    btn.textContent = say("Sending…");
+
+    /* "sent", "failed", or a refusal the person can act on. A 4xx carrying an
+       sjva- hint is a rule saying no on purpose — sql/092 refusing an address
+       — and the fix is theirs to make in the form, so it is shown on the
+       field rather than dressed up as the database being down and turned
+       into an email they would then have to send by hand. */
+    fetch(ENDPOINT, { method: "POST", headers: HEADERS, body: JSON.stringify(d) })
+      .then(function (r) {
+        if (r.ok) return "sent";
+        if (r.status < 400 || r.status >= 500) return "failed";
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (x) {}
+          if (j && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0 && j.message) {
+            return { hint: j.hint, message: String(j.message) };
+          }
+          return "failed";
+        }, function () { return "failed"; });
+      })
+      ["catch"](function () { return "failed"; })
+      .then(function (v) {
+        if (v && v.hint) {
+          ready();
+          if (v.hint === "sjva-address") {
+            var s = say("That email address does not look complete. Check it and send again.");
+            /* On the English page SAYS is empty and the sentence is the
+               database's; on /es it is ours. */
+            fail("c-email", s === "That email address does not look complete. Check it and send again." ? v.message : s);
+            document.getElementById("c-email").focus();
+          } else if (v.hint === "sjva-throttled") {
+            /* sql/047 counts contact_messages too, ten an hour from one place.
+               The sentence is the one /careers says for the same rule, so /es
+               already has it in Spanish. */
+            var t = say("That is more submissions than we accept from one place in an hour. " +
+                        "Write to support@securejobva.com and a person will pick it up.");
+            fail("c-send", t === "That is more submissions than we accept from one place in an hour. " +
+                                 "Write to support@securejobva.com and a person will pick it up." ? v.message : t);
+          } else {
+            /* A rule written after this page. It is about the message as a
+               whole, not the Terms box, so it goes under Send, where the
+               person is looking — it used to sit under c-agree and read as
+               if the checkbox had been the problem. */
+            fail("c-send", v.message);
+          }
+          return;
+        }
+        var sent = v === "sent";
+        form.setAttribute("hidden", "");
+        done.removeAttribute("hidden");
+        done.innerHTML = sent
+          ? '<div class="cform__ok">' +
+              say("<b>Message sent.</b> We answer within one to two business days, at {email}.",
+                  { email: esc(d.email) }) +
+            '</div>'
+          /* Not lost: the message is written into an email the visitor sends
+             themselves, which works even when our database does not. */
+          : '<div class="cform__ok">' +
+              say("<b>That did not send.</b> Your message is ready to email instead &mdash; {link}.",
+                  { link: '<a href="mailto:support@securejobva.com?subject=' +
+                      encodeURIComponent(d.reason + " — " + d.name) +
+                      '&body=' + encodeURIComponent(d.message + "\n\n" + d.name + "\n" + d.email + (d.phone ? "\n" + d.phone : "")) +
+                      '">' + say("send it now") + '</a>' }) +
+            '</div>';
+      });
+  });
+})();
+</script>`.split("\n").join(nl);
 
 /* The fifth column is where the language link points. Written out per page
    rather than derived from the filename: /contact and /privacy do not follow

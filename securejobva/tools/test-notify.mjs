@@ -138,7 +138,9 @@ is("and is still readable", sent.body.html.includes("&lt;script&gt;"), true);
 /* ── a Resend outage must not lose the row ─────────────────────────────── */
 
 resendStatus = 500;
-is("a Resend failure asks Supabase to retry", (await call(APPLICATION)).code, 502);
+/* Nothing retries this — pg_net fires once (see send() in api/notify.js).
+   The 502 is what net._http_response keeps, so a lost alert can be found. */
+is("a Resend failure is reported with 502", (await call(APPLICATION)).code, 502);
 resendStatus = 200;
 
 
@@ -204,8 +206,8 @@ is("and still counts your two", half.body.sent, 2);
 /* ── decisions, both directions ────────────────────────────────────────────
    031 posts these rather than Supabase, because a timesheet carries no address
    and the person is looked up in the database instead. The shape is different
-   from a webhook and so are the rules: one direction must be retried, the
-   other must never be. */
+   from a webhook and so are the rules: a failure in one direction is
+   reported with a 502, in the other it never changes the answer. */
 
 const WEEK = {
   type: "STATUS", event: "arrived", table: "timesheets",
@@ -486,9 +488,10 @@ is("there is no message to the assistant, even with her address in hand",
 is("and asking for one is skipped", swapOut.code, 200);
 is("it is skipped by name", swapOut.body.skipped, "swap_requests/decided");
 
-/* Resend failing here must be retried — this is the one holding a reply. */
+/* Resend failing here is reported, not swallowed — this is the one holding a
+   reply. Reported is all: nothing asks twice. */
 resendStatus = 500;
-is("a failed swap email is retried", (await call(SWAP)).code, 502);
+is("a failed swap email is reported with 502", (await call(SWAP)).code, 502);
 resendStatus = 200;
 
 /* ── the interview handshake ─────────────────────────────────────────────
@@ -637,23 +640,155 @@ is("and tells her to be early", sent.body.text.includes("couple of minutes early
 is("exactly one email", all.length, 1);
 
 /* A placement link is not news — the client typed it while confirming, so the
-   confirmation already carried it. 067 does not post the moment for that side;
-   this is the handler agreeing. */
+   confirmation already carried it. 067 does not post the moment for that side,
+   and the handler must agree rather than trust that it never arrives: the
+   locks in notify.js exist for a payload posted by hand. This used to assert
+   that the mail WENT, directly under a comment saying it should not — so the
+   test would have gone red on the fix and pushed whoever made it to revert.
+   Sent, it is a second "Where to join" whose button points at /status, a page
+   an assistant has no use for. */
 all = [];
 const plLink = await call(iv("link", {
   record: { meeting_url: "https://meet.google.com/abc-defg-hij" }
 }));
-is("a placement link mails the assistant, who got it on the confirmation",
-   all.length, 1);
+is("a placement link does not mail the assistant, who got it on the confirmation",
+   all.length, 0);
 is("and is not an error", plLink.code, 200);
+is("it is skipped, and says so", typeof (plLink.body && plLink.body.skipped), "string");
 
-/* ── the retry rule, which is the whole point of splitting them ── */
+/* ── a payment, recorded (sql/093) ──────────────────────────────────────
+   Until 093 a client who paid heard nothing back. The receipt says what was
+   recorded and where the statement is — and nothing the payload cannot back:
+   no balance, no due date, no refund promise. */
+const PAID = (over) => ({
+  type: "STATUS", event: "recorded", table: "client_payments",
+  person: { name: "Dana Whitfield", email: "dana@northlake.example" },
+  record: Object.assign({ id: "p1", business: "Northlake Dental", amount_cents: 32750,
+    paid_on: "2026-09-29", method: "bank_transfer", reference: "INV-12" }, over || {})
+});
+{
+  const r = await call(PAID());
+  is("a recorded payment is answered 200", r.code, 200);
+  is("exactly one email", all.length, 1);
+  const m = all[0] ? all[0].body : {};
+  is("to the client's contact, and nobody else", m.to, ["dana@northlake.example"]);
+  is("the subject carries the amount", m.subject, "Payment received — $327.50");
+  const t = m.text || "";
+  is("it names the business, the amount, the date, the method and the reference",
+    /from Northlake Dental of \$327\.50, paid on .*29.*2026 by bank transfer, reference INV-12\./.test(t), true);
+  is("and points at the statement", t.indexOf("https://www.securejobva.com/pay") > -1, true);
+  is("and promises nothing it cannot back", /refund|due|balance|owe/i.test(t), false);
+}
+{
+  await call(PAID({ method: "other", reference: null, amount_cents: 123456789 }));
+  const t = all[0] ? all[0].body.text : "";
+  is("a large amount is grouped by hand, not by the machine's locale", /\$1,234,567\.89/.test(t), true);
+  is("\"other\" is left out rather than printed", /by other/.test(t), false);
+}
+{
+  const r = await call({ ...PAID(), person: { name: "Dana", email: "" } });
+  is("a client with no contact address is skipped, not an error", [r.code, all.length], [200, 0]);
+}
+
+/* ── what reaches an attribute ──────────────────────────────────────────
+   esc() used to stop at & < >. Inside a double-quoted href that let a " close
+   the attribute and add one of its own. 081 refuses such links now; rows
+   written before it still reach this. */
+{
+  await call(PAID({ business: 'Acme" style="display:none', reference: "it's" }));
+  const h = all[0] ? all[0].body.html : "";
+  is("a double quote in a value is escaped in the HTML", h.indexOf('Acme" style') < 0, true);
+  is("as &quot;", h.indexOf("Acme&quot; style") > -1, true);
+  is("and a single quote as &#39;", h.indexOf("it&#39;s") > -1, true);
+}
+
+/* ── the tracks an applicant is told she applied for ─────────────────────
+   091 stops new rows carrying anything but the three; rows before it could
+   carry a sentence, and the confirmation is signed by us. */
+{
+  await call({ ...APPLICATION, record: { ...APPLICATION.record,
+    tracks: ["Customer Service", "ACTION REQUIRED: your payout is on hold"] } });
+  /* Her confirmation only. The staff notification lists the row as it
+     landed, on purpose — it goes to us, and a strange track is something we
+     should see. */
+  const hers = all.filter((c) => JSON.stringify(c.body.to).indexOf("maria@example.com") > -1)
+    .map((c) => (c.body.subject || "") + "\n" + (c.body.text || "") + "\n" + (c.body.html || ""));
+  is("her confirmation went out", hers.length, 1);
+  is("a track that is not one of the three is not in it", hers.some((s) => /ACTION REQUIRED/.test(s)), false);
+  is("the real one still is", hers.some((s) => /Customer Service/.test(s)), true);
+}
+
+/* ── an address that is not one is not a reply-to ────────────────────── */
+{
+  await call({ ...APPLICATION, record: { ...APPLICATION.record, email: "maria@example" } });
+  is("an incomplete address is not offered as reply_to", sent && sent.body.reply_to, undefined);
+  is("and is not mailed a confirmation", all.length, 1);
+}
+
+/* ── the reporting rule, which is the whole point of splitting them ── */
 resendStatus = 500;
-is("a failed email to you is retried", (await call(WEEK)).code, 502);
+is("a failed email to you is reported with 502", (await call(WEEK)).code, 502);
 const lost = await call(decided({ status: "approved" }));
 is("a failed email to them is not", lost.code, 200);
 is("and is reported rather than hidden", lost.body.told, false);
 resendStatus = 200;
+
+/* ── a first word that is not a name ─────────────────────────────────────
+   The greeting is the first line of a message we sign, and the name is typed
+   into a public form. "www.evil.example" there made the greeting a link in
+   most mail apps. */
+{
+  await call({ ...decided({ status: "approved" }),
+    person: { name: "www.evil.example click here", email: "maricel@example.com" } });
+  is("a name that is an address is greeted as there", sent.body.text.startsWith("Hi there,"), true);
+  is("and the address is nowhere in it", /evil\.example/.test(sent.body.text + sent.body.html), false);
+}
+
+/* ── NOTIFY_TO is only asked for by the sends that use it ──────────────── */
+{
+  const keep = process.env.NOTIFY_TO;
+  delete process.env.NOTIFY_TO;
+  const d = await call(decided({ status: "approved" }));
+  is("without NOTIFY_TO a decision still reaches the assistant", [d.code, sent && sent.body.to],
+     [200, ["maricel@example.com"]]);
+  const i = await call(APPLICATION);
+  is("but a row landing, which mails staff, answers 500", i.code, 500);
+  is("and sends nothing", all.length, 0);
+  process.env.NOTIFY_TO = keep;
+}
+
+/* ── a body that is not JSON ─────────────────────────────────────────────── */
+{
+  let r, threw = null;
+  try { r = await call("{bad"); } catch (e) { threw = e; }
+  is("a text body that is not JSON gets a 400, not a crash",
+     threw ? "threw " + threw.message : r.code, 400);
+  is("and sends nothing", all.length, 0);
+}
+
+/* ── a reply_to Resend will not take ─────────────────────────────────────
+   The one retry that happens: the address was typed by whoever sent the
+   form, and a typo in it must cost staff a reply button, not the alert. */
+{
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opt) => {
+    const r = await realFetch(url, opt);
+    return JSON.parse(opt.body).reply_to ? { ok: false, status: 422, text: async () => "invalid reply_to" } : r;
+  };
+  const r = await call(WEEK);
+  globalThis.fetch = realFetch;
+  is("a 422 with a reply_to is tried once more", all.length, 2);
+  is("the first try carried it", all[0].body.reply_to, "maricel@example.com");
+  is("the second went without it", all[1].body.reply_to, undefined);
+  is("and the alert landed", r.code, 200);
+}
+
+/* ── the joining link on its own is the applicant's alone ──────────────── */
+{
+  const r = await call(iv("link", { record: { side: "assistant", meeting_url: "https://meet.example/abc" } }));
+  is("a link event on a placement interview is skipped", [r.code, all.length], [200, 0]);
+  is("by name", r.body.skipped, "interview_slots/link (assistant)");
+}
 
 console.log("");
 console.log(bad ? bad + " FAILED" : "all passed");

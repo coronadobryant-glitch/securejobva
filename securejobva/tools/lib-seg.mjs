@@ -1,3 +1,5 @@
+import { readFileSync, existsSync } from "node:fs";
+
 /* One definition of "a translatable segment", shared by the extractor, the
    builder and the guard — so the three can never disagree about what needs a
    translation, which is the only way a coverage number means anything.
@@ -90,10 +92,6 @@ export function sayKeys(html) {
   return keys;
 }
 
-/* The pages that build sentences at runtime. Kept beside PAGES so that adding
-   a Spanish page without asking this question is hard to do by accident. */
-export const SAY_PAGES = ["index.html", "careers.html"];
-
 /* Keys say() is handed as a variable rather than a literal, so sayKeys() is
    blind to them by construction. Only two, both from the DISC tick that gives
    way: say(freed), where freed is "most" or "least". Listed here so that the
@@ -108,3 +106,19 @@ export const PAGES = [
   ["terms.html",    "es/terms.html",    "/es/terms",    "/terms"],
   ["refunds.html",  "es/refunds.html",  "/es/refunds",  "/refunds"]
 ];
+
+/* The pages that build sentences at runtime: every page above whose source
+   declares the empty SAYS that build-es.mjs replaces.
+
+   This was a list written by hand — index.html and careers.html — and the
+   question it existed to make somebody ask was never asked for /contact. Its
+   form wrote "Tell us your name.", "Message sent." and "That did not send."
+   in English under a Spanish heading on /es/contact, because nothing said
+   the page had runtime sentences at all. Read from the page, the answer
+   cannot fall behind: the day a page routes a sentence through say(), its
+   keys are planted, checked for a translation, and tested in Spanish. A page
+   that writes English at runtime WITHOUT say() is still invisible here, and
+   that is what the "nothing is left in English" part of
+   tools/test-es-runtime.mjs is for once it opts in. */
+export const SAY_PAGES = PAGES.map(([src]) => src)
+  .filter((src) => existsSync(src) && readFileSync(src, "utf8").indexOf("var SAYS = {};") > -1);

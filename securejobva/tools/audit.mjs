@@ -2,10 +2,48 @@
    bitten today: CSS that is overridden or never used, links that go nowhere,
    ids that collide, JS that reaches for an element that is not there, and
    form fields with no column behind them. */
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 
-const PAGES = ["index.html", "careers.html", "status.html", "admin.html",
-               "privacy.html", "terms.html", "refunds.html", "contact.html", "seats.html"];
+/* Every page build.mjs ships, read from build.mjs.
+
+   This was a list typed here, and it stopped at nine: /hub and /pay — the
+   pages assistants and paying clients live in — were never swept, and neither
+   were the six Spanish pages. Added to a scratch copy, the first run found a
+   theme toggle /hub looks for and never draws, and a day-note box with no
+   label, both of which had shipped. A second copy of a list is a list that
+   will disagree with the first; the route check at the bottom of this file
+   learned that already, and reads build.mjs for the same reason. */
+const PAGES = [...readFileSync("build.mjs", "utf8").matchAll(/^\s*src:\s*"([^"]+\.html)"/gm)]
+  .map((m) => m[1])
+  .filter((f) => existsSync(f));
+if (PAGES.length < 9) throw new Error("could not read the page list out of build.mjs");
+
+/* An id written in more than one place in a script is only a collision if
+   both can be on the page at once. The portal pages draw a card from one
+   function with several early returns — the interview card on /hub has four,
+   one per state, each opening with id="iv-card" — and exactly one of them
+   runs. Those are not duplicates, and reporting them teaches whoever reads
+   this to skip the section.
+
+   So an id is let off when every copy is inside a script, all in one
+   function, and each copy sits in a different return statement: between any
+   two of them the function returns. Anything else — a copy in the markup, a
+   copy in another function, two copies in one returned string — is still a
+   collision. */
+function exclusiveBranches(h, id, scripts) {
+  const at = [];
+  const re = new RegExp("\\sid=\\\\?[\"']" + id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\\\?[\"']", "g");
+  let m;
+  while ((m = re.exec(h)) !== null) at.push(m.index);
+  if (at.length < 2) return false;
+  if (!at.every((i) => scripts.some(([a, b]) => i > a && i < b))) return false;
+  for (let k = 1; k < at.length; k++) {
+    const between = h.slice(at[k - 1], at[k]);
+    if (/\r?\n(?:async\s+)?function\s/.test(between)) return false;   /* crossed into another function */
+    if (!/(^|[;{}\n])\s*return\b/.test(between)) return false;        /* same returned string */
+  }
+  return true;
+}
 
 const found = [];
 const note = (page, kind, detail) => found.push({ page, kind, detail });
@@ -23,7 +61,11 @@ for (const f of PAGES) {
   /* ── duplicate ids ── */
   const ids = [...h.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
   const dupes = ids.filter((x, i) => ids.indexOf(x) !== i);
-  [...new Set(dupes)].forEach((d) => note(f, "duplicate id", d));
+  const scripts = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+    .map((m) => [m.index, m.index + m[0].length]);
+  [...new Set(dupes)]
+    .filter((d) => !exclusiveBranches(h, d, scripts))
+    .forEach((d) => note(f, "duplicate id", d));
 
   /* ── in-page anchors that resolve to nothing ── */
   const idSet = new Set(ids);

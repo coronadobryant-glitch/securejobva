@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -314,12 +355,29 @@ img{max-width:100%}
 .cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
 .cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .cform label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
-.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
+/* --muted, not --line, for the same reason as the two dialogs: --line on white
+   is 1.23:1, and the edge of a text box needs 3:1 to be findable at all. */
+.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--muted);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
 .cform textarea{min-height:8rem;resize:vertical}
 .cform input:focus-visible,.cform select:focus-visible,.cform textarea:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
 .cform .err{color:#B3261E;font-size:.85rem;margin:.15rem 0 0;min-height:1.1em}
 :root[data-theme="dark"] .cform .err{color:#F2B8B5}
 @media(min-width:560px){.cform__two{display:grid;grid-template-columns:1fr 1fr;gap:0 .9rem}}
+/* The agree box. The markup is the .opt pattern from the two dialogs, but its
+   rules never came with it — they sit after the hero marker in careers.html,
+   outside what lib-chrome.mjs lifts — so the page showed a raw checkbox, a
+   tick that was always visible, and the whole label forced into the
+   uppercase mono of .cform label. These are those rules, scoped to the form. */
+.cform label.opt{display:flex;align-items:flex-start;gap:.7rem;position:relative;cursor:pointer;font-family:inherit;font-size:.95rem;letter-spacing:0;text-transform:none;color:var(--ink);margin-bottom:.25rem}
+.cform .opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.cform .opt__box{width:18px;height:18px;flex:none;margin-top:.15rem;border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);display:grid;place-items:center;color:var(--accent-ink)}
+.cform .opt__box svg{opacity:0;transition:opacity .12s ease}
+.cform .opt input:checked ~ .opt__box{background:var(--accent);border-color:var(--accent)}
+.cform .opt input:checked ~ .opt__box svg{opacity:1}
+.cform .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
+.cform .opt__t{display:block;font-weight:600;line-height:1.35}
+.cform .opt__d{display:block;font-size:.85rem;color:var(--ink-2);margin-top:.15rem}
+.cform .opt__d a{color:var(--accent)}
 .cform__ok{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.15rem 1.3rem}
 .contact__at{display:grid;gap:.8rem;margin:1.4rem 0 2.2rem}
 .contact__row{display:flex;flex-wrap:wrap;gap:.5rem 1rem;padding-bottom:.7rem;border-bottom:1px solid var(--line)}
@@ -365,8 +423,26 @@ img{max-width:100%}
         <a href="/careers">Careers</a>
         <a href="/contact">Contact</a>
         <a class="nav__signin" href="/status">Sign in</a>
-        <a class="langtog" id="langtog" href="/es/privacy" hreflang="es" lang="es" aria-label="Ver esta página en español">ES</a>
       </nav>
+      <div class="nav__tools">
+        <button class="navtog" id="navtog" type="button" aria-expanded="false" aria-controls="mobnav" aria-label="Menu">
+          <svg class="i-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+          <svg class="i-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+          </svg>
+        </button>
+        <a class="langtog" id="langtog" href="/es/privacy" hreflang="es" lang="es" aria-label="Ver esta página en español">ES</a>
+      </div>
+    </div>
+  </div>
+  <div class="mobnav" id="mobnav" hidden>
+    <div class="wrap mobnav__in">
+      <a href="/">Hiring a VA?</a>
+      <a href="/careers">Careers</a>
+      <a href="/contact">Contact</a>
+      <a class="nav__signin" href="/status">Sign in</a>
     </div>
   </div>
 </header>
@@ -376,7 +452,7 @@ img{max-width:100%}
     <div class="wrap doc__wrap">
       <span class="eyebrow">Site policies</span>
       <h1>Privacy Policy</h1>
-      <p class="doc__meta">Last updated 26 August 2026</p>
+      <p class="doc__meta">Last updated 30 September 2026</p>
       <nav class="doc__toc" aria-label="On this page"><ul><li><a href="#p1">1. Who we are</a></li><li><a href="#p2">2. What we collect</a></li><li><a href="#p3">3. How we use it</a></li><li><a href="#p4">4. How we share it</a></li><li><a href="#p5">5. Security</a></li><li><a href="#p6">6. Retention</a></li><li><a href="#p7">7. International transfers</a></li><li><a href="#p8">8. Your rights</a></li><li><a href="#p9">9. Cookies</a></li><li><a href="#p10">10. Children</a></li><li><a href="#p11">11. Changes</a></li><li><a href="#p12">12. Contact</a></li></ul></nav>
       <h2 id="p1">1. Who we are</h2>
       <p>SecureJobVA (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;), legally operating as Secure Job VA, runs securejobva.com (the &ldquo;Site&rdquo;), a platform connecting employers with virtual assistant applicants. This policy explains how we collect, use and protect information from visitors, applicants and clients.</p>
@@ -385,7 +461,7 @@ img{max-width:100%}
         <li><b>Account information</b> &mdash; name, email, phone number, and a password. Passwords are stored only as a one-way hash; nobody here can read yours, including us.</li>
         <li><b>Applicant information</b> &mdash; work history, skills, availability, location, equipment and internet access, and anything you submit during the application.</li>
         <li><b>Social media information</b> &mdash; if you choose to give us profile links or connect an account, we may access profile information and public activity within the scope that platform grants. We ask for the minimum needed to review an application, and connecting is optional.</li>
-        <li><b>Payment information</b> &mdash; handled by third-party payment processors. Full card and bank numbers are never stored on our servers.</li>
+        <li><b>Payment information</b> &mdash; the Site does not take payments. Clients pay by bank transfer or another method arranged with us, and when a payment arrives a member of our staff records its date, amount, method and any reference you gave it, so it appears on your statement. We do not ask for or store card or bank account numbers.</li>
         <li><b>Usage data</b> &mdash; pages visited, device and browser type, and IP address, collected automatically.</li>
       </ul>
       <h2 id="p3">3. How we use it</h2>
@@ -399,8 +475,16 @@ img{max-width:100%}
       <h2 id="p4">4. How we share it</h2>
       <ul>
         <li>With prospective clients reviewing applicants, as part of hiring.</li>
-        <li>With service providers who help us run the Site &mdash; hosting, payment processing, email delivery &mdash; under confidentiality obligations.</li>
+        <li>With the service providers below, who run parts of the Site for us.</li>
         <li>Where required by law, subpoena or legal process.</li>
+      </ul>
+      <p>The service providers we use, and what each one does:</p>
+      <ul>
+        <li><b>Supabase</b> &mdash; hosts our database, sign-in and file storage. Applications, accounts, uploaded CVs, timesheets and billing records are stored with Supabase.</li>
+        <li><b>Vercel</b> &mdash; hosts the Site and runs the small server functions that send our notification emails, so every page request passes through Vercel.</li>
+        <li><b>Resend</b> &mdash; delivers the emails the Site sends, such as application confirmations, updates and account invitations. It receives the address and the content of each email.</li>
+        <li><b>Zoho</b> &mdash; hosts our support@securejobva.com mailbox, so anything you email us is stored there.</li>
+        <li><b>Google</b> &mdash; serves the typefaces the Site uses, so your browser requests them from Google, which receives your IP address and browser details when a page loads. If you choose to sign in with Google, Google also confirms your identity and passes us your name and email address.</li>
       </ul>
       <h2 id="p5">5. Security</h2>
       <p>We use reasonable administrative, technical and physical safeguards. In practice that means passwords stored as hashes rather than text, and role-based access controls that decide who can see applicant data at the database level rather than in the page &mdash; so a mistake in the interface does not become a disclosure.</p>
@@ -412,7 +496,13 @@ img{max-width:100%}
       <h2 id="p8">8. Your rights</h2>
       <p>Depending on where you live, you may have the right to see, correct or delete your personal information. Some of that you can do yourself: signing in at <a href="/status">your application page</a> lets you read and update what you sent us. For anything else, write to <a href="mailto:support@securejobva.com">support@securejobva.com</a>.</p>
       <h2 id="p9">9. Cookies</h2>
-      <p>The Site uses browser storage to keep you signed in and to remember whether you prefer the light or dark theme. You can clear or block it in your browser settings, though signing in will stop working if you do.</p>
+      <p>The Site keeps a few things in your browser&rsquo;s own storage, on the device you are using:</p>
+      <ul>
+        <li>Your sign-in, so you stay signed in, and whether you prefer the light or dark theme.</li>
+        <li>A draft of the application or seat request form while you fill it in, including the contact details you type, so nothing is lost if the page closes. The draft is removed once the form has been sent.</li>
+        <li>If a form fails to send, a copy of it, which the Site tries to send again on your next visits. It is deleted after seven days whether or not it went.</li>
+      </ul>
+      <p>On a shared or public computer, clear this site&rsquo;s data in your browser settings when you finish. You can also block browser storage entirely, though signing in and saving drafts will stop working if you do.</p>
       <h2 id="p10">10. Children</h2>
       <p>The Site is not intended for anyone under 18, and we do not knowingly collect information from minors.</p>
       <h2 id="p11">11. Changes</h2>
@@ -438,4 +528,27 @@ img{max-width:100%}
     </div>
   </div>
 </footer>
+<script>
+(function () {
+  var btn = document.getElementById("navtog");
+  var panel = document.getElementById("mobnav");
+  if (!btn || !panel) return;
+  function setOpen(open) {
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) { panel.removeAttribute("hidden"); } else { panel.setAttribute("hidden", ""); }
+  }
+  btn.addEventListener("click", function () {
+    setOpen(btn.getAttribute("aria-expanded") !== "true");
+  });
+  panel.addEventListener("click", function (e) {
+    if (e.target.closest("a")) setOpen(false);
+  });
+  window.addEventListener("resize", function () {
+    if (window.innerWidth >= 900) setOpen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setOpen(false);
+  });
+})();
+</script>
 

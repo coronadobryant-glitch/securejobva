@@ -97,6 +97,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -142,7 +148,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.75rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.6rem;margin-left:auto;font-size:.94rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -152,8 +157,20 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px the row measured
+   424px (496px in Spanish, where the call-to-action is "Agendar una llamada")
+   and the whole home page scrolled sideways, with the one button the page is
+   selling clipped off the right edge. The brand may now shrink, and its word
+   is cut with an ellipsis before the row is ever allowed to overflow —
+   below 600px only, in the block further down. Above that the links are
+   what give way, as they always did: letting the brand shrink everywhere cut
+   "SecureJobVA" to "SecureJ…" at 900px, where the links still had room to
+   scroll. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -251,10 +268,34 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu above carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is, and in Spanish the label alone is
+   half the bar. 600 rather than 560 because "Agendar una llamada" still
+   pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -279,14 +320,13 @@ img{max-width:100%}
 .hero__actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.9rem}
 .hero__note{margin-top:1rem;font-size:var(--step--1);color:var(--muted)}
 
-/* rating banner + free-week offer */
-/* Sits above the sticky nav, so it scrolls away rather than eating header room. */
-.rated{background:var(--price-bg);color:var(--price-fg)}
-.rated__in{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.35rem .7rem;padding:.6rem clamp(.9rem,2vw,1.6rem)}
-.rated__stars{display:inline-flex;gap:.1rem;color:var(--signal);line-height:0}
-.rated__t{margin:0;font-size:.86rem;text-align:center;opacity:.92}
-.rated__t b{font-weight:700;opacity:1}
+/* free-week offer
 
+   There was a rating banner above the header here — five stars and "Rated 5
+   stars by the businesses we staff" — with no review, no count and no source
+   behind it, on a page whose client rail was empty. A rating nobody gave is
+   not something to put above the fold, so it is gone rather than reworded; if
+   real, attributable reviews exist one day, they come back with their source. */
 .trial{background:var(--price-bg);color:var(--price-fg);padding:clamp(2.4rem,5vw,3.6rem) 0}
 .trial__in{display:grid;gap:1.6rem;align-items:center}
 .trial__in > div{max-width:60ch}
@@ -514,7 +554,9 @@ img{max-width:100%}
 /* final cta */
 .cta{background:var(--accent);color:var(--accent-ink);padding:clamp(3rem,6vw,5rem) 0}
 .cta h2{font-size:var(--step-3);max-width:20ch}
-.cta p{margin:1rem 0 2rem;max-width:52ch;opacity:.9}
+/* No opacity: white at .9 on the accent blue is 3.96:1, under the 4.5 that
+   text this size needs, and this is the paragraph that asks for the call. */
+.cta p{margin:1rem 0 2rem;max-width:52ch}
 .cta .btn--solid{background:var(--accent-ink);color:var(--accent);border-color:var(--accent-ink)}
 .cta .btn--ghost{border-color:currentColor;color:var(--accent-ink)}
 .cta .btn--ghost:hover{border-color:currentColor}
@@ -599,13 +641,16 @@ img{max-width:100%}
 .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
 .opt__box{
   width:18px;height:18px;flex:none;margin-top:.18rem;
-  border:1.5px solid var(--line);border-radius:5px;background:var(--surface);
+  border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
 .opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
 .opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
+/* --muted on the tinted ground of a picked option is 4.10:1, under the 4.5
+   small text needs, so the description darkens with the pick. */
+.opt:has(input:checked) .opt__d,.opt.is-on .opt__d{color:var(--ink-2)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 
@@ -651,14 +696,18 @@ img{max-width:100%}
   text-transform:uppercase;color:var(--ink-2);
 }
 .field > label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.8}
+/* The field edge is --muted, not --line. --line on white is 1.23:1, so a text
+   box had no boundary anybody with low vision could find; 1.4.11 asks 3:1 of
+   the edge of a control, and --muted gives 4.6:1. Hover moves to --ink-2 so
+   it is still a visible change. */
 .field input,.field textarea,.field select{
   font-family:inherit;font-size:1.12rem;color:var(--ink);background:var(--paper);
-  border:1.5px solid var(--line);border-radius:9px;padding:.95rem 1.05rem;width:100%;
+  border:1.5px solid var(--muted);border-radius:9px;padding:.95rem 1.05rem;width:100%;
   text-overflow:ellipsis;
   transition:border-color .15s ease;
 }
 .field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
-.field input:hover,.field textarea:hover,.field select:hover{border-color:var(--muted)}
+.field input:hover,.field textarea:hover,.field select:hover{border-color:var(--ink-2)}
 /* The border a field gets when it is wrong, and it has to be a different
    colour from the one it gets when it is focused. This said var(--accent),
    which is the focus colour, so on step 3 an invalid field and the field you
@@ -688,7 +737,7 @@ img{max-width:100%}
 }
 .intake__foot[hidden]{display:none}
 .intake__count{
-  font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-2);
   margin-right:auto;font-variant-numeric:tabular-nums;
 }
 .intake .btn{padding:.8rem 1.4rem;font-size:1rem}
@@ -795,19 +844,6 @@ function forwardAuthFragment(loc) {
   </defs>
 </svg>
 
-<section class="rated" aria-label="Customer rating">
-  <div class="wrap rated__in">
-    <span class="rated__stars" role="img" aria-label="Rated 5 out of 5 stars">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.1-6.46-4.69-4.58 6.49-.95L12 2.6Z"></path></svg>
-    </span>
-    <p class="rated__t"><b>Rated 5 stars</b> by the businesses we staff.</p>
-  </div>
-</section>
-
 <header class="nav">
   <div class="wrap nav__in">
     <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="SecureJobVA home">
@@ -857,6 +893,7 @@ function forwardAuthFragment(loc) {
       <a href="#faq">FAQ</a>
       <a class="nav__cross" href="https://claude.ai/code/artifact/59e78011-5885-43c0-bd9a-8c4754a13d45">Careers</a>
       <a class="nav__signin" href="/status">Sign in</a>
+      <a class="nav__book" data-book href="#book">Book a call</a>
     </div>
   </div>
 </header>
@@ -919,7 +956,7 @@ function forwardAuthFragment(loc) {
             <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Time tracking you can audit yourself</li>
             <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Backup coverage for sick days and holidays</li>
             <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Free replacement if the fit stops working</li>
-            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Payroll, benefits and compliance handled by us</li>
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg> Your assistant is contracted and paid through us</li>
           </ul>
         </div>
 
@@ -930,43 +967,52 @@ function forwardAuthFragment(loc) {
               <div class="vs__col">
                 <div class="vs__track">
                   <div class="vs__bar" style="height:100%">
-                    <i class="vs__seg vs__seg--d" style="height:4.32%" title="Desk, equipment and software: $180"></i>
-                    <i class="vs__seg vs__seg--c" style="height:10.32%" title="Benefits and PTO accrual: $430"></i>
-                    <i class="vs__seg vs__seg--b" style="height:12.41%" title="Payroll tax and insurance: $517"></i>
-                    <i class="vs__seg vs__seg--a" style="height:72.95%" title="Wages at $19/hr: $3,040"></i>
+                    <i class="vs__seg vs__seg--d" style="height:4.03%" title="Desk, equipment and software: $180"></i>
+                    <i class="vs__seg vs__seg--c" style="height:9.63%" title="Benefits and PTO accrual: $430"></i>
+                    <i class="vs__seg vs__seg--b" style="height:12.54%" title="Payroll tax and insurance: $560"></i>
+                    <i class="vs__seg vs__seg--a" style="height:73.79%" title="Wages at $19/hr: $3,293"></i>
                   </div>
                 </div>
-                <p class="vs__tot">$4,167</p>
+                <p class="vs__tot">$4,463</p>
                 <p class="vs__lab"><b>In-house hire</b>$19/hr plus employer costs</p>
               </div>
               <div class="vs__col">
                 <div class="vs__track">
-                  <div class="vs__bar" style="height:29.76%">
-                    <i class="vs__seg vs__seg--win" style="height:100%" title="SecureJobVA seat at $7.75/hr flat: $1,240"></i>
+                  <div class="vs__bar" style="height:30.10%">
+                    <i class="vs__seg vs__seg--win" style="height:100%" title="SecureJobVA seat at $7.75/hr flat: $1,343"></i>
                   </div>
                 </div>
-                <p class="vs__tot">$1,240</p>
+                <p class="vs__tot">$1,343</p>
                 <p class="vs__lab"><b>SecureJobVA seat</b>$7.75/hr flat, nothing on top</p>
               </div>
             </div>
             <p class="vs__grp">What an in-house hire costs</p>
             <ul class="vs__rows">
-              <li><i class="vs__sw vs__sw--a" aria-hidden="true"></i><span>Wages at $19/hr</span><b>$3,040</b></li>
-              <li><i class="vs__sw vs__sw--b" aria-hidden="true"></i><span>Payroll tax and insurance</span><b>$517</b></li>
+              <li><i class="vs__sw vs__sw--a" aria-hidden="true"></i><span>Wages at $19/hr</span><b>$3,293</b></li>
+              <li><i class="vs__sw vs__sw--b" aria-hidden="true"></i><span>Payroll tax and insurance</span><b>$560</b></li>
               <li><i class="vs__sw vs__sw--c" aria-hidden="true"></i><span>Benefits and PTO accrual</span><b>$430</b></li>
               <li><i class="vs__sw vs__sw--d" aria-hidden="true"></i><span>Desk, equipment, software</span><b>$180</b></li>
-              <li class="vs__row--tot"><i class="vs__sw" aria-hidden="true" style="background:var(--line)"></i><span>Total every month</span><b>$4,167</b></li>
+              <li class="vs__row--tot"><i class="vs__sw" aria-hidden="true" style="background:var(--line)"></i><span>Total every month</span><b>$4,463</b></li>
             </ul>
 
             <p class="vs__grp vs__grp--win">What a SecureJobVA seat costs</p>
             <ul class="vs__rows vs__rows--win">
-              <li><i class="vs__sw vs__sw--win" aria-hidden="true"></i><span>160 hrs &times; $7.75 flat</span><b>$1,240</b></li>
+              <li><i class="vs__sw vs__sw--win" aria-hidden="true"></i><span>173 hrs &times; $7.75 flat</span><b>$1,343</b></li>
               <li class="vs__row--zero"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Payroll tax, benefits, equipment</span><b>$0</b></li>
-              <li class="vs__row--tot"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Total every month</span><b>$1,240</b></li>
+              <li class="vs__row--tot"><i class="vs__sw vs__sw--none" aria-hidden="true"></i><span>Total every month</span><b>$1,343</b></li>
             </ul>
-            <p class="vs__save">You keep <b>$2,927</b> a month &mdash; <b>$35,124</b> a year.</p>
+            <p class="vs__save">You keep <b>$3,120</b> a month &mdash; <b>$37,440</b> a year.</p>
           </div>
-          <p class="small" style="margin-top:.9rem">A 40-hour week is 160 hours a month, so the seat is 160 &times; $7.75. The in-house column assumes $19/hr, payroll tax and insurance at 17% of wages, and typical benefit and equipment costs; your figures will differ by state and role &mdash; we build the real version with you on the call.</p>
+          <!-- A month is 52 weeks over 12, not four weeks. The chart used to say "a
+               40-hour week is 160 hours a month", which is four weeks, while billing
+               is weekly: a year of it is 52 bills of $310 ($16,120), not 12 of $1,240
+               ($14,880), and every five-week month came in $310 over the figure
+               quoted here. Both columns moved to the same basis, so the comparison
+               is unchanged in shape and now matches what an invoice adds up to.
+               The yearly figure is 12 times the monthly one as printed ($3,120),
+               not the unrounded sum, which came to $37,438 and made the line
+               disagree with its own multiplication by two dollars. -->
+          <p class="small" style="margin-top:.9rem">A month here is 52 weeks divided by 12, so a 40-hour week comes to about 173 hours a month and the seat to 173 &times; $7.75. You are billed weekly for the hours actually worked, so a single month&rsquo;s bills can be four or five weeks. The in-house column assumes $19/hr on the same hours, payroll tax and insurance at 17% of wages, and typical benefit and equipment costs; your figures will differ by state and role &mdash; we build the real version with you on the call.</p>
         </div>
       </div>
     </div>
@@ -995,7 +1041,7 @@ function forwardAuthFragment(loc) {
     <div class="wrap">
       <div class="sec__head">
         <span class="eyebrow">How it works</span>
-        <h2>From first call to first shift in about a week.</h2>
+        <h2>From first call to the assistant you picked in about a week.</h2>
       </div>
 
       <div class="steps">
@@ -1007,7 +1053,7 @@ function forwardAuthFragment(loc) {
         <div class="step">
           <span class="step__n">Day 2&ndash;4</span>
           <h3>Shortlist</h3>
-          <p>Two or three vetted candidates, each with a recorded intro, a skills assessment and references already checked. You see the same file we do.</p>
+          <p>Two or three vetted candidates, each of whom has passed a written task in their track, the qualification exams, a strengths test and an interview with us. You see the same file we do.</p>
         </div>
         <div class="step">
           <span class="step__n">Day 5</span>
@@ -1022,7 +1068,7 @@ function forwardAuthFragment(loc) {
         <div class="step">
           <span class="step__n">Ongoing</span>
           <h3>Managed, not dropped off</h3>
-          <p>Weekly quality reviews, backup coverage when your VA is out, and a free replacement if the fit stops working. You manage the work, we manage the employment.</p>
+          <p>Weekly quality reviews, backup coverage when your VA is out, and a free replacement if the fit stops working. You direct the work; your assistant is contracted, paid and managed through us.</p>
         </div>
       </div>
     </div>
@@ -1041,7 +1087,7 @@ function forwardAuthFragment(loc) {
           <span class="sv__n">01</span>
           <h3>Communication gaps</h3>
           <p class="sv__p">Time-zone mismatches, language and accent barriers, replies that take hours, and assistants who never raise a problem until it lands on you.</p>
-          <p class="sv__fix"><b>How we solve it:</b> Your seat works your hours in your time zone, English is tested in a written task and two live interviews before you meet anyone, and you get a summary at the end of every day &mdash; problems flagged the day they appear, not the week after.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Your seat works your hours in your time zone, English is tested in a written task, the qualification exams and a live interview before you meet anyone, and you get a summary at the end of every day &mdash; problems flagged the day they appear, not the week after.</p>
         </div>
         <div class="sv">
           <span class="sv__n">02</span>
@@ -1059,7 +1105,7 @@ function forwardAuthFragment(loc) {
           <span class="sv__n">04</span>
           <h3>Training overhead</h3>
           <p class="sv__p">Onboarding takes far longer than expected, especially on niche tasks &mdash; and that time was exactly what you were trying to buy back.</p>
-          <p class="sv__fix"><b>How we solve it:</b> Training happens on our payroll, not your calendar. Your assistant is onboarded on your tools and your scripts before the first shift, so day one is work, not setup.</p>
+          <p class="sv__fix"><b>How we solve it:</b> Training is paid by us and happens on our time, not your calendar. Your assistant is onboarded on your tools and your scripts before the first shift, so day one is work, not setup.</p>
         </div>
         <div class="sv">
           <span class="sv__n">05</span>
@@ -1095,7 +1141,7 @@ function forwardAuthFragment(loc) {
         <div class="quote">
           <span class="eyebrow">Week one</span>
           <p>Your seat goes live. Trained on your tools, your scripts and your escalation rules, with the shift pattern agreed before day one &mdash; not assigned to you afterwards.</p>
-          <footer>Hold us to<br>A working seat inside seven days of the call</footer>
+          <footer>Hold us to<br>A shortlist within three working days of the call</footer>
         </div>
         <div class="quote">
           <span class="eyebrow">Day thirty</span>
@@ -1142,7 +1188,7 @@ function forwardAuthFragment(loc) {
         </details>
         <details>
           <summary>Is the first week really free?</summary>
-          <p>Yes &mdash; you are not billed for the hours your assistant works in week one. We do set up a card and a deposit before the week starts, so the seat can begin the day you approve it rather than waiting on paperwork. Billing itself starts in week two, at $7.75 an hour worked.</p>
+          <p>Yes &mdash; you are not billed for the hours your assistant works in week one. Billing starts in week two, weekly and in arrears: each bill covers hours already worked, at $7.75 an hour.</p>
         </details>
         <details>
           <summary>What is the minimum commitment?</summary>
@@ -1156,8 +1202,11 @@ function forwardAuthFragment(loc) {
     <div class="wrap trial__in">
       <div>
         <span class="trial__tag">The free week</span>
-        <h2>How the <b>free week</b> works.</h2>
-        <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. A card and a deposit are set up before the week starts, so the seat can begin the day you approve it, and the week itself is not charged.</p>
+        <!-- &nbsp;, not a space, before "works": the text after </b> is its own
+             segment for build-es.mjs, and a plain space stayed in front of the
+             Spanish full stop ("la <b>semana gratis</b> ."). -->
+        <h2>How the <b>free week</b>&nbsp;works.</h2>
+        <p>Take a full week with your matched assistant &mdash; real work, your hours, your tools &mdash; before a single hour is billed. The week itself is not charged; from week two you are billed weekly for the hours worked the week before.</p>
         <div class="hero__actions">
           <a class="btn btn--solid" data-book href="mailto:support@securejobva.com">Start the free week</a>
         </div>
@@ -1418,9 +1467,9 @@ function sayList(items) {
 
       <!-- 2 -->
       <section class="step" data-step="1" hidden>
-        <h3 class="q">How much cover, and when?</h3>
+        <h3 class="q" id="q-hours">How much cover, and when?</h3>
         <p class="q__sub">One seat is 40 hours a week. Pick the closest &mdash; we can tune it on the call.</p>
-        <div class="seg" id="seg-hours">
+        <div class="seg" id="seg-hours" role="radiogroup" aria-labelledby="q-hours">
           <label><input type="radio" name="hours" value="20"><span>20 hrs</span></label>
           <label><input type="radio" name="hours" value="30"><span>30 hrs</span></label>
           <label><input type="radio" name="hours" value="40" checked><span>40 hrs</span></label>
@@ -1428,8 +1477,8 @@ function sayList(items) {
           <label><input type="radio" name="hours" value="custom"><span>Custom</span></label>
         </div>
         <div class="field seg__custom" id="hours-custom">
-          <label for="in-hours">Hours a week you are looking to hire <em>&mdash; per seat</em></label>
-          <input type="number" id="in-hours" name="hours_custom" min="5" max="200" step="5" value="40" inputmode="numeric" placeholder="e.g. 25">
+          <label for="in-hours">Hours a week you are looking to hire <em>&mdash; in total, across every seat</em></label>
+          <input type="number" id="in-hours" name="hours_custom" min="5" max="168" step="5" value="40" inputmode="numeric" placeholder="e.g. 25">
         </div>
 
         <h3 class="q q--again">Which block is hurting?</h3>
@@ -1474,7 +1523,7 @@ function sayList(items) {
 
         <div class="est">
           <div class="est__n" id="est-week">$310 <span>/ week</span></div>
-          <div class="est__l" id="est-note">40 hrs &times; $7.75/hr<br>&asymp; $1,240 a month</div>
+          <div class="est__l" id="est-note">40 hrs &times; $7.75/hr<br>&asymp; $1,343 a month</div>
         </div>
       </section>
 
@@ -1485,30 +1534,30 @@ function sayList(items) {
         <div class="fields2">
           <div class="field field--split">
             <label for="in-name">Your name</label>
-            <input id="in-name" name="name" type="text" autocomplete="name" spellcheck="false">
+            <input id="in-name" name="name" type="text" autocomplete="name" spellcheck="false" maxlength="200">
             <p class="err" aria-live="polite"></p>
           </div>
           <div class="field field--split">
             <label for="in-co">Company</label>
-            <input id="in-co" name="company" type="text" autocomplete="organization" spellcheck="false">
+            <input id="in-co" name="company" type="text" autocomplete="organization" spellcheck="false" maxlength="200">
             <p class="err" aria-live="polite"></p>
           </div>
         </div>
         <div class="fields2">
           <div class="field field--split">
             <label for="in-email">Work email</label>
-            <input id="in-email" name="email" type="email" autocomplete="email" spellcheck="false" inputmode="email">
+            <input id="in-email" name="email" type="email" autocomplete="email" spellcheck="false" inputmode="email" maxlength="320">
             <p class="err" aria-live="polite"></p>
           </div>
           <div class="field field--split">
             <label for="in-phone">Phone <em>&mdash; optional</em></label>
-            <input id="in-phone" name="phone" type="tel" autocomplete="tel">
+            <input id="in-phone" name="phone" type="tel" autocomplete="tel" maxlength="60">
             <p class="err" aria-live="polite"></p>
           </div>
         </div>
         <div class="field">
           <label for="in-notes">What is eating your week? <em>&mdash; optional</em></label>
-          <textarea id="in-notes" name="notes" placeholder="Missed calls after 5pm, quotes going out two days late&hellip;"></textarea>
+          <textarea id="in-notes" name="notes" maxlength="4000" placeholder="Missed calls after 5pm, quotes going out two days late&hellip;"></textarea>
         </div>
         <p class="err" id="err-send" aria-live="polite"></p>
       </section>
@@ -1522,7 +1571,7 @@ function sayList(items) {
             </svg>
           </div>
           <h3 id="done-h">One tap left.</h3>
-          <p id="done-p">Your email is written and ready &mdash; send it and we reply the same working day.</p>
+          <p id="done-p">Your email is written and ready &mdash; send it and we reply within one to two business days.</p>
           <div class="recap" id="done-recap"></div>
           <div class="done__actions" id="done-actions"></div>
           <p class="done__note">No setup fee. No recruiting fee. Cancel with two weeks&rsquo; notice.</p>
@@ -1648,12 +1697,25 @@ function sayList(items) {
     });
   }
 
+  /* Two corrections here, both about what the reader is actually shown.
+
+     The words went through say(), because this runs on every open() and
+     overwrote the translated "$310 / semana" on /es with "/ week" and "a month"
+     in English — the one number the dialog exists to show, in the wrong
+     language, on the page that promised the other one.
+
+     And a month is 52 weeks over 12, not four. week * 4 is the same
+     160-hours-a-month basis the pricing chart used to use, which understates a
+     year of weekly bills by one month in thirteen. Rounded to the dollar
+     because it is an approximation and is labelled as one. */
   function estimate() {
     var h = hours();
     var week = h * CFG.rate;
-    document.getElementById("est-week").innerHTML = money(week) + " <span>/ week</span>";
-    document.getElementById("est-note").innerHTML = h + " hrs &times; $" + CFG.rate + "/hr<br>&asymp; " +
-      money(week * 4) + " a month";
+    document.getElementById("est-week").innerHTML =
+      say("{money} <span>/ week</span>", { money: money(week) });
+    document.getElementById("est-note").innerHTML =
+      say("{h} hrs &times; ${rate}/hr<br>&asymp; {month} a month",
+          { h: h, rate: CFG.rate, month: money(Math.round(week * 52 / 12)) });
   }
 
   function mark(el, msg) {
@@ -1729,7 +1791,12 @@ function sayList(items) {
       email: val("in-email"),
       phone: val("in-phone"),
       notes: val("in-notes"),
-      page: location.href
+      /* seat_requests_sane caps page at 500. An ad link with a long query string
+         went past it, the whole insert was refused, and post() parked the lead
+         in a queue it could never leave while telling the visitor we would keep
+         trying. The address is context for us, not the lead itself, so it is
+         the part that gives way. */
+      page: location.href.slice(0, 500)
     };
   }
 
@@ -1742,7 +1809,7 @@ function sayList(items) {
   function letter(d) {
     var lines = [
       "Seat: " + d.seats.join(", "),
-      "Hours: " + d.hours + " a week (" + money(d.weekly) + " a week at $" + CFG.rate + "/hr)",
+      "Hours: " + d.hours + " a week (" + money(d.weekly_cents / 100) + " a week at $" + CFG.rate + "/hr)",
       "Coverage: " + d.blocks.join(", "),
       "Time zone: " + d.timezone,
       "",
@@ -1760,12 +1827,25 @@ function sayList(items) {
       row(say("Seat"), esc((d.seats || []).join(", "))) +
       row(say("Cover"), esc((d.blocks || []).join(", ")) + " &middot; " + esc(d.timezone)) +
       row(say("Hours"), say("{n} a week", { n: d.hours })) +
-      row(say("Estimate"), say("{money} / week", { money: money(d.weekly) }), true);
+      /* weekly_cents, not weekly. weekly is the rounded integer column kept for
+         old readers, so 30 hours showed $233 here straight after the estimate
+         above it said $232.50 — the dialog contradicting itself on the one
+         number it sells. sql/046 says everything that displays a quote reads
+         weekly_cents; this and letter() were the two places that did not. */
+      row(say("Estimate"), say("{money} / week", { money: money(d.weekly_cents / 100) }), true);
 
+    /* The timings here are the ones "How it works" publishes, and nothing
+       else. This screen used to promise a shortlist "within one working day"
+       while the page behind it said Day 2–4 — after a scoping call this
+       screen never mentioned — and the email handoff promised a reply "the
+       same working day" while /contact said one to two. Whichever of two
+       promises somebody remembers, the other one is the one they were let
+       down by. */
     if (mode === "sent") {
       document.getElementById("done-h").textContent = say("We have it.");
       document.getElementById("done-p").textContent =
-        say("A shortlist for {company} lands in {email} within one working day.",
+        say("Next is the 20-minute scoping call — pick a time below. The shortlist for " +
+            "{company} follows in {email} within three working days of the call.",
             { company: d.company, email: d.email });
       actions.innerHTML = CFG.scheduler
         ? "<a class=\"btn btn--solid\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">" + say("Pick your time") + "</a>"
@@ -1773,7 +1853,7 @@ function sayList(items) {
     } else {
       document.getElementById("done-h").textContent = say("One tap left.");
       document.getElementById("done-p").textContent =
-        say("Your email is written and ready — send it and we reply the same working day.");
+        say("Your email is written and ready — send it and we reply within one to two business days.");
       var href = "mailto:" + CFG.email +
         "?subject=" + encodeURIComponent("Seat request — " + d.company) +
         "&body=" + encodeURIComponent(letter(d));
@@ -1847,13 +1927,36 @@ function sayList(items) {
           try { j = JSON.parse(t); } catch (e) {}
           if (j && typeof j.hint === "string" &&
               j.hint.indexOf("sjva-") === 0 && j.message) {
-            return { refused: String(j.message) };
+            return { refused: refusal(j.hint, j.message) };
+          }
+          /* 23514 is a CHECK constraint: something in the payload is longer
+             than the table accepts. It will be refused on every retry, so
+             parking it is the same broken promise as parking a deliberate
+             no — the fields now carry the table's own limits, so this is the
+             net under them rather than the usual way in. */
+          if (j && j.code === "23514") {
+            return { refused: say("Something in the form is longer than we can store. " +
+              "Shorten your note and send it again, or use the email button below.") };
           }
           return "dead";
         })["catch"](function () { return "dead"; });
       }
       return "retry";
     })["catch"](function () { return "retry"; }); /* offline, DNS, CORS */
+  }
+
+  /* The database writes its refusals in English, and /es showed them raw under
+     a Spanish heading. The hint is the part meant for a program, so it is the
+     part this reads: a hint we know is said in the page's own language, and
+     one we do not falls back to the database's sentence rather than to
+     nothing. Each say() takes its sentence as a literal, which is what lets
+     build-es.mjs find it and refuse to ship /es without its translation. */
+  function refusal(hint, message) {
+    if (hint === "sjva-throttled") {
+      return say("That is more submissions than we accept from one place in an hour. " +
+        "Write to support@securejobva.com and a person will pick it up.");
+    }
+    return String(message);
   }
 
   function queueRead() {
@@ -2128,8 +2231,10 @@ function sayList(items) {
       var a = e.target.closest ? e.target.closest("a[href^=\"mailto:\"]") : null;
       if (!a) return;
       var addr = a.getAttribute("href").slice(7).split("?")[0];
+      /* Through say(), with the same key careers.html uses, so /es says it
+         in Spanish like the rest of the page does. */
       copy(addr).then(
-        function () { toast("Copied  " + addr); },
+        function () { toast(say("Copied  {what}", { what: addr })); },
         function () { toast(addr); }
       );
     });

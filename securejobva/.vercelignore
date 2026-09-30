@@ -20,10 +20,25 @@ README.md
 # numbered file in sql/ to prove each form field still has a column — so it is
 # a build input, and ignoring it makes the deploy fail on a missing file
 # rather than pass.
+#
+# Its filled-in copies are a different matter. A *.local.sql file is a
+# migration with the real WEBHOOK_SECRET pasted over the placeholder, made to
+# be pasted into Supabase and then deleted. .gitignore keeps them out of git,
+# but a `vercel` deploy from this folder takes its list from this file and
+# cannot be relied on to read .gitignore as well — so without this line a CLI
+# deploy, preview included, could store the secret in the deployment's source
+# for anybody with the project to read. (A deploy from git never had them:
+# they were never committed.) build.mjs and check.mjs already skip them, so nothing needs
+# them. The same goes for the local env files the tools read, which can hold
+# keys stronger than that one.
+*.local.sql
+.env*
 
-# Host configs for Cloudflare Pages, Netlify and Apache. Kept in the repo so the
-# site can move hosts without a rewrite; Vercel reads vercel.json instead and
-# these would only confuse the picture.
-_headers
-_redirects
+# What tools/walk-paying.mjs --go leaves behind when a run is killed: one
+# machine's state, not the project's.
+tools/.walk-made.json
+
+# The Apache config. Vercel reads vercel.json and never this, and build.mjs
+# does not copy it into dist/ — it is kept in the repo for a move to Apache
+# hosting, and copied up by hand if that ever happens. See the file itself.
 .htaccess

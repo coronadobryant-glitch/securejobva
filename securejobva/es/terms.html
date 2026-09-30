@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -314,12 +355,29 @@ img{max-width:100%}
 .cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
 .cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .cform label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
-.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
+/* --muted, not --line, for the same reason as the two dialogs: --line on white
+   is 1.23:1, and the edge of a text box needs 3:1 to be findable at all. */
+.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--muted);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
 .cform textarea{min-height:8rem;resize:vertical}
 .cform input:focus-visible,.cform select:focus-visible,.cform textarea:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
 .cform .err{color:#B3261E;font-size:.85rem;margin:.15rem 0 0;min-height:1.1em}
 :root[data-theme="dark"] .cform .err{color:#F2B8B5}
 @media(min-width:560px){.cform__two{display:grid;grid-template-columns:1fr 1fr;gap:0 .9rem}}
+/* The agree box. The markup is the .opt pattern from the two dialogs, but its
+   rules never came with it — they sit after the hero marker in careers.html,
+   outside what lib-chrome.mjs lifts — so the page showed a raw checkbox, a
+   tick that was always visible, and the whole label forced into the
+   uppercase mono of .cform label. These are those rules, scoped to the form. */
+.cform label.opt{display:flex;align-items:flex-start;gap:.7rem;position:relative;cursor:pointer;font-family:inherit;font-size:.95rem;letter-spacing:0;text-transform:none;color:var(--ink);margin-bottom:.25rem}
+.cform .opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.cform .opt__box{width:18px;height:18px;flex:none;margin-top:.15rem;border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);display:grid;place-items:center;color:var(--accent-ink)}
+.cform .opt__box svg{opacity:0;transition:opacity .12s ease}
+.cform .opt input:checked ~ .opt__box{background:var(--accent);border-color:var(--accent)}
+.cform .opt input:checked ~ .opt__box svg{opacity:1}
+.cform .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
+.cform .opt__t{display:block;font-weight:600;line-height:1.35}
+.cform .opt__d{display:block;font-size:.85rem;color:var(--ink-2);margin-top:.15rem}
+.cform .opt__d a{color:var(--accent)}
 .cform__ok{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.15rem 1.3rem}
 .contact__at{display:grid;gap:.8rem;margin:1.4rem 0 2.2rem}
 .contact__row{display:flex;flex-wrap:wrap;gap:.5rem 1rem;padding-bottom:.7rem;border-bottom:1px solid var(--line)}
@@ -350,7 +408,7 @@ img{max-width:100%}
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
-      <a class="brand" href="/" aria-label="Inicio de SecureJobVA">
+      <a class="brand" href="/es" aria-label="Inicio de SecureJobVA">
 <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -361,12 +419,30 @@ img{max-width:100%}
         <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
       </a>
       <nav class="nav__links">
-        <a href="/">Empresas</a>
-        <a href="/careers">Empleos</a>
-        <a href="/contact">Contacto</a>
+        <a href="/es">Empresas</a>
+        <a href="/es/careers">Empleos</a>
+        <a href="/es/contact">Contacto</a>
         <a class="nav__signin" href="/status">Entrar</a>
-        <a class="langtog" id="langtog" href="/terms" hreflang="en" lang="en" aria-label="View this page in English">EN</a>
       </nav>
+      <div class="nav__tools">
+        <button class="navtog" id="navtog" type="button" aria-expanded="false" aria-controls="mobnav" aria-label="Menú">
+          <svg class="i-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+          <svg class="i-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+          </svg>
+        </button>
+        <a class="langtog" id="langtog" href="/terms" hreflang="en" lang="en" aria-label="View this page in English">EN</a>
+      </div>
+    </div>
+  </div>
+  <div class="mobnav" id="mobnav" hidden>
+    <div class="wrap mobnav__in">
+      <a href="/es">Empresas</a>
+      <a href="/es/careers">Empleos</a>
+      <a href="/es/contact">Contacto</a>
+      <a class="nav__signin" href="/status">Entrar</a>
     </div>
   </div>
 </header>
@@ -376,7 +452,7 @@ img{max-width:100%}
     <div class="wrap doc__wrap">
       <span class="eyebrow">Políticas del sitio</span>
       <h1>Términos del servicio</h1>
-      <p class="doc__meta">Última actualización: 26 de agosto de 2026</p>
+      <p class="doc__meta">Última actualización: 30 de septiembre de 2026</p>
       <p class="doc__gov">Esta es una traducción de cortesía para facilitar la lectura. La versión en inglés es la que rige: si las dos difieren, prevalece el inglés. <a href="/terms" hreflang="en" lang="en">Read the English version</a>.</p>
       <nav class="doc__toc" aria-label="En esta página"><ul><li><a href="#t1">1. Aceptación</a></li><li><a href="#t2">2. El servicio</a></li><li><a href="#t3">3. Requisitos</a></li><li><a href="#t4">4. Tu cuenta</a></li><li><a href="#t5">5. Conducta del postulante</a></li><li><a href="#t6">6. Cuentas de redes sociales</a></li><li><a href="#t7">7. Sin garantía de trabajo</a></li><li><a href="#t8">8. Situación de los asistentes colocados</a></li><li><a href="#t9">9. Tarifas</a></li><li><a href="#t10">10. Propiedad intelectual</a></li><li><a href="#t11">11. Terminación</a></li><li><a href="#t12">12. Responsabilidad</a></li><li><a href="#t13">13. Ley aplicable</a></li><li><a href="#t14">14. Cambios</a></li><li><a href="#t15">15. Contacto</a></li></ul></nav>
       <h2 id="t1">1. Aceptación</h2>
@@ -406,8 +482,8 @@ img{max-width:100%}
       <p>Si estás postulando y quieres saber en qué situación quedarías antes de dedicar tiempo a los exámenes, pregúntanos a <a href="mailto:support@securejobva.com">support@securejobva.com</a> y te lo diremos con claridad.</p>
       <h2 id="t9">9. Tarifas</h2>
       <p><b>A los Postulantes nunca se les cobra.</b> No hay ningún cobro por postular, por aparecer en la lista, por ser evaluado ni por ser colocado, y no nos quedamos con un porcentaje de lo que te pagan. Si alguien te pide pagarnos por cualquiera de esas cosas, no viene de nosotros &mdash; avísanos a <a href="mailto:support@securejobva.com">support@securejobva.com</a>.</p>
-      <p><b>Los Clientes</b> pagan una tarifa fija por hora trabajada, cotizada antes de que el puesto empiece y facturada semanalmente. No hay cargo de instalación, ni cargo de reclutamiento, ni recargos añadidos después. La tarifa vigente y lo que incluye están en la <a href="/#pricing">sección de precios</a> de la página de inicio; la tarifa que se te cotiza en la primera llamada es la que se te factura.</p>
-      <p>La primera semana de un puesto nuevo no se cobra. Se registra una tarjeta y un depósito antes de que empiece, para que el puesto pueda comenzar el mismo día en que se aprueba. La facturación empieza en la segunda semana.</p>
+      <p><b>Los Clientes</b> pagan una tarifa fija por hora trabajada, cotizada antes de que el puesto empiece y facturada semanalmente. No hay cargo de instalación, ni cargo de reclutamiento, ni recargos añadidos después. La tarifa vigente y lo que incluye están en la <a href="/es#pricing">sección de precios</a> de la página de inicio; la tarifa que se te cotiza en la primera llamada es la que se te factura.</p>
+      <p>La primera semana de un puesto nuevo no se cobra. La facturación empieza en la segunda semana, cada semana y por semana vencida: cada factura cubre horas ya trabajadas, a la tarifa que se te cotizó.</p>
       <h2 id="t10">10. Propiedad intelectual</h2>
       <p>Todo lo que hay en el Sitio, salvo el contenido enviado por los usuarios, pertenece a Secure Job VA y no puede copiarse ni reproducirse sin permiso.</p>
       <h2 id="t11">11. Terminación</h2>
@@ -429,14 +505,37 @@ img{max-width:100%}
     <div class="foot__bot" style="margin-top:0;border-top:0;padding-top:0">
       <span>&copy; 2026 Secure Job VA &middot; Houston, Texas</span>
       <span>
-        <a href="/">Inicio</a> &middot;
-        <a href="/careers">Empleos</a> &middot;
-        <a href="/privacy">Privacidad</a> &middot;
-        <a href="/terms">Términos</a> &middot;
-        <a href="/refunds">Reembolsos</a> &middot;
-        <a href="/contact">Contacto</a>
+        <a href="/es">Inicio</a> &middot;
+        <a href="/es/careers">Empleos</a> &middot;
+        <a href="/es/privacy">Privacidad</a> &middot;
+        <a href="/es/terms">Términos</a> &middot;
+        <a href="/es/refunds">Reembolsos</a> &middot;
+        <a href="/es/contact">Contacto</a>
       </span>
     </div>
   </div>
 </footer>
+<script>
+(function () {
+  var btn = document.getElementById("navtog");
+  var panel = document.getElementById("mobnav");
+  if (!btn || !panel) return;
+  function setOpen(open) {
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) { panel.removeAttribute("hidden"); } else { panel.setAttribute("hidden", ""); }
+  }
+  btn.addEventListener("click", function () {
+    setOpen(btn.getAttribute("aria-expanded") !== "true");
+  });
+  panel.addEventListener("click", function (e) {
+    if (e.target.closest("a")) setOpen(false);
+  });
+  window.addEventListener("resize", function () {
+    if (window.innerWidth >= 900) setOpen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setOpen(false);
+  });
+})();
+</script>
 

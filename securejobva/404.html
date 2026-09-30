@@ -1,0 +1,136 @@
+<title>Page not found — SecureJobVA</title>
+
+<style>
+/* The page a wrong address lands on, served by the host for any path it has
+   no file for. It used to be Vercel's own plain-text "NOT_FOUND" with a
+   request id, which reads as the site being broken rather than a link being
+   wrong.
+
+   Deliberately small, and deliberately on its own. It is served at whatever
+   depth the bad address had — /es/careers/typo gets it as much as /typo — so
+   every link is absolute, and it carries only the few tokens it uses rather
+   than a copy of the whole stylesheet. No web fonts: a page that exists to
+   say "not here" should not also be the one that waits on a third party. */
+:root{
+  --paper:#FFFFFF;
+  --surface-2:#F1F5FA;
+  --ink:#001232;
+  --ink-2:#3B4C66;
+  --muted:#64778F;
+  --line:#E1E8F1;
+  --accent:#0072EE;
+  --accent-ink:#FFFFFF;
+  --mark-from:#0072EE;
+  --mark-to:#002E6B;
+  --mark-bg:#FFFFFF;
+  --mark-ink:#FFFFFF;
+  --gut:clamp(1.25rem,4vw,2.5rem);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#080F1C;
+  --surface-2:#152034;
+  --ink:#EAF1FB;
+  --ink-2:#B9C8DE;
+  --muted:#7F91AA;
+  --line:#22304A;
+  --accent:#3B9BFF;
+  --accent-ink:#001232;
+  --mark-from:#6FBBFF;
+  --mark-to:#2B7FE0;
+  --mark-bg:#0B1424;
+  --mark-ink:#08111F;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+  font-size:1.0625rem;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:3px;border-radius:4px}
+.wrap{width:min(100% - (var(--gut) * 2),40rem);margin-inline:auto}
+.nav{border-bottom:1px solid var(--line)}
+.nav__in{display:flex;align-items:center;height:68px}
+.brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;letter-spacing:-.02em;font-size:1.12rem}
+.brand__mark{width:26px;height:26px;flex:none}
+.brand__va{color:var(--accent)}
+.lost{padding:clamp(3rem,10vw,6rem) 0 4rem}
+.lost__code{font-family:ui-monospace,"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 .8rem}
+.lost h1{font-size:clamp(2rem,1.4rem + 3vw,2.9rem);line-height:1.08;letter-spacing:-.022em;margin:0 0 1rem;font-weight:800}
+.lost p{color:var(--ink-2);margin:0 0 1.6rem;max-width:36rem}
+.lost__go{display:flex;flex-wrap:wrap;gap:.7rem;margin:0 0 3rem;padding:0;list-style:none}
+.btn{display:inline-flex;align-items:center;font-weight:700;font-size:.98rem;padding:.8rem 1.35rem;border-radius:8px;text-decoration:none;border:1.5px solid var(--line)}
+.btn--solid{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.lost__es{border-top:1px solid var(--line);padding-top:1.6rem}
+.lost__es h2{font-size:1.25rem;margin:0 0 .5rem;font-weight:800;letter-spacing:-.015em}
+.lost__es p{margin:0 0 1rem}
+.lost__es .lost__go{margin:0}
+</style>
+
+<script>
+/* Restore the saved theme before paint, the same key every other page uses,
+   so somebody who chose dark does not get a white flash for a typo. */
+(function () {
+  try {
+    var saved = localStorage.getItem("sjva-theme");
+    if (saved === "dark" || saved === "light") {
+      document.documentElement.setAttribute("data-theme", saved);
+    }
+  } catch (e) {}
+})();
+</script>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="nav__in">
+      <a class="brand" href="/" aria-label="SecureJobVA home">
+        <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="brandShield" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#0072EE" style="stop-color:var(--mark-from,#0072EE)"></stop>
+              <stop offset="1" stop-color="#002E6B" style="stop-color:var(--mark-to,#002E6B)"></stop>
+            </linearGradient>
+          </defs>
+          <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
+          <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
+          <path d="M13.2 13.1v-1.4a1.7 1.7 0 0 1 1.7-1.7h2.2a1.7 1.7 0 0 1 1.7 1.7v1.4" stroke="url(#brandShield)" stroke-width="1.7" stroke-linecap="round"></path>
+          <rect x="8.9" y="13.1" width="14.2" height="9.6" rx="1.7" fill="url(#brandShield)"></rect>
+          <path d="m11.9 18.2 2.9 3 6.1-7" stroke="var(--mark-ink)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <span>SecureJob<b class="brand__va">VA</b></span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="lost">
+    <div class="wrap">
+      <p class="lost__code">404 &middot; Not found</p>
+      <h1>There is no page at this address.</h1>
+      <p>The link may be old, or a letter may have gone astray in typing it. Nothing on your side is broken.</p>
+      <ul class="lost__go">
+        <li><a class="btn btn--solid" href="/">Hiring a VA</a></li>
+        <li><a class="btn" href="/careers">Careers</a></li>
+        <li><a class="btn" href="/status">Sign in</a></li>
+        <li><a class="btn" href="/contact">Contact</a></li>
+      </ul>
+
+      <div class="lost__es" lang="es">
+        <h2>Esta página no existe.</h2>
+        <p>Puede que el enlace sea antiguo o que la dirección tenga un error de escritura.</p>
+        <ul class="lost__go">
+          <li><a class="btn" href="/es" hreflang="es">Inicio</a></li>
+          <li><a class="btn" href="/es/careers" hreflang="es">Empleos</a></li>
+          <li><a class="btn" href="/es/contact" hreflang="es">Contacto</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>

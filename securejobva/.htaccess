@@ -1,9 +1,14 @@
-# Apache config for GoDaddy cPanel hosting. Upload with the rest of dist/ into
-# public_html.
+# Apache config, for a move to Apache or cPanel hosting. Nothing reads it today.
 #
-# Cloudflare Pages and Netlify read _headers and _redirects and give clean URLs,
-# HTTPS and www->apex for free. Apache does none of that on its own and ignores
-# both of those files, so everything they describe is restated here.
+# The site is on Vercel, which reads vercel.json and never this file, and
+# build.mjs does not copy it into dist/. It is kept so a move does not start
+# from nothing: copy it by hand into public_html next to the contents of dist/.
+#
+# vercel.json is the source of truth. Everything below restates it for Apache,
+# which gives none of it on its own — clean URLs, the host redirect, the
+# response headers, the 404 page — so when one changes, change the other.
+# The Cloudflare/Netlify copies (_headers, _redirects) were deleted rather than
+# kept as a third list that nobody deployed and that had already drifted.
 
 RewriteEngine On
 
@@ -13,9 +18,14 @@ RewriteEngine On
 RewriteCond %{HTTPS} !=on
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Drop www.
-RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
-RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+# Add www. build.mjs stamps https://www.securejobva.com into every canonical,
+# og:url, hreflang and the sitemap, because that is the host Vercel serves and
+# the apex redirects to it. This used to drop www instead, which would have
+# made every one of those name an address that redirects — the split ranking
+# signal the comment on SITE in build.mjs warns about. If SITE ever changes,
+# this changes with it.
+RewriteCond %{HTTP_HOST} ^securejobva\.com$ [NC]
+RewriteRule ^ https://www.securejobva.com%{REQUEST_URI} [L,R=301]
 
 # --- Path aliases -----------------------------------------------------------
 # Short addresses worth printing on a card or an ad. Kept above the clean-URL
@@ -44,7 +54,13 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME}.html -f
 RewriteRule ^(.+?)/?$ $1.html [L]
 
+# --- Not found --------------------------------------------------------------
+# The branded page build.mjs writes, as Vercel serves it from dist/404.html.
+
+ErrorDocument 404 /404.html
+
 # --- Response headers -------------------------------------------------------
+# The same set, with the same values, as the headers block in vercel.json.
 
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
@@ -52,9 +68,26 @@ RewriteRule ^(.+?)/?$ $1.html [L]
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
 
-  # No includeSubDomains or preload: those commit every future subdomain to
-  # HTTPS for a year and are painful to walk back. Add them once settled.
-  Header always set Strict-Transport-Security "max-age=31536000" env=HTTPS
+  # includeSubDomains, and still no preload. Two years, which is what Vercel's
+  # own redirects already send, so the host a visitor happens to hit first
+  # does not decide how long the rule lasts. Preload is left out because it is
+  # the part that cannot be walked back quickly: it is compiled into browsers.
+  Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains" env=HTTPS
+
+  # Report-only: browsers log a violation in the console and block nothing.
+  # These four directives restrict things no page here does — being framed by
+  # another site, a <base> tag, a form posting off-site, a plugin — so they are
+  # the part of a policy that can be switched to enforcing with no page
+  # changes, once nothing has shown up for a while. Scripts and styles are not
+  # covered: every page carries inline ones, and a policy for those is a
+  # rewrite, not a header.
+  Header always set Content-Security-Policy-Report-Only "frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+  # The signed-in pages say noindex in a meta tag too; this covers a crawler
+  # that reads headers and not markup.
+  <If "%{REQUEST_URI} =~ m#^/(admin|status|hub|seats|pay)(\.html)?$#">
+    Header always set X-Robots-Tag "noindex, nofollow"
+  </If>
 </IfModule>
 
 # --- Caching ----------------------------------------------------------------
@@ -70,13 +103,5 @@ RewriteRule ^(.+?)/?$ $1.html [L]
 </IfModule>
 
 # --- Housekeeping -----------------------------------------------------------
-
-# _headers and _redirects are Cloudflare/Netlify files. build.mjs leaves them
-# out of dist/, so on a clean deploy there is nothing here to reach. The rule is
-# for the case where someone copies them up by hand: Apache ignores both files
-# but would still hand their contents to anyone who asked.
-<FilesMatch "^_(headers|redirects)$">
-  Require all denied
-</FilesMatch>
 
 Options -Indexes

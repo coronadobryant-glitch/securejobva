@@ -52,11 +52,22 @@ const SHARED = ["tzOpts", "browserTz", "slotDay", "slotClock", "slotLabel", "slo
 
 /* Her side. MY_TZ is hers; CENTRAL is ours, and the card prints both because
    one of the two is the one she is going to get wrong. */
-const her = new Function("esc",
+/* Her card judges "has this time started" by serverNow(), the offset from
+   sql/078's server_time, and stops offering a time that has. That clock is
+   the test's, not the machine's: the fixtures are early September 2026, and
+   read against the real date every one of them had passed by the end of that
+   month, so the card offered nothing and every assertion below about picking
+   failed for a reason that was only the calendar. Fixed on the Saturday
+   before the first slot unless a section moves it on purpose. */
+const BEFORE = Date.parse("2026-09-05T12:00:00Z");
+let NOW = BEFORE;
+const serverNow = () => NOW;
+
+const her = new Function("esc", "serverNow",
   "var MY_TZ = null, CENTRAL = 'America/Chicago';\n" +
   SHARED.concat(["ivCard"]).map((n) => grab(statusHtml, n, "status.html")).join("\n") +
   "\nreturn { set: function (tz) { MY_TZ = tz; }, card: ivCard, label: slotLabel };"
-)(esc);
+)(esc, serverNow);
 
 /* Ours. Staff read one clock, so this side never sets MY_TZ. */
 const us = new Function("esc", "todayLocal",
@@ -193,6 +204,18 @@ console.log("\n  Once there is a link");
   ok("she gets a way in", has(v.h, "https://meet.example/abc"), true);
   ok("that opens safely", has(v.h, 'rel="noopener noreferrer"'), true);
   ok("and no longer says a link is coming", has(v.h, "link to follow"), false);
+
+  /* meeting_url is typed by staff and was once put into href= as it came.
+     sql/081 now refuses anything that is not a web address, and the card
+     checks for http(s) itself as well, for rows written before 081. A
+     javascript: link would run on her page, signed in, when she pressed Join. */
+  const w = both([slot("s1", T1, {
+    chosen_at: "2026-09-05T10:00:00Z", confirmed_at: "2026-09-05T11:00:00Z",
+    meeting_url: "javascript:x"
+  })]);
+  ok("a link that is not a web address is never made a Join button",
+     /href="\s*javascript:/i.test(w.h), false);
+  ok("and she is still told a link is coming", has(w.h, "link to follow"), true);
 }
 
 /* ── none of them worked ─────────────────────────────────────────────────
@@ -219,6 +242,30 @@ console.log("\n  One declined, one still live");
   ok("she is still asked to pick", has(v.h, "Pick a time"), true);
   ok("and not told a new set is coming", has(v.h, "New times coming"), false);
   ok("we are not told to offer a new set", has(v.u, "Offer a new set"), false);
+}
+
+/* ── times that have gone by ─────────────────────────────────────────────
+   Offered for Monday, still drawn with Choose on Wednesday: she picked, was
+   told "we will confirm", and waited on an interview that had already
+   happened. sql/082 refuses that pick now; the card has to stop offering it. */
+console.log("\n  The times have gone by");
+{
+  NOW = Date.parse(T1) + 60000;           /* the first has started, the second not */
+  const v = both([slot("s1", T1), slot("s2", T2)]);
+  ok("only the time still ahead can be chosen", (v.h.match(/data-slot=/g) || []).length, 1);
+  ok("the other is listed and says it has passed", has(v.h, "this time has passed"), true);
+
+  NOW = Date.parse(T2) + 60000;           /* both gone */
+  const w = both([slot("s1", T1), slot("s2", T2)]);
+  ok("nothing left to choose", has(w.h, "data-slot"), false);
+  ok("and she is told why", has(w.h, "These times have passed"), true);
+  ok("with the button that asks us for new ones", has(w.h, "data-none"), true);
+
+  /* A pick she already made is hers to wait on, passed or not — the card
+     does not take it back from her. */
+  const x = both([slot("s1", T1, { chosen_at: "2026-09-05T10:00:00Z" })]);
+  ok("a time she already picked still reads as picked", has(x.h, "picked &mdash;"), true);
+  NOW = BEFORE;
 }
 
 /* ── the two sides never disagree about who is holding it ───────────── */

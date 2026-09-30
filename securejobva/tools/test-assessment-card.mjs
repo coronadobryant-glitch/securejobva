@@ -63,10 +63,19 @@ const FILE = "status.html";
 if (!existsSync(FILE)) { console.log("  FAIL  " + FILE + " is not built"); process.exit(1); }
 const html = readFileSync(FILE, "utf8");
 
+/* The card times a part by serverNow() — the device clock corrected by the
+   offset from sql/078's server_time — because the database closes the part by
+   its own clock. With no offset that is Date.now(), which is also what the
+   fixtures below measure "minutes ago" from. */
 const card = new Function(
   "var MY_TZ = null;\n" +
+  "function serverNow() { return Date.now(); }\n" +
   ["QBANK", "SCEN", "TRACK_AXES"].map((v) => grabVar(html, v, FILE)).join("\n") + "\n" +
-  ["esc", "tzOpts", "when", "assessCard"].map((n) => grab(html, n, FILE)).join("\n") +
+  /* trackFor() is lifted when the page has it: it is how the card picks the
+     track before the assessment row exists (see the section on tracks below). */
+  ["esc", "tzOpts", "when", "assessCard"]
+    .concat(html.indexOf("function trackFor(") > -1 ? ["trackFor"] : [])
+    .map((n) => grab(html, n, FILE)).join("\n") +
   "\nreturn assessCard;"
 )();
 
@@ -107,6 +116,29 @@ const sales = card({ status: "assessment", track: "Sales & Marketing" }, null);
 ok("six parts on the track sales actually gates", starts(sales), 6);
 ok("and it says six", sales.indexOf("Six parts") > -1, true);
 ok("the sales part is there", startFor(sales, "sales"), true);
+
+/* ── which track decides whether Sales exists ──────────────────────────────
+   The card read a.track, the legacy single-track column that the careers
+   form stopped filling when it started sending tracks[]. So for everyone who
+   applied since, the card asked Customer Service's five parts while the row
+   was created with tracks[0] and scored on Sales & Marketing — a Sales
+   applicant was never shown the Sales part and was then scored on it.
+   sql/079 has the database write coalesce(tracks[1], track, 'Customer
+   Service') into the row; the page has to agree with it. */
+console.log("\n  The track she applied for, not the column nobody fills");
+
+const salesNew = card({ status: "assessment", track: null, tracks: ["Sales & Marketing", "Admin Tasks"] }, null);
+ok("before the row exists, tracks[0] decides", startFor(salesNew, "sales"), true,
+   "the same expression 079 writes");
+const salesRow = card({ status: "assessment", track: "Customer Service", tracks: ["Customer Service"] },
+  { track: "Sales & Marketing", part_done: {} });
+ok("once the row exists, its own track decides", startFor(salesRow, "sales"), true,
+   "the row is what the verdict is scored on");
+const csRow = card({ status: "assessment", track: null, tracks: ["Sales & Marketing"] },
+  { track: "Customer Service", part_done: {} });
+ok("and wins over what the application says", startFor(csRow, "sales"), false);
+ok("nobody with no track at all is asked for Sales",
+   startFor(card({ status: "assessment" }, null), "sales"), false);
 
 /* ── 054, the one the walkthrough says to expect back ──────────────────── */
 console.log("\n  Answers are not the same thing as finished");

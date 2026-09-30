@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -282,13 +323,16 @@ img{max-width:100%}
 .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
 .opt__box{
   width:18px;height:18px;flex:none;margin-top:.18rem;
-  border:1.5px solid var(--line);border-radius:5px;background:var(--surface);
+  border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
 .opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
 .opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
+/* --muted on the tinted ground of a picked option is 4.10:1, under the 4.5
+   small text needs, so the description darkens with the pick. */
+.opt:has(input:checked) .opt__d,.opt.is-on .opt__d{color:var(--ink-2)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 /* ---------- portal ---------- */
@@ -1160,6 +1204,41 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* The client portal keeps its session in a slot of its own (seats.html sets
+   SLOT = "client"), so sending somebody there hands them a page that cannot
+   see they are signed in: the sign-in card, with no explanation, having
+   clicked nothing. The slots exist so three audiences stop evicting each
+   other — not so that this page's own redirect can land on a wall.
+
+   So put the same token in the client drawer before going, which is exactly
+   what signing in again at /seats would have put there. It grants nothing:
+   the lock is the signature on the token and Postgres checks it either way.
+
+   The one thing that must not be overwritten is a LIVE session belonging to
+   somebody else, because that is the eviction the slots were added to stop.
+   An expired one is already spent, so it is fair game. When we will not
+   overwrite, this returns false and the caller stays here and offers the link
+   instead, which is still better than the wall. */
+function handToClientSlot() {
+  var s = loadSession();
+  if (!s || !s.access_token) return false;
+  var mine = readToken(s.access_token);
+  if (!mine || !mine.email) return false;
+
+  var raw = null;
+  try { raw = localStorage.getItem("sjva-session-client"); } catch (e) { return false; }
+  if (raw) {
+    var theirs = null;
+    try { theirs = JSON.parse(raw); } catch (e) { theirs = null; }
+    var t = theirs && theirs.access_token ? readToken(theirs.access_token) : null;
+    if (t && t.email && t.email !== mine.email && t.exp && t.exp * 1000 > Date.now()) return false;
+  }
+
+  try { localStorage.setItem("sjva-session-client", JSON.stringify(s)); }
+  catch (e) { return false; }
+  return true;
+}
+
 /* ── whose rows are these? ────────────────────────────────────
 
    Every portal page below asks the database for its rows and, until now, took
@@ -1582,6 +1661,71 @@ function api(path, opts) {
   }
 }
 
+/* The sentence the database meant for her, when it refused on purpose.
+
+   A deliberate refusal in sql/ raises with a hint that starts "sjva-" and a
+   message written for the person reading it — "that time has already passed",
+   "that is not a link". api() throws the raw PostgREST body, so without this
+   every one of them arrived as "That did not save. Check your connection",
+   which sends her off to fix a connection that was never the problem.
+
+   Anything else — a dropped connection, a 500, a refusal nobody wrote words
+   for — gives back "", and the caller says what it always said. */
+function ourWords(e) {
+  var t = String((e && e.message) || e || "");
+  try {
+    var j = JSON.parse(t);
+    if (j && j.message && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0) return String(j.message);
+  } catch (x) {}
+  return "";
+}
+
+/* The server's clock, as an offset from this device's.
+
+   A part's deadline is the server's opening time plus its minutes, and the
+   page used to hold that against Date.now() — this device's clock. A laptop
+   running 25 minutes fast therefore opened a 20-minute part already over, and
+   the page closed it on the spot with nothing in it. She could not reopen it.
+   The database (sql/078) judges the deadline by its own clock, so the page has
+   to judge by the same one or the two will disagree about when she ran out.
+
+   rpc/server_time (sql/078) answers with now(). The offset is the difference,
+   read once per part opened rather than trusted from the first page load, so
+   a clock corrected halfway through is caught at the next part. If the call
+   fails — 078 not pasted, a blip — the offset stays where it was, which is 0
+   the first time: exactly the old behaviour, and no worse than before.
+
+   The same clock serves the two interview pages. On /hub it decides which
+   interview times have already passed, and it has to agree with sql/082,
+   which refuses a pick by the database's own now(): a phone clock a few
+   minutes out would otherwise offer a time the database then refuses, or hide
+   one it would still take. On /seats it decides whether the interview card is
+   still in play and whether a time the client is about to offer is in the
+   past, at the same moment /hub decides it for the assistant. Both read the
+   offset once as they load; if that fails the offset stays 0, which is exactly
+   how the pages behaved before.
+
+   It lives here, once, because this block is the same on all five pages. It
+   used to be pasted into three of them with three different comments, and the
+   generator can only write one. */
+var SKEW = 0;
+
+function serverNow() {
+  return Date.now() + SKEW;
+}
+
+function syncClock() {
+  var sent = Date.now();
+  return api("rpc/server_time", { method: "POST", body: {} })
+    .then(function (iso) {
+      var t = Date.parse(iso);
+      if (isNaN(t)) return;
+      /* Half the round trip, so a slow answer is not read as a slow clock. */
+      SKEW = t - Math.round((sent + Date.now()) / 2);
+    })
+    .catch(function () {});
+}
+
 /* Storage lives beside PostgREST on the same project. */
 function storageBase() {
   return SB + "/storage/v1";
@@ -1625,19 +1769,42 @@ function signDoc(path) {
   });
 }
 
+/* Three things this used to get wrong, all found the same afternoon.
+
+   A second click while the first was still signing opened the file twice, so
+   a button that is already busy is left alone.
+
+   The tab was opened after the signing request came back, which is no longer
+   "in the click" as far as a popup blocker is concerned. Safari refuses that
+   without a word, so on an iPhone the button said "Opening…", then went back
+   to the filename, and nothing ever opened. The tab is now opened blank while
+   the click is still happening and pointed at the file when the link arrives.
+   It is opened without "noopener" only because that makes window.open hand
+   back null, and there would be nothing to point; the opener is cut by hand
+   straight after, which is the same protection.
+
+   And a failure put the label back at once: the last .then ran after the
+   .catch and found the button still disabled, so "Could not open" was
+   replaced before anybody could read it. Only success puts the label back
+   now; a failure waits its 2.2 seconds as it was always meant to. */
 function openDoc(btn) {
+  if (btn.disabled) return;
   var path = btn.getAttribute("data-doc");
   var was = btn.textContent;
+  var tab = null;
+  try { tab = window.open("", "_blank"); } catch (e) { tab = null; }
+  if (tab) { try { tab.opener = null; } catch (e) {} }
   btn.disabled = true;
   btn.textContent = "Opening…";
   signDoc(path).then(function (url) {
-    window.open(url, "_blank", "noopener");
-  }).catch(function (e) {
+    if (tab && !tab.closed) tab.location.href = url;
+    else window.open(url, "_blank", "noopener");
+    btn.textContent = was;
+    btn.disabled = false;
+  }, function (e) {
+    if (tab && !tab.closed) { try { tab.close(); } catch (x) {} }
     btn.textContent = e.message === "signed out" ? "Signed out" : "Could not open";
     setTimeout(function () { btn.textContent = was; btn.disabled = false; }, 2200);
-    return;
-  }).then(function () {
-    if (btn.disabled) { btn.textContent = was; btn.disabled = false; }
   });
 }
 
@@ -1942,14 +2109,24 @@ function wireTz() {
 
     /* Upsert by hand: one row per user, and whether it exists yet depends on
        whether they have ever opened this card. Prefer resolution=merge-duplicates
-       makes the first save and the tenth the same request. */
+       makes the first save and the tenth the same request.
+
+       No user_id in the body. PostgREST turns every column it is sent into
+       the SET list of ON CONFLICT DO UPDATE, and Postgres wants UPDATE
+       permission on each of them before it looks for a conflict at all, even
+       on a first save that never conflicts. 059 grants update on time_zone
+       only, so sending user_id asked to update user_id, which nobody may, and
+       every save came back a 42501, "permission denied for table
+       user_settings", with nothing ever stored. sql/080
+       gives the column a default of auth.uid(), so the row is still hers
+       without the page naming her, and the policy pins it either way. */
     api("user_settings", {
       method: "POST",
       headers: {
         Prefer: "resolution=merge-duplicates,return=minimal",
         "Content-Profile": "public"
       },
-      body: { user_id: MY_USER, time_zone: pick }
+      body: { time_zone: pick }
     }).then(function () {
       MY_TZ = pick;
       tzFlash(ok, "Saved");
@@ -2064,6 +2241,28 @@ function slotState(slots) {
          : live.length ? "waiting_on_assistant"
          : "not_started"
   };
+}
+
+/* When a declined applicant may apply again: three months after the decline,
+   the rule sql/027 and 075 enforce (status_changed_at + interval '3 months').
+
+   075 took the date out of the refusal the careers form shows, because that
+   form answers anybody who types an address, and the date told a stranger who
+   had been turned down and when. This page only ever shows her own
+   application, so the date moves here, where it is hers to see.
+
+   Month arithmetic the way Postgres does it, in UTC: the same day three months
+   on, or the last day of that month when it is shorter. setMonth rolls over
+   instead — 30 November plus three would be 2 March, not 28 February — so the
+   day is clamped by hand. Null when there is nothing to count from. */
+function againFrom(a) {
+  var t = Date.parse((a && (a.status_changed_at || a.created_at)) || "");
+  if (isNaN(t)) return null;
+  var d = new Date(t);
+  var y = d.getUTCFullYear(), m = d.getUTCMonth() + 3, day = d.getUTCDate();
+  var last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(day, last),
+    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()));
 }
 
 function when(iso) {
@@ -2231,6 +2430,45 @@ var TS_OFF = false;
 
 function view(html) { root.innerHTML = html; }
 
+/* "Email not confirmed" gets its way out here too.
+
+   The shared sign-in form has called unconfirmed() since the day /status
+   learned to offer the link again — but only /status ever defined it. On this
+   page the same answer from Supabase threw "unconfirmed is not defined" inside
+   the sign-in handler, so an assistant with the right password and an
+   unconfirmed address pressed Sign in and was told nothing at all. Same card
+   as /status, word for word, because it is the same situation. */
+function unconfirmed(email) {
+  view(
+    '<div class="card">' +
+      '<div class="note"><b>Almost there.</b> That password is right, but ' +
+      esc(email) + " has not been confirmed yet. We sent a link when the account " +
+      "was made &mdash; it is worth checking your spam folder.</div>" +
+      '<button class="btn btn--solid" id="again" type="button" style="margin-top:1.1rem">' +
+        "Send the link again</button>" +
+      '<p class="msg" id="againmsg"></p>' +
+      '<p class="msg"><button class="lnk" id="againback" type="button">Back to signing in</button></p>' +
+    "</div>"
+  );
+
+  document.getElementById("againback").addEventListener("click", function () { signedOut(""); });
+
+  document.getElementById("again").addEventListener("click", function () {
+    var b = document.getElementById("again");
+    var m = document.getElementById("againmsg");
+    b.disabled = true;
+    b.textContent = "Sending…";
+    resendConfirmation(email).then(function () {
+      b.textContent = "Sent";
+      m.textContent = "Open the link in that email and you are in.";
+    })["catch"](function (e) {
+      b.disabled = false;
+      b.textContent = "Send the link again";
+      m.textContent = (e && e.message) || "That did not work.";
+    });
+  });
+}
+
 /* How somebody would rather be paid. The choice is stored; nothing else is.
    No account number, no bank detail, no wallet credential ever reaches this
    database — those are set up on the provider's own site with a person. */
@@ -2346,13 +2584,21 @@ function settingsCard(a) {
   }).join("");
 
   /* She gets better at things. A level set the day she applied and never
-     changeable is a level that goes stale and stops meaning anything. */
+     changeable is a level that goes stale and stops meaning anything.
+
+     "Not answered" is a choice here, as it is on /status. This used to have
+     no empty option and pre-select Beginner for anything blank, so raising
+     her English and pressing Save skills also wrote Beginner into every
+     skill she had never answered — a claim she did not make, which /admin
+     then matched on, and which /admin's own label says is not the same
+     thing: a blank is not a beginner. */
   var skills = SKILLS.map(function (sk) {
     return '<div class="fld"><label for="set-' + sk[0] + '">' + esc(sk[1]) + "</label>" +
       '<select id="set-' + sk[0] + '">' +
+      '<option value=""' + (a[sk[0]] ? "" : " selected") + ">Not answered</option>" +
       LEVELS.map(function (lv) {
         return '<option value="' + lv + '"' +
-          ((a[sk[0]] || "beginner") === lv ? " selected" : "") + ">" +
+          (a[sk[0]] === lv ? " selected" : "") + ">" +
           esc(LEVEL_LABEL[lv]) + "</option>";
       }).join("") + "</select></div>";
   }).join("");
@@ -2463,8 +2709,10 @@ function wireSettings(a) {
     skillGo.addEventListener("click", function () {
       var ok = document.getElementById("skill-ok");
       var body = {};
+      /* A blank goes as null, never as "" — the column's check allows the
+         four levels or nothing, and nothing is what "Not answered" means. */
       for (var i = 0; i < SKILLS.length; i++) {
-        body[SKILLS[i][0]] = document.getElementById("set-" + SKILLS[i][0]).value;
+        body[SKILLS[i][0]] = document.getElementById("set-" + SKILLS[i][0]).value || null;
       }
       skillGo.disabled = true;
       flash(ok, "Saving\u2026");
@@ -2729,7 +2977,8 @@ function dayRow(sheet, iso, i, open) {
       '<span class="day__t">' +
         esc(fromIso(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" })) +
       "</span></span>" +
-    '<input class="day__note" data-note type="text" maxlength="500" value="' +
+    '<input class="day__note" data-note type="text" maxlength="500" ' +
+      'aria-label="What you worked on, ' + DAY_NAME[i] + '" value="' +
       esc(d && d.note ? d.note : "") + '" placeholder="' +
       (wknd ? "&mdash;" : "What you worked on (optional)") + '"' +
       (open ? "" : " disabled") + ">" +
@@ -3076,7 +3325,13 @@ function render(a, leaves, notices) {
         '<div class="rail__foot">' +
           '<a class="rlink" href="/contact?about=tech">Something broken</a>' +
           '<a class="rlink" href="/contact?about=work">Your work or your pay</a>' +
+          /* The toggle the page's theme script has always looked for. /hub has
+             no header — the rail replaced it — so the script's
+             getElementById("themetog") found nothing and the site-wide one-click
+             switch was simply missing here. Same place /admin keeps it, beside
+             Sign out; Settings still has the three-way choice. */
           '<div class="rail__acts">' +
+            '<button class="rbtn" id="themetog" type="button" aria-label="Switch theme">Theme</button>' +
             '<button class="rbtn" id="out" type="button">Sign out</button></div>' +
         "</div>" +
       "</nav>" +
@@ -3160,6 +3415,17 @@ function render(a, leaves, notices) {
   );
 
   document.getElementById("out").addEventListener("click", signOut);
+
+  /* Wired here rather than by the theme script at the top of the page: that
+     one runs once, at load, before anybody has signed in and before this rail
+     exists, so it would find no button to listen to. Same behaviour, same
+     store, as every other page's toggle. */
+  document.getElementById("themetog").addEventListener("click", function () {
+    var root = document.documentElement;
+    var next = (root.getAttribute("data-theme") || "light") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("sjva-theme", next); } catch (e) {}
+  });
   wireHubTabs();
   wireInterviewHub();
   wireTz();
@@ -3202,8 +3468,18 @@ function interviewCard(pl) {
           ? '<span class="iv__k">Also</span><span class="iv__v">' +
             esc(slotAlso(c.starts_at, c.minutes)) + "</span>"
           : "") +
+        /* A link only when it is a web address. The client types this, and
+           esc() keeps it inside the attribute without asking what it is — a
+           "javascript:" link would have been a live href on this origin.
+           sql/081 refuses those now; rows written before it are shown as
+           text rather than trusted. The whole address is tested, not just
+           its scheme — the same test /admin uses, so a row with a space in it
+           is text here and "not a web address" there, rather than a dead link
+           here and a warning there. */
         '<span class="iv__k">Where</span><span class="iv__v">' +
-          (c.meeting_url
+          (c.meeting_url && !/^https?:\/\/[^\s"'<>]+$/i.test(String(c.meeting_url))
+            ? esc(c.meeting_url)
+            : c.meeting_url
             ? '<a href="' + esc(c.meeting_url) + '" rel="noopener noreferrer" target="_blank">' +
               esc(c.meeting_url) + "</a>"
             : "They will write to you at the address on your application.") +
@@ -3236,10 +3512,18 @@ function interviewCard(pl) {
     "</div>";
   }
 
+  /* Every time on offer has already started. Said plainly rather than drawn
+     as a list of dead buttons; the "none of these" button stays, because
+     pressing it is how the client hears that she needs a new set. */
+  var ahead = st.slots.filter(function (s) { return !slotPassed(s); });
+
   return '<div class="card" id="iv-card"><h2>Your interview with ' + esc(firm) + "</h2>" +
-    '<p class="msg" style="margin-top:0">They have offered ' + esc(String(st.slots.length)) +
-      (st.slots.length === 1 ? " time" : " times") + ". Pick the one that works and they will " +
-      "confirm it. Times are shown on your clock, with theirs underneath.</p>" +
+    (ahead.length
+      ? '<p class="msg" style="margin-top:0">They have offered ' + esc(String(ahead.length)) +
+        (ahead.length === 1 ? " time" : " times") + ". Pick the one that works and they will " +
+        "confirm it. Times are shown on your clock, with theirs underneath.</p>"
+      : '<p class="msg" style="margin-top:0"><b>The times they offered have passed.</b> ' +
+        "Press the button below and they will be asked for new ones.</p>") +
     '<div class="iv__slots">' +
       st.slots.map(function (s) { return hubSlot(s, false); }).join("") +
     "</div>" +
@@ -3253,17 +3537,28 @@ function interviewCard(pl) {
   "</div>";
 }
 
+/* A time that has already started, by the server's clock. Offered on Monday,
+   still drawn with Choose on Wednesday, picked, and waited on — sql/082 now
+   refuses the pick, and this stops offering it in the first place. */
+function slotPassed(s) {
+  return new Date(s.starts_at).getTime() <= serverNow();
+}
+
+/* A passed time is still listed, so the card does not silently lose a row she
+   saw yesterday, but it is not a button: no data-iv-pick, no role, no tab
+   stop, and it says why. */
 function hubSlot(s, picked) {
   var also = slotAlso(s.starts_at, s.minutes);
-  return '<div class="iv__slot iv__slot--pick' + (picked ? " iv__slot--picked" : "") +
-      '" data-iv-pick="' + esc(s.id) + '" role="button" tabindex="0">' +
+  var gone = !picked && slotPassed(s);
+  return '<div class="iv__slot' + (gone ? "" : " iv__slot--pick") + (picked ? " iv__slot--picked" : "") +
+      (gone ? '">' : '" data-iv-pick="' + esc(s.id) + '" role="button" tabindex="0">') +
     '<span class="iv__mk"></span>' +
     "<span>" +
       '<span class="iv__d">' + esc(slotLabel(s.starts_at)) + "</span>" +
       (also ? '<span class="iv__z">' + esc(also) + "</span>" : "") +
     "</span>" +
     '<span class="iv__tag' + (picked ? " iv__tag--go" : "") + '">' +
-      (picked ? "Your pick" : "Choose") + "</span>" +
+      (picked ? "Your pick" : gone ? "Passed" : "Choose") + "</span>" +
   "</div>";
 }
 
@@ -3420,9 +3715,21 @@ function flash(el, text, bad) {
   el.classList.add("is-on");
 }
 
+/* "Did not save" for everything, except a refusal the database wrote words
+   for. Those raise with a hint starting "sjva-" and a message meant for her —
+   since sql/086, a day's hours on a date outside her placement come back
+   naming the date and the placement's first and last day. Collapsing that into
+   "Did not save" left her retyping the same number at the same wall. Anything
+   else still gets the short answer: a raw PostgREST body is not a sentence. */
 function why(e) {
   var m = String(e && e.message ? e.message : e);
   if (m === "signed out") return "Signed out";
+  try {
+    var j = JSON.parse(m);
+    if (j && j.message && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0) {
+      return String(j.message).slice(0, 200);
+    }
+  } catch (x) {}
   return "Did not save";
 }
 
@@ -3533,8 +3840,9 @@ function start() {
   view('<div class="card"><span class="spin"></span>Opening your portal&hellip;</div>');
 
   /* Before load(), so the chosen zone is known by the time the first date is
-     drawn. It never rejects, so it cannot be what stops the portal opening. */
-  loadMyTz().then(load).catch(function (e) {
+     drawn. It never rejects, so it cannot be what stops the portal opening.
+     The server clock beside it, for the interview card, never rejects either. */
+  Promise.all([loadMyTz(), syncClock()]).then(load).catch(function (e) {
     if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
     view('<div class="card"><p class="msg msg--bad">We could not open your portal just now. ' +
          "Refresh, or try again in a minute.</p></div>");

@@ -30,6 +30,22 @@ function grab(html, name, file) {
 const esc = (s) => String(s === null || s === undefined ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+/* A helper the page may or may not have yet, lifted when it is there. */
+function grabIf(html, name) {
+  return html.indexOf("function " + name + "(") < 0 ? "" : grab(html, name, "");
+}
+
+/* The clock both pages read. /hub asks the server for the time (serverNow,
+   sql/078's server_time) and stops offering a slot that has already started.
+   Lifting serverNow itself would tie every assertion here to the day the test
+   is run — the fixtures below are in early September 2026, and by the end of
+   that month every one of them had "passed" and the card had nothing left to
+   pick. So the clock is the test's: the Monday before the first slot, unless
+   a section moves it on purpose. */
+const BEFORE = Date.parse("2026-09-07T12:00:00Z");
+let NOW = BEFORE;
+const serverNow = () => NOW;
+
 const SHARED = ["tzOpts", "browserTz", "slotDay", "slotClock", "slotLabel", "slotAlso", "slotState"];
 
 /* The client's side. */
@@ -43,14 +59,15 @@ const client = new Function("esc",
 )(esc);
 
 /* Hers. */
-const asst = new Function("esc",
+const asst = new Function("esc", "serverNow",
   "var MY_TZ = null, CENTRAL = 'America/Chicago';\n" +
   "var H_SLOTS = [];\n" +
   SHARED.concat(["hubSlot", "interviewCard"])
     .map((n) => grab(hubHtml, n, "hub.html")).join("\n") +
+  "\n" + grabIf(hubHtml, "slotPassed") +
   "\nreturn { set: function (s) { H_SLOTS = s.slots; MY_TZ = s.tz || null; }," +
   " card: interviewCard, label: slotLabel };"
-)(esc);
+)(esc, serverNow);
 
 let failed = 0;
 function ok(what, got, want, note) {
@@ -150,9 +167,29 @@ v = both(done);
 ok("the client sees the details, not a form", /Confirm this time/.test(v.c), false);
 ok("with the link they gave", /meet\.google\.com/.test(v.c), true);
 ok("she sees the same link", /meet\.google\.com/.test(v.h), true);
+
+/* The link is typed by the client, and both cards used to put it straight
+   into href=. sql/081 refuses anything but a web address now; the cards check
+   for http(s) as well, for rows written before it. Shown as text is fine —
+   escaped, it is only words. A javascript: href is not: it runs, signed in,
+   on whichever page it is pressed. */
+{
+  const bad = both([slot("s1", T1, {
+    chosen_at: "2026-09-02T03:00:00Z", confirmed_at: "2026-09-02T15:00:00Z",
+    meeting_url: "javascript:x"
+  })]);
+  ok("a javascript: link is not a link on her card", /href="\s*javascript:/i.test(bad.h), false);
+  ok("nor on the client's", /href="\s*javascript:/i.test(bad.c), false);
+}
 ok("and the same moment on her own clock", /10:00\s*PM/.test(v.h), true);
-ok("the client can still take it back", /Change the time/.test(v.c), true,
-   "things come up, and the alternative is an email to support");
+/* This asserted the opposite until 29 September: that the client was offered
+   "Change the time". The button called withdraw_interview_slot, which refuses
+   a confirmed slot by design, so it could only ever fail. Nothing moves a
+   confirmed placement interview yet (see seats.html), and the honest control
+   is the address that can. */
+ok("the client is not offered a button that cannot work", /Change the time/.test(v.c), false,
+   "withdraw_interview_slot refuses a confirmed slot");
+ok("and is told who can move it", /support@securejobva\.com/.test(v.c), true);
 ok("she is not offered a way to cancel it", /None of these work/.test(v.h), false,
    "she agreed to it; unpicking it unilaterally is a phone call, not a button");
 
@@ -162,6 +199,30 @@ v = both([slot("s1", T1, {
 })]);
 ok("no link still tells her how to reach them",
    /address on your application/.test(v.h), true);
+
+/* ── the times have passed ────────────────────────────────────────────────
+   Offered on Monday, still drawn with Choose on Wednesday, picked, and
+   waited on: sql/082 now refuses a pick of a time that has started, so the
+   page must stop offering one. */
+console.log("\n  The times have gone by");
+
+if (/function slotPassed\(/.test(hubHtml)) {
+  NOW = Date.parse(T2) + 60000;          /* after the first two, before the third */
+  v = both(offered);
+  ok("only the time still ahead can be picked", (v.h.match(/data-iv-pick/g) || []).length, 1);
+  ok("the ones gone by are still listed, and say so", (v.h.match(/>Passed</g) || []).length, 2);
+  ok("she is told how many are really on offer", /offered 1 time\./.test(v.h), true);
+
+  NOW = Date.parse(T3) + 60000;          /* all three gone */
+  v = both(offered);
+  ok("nothing left to pick", /data-iv-pick/.test(v.h), false);
+  ok("and she is told why, not shown dead buttons", /have passed/.test(v.h), true);
+  ok("she can still ask for new ones", /None of these work/.test(v.h), true);
+  NOW = BEFORE;
+} else {
+  ok("/hub hides a time that has already started (slotPassed)", false, true,
+     "hub.html has no slotPassed() — sql/082 refuses the pick it would offer");
+}
 
 /* ── she declined ───────────────────────────────────────────────────────── */
 console.log("\n  None of them worked");

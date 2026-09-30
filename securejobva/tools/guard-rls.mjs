@@ -8,15 +8,31 @@
 
    So it is checked against the live database rather than assumed from the SQL.
 
-   Run: node tools/guard-rls.mjs
+   Run: node tools/guard-rls.mjs                   read-only, safe on a schedule
+        node tools/guard-rls.mjs --probe-signup    also test that sign-up needs
+                                                   a confirmed address (writes)
 
-   Nothing here writes a row. The insert probe deliberately names a column that
-   does not exist, so it proves the key still authenticates and gets as far as
-   the schema, then stops there.
+   Run bare, nothing here writes anything. Every probe is a read, or an insert
+   that deliberately names a column that does not exist — which proves the key
+   still authenticates and gets as far as the schema, then stops there.
+
+   --probe-signup is different, and this header used to hide that behind
+   "nothing here writes a row". It signs up a made-up address at
+   @securejobva-guard.invalid, which INSERTS A ROW INTO auth.users and, with
+   email confirmation on (the state it is checking for), makes GoTrue try to
+   send a confirmation mail to an address that cannot receive one: a unit of
+   the project's auth email rate limit — the one real sign-ups and password
+   resets share — and a bounce on the sending domain, every run. If
+   .env.local holds the service role key it then DELETES that row, and any
+   other @securejobva-guard.invalid account older than an hour. That is worth
+   doing once after touching the auth settings. It is not worth doing hourly,
+   so it is never the default.
 
    Exit status is 1 if applicant data is readable, so this can run on a
    schedule and shout. */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+
+const PROBE_SIGNUP = process.argv.includes("--probe-signup");
 
 /* Read the endpoint and key out of the pages, so there is one source of truth
    and this cannot drift into checking a project you no longer use. */
@@ -36,7 +52,7 @@ const TARGETS = ["index.html", "careers.html"].map(cfg);
 
    Keyed by what is behind the door, so a breach message says what leaked
    rather than naming a table and leaving you to work it out. */
-const SEALED = [
+const HOLDS = [
   ["application_tracking", "the internal pipeline, contact history and interview scores"],
   ["application_notes",    "private staff notes about applicants"],
   ["application_socials",  "applicants' social handles"],
@@ -54,13 +70,77 @@ const SEALED = [
   ["placements",           "who works for whom"],
   ["placement_billing",    "what every client is charged an hour"],
   ["placement_pay",        "what every assistant is paid an hour"],
-  ["swap_requests",        "clients asking to replace the person working for them"]
+  ["swap_requests",        "clients asking to replace the person working for them"],
+  ["client_payments",      "every payment a client has made, and how"],
+  ["client_payment_weeks", "which payment settled which week"],
+  ["client_private",       "each client's contact name and email address"],
+  ["application_assessment", "applicants' assessment answers and scores"],
+  ["application_disc",     "applicants' personality answers"],
+  ["application_disc_read", "applicants' personality results"],
+  ["application_documents", "where every applicant's CV is stored"],
+  ["application_note_log", "every staff note ever written about an applicant"],
+  ["application_public",   "the assistant name a client is shown"],
+  ["intake_throttle",      "the IP addresses of everyone who submitted a form"],
+  ["interview_slots",      "interview times and the links to join them"],
+  ["interview_state",      "whose interviews are stalled, and on whom"],
+  ["deletion_log",         "who was erased, and by whom"],
+  ["placement_starts",     "the start dates clients confirmed"],
+  ["user_settings",        "each person's saved time zone"],
+  ["roles",                "the roles this site hands out"],
+  ["permissions",          "what each permission allows"],
+  ["role_permissions",     "which role holds which permission"],
+  ["timesheet_charges",    "what every week of work is billed at"],
+  /* 015 grants anon a column list on this one, because the home page shows
+     the logos. select=* still has to be refused: added_by and the rest are
+     not part of that list, and the day they are, this says so. */
+  ["client_logos",         "the logo table's whole row, beyond the columns the home page shows"]
 ];
+
+/* The list above was written by hand and fell behind: eighteen of thirty-seven
+   tables and one of three views, with payments, client contact details,
+   assessment scores and the throttle's IP addresses not on it. Nothing was
+   exposed — every one of them refused the public key when probed — but a
+   grant added to any of them would have left this printing "ok" and exiting 0.
+
+   So the set is read from sql/ as well: every table or view a numbered file
+   creates and a later one has not dropped. The hand-written line stays as the
+   way to say what a table holds; one with no line is still probed, under a
+   plainer description, so a table added tomorrow is guarded the day it is
+   pasted. The two intake tables and schema_migrations are left out of it and
+   probed on their own further down, because each of those is meant to answer
+   the public key in one narrow way. */
+function relationsInSql() {
+  const files = readdirSync("sql").filter((f) => /^\d+.*\.sql$/.test(f) && !f.endsWith(".local.sql")).sort();
+  const sql = files.map((f) => readFileSync("sql/" + f, "utf8").replace(/--[^\n]*/g, " ")).join("\n");
+  const live = new Set();
+  const re = /\b(create(?:\s+or\s+replace)?|drop)\s+(?:table|view)\s+(?:if\s+(?:not\s+)?exists\s+)?public\.([a-z_][a-z0-9_]*)/gi;
+  let m;
+  while ((m = re.exec(sql)) !== null) {
+    if (/^drop$/i.test(m[1])) live.delete(m[2]); else live.add(m[2]);
+  }
+  return live;
+}
+const NOT_SEALED = new Set(["seat_requests", "applications", "schema_migrations"]);
+const described = new Map(HOLDS);
+let fromSql = new Set();
+try { fromSql = relationsInSql(); } catch (e) {
+  console.log("  warn    could not read sql/ for the table list — " + e.message + " (checking the named ones only)");
+}
+const SEALED = [...new Set([...described.keys(), ...fromSql])]
+  .filter((t) => !NOT_SEALED.has(t))
+  .map((t) => [t, described.get(t) || "rows behind sign-in (" + t + ", created in sql/)"]);
 
 /* The functions are SECURITY DEFINER, so a missing grant is the only thing
    stopping the public key calling them. is_admin() answering at all would be
    bad; my_permissions() answering would be worse. */
-const RPCS = ["is_admin", "my_permissions", "list_role_grants", "list_account_requests"];
+const RPCS = ["is_admin", "my_permissions", "list_role_grants", "list_account_requests",
+  /* 085: what every client owes. Answers [] to a stranger by design, so a
+     200 is not a breach on its own — see below. */
+  "client_balances"];
+/* Functions that are granted to authenticated and answer anyone else with an
+   empty result rather than a refusal. For these a 200 is a breach only if it
+   carries rows. */
+const EMPTY_FOR_STRANGERS = new Set(["client_balances"]);
 const headers = (k) => ({
   apikey: k,
   Authorization: "Bearer " + k,
@@ -131,6 +211,11 @@ for (const [table, holds] of SEALED) {
       console.log("  BREACH  " + table + ": readable with the public key — " + holds);
       console.log("          returned " + (Array.isArray(rows) ? rows.length : "?") + " row(s)");
       console.log("          Revoke it now:  revoke all on public." + table + " from anon;");
+    } else if (r.status === 404) {
+      /* Now that the list comes from sql/, it names tables in files not yet
+         pasted. Nothing to read is safe, but it is not the same claim as a
+         refusal, so it is not printed as one. */
+      console.log("  ok      " + table + ": not in the database yet (404) — nothing to read");
     } else {
       console.log("  ok      " + table + ": denied (" + r.status + ")");
     }
@@ -147,7 +232,10 @@ for (const fn of RPCS) {
     });
     /* A 404 is fine and expected: no EXECUTE grant means PostgREST does not
        expose the function to this role at all. */
-    if (r.ok) {
+    const rows = r.ok && EMPTY_FOR_STRANGERS.has(fn) ? await r.json().catch(() => null) : null;
+    if (r.ok && EMPTY_FOR_STRANGERS.has(fn) && Array.isArray(rows) && !rows.length) {
+      console.log("  ok      rpc/" + fn + ": answers the public key with nothing");
+    } else if (r.ok) {
       fails.push("rpc/" + fn);
       console.log("  BREACH  rpc/" + fn + ": callable with the public key");
       console.log("          Revoke it:  revoke all on function public." + fn + " from anon;");
@@ -286,7 +374,8 @@ try {
  * Probed the only way it can be from outside: ask for a session on an address
  * that cannot receive mail, and see whether one comes back. Nothing is left
  * behind that a person could sign in with — the address is not real and the
- * password is thrown away.
+ * password is thrown away. But it is a write, and a mail attempt, so it only
+ * happens under --probe-signup; see the header.
  *
  * It used to leave an unconfirmed row in auth.users every run, described here
  * as the cost of asking. It is not a cost worth paying repeatedly: one row per
@@ -298,7 +387,17 @@ try {
  */
 const probeEmail = "guard-rls-probe-" + Date.now() + "@securejobva-guard.invalid";
 
-try {
+/* Whether the sign-up probe reached a verdict, and which. The closing line
+   used to promise "no session was issued to the probe" whatever happened —
+   including when the request timed out and nothing was measured at all, and
+   when GoTrue answered 500 because it could not send the confirmation mail,
+   which is sign-up broken for every real person, reported as a pass. */
+let signup = "not run";
+
+if (!PROBE_SIGNUP) {
+  console.log("  skip    sign-up needs a confirmed address — not probed. It writes a row to " +
+    "auth.users and sends mail; run with --probe-signup when you mean to");
+} else try {
   const r = await fetch(base.replace("/rest/v1", "/auth/v1") + "/signup", {
     method: "POST",
     headers: { apikey: anonKey, "Content-Type": "application/json" },
@@ -310,19 +409,29 @@ try {
   const j = await r.json().catch(() => ({}));
 
   if (j && j.access_token) {
+    signup = "breach";
     fails.push("email confirmation");
     console.log("  BREACH  sign-up returns a session without confirming the address — " +
       "anyone may sign up as " + "the address in sql/014" + " and hold every permission it has. " +
       "Supabase -> Authentication -> Providers -> Email -> Confirm email must be ON.");
   } else if (r.ok) {
+    signup = "confirmed";
     console.log("  ok      sign-up issues no session until the address is confirmed");
+  } else if (r.status >= 500) {
+    /* Not a pass. A 500 here is usually "Error sending confirmation email":
+       no session came back, but no real person can sign up either. */
+    signup = "broken";
+    console.log("  warn    sign-up answered " + r.status + " " + (j.error_code || j.msg || "") +
+      " — no session, but sign-up is failing for everybody. Check the auth SMTP settings");
   } else {
     /* Sign-ups disabled outright is also a pass: no session, no forged claim.
        Anything else is reported rather than guessed at. */
+    signup = "refused";
     console.log("  ok      sign-up refused outright (" + r.status +
       " " + (j.error_code || j.msg || "") + ") — no session to forge a claim with");
   }
 } catch (e) {
+  signup = "unmeasured";
   console.log("  warn    could not probe the sign-up path — " + e.message);
 }
 
@@ -345,7 +454,8 @@ try {
  * behind before the cleanup existed would sit there for good, and the fix
  * would only apply to leaks it had not already caused. */
 const ABANDONED_MS = 60 * 60 * 1000;
-try {
+let deleted = 0;
+if (PROBE_SIGNUP) try {
   const { existsSync: hasFile, readFileSync: readEnv } = await import("node:fs");
   let serviceKey = null;
   if (hasFile(".env.local")) {
@@ -359,8 +469,15 @@ try {
   } else {
     const authBase = base.replace("/rest/v1", "/auth/v1");
     const H = { apikey: serviceKey, Authorization: "Bearer " + serviceKey };
-    const list = await (await fetch(authBase + "/admin/users?per_page=200", { headers: H })).json();
-    const users = list.users || [];
+    /* Every page of accounts: the first two hundred used to be all it read,
+       so past that a probe row could sit on page two for good. */
+    const users = [];
+    for (let page = 1; page <= 100; page++) {
+      const list = await (await fetch(authBase + "/admin/users?per_page=200&page=" + page, { headers: H })).json();
+      const got = (list && list.users) || [];
+      users.push(...got);
+      if (got.length < 200) break;
+    }
     const mine = users.find((u) => (u.email || "").toLowerCase() === probeEmail.toLowerCase());
     const stale = users.filter((u) =>
       /@securejobva-guard\.invalid$/i.test(u.email || "") &&
@@ -372,6 +489,7 @@ try {
       const d = await fetch(authBase + "/admin/users/" + u.id, { method: "DELETE", headers: H });
       if (d.ok) gone++; else stuck++;
     }
+    deleted = gone;
 
     if (!mine && !stale.length) {
       console.log("  ok      no probe row to clear — sign-up created none");
@@ -385,11 +503,38 @@ try {
   console.log("  note    probe account " + probeEmail + " may still be there — " + e.message);
 }
 
+/* What this run wrote, said on every exit — and only what it knows it wrote.
+   A sign-up that came back confirmed or with a session made a row. One that
+   was refused outright made none and mailed nobody. One that threw, or failed
+   with a 5xx, may or may not have got as far as the row: the usual 500 is
+   GoTrue failing to send the confirmation, after it has written the user. The
+   deletion count is said either way, because the sweep also clears probe
+   accounts left behind by earlier runs. */
+const cleared = deleted ? deleted + " probe account(s) deleted" : "none deleted here";
+const wrote = !PROBE_SIGNUP
+  ? "No rows written."
+  : signup === "confirmed" || signup === "breach"
+    ? "--probe-signup: one auth.users row created, " + cleared +
+      "; GoTrue may have tried to mail " + probeEmail + "."
+    : signup === "refused"
+      ? "--probe-signup: sign-up was refused, so no auth.users row was created and no mail sent; " +
+        cleared + "."
+      : "--probe-signup: sign-up did not finish (" + signup + "), so an auth.users row may have " +
+        "been created; " + cleared + ".";
+
 if (fails.length) {
   console.log("FAILED: " + fails.join(", "));
+  console.log(wrote);
   console.log("");
   process.exit(1);
 }
-console.log("Both tables: insert-only, as designed. No rows written.");
-console.log("An email claim still has to be earned. No session was issued to the probe.");
+console.log("Both tables: insert-only, as designed. " + SEALED.length + " others sealed. " + wrote);
+/* Only the verdict that was actually reached. */
+if (signup === "confirmed" || signup === "refused") {
+  console.log("An email claim still has to be earned. No session was issued to the probe.");
+} else if (signup === "not run") {
+  console.log("Whether sign-up needs a confirmed address was not checked this run.");
+} else {
+  console.log("Whether sign-up needs a confirmed address is UNKNOWN this run — see the warn above.");
+}
 console.log("");

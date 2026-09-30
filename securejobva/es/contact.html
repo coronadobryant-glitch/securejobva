@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -314,12 +355,29 @@ img{max-width:100%}
 .cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
 .cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .cform label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
-.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
+/* --muted, not --line, for the same reason as the two dialogs: --line on white
+   is 1.23:1, and the edge of a text box needs 3:1 to be findable at all. */
+.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--muted);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
 .cform textarea{min-height:8rem;resize:vertical}
 .cform input:focus-visible,.cform select:focus-visible,.cform textarea:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
 .cform .err{color:#B3261E;font-size:.85rem;margin:.15rem 0 0;min-height:1.1em}
 :root[data-theme="dark"] .cform .err{color:#F2B8B5}
 @media(min-width:560px){.cform__two{display:grid;grid-template-columns:1fr 1fr;gap:0 .9rem}}
+/* The agree box. The markup is the .opt pattern from the two dialogs, but its
+   rules never came with it — they sit after the hero marker in careers.html,
+   outside what lib-chrome.mjs lifts — so the page showed a raw checkbox, a
+   tick that was always visible, and the whole label forced into the
+   uppercase mono of .cform label. These are those rules, scoped to the form. */
+.cform label.opt{display:flex;align-items:flex-start;gap:.7rem;position:relative;cursor:pointer;font-family:inherit;font-size:.95rem;letter-spacing:0;text-transform:none;color:var(--ink);margin-bottom:.25rem}
+.cform .opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.cform .opt__box{width:18px;height:18px;flex:none;margin-top:.15rem;border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);display:grid;place-items:center;color:var(--accent-ink)}
+.cform .opt__box svg{opacity:0;transition:opacity .12s ease}
+.cform .opt input:checked ~ .opt__box{background:var(--accent);border-color:var(--accent)}
+.cform .opt input:checked ~ .opt__box svg{opacity:1}
+.cform .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
+.cform .opt__t{display:block;font-weight:600;line-height:1.35}
+.cform .opt__d{display:block;font-size:.85rem;color:var(--ink-2);margin-top:.15rem}
+.cform .opt__d a{color:var(--accent)}
 .cform__ok{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.15rem 1.3rem}
 .contact__at{display:grid;gap:.8rem;margin:1.4rem 0 2.2rem}
 .contact__row{display:flex;flex-wrap:wrap;gap:.5rem 1rem;padding-bottom:.7rem;border-bottom:1px solid var(--line)}
@@ -350,7 +408,7 @@ img{max-width:100%}
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
-      <a class="brand" href="/" aria-label="Inicio de SecureJobVA">
+      <a class="brand" href="/es" aria-label="Inicio de SecureJobVA">
 <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -361,12 +419,30 @@ img{max-width:100%}
         <span class="brand__word">SecureJob<b class="brand__va">VA</b></span>
       </a>
       <nav class="nav__links">
-        <a href="/">Empresas</a>
-        <a href="/careers">Empleos</a>
-        <a href="/contact">Contacto</a>
+        <a href="/es">Empresas</a>
+        <a href="/es/careers">Empleos</a>
+        <a href="/es/contact">Contacto</a>
         <a class="nav__signin" href="/status">Entrar</a>
-        <a class="langtog" id="langtog" href="/contact" hreflang="en" lang="en" aria-label="View this page in English">EN</a>
       </nav>
+      <div class="nav__tools">
+        <button class="navtog" id="navtog" type="button" aria-expanded="false" aria-controls="mobnav" aria-label="Menú">
+          <svg class="i-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+          <svg class="i-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+          </svg>
+        </button>
+        <a class="langtog" id="langtog" href="/contact" hreflang="en" lang="en" aria-label="View this page in English">EN</a>
+      </div>
+    </div>
+  </div>
+  <div class="mobnav" id="mobnav" hidden>
+    <div class="wrap mobnav__in">
+      <a href="/es">Empresas</a>
+      <a href="/es/careers">Empleos</a>
+      <a href="/es/contact">Contacto</a>
+      <a class="nav__signin" href="/status">Entrar</a>
     </div>
   </div>
 </header>
@@ -388,19 +464,19 @@ img{max-width:100%}
         <div class="cform__two">
           <div class="fld">
             <label for="c-name">Nombre completo</label>
-            <input id="c-name" name="name" type="text" autocomplete="name">
+            <input id="c-name" name="name" type="text" autocomplete="name" maxlength="200">
             <p class="err" data-for="c-name" aria-live="polite"></p>
           </div>
           <div class="fld">
             <label for="c-email">Correo electrónico</label>
-            <input id="c-email" name="email" type="email" autocomplete="email" spellcheck="false">
+            <input id="c-email" name="email" type="email" autocomplete="email" spellcheck="false" maxlength="320">
             <p class="err" data-for="c-email" aria-live="polite"></p>
           </div>
         </div>
         <div class="cform__two">
           <div class="fld">
             <label for="c-phone">Teléfono <em>&mdash; opcional</em></label>
-            <input id="c-phone" name="phone" type="tel" autocomplete="tel">
+            <input id="c-phone" name="phone" type="tel" autocomplete="tel" maxlength="60">
           </div>
           <div class="fld">
             <label for="c-reason">Motivo del contacto</label>
@@ -415,17 +491,18 @@ img{max-width:100%}
         </div>
         <div class="fld">
           <label for="c-message">Mensaje</label>
-          <textarea id="c-message" name="message" placeholder="¿En qué podemos ayudar?"></textarea>
+          <textarea id="c-message" name="message" maxlength="5000" placeholder="¿En qué podemos ayudar?"></textarea>
           <p class="err" data-for="c-message" aria-live="polite"></p>
         </div>
         <label class="opt" style="margin-bottom:1rem">
           <input type="checkbox" id="c-agree">
           <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
           <span><span class="opt__t">Acepto los Términos del servicio y la Política de privacidad</span>
-          <span class="opt__d">Lee los <a href="/terms">Términos</a> y la <a href="/privacy">Política de privacidad</a></span></span>
+          <span class="opt__d">Lee los <a href="/es/terms">Términos</a> y la <a href="/es/privacy">Política de privacidad</a></span></span>
         </label>
         <p class="err" data-for="c-agree" aria-live="polite"></p>
         <button class="btn btn--solid" id="c-send" type="submit">Enviar mensaje</button>
+        <p class="err" data-for="c-send" aria-live="polite" style="margin-top:.5rem"></p>
         <p class="doc__meta" style="margin:1rem 0 0;text-transform:none;letter-spacing:0;font-family:inherit;font-size:.85rem">Al enviarlo aceptas que te contactemos sobre tu consulta en el correo o el teléfono indicados arriba. Respondemos en uno o dos días hábiles.</p>
       </form>
       <div id="c-done" hidden></div>
@@ -438,17 +515,64 @@ img{max-width:100%}
     <div class="foot__bot" style="margin-top:0;border-top:0;padding-top:0">
       <span>&copy; 2026 Secure Job VA &middot; Houston, Texas</span>
       <span>
-        <a href="/">Inicio</a> &middot;
-        <a href="/careers">Empleos</a> &middot;
-        <a href="/privacy">Privacidad</a> &middot;
-        <a href="/terms">Términos</a> &middot;
-        <a href="/refunds">Reembolsos</a> &middot;
-        <a href="/contact">Contacto</a>
+        <a href="/es">Inicio</a> &middot;
+        <a href="/es/careers">Empleos</a> &middot;
+        <a href="/es/privacy">Privacidad</a> &middot;
+        <a href="/es/terms">Términos</a> &middot;
+        <a href="/es/refunds">Reembolsos</a> &middot;
+        <a href="/es/contact">Contacto</a>
       </span>
     </div>
   </div>
 </footer>
 <script>
+(function () {
+  var btn = document.getElementById("navtog");
+  var panel = document.getElementById("mobnav");
+  if (!btn || !panel) return;
+  function setOpen(open) {
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) { panel.removeAttribute("hidden"); } else { panel.setAttribute("hidden", ""); }
+  }
+  btn.addEventListener("click", function () {
+    setOpen(btn.getAttribute("aria-expanded") !== "true");
+  });
+  panel.addEventListener("click", function (e) {
+    if (e.target.closest("a")) setOpen(false);
+  });
+  window.addEventListener("resize", function () {
+    if (window.innerWidth >= 900) setOpen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setOpen(false);
+  });
+})();
+</script>
+<script>
+/* ── the words this page builds after it has loaded ───────────────────────
+   The same arrangement as careers.html and index.html: SAYS is empty here and
+   tools/build-es.mjs replaces it wholesale when it writes /es/contact, so the
+   English page is untouched and the Spanish one says its own validation
+   messages and results. /es/contact used to answer a Spanish form with "Tell
+   us your name." and "Message sent." — contact.html was not one of the pages
+   that went through say(). The key IS the English sentence. */
+var SAYS = {" and ":" y ","Send message":"Enviar mensaje","Tell us your name.":"Dinos tu nombre.","We need an address we can reply to.":"Necesitamos una dirección a la que podamos responder.","Tell us what you need.":"Cuéntanos qué necesitas.","Please agree to the Terms and Privacy Policy.":"Acepta los Términos y la Política de privacidad, por favor.","Sending…":"Enviando…","That email address does not look complete. Check it and send again.":"Esa dirección de correo no parece completa. Revísala y envía de nuevo.","That is more submissions than we accept from one place in an hour. Write to support@securejobva.com and a person will pick it up.":"Son más envíos de los que aceptamos desde un mismo lugar en una hora. Un correo a support@securejobva.com llega a una persona que se encarga.","<b>Message sent.</b> We answer within one to two business days, at {email}.":"<b>Mensaje enviado.</b> Respondemos en uno o dos días hábiles, a {email}.","<b>That did not send.</b> Your message is ready to email instead &mdash; {link}.":"<b>No se envió.</b> Tu mensaje está listo para mandarlo por correo &mdash; {link}.","send it now":"envíalo ahora","most":"la que más","least":"la que menos"};
+function say(en, vars) {
+  var s = Object.prototype.hasOwnProperty.call(SAYS, en) ? SAYS[en] : en;
+  if (!vars) return s;
+  return s.replace(/[{]([a-zA-Z]+)[}]/g, function (m, k) {
+    return Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m;
+  });
+}
+
+/* Unused on this page, and here so the page has the same pair as the other
+   two: tools/test-es-runtime.mjs lifts say() and sayList() together out of
+   every page that builds sentences. */
+function sayList(items) {
+  if (items.length < 2) return items.join("");
+  return items.slice(0, -1).join(", ") + say(" and ") + items[items.length - 1];
+}
+
 (function () {
   "use strict";
 
@@ -478,20 +602,36 @@ img{max-width:100%}
   function clear() {
     Array.prototype.forEach.call(form.querySelectorAll(".err"), function (p) { p.textContent = ""; });
   }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  /* The rule is the database's own, character for character: sql/073 checks
+     it on the two intake tables and sql/092 on this one. It used to be "an @
+     after the first character and a dot anywhere", which let juan.perez@gmail
+     through — and that address then went out as the reply-to on the staff
+     notification, where Resend refused the whole email over it. */
+  var ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  var btn = document.getElementById("c-send");
+  function ready() {
+    btn.disabled = false;
+    btn.textContent = say("Send message");
+  }
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     clear();
 
     var ok = true;
-    if (!val("c-name")) ok = fail("c-name", "Tell us your name.") && ok;
+    if (!val("c-name")) ok = fail("c-name", say("Tell us your name.")) && ok;
     var em = val("c-email");
-    if (!em || em.indexOf("@") < 1 || em.indexOf(".") < 0) {
-      ok = fail("c-email", "We need an address we can reply to.") && ok;
+    if (!ADDRESS.test(em)) {
+      ok = fail("c-email", say("We need an address we can reply to.")) && ok;
     }
-    if (!val("c-message")) ok = fail("c-message", "Tell us what you need.") && ok;
+    if (!val("c-message")) ok = fail("c-message", say("Tell us what you need.")) && ok;
     if (!document.getElementById("c-agree").checked) {
-      ok = fail("c-agree", "Please agree to the Terms and Privacy Policy.") && ok;
+      ok = fail("c-agree", say("Please agree to the Terms and Privacy Policy.")) && ok;
     }
     if (!ok) return;
 
@@ -501,29 +641,76 @@ img{max-width:100%}
       phone: val("c-phone") || null,
       reason: val("c-reason"),
       message: val("c-message"),
-      page: location.href
+      /* contact_messages_sane caps page at 500, and a long query string from
+         an ad link used to take the whole message down with it. */
+      page: location.href.slice(0, 500)
     };
 
-    var btn = document.getElementById("c-send");
     btn.disabled = true;
-    btn.textContent = "Sending\u2026";
+    btn.textContent = say("Sending…");
 
+    /* "sent", "failed", or a refusal the person can act on. A 4xx carrying an
+       sjva- hint is a rule saying no on purpose — sql/092 refusing an address
+       — and the fix is theirs to make in the form, so it is shown on the
+       field rather than dressed up as the database being down and turned
+       into an email they would then have to send by hand. */
     fetch(ENDPOINT, { method: "POST", headers: HEADERS, body: JSON.stringify(d) })
-      .then(function (r) { return r.ok; })
-      ["catch"](function () { return false; })
-      .then(function (sent) {
+      .then(function (r) {
+        if (r.ok) return "sent";
+        if (r.status < 400 || r.status >= 500) return "failed";
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (x) {}
+          if (j && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0 && j.message) {
+            return { hint: j.hint, message: String(j.message) };
+          }
+          return "failed";
+        }, function () { return "failed"; });
+      })
+      ["catch"](function () { return "failed"; })
+      .then(function (v) {
+        if (v && v.hint) {
+          ready();
+          if (v.hint === "sjva-address") {
+            var s = say("That email address does not look complete. Check it and send again.");
+            /* On the English page SAYS is empty and the sentence is the
+               database's; on /es it is ours. */
+            fail("c-email", s === "That email address does not look complete. Check it and send again." ? v.message : s);
+            document.getElementById("c-email").focus();
+          } else if (v.hint === "sjva-throttled") {
+            /* sql/047 counts contact_messages too, ten an hour from one place.
+               The sentence is the one /careers says for the same rule, so /es
+               already has it in Spanish. */
+            var t = say("That is more submissions than we accept from one place in an hour. " +
+                        "Write to support@securejobva.com and a person will pick it up.");
+            fail("c-send", t === "That is more submissions than we accept from one place in an hour. " +
+                                 "Write to support@securejobva.com and a person will pick it up." ? v.message : t);
+          } else {
+            /* A rule written after this page. It is about the message as a
+               whole, not the Terms box, so it goes under Send, where the
+               person is looking — it used to sit under c-agree and read as
+               if the checkbox had been the problem. */
+            fail("c-send", v.message);
+          }
+          return;
+        }
+        var sent = v === "sent";
         form.setAttribute("hidden", "");
         done.removeAttribute("hidden");
         done.innerHTML = sent
-          ? '<div class="cform__ok"><b>Message sent.</b> We answer within one to two business days, at ' +
-            d.email.replace(/&/g, "&amp;").replace(/</g, "&lt;") + ".</div>"
+          ? '<div class="cform__ok">' +
+              say("<b>Message sent.</b> We answer within one to two business days, at {email}.",
+                  { email: esc(d.email) }) +
+            '</div>'
           /* Not lost: the message is written into an email the visitor sends
              themselves, which works even when our database does not. */
-          : '<div class="cform__ok"><b>That did not send.</b> Your message is ready to email instead &mdash; ' +
-            '<a href="mailto:support@securejobva.com?subject=' +
-            encodeURIComponent(d.reason + " — " + d.name) +
-            '&body=' + encodeURIComponent(d.message + "\n\n" + d.name + "\n" + d.email + (d.phone ? "\n" + d.phone : "")) +
-            '">send it now</a>.</div>';
+          : '<div class="cform__ok">' +
+              say("<b>That did not send.</b> Your message is ready to email instead &mdash; {link}.",
+                  { link: '<a href="mailto:support@securejobva.com?subject=' +
+                      encodeURIComponent(d.reason + " — " + d.name) +
+                      '&body=' + encodeURIComponent(d.message + "\n\n" + d.name + "\n" + d.email + (d.phone ? "\n" + d.phone : "")) +
+                      '">' + say("send it now") + '</a>' }) +
+            '</div>';
       });
   });
 })();

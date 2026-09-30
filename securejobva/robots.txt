@@ -1,7 +1,9 @@
+# No Disallow lines, on purpose. The signed-in pages — /admin, /status, /hub,
+# /seats and /pay — each say noindex, in a meta tag build.mjs writes and in an
+# X-Robots-Tag header from vercel.json. A crawler told not to fetch a page never
+# reads either, and can still list the bare address it found in a link. Letting
+# it fetch them is what lets it see that they are not for search.
 User-agent: *
-Disallow: /admin
-Disallow: /status
-Disallow: /seats
 Allow: /
 
 Sitemap: https://www.securejobva.com/sitemap.xml

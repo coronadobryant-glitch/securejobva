@@ -57,15 +57,89 @@ function columns(sql, table) {
      Cheap to be wrong in the safe direction here: a column this finds that is
      not really there shows up immediately as a rejected insert, whereas one it
      misses blocks a form field that is perfectly fine. */
-  const alterRe = new RegExp(
-    "alter\\s+table\\s+(?:only\\s+)?public\\." + table +
-      "\\s+add\\s+column\\s+(?:if\\s+not\\s+exists\\s+)?" +
-      "([a-z_][a-z0-9_]*)\\s+(text\\[\\]|timestamptz|integer|uuid|text|boolean|numeric)",
+  /* That note was only ever about adds. A column can also LEAVE by ALTER, and
+     the first version of this never looked: it read every `add column` and no
+     `drop column`, so a column a later migration dropped stayed in the list
+     for good. The check below that exists to catch a form sending a key the
+     table no longer has would then have passed it, and the visitor would have
+     found out as "that did not send". "Shows up immediately as a rejected
+     insert" is true — in production, which is the one place this file is
+     meant to get there first. 039 already drops four columns from clients;
+     nothing a form sends has gone that way yet, which is the only reason it
+     never bit.
+
+     So the ALTERs are replayed in file order, the way the database ran them:
+     an add, a drop and a rename each move the list, and a column dropped and
+     then added back is present because the add came last. One ALTER can carry
+     several actions separated by commas, so each is read on its own.
+     Comments are stripped first — a sentence about dropping a column is not a
+     drop. */
+  const TYPE = "(text\\[\\]|timestamptz|integer|uuid|text|boolean|numeric)";
+  const NOT_A_COLUMN = /^(constraint|primary|unique|foreign|check|exclude|to)$/i;
+  const stmtRe = new RegExp(
+    "alter\\s+table\\s+(?:if\\s+exists\\s+)?(?:only\\s+)?public\\." + table + "\\s+([^;]*);",
     "gi"
   );
-  let a;
-  while ((a = alterRe.exec(sql)) !== null) out[a[1]] = a[2].toLowerCase();
+  const bare = sql.replace(/--[^\n]*/g, " ");
+  let st;
+  while ((st = stmtRe.exec(bare)) !== null) {
+    /* Commas inside parentheses belong to a default or a check, not to the
+       list of actions. */
+    const actions = [];
+    let depth = 0, from = 0;
+    const body = st[1];
+    for (let i = 0; i < body.length; i++) {
+      if (body[i] === "(") depth++;
+      else if (body[i] === ")") depth--;
+      else if (body[i] === "," && depth === 0) { actions.push(body.slice(from, i)); from = i + 1; }
+    }
+    actions.push(body.slice(from));
+    for (const raw of actions) {
+      const act = raw.trim();
+      let m = act.match(new RegExp(
+        "^add\\s+(?:column\\s+)?(?:if\\s+not\\s+exists\\s+)?([a-z_][a-z0-9_]*)\\s+" + TYPE, "i"));
+      if (m && !NOT_A_COLUMN.test(m[1])) { out[m[1]] = m[2].toLowerCase(); continue; }
+      m = act.match(/^drop\s+(?:column\s+)?(?:if\s+exists\s+)?([a-z_][a-z0-9_]*)/i);
+      if (m && !NOT_A_COLUMN.test(m[1])) { delete out[m[1]]; continue; }
+      m = act.match(/^rename\s+(?:column\s+)?([a-z_][a-z0-9_]*)\s+to\s+([a-z_][a-z0-9_]*)/i);
+      if (m && !NOT_A_COLUMN.test(m[1]) && m[1] in out) {
+        out[m[2]] = out[m[1]];
+        delete out[m[1]];
+      }
+    }
+  }
   return out;
+}
+
+/* Which columns of a table the anonymous key may INSERT, replayed in file
+   order the same way: a `revoke insert` (or `revoke all`) from anon empties
+   the list, a table-wide `grant insert … to anon` covers every column, and a
+   `grant insert (a, b) … to anon` adds those two.
+
+   Having a column is not the same as being allowed to write it. 046 took the
+   whole-table grant back and named the columns careers.html sends, and 084
+   added two more — deliberately leaving out privacy_consent_at, which the
+   database stamps and nobody may send. A form that sent it would pass the
+   column check above and still lose every application to a 42501, because
+   PostgREST refuses the whole insert over the one column. */
+function anonInsert(sql, table) {
+  const bare = sql.replace(/--[^\n]*/g, " ");
+  let all = false;
+  let cols = new Set();
+  for (const stmt of bare.split(";")) {
+    const s = stmt.replace(/\s+/g, " ").trim();
+    const onT = new RegExp("\\bon (?:table )?public\\." + table + "\\b", "i");
+    if (!onT.test(s)) continue;
+    if (/^revoke /i.test(s) && /\b(insert|all)\b/i.test(s.split(/ on /i)[0]) &&
+        /\bfrom [a-z_, ]*\banon\b/i.test(s)) {
+      all = false; cols = new Set(); continue;
+    }
+    if (!/^grant /i.test(s) || !/\bto [a-z_, ]*\banon\b/i.test(s)) continue;
+    const listed = s.match(/^grant insert\s*\(([^)]*)\)/i);
+    if (listed) { for (const c of listed[1].split(",")) if (c.trim()) cols.add(c.trim()); continue; }
+    if (/\b(insert|all)\b/i.test(s.split(/ on /i)[0])) all = true;
+  }
+  return { all, cols };
 }
 
 /* ── the payload, as the page actually sends it ──────────────────────────── */
@@ -354,6 +428,23 @@ for (const p of PAGES) {
         " — add them to a new file in sql/ in this commit");
     }
     return Object.keys(keys).length + " fields -> " + p.table;
+  });
+
+  /* The column existing is half of it; the anonymous key being allowed to
+     write it is the other half, and it fails the same way — the whole insert
+     refused over one key. See anonInsert() above for why that is not the
+     same thing. */
+  await check(p.file + ": every form field is one anon may write", () => {
+    const g = anonInsert(sql, p.table);
+    if (g.all) return "table-wide INSERT to anon covers all " + Object.keys(keys).length + " fields";
+    const refused = Object.keys(keys).filter((k) => !g.cols.has(k));
+    if (refused.length) {
+      throw new Error("anon has no INSERT on " + p.table + " for: " + refused.join(", ") +
+        " — PostgREST refuses the whole insert (42501) and the visitor loses the form. " +
+        "Grant the column to anon in a new file in sql/, or stop sending it if the " +
+        "database is meant to fill it (privacy_consent_at is stamped, never sent)");
+    }
+    return Object.keys(keys).length + " fields, each granted to anon by name";
   });
 
   /* An integer column will not take 232.5. This is exactly how the 30-hour
@@ -2110,6 +2201,57 @@ await check("the timesheet's weeks and totals hold up", async () => {
   }
 });
 
+/* ── fixes that live in the five generated pages ──────────────────────────
+   Each entry is a fix that went into one of the pages tools/build-portal.mjs
+   writes. Two checks below read this list: one asks whether the page in the
+   repo still has it, the other whether the generator would write it. */
+const PORTAL_MARKERS = [
+  ["seats.html",  "function placeBlock",  "every assistant is drawn, not only the first"],
+  ["seats.html",  "function billingBlock", "the bill"],
+  ["seats.html",  "function quoted",      "the quote shown to the cent"],
+  ["seats.html",  "C_WEEK_LIMIT",         "the statement's week limit"],
+  ["status.html", "id=\"a-shot\"",        "the typing result screenshot she attaches"],
+  ["status.html", "typing_proof",         "proof of the typing score"],
+  ["admin.html",  "function todayCentral", "dates stamped in Central"],
+  ["admin.html",  "function downloadCvs", "the bulk CV download"],
+  ["admin.html",  "DATE_RANGES",          "the date filter"],
+  ["admin.html",  "weekly_cents",         "the exact quote"],
+  ["admin.html",  "function drawPayments", "recording that a client paid"],
+  ["pay.html",    "function dueCard",     "the figure a client came to /pay for"],
+  ["pay.html",    "function receiptsCard", "the payments received panel"],
+  ["seats.html",  "function cBill",       "one definition of what a client owes"],
+  ["seats.html",  "Left to pay",          "the total that comes down when somebody pays"],
+  ["status.html", "function tzCard",      "the applicant's time zone setting"],
+  ["hub.html",    "function tzCard",      "the assistant's time zone setting"],
+  ["seats.html",  "function tzCard",      "the client's time zone setting"],
+  ["seats.html",  "function interviewBlock", "the client's half of the interview"],
+  ["hub.html",    "function interviewCard",  "the assistant's half of the interview"],
+  ["admin.html",  "function drawInterviews", "which interviews have stalled"],
+  /* The 29 September round. Every one of these went into the page by hand
+     first, which is how the generator fell a day behind; they are listed so
+     that the next time that happens it is a failure and not a surprise. */
+  ["admin.html",  "function objectName",  "an erasure deletes the CV under its real name, not applicant-docs/ twice"],
+  ["admin.html",  "function centralParts", "interview boxes read and write Central, whatever zone the browser is in"],
+  ["status.html", "function trackFor",    "the track her assessment is scored on, as sql/079 decides it"],
+  ["status.html", "function serverNow",   "a part's deadline judged by the server's clock"],
+  ["hub.html",    "function unconfirmed", "the card for a right password on an unconfirmed address"],
+  ["hub.html",    "function slotPassed",  "an interview time that has already gone by"],
+  ["seats.html",  "function zonedInstant", "a time the client offers, read in their own saved zone"],
+  ["seats.html",  "function cBalance",    "the balance the database works out, not the page"],
+  ["pay.html",    "function cBalance",    "the balance the database works out, not the page"],
+  ["status.html", "wantsSales",           "the Sales track she applied for, not a guess from her answers"],
+  ["admin.html",  "var safe = /^https?:", "a social link is only a link when it is a web address"],
+  /* The other direction: fixes that were in the generator and never reached
+     four of the pages until they were regenerated on 30 September. Listed so
+     that a page edited by hand from an older copy is caught losing them. */
+  ["admin.html",  "tab.location.href = url", "a document opens in a tab opened inside the click, so Safari lets it"],
+  ["hub.html",    "tab.location.href = url", "a document opens in a tab opened inside the click, so Safari lets it"],
+  ["seats.html",  "tab.location.href = url", "a document opens in a tab opened inside the click, so Safari lets it"],
+  ["pay.html",    "tab.location.href = url", "a document opens in a tab opened inside the click, so Safari lets it"],
+  ["status.html", "tab.location.href = url", "a document opens in a tab opened inside the click, so Safari lets it"],
+  ["hub.html",    "@media(max-width:599px)", "below 600px the header button moves into the menu instead of pushing the page sideways"]
+];
+
 /* ── the generator that overwrites four of these pages ────────────────────
    tools/build-portal.mjs WRITES status.html, admin.html, hub.html, seats.html
    and pay.html. It never reads them. So anything edited in those files by hand
@@ -2125,29 +2267,7 @@ await check("the timesheet's weeks and totals hold up", async () => {
    page comes back without one, that page has been regenerated from a
    generator that does not know about it, and the fix is gone. */
 await check("no generated page has lost a fix to its generator", () => {
-  const MARKERS = [
-    ["seats.html",  "function placeBlock",  "every assistant is drawn, not only the first"],
-    ["seats.html",  "function billingBlock", "the bill"],
-    ["seats.html",  "function quoted",      "the quote shown to the cent"],
-    ["seats.html",  "C_WEEK_LIMIT",         "the statement's week limit"],
-    ["status.html", "id=\"a-shot\"",        "the typing result screenshot she attaches"],
-    ["status.html", "typing_proof",         "proof of the typing score"],
-    ["admin.html",  "function todayCentral", "dates stamped in Central"],
-    ["admin.html",  "function downloadCvs", "the bulk CV download"],
-    ["admin.html",  "DATE_RANGES",          "the date filter"],
-    ["admin.html",  "weekly_cents",         "the exact quote"],
-    ["admin.html",  "function drawPayments", "recording that a client paid"],
-    ["pay.html",    "function dueCard",     "the figure a client came to /pay for"],
-    ["pay.html",    "function receiptsCard", "the payments received panel"],
-    ["seats.html",  "function cBill",       "one definition of what a client owes"],
-    ["seats.html",  "Left to pay",          "the total that comes down when somebody pays"],
-    ["status.html", "function tzCard",      "the applicant's time zone setting"],
-    ["hub.html",    "function tzCard",      "the assistant's time zone setting"],
-    ["seats.html",  "function tzCard",      "the client's time zone setting"],
-    ["seats.html",  "function interviewBlock", "the client's half of the interview"],
-    ["hub.html",    "function interviewCard",  "the assistant's half of the interview"],
-    ["admin.html",  "function drawInterviews", "which interviews have stalled"]
-  ];
+  const MARKERS = PORTAL_MARKERS;
   const lost = [];
   for (const [file, marker, what] of MARKERS) {
     if (!existsSync(file)) continue;
@@ -2160,6 +2280,136 @@ await check("no generated page has lost a fix to its generator", () => {
       "port the change into the generator before running it again.");
   }
   return MARKERS.length + " fixes still present in the five generated pages";
+});
+
+/* The markers above catch a page that has LOST a fix, after the generator has
+   been run. They cannot see the state before that: a page carrying fixes the
+   generator has never heard of, one command away from losing them all. That
+   is the state that matters, and it is the one this repo was in — the /status
+   to /seats hand-over (99d05ec) went into status.html alone, and the 29
+   September fixes went into all five pages by hand while the generator stayed
+   at the day before.
+
+   So run the generator where it cannot overwrite anything — a scratch folder
+   holding a copy of tools/ and of careers.html, which is all it reads — and
+   compare what it writes with the pages in the repo, line endings aside.
+
+   A difference on its own is a warning, not a failure: the pages are what
+   ships, and the difference can run the other way — on 30 September the
+   generator was brought up to the pages and then some, carrying the header
+   rules careers.html had moved on to and one copy of the shared helpers that
+   three pages had each pasted differently. A fix listed in PORTAL_MARKERS
+   that the generator would drop is a failure, because that is the case where
+   running it loses something. */
+await check("the portal generator reproduces the pages it writes", async () => {
+  const { mkdtempSync, cpSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { execFileSync } = await import("node:child_process");
+  const OUT = ["status.html", "admin.html", "hub.html", "seats.html", "pay.html"];
+  const dir = mkdtempSync(join(tmpdir(), "sjva-portal-"));
+  try {
+    cpSync("tools", join(dir, "tools"), { recursive: true });
+    cpSync("careers.html", join(dir, "careers.html"));
+    try {
+      execFileSync(process.execPath, ["tools/build-portal.mjs"], { cwd: dir, stdio: "pipe" });
+    } catch (e) {
+      throw new Error("tools/build-portal.mjs did not run: " +
+        String((e.stderr || "") + "").split("\n").filter(Boolean).slice(-1)[0]);
+    }
+    const bare = (t) => t.replace(/\r/g, "");
+    /* The part that is a failure, not a warning: a fix the page has and the
+       generator would not write. Running the generator in that state loses
+       it, so the state itself is what fails. The same list as the check
+       above, read from the generator's output instead of the repo's pages. */
+    const unknown = [];
+    for (const [file, marker, what] of PORTAL_MARKERS) {
+      if (!existsSync(file) || !read(file).includes(marker)) continue;
+      if (!readFileSync(join(dir, file), "utf8").includes(marker)) unknown.push(file + ": " + what);
+    }
+    if (unknown.length) {
+      throw new Error(unknown.join("; ") + " — in the page, not in tools/build-portal.mjs. " +
+        "Running the generator now would remove them. Port them into it first.");
+    }
+
+    const behind = [];
+    for (const f of OUT) {
+      if (!existsSync(f)) continue;
+      const want = bare(read(f)).split("\n");
+      const got = bare(readFileSync(join(dir, f), "utf8")).split("\n");
+      if (want.join("\n") === got.join("\n")) continue;
+      /* Where they first part, so the note says where to start porting. */
+      let i = 0;
+      while (i < want.length && want[i] === got[i]) i++;
+      behind.push(f + " (from line " + (i + 1) + ")");
+    }
+    if (behind.length) {
+      /* Either direction ends up here. A page edited by hand past the generator
+         is the dangerous one, and the markers above fail on the fixes that are
+         known to matter. The other is a generator that has moved on — the
+         shared header rules lifted from careers.html, or a helper that lives
+         in the block every page shares — and there running it is the fix. The
+         diff says which: look at it before running anything. */
+      const e = new Error(behind.join(", ") + " — not what tools/build-portal.mjs writes. If the " +
+        "page was edited by hand, port the edit into the generator; if the generator has moved on, " +
+        "run it. Either way git diff afterwards should show nothing but line endings.");
+      e.warning = true;
+      throw e;
+    }
+    return OUT.length + " pages, each exactly what the generator writes";
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/* The same trap, for the four policy pages. tools/build-policy.mjs WRITES
+   contact.html, privacy.html, terms.html and refunds.html, and build-es.mjs
+   reads those English pages to make the Spanish ones, so a policy page edited
+   by hand and then regenerated loses the edit twice over. On 30 September it
+   was one command away from undoing that day's privacy, terms, refund and
+   contact fixes, and nothing here was looking.
+
+   Run it in a scratch folder — it reads careers.html for the chrome — and
+   compare. A warning for the same reason as the portal one: the pages are
+   what ships. */
+await check("the policy generator reproduces the pages it writes", async () => {
+  const { mkdtempSync, cpSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { execFileSync } = await import("node:child_process");
+  const OUT = ["contact.html", "privacy.html", "terms.html", "refunds.html"];
+  if (!existsSync("tools/build-policy.mjs")) return "no policy generator in this checkout";
+  const dir = mkdtempSync(join(tmpdir(), "sjva-policy-"));
+  try {
+    cpSync("tools", join(dir, "tools"), { recursive: true });
+    cpSync("careers.html", join(dir, "careers.html"));
+    try {
+      execFileSync(process.execPath, ["tools/build-policy.mjs"], { cwd: dir, stdio: "pipe" });
+    } catch (e) {
+      throw new Error("tools/build-policy.mjs did not run: " +
+        String((e.stderr || "") + "").split("\n").filter(Boolean).slice(-1)[0]);
+    }
+    const bare = (t) => t.replace(/\r/g, "");
+    const behind = [];
+    for (const f of OUT) {
+      if (!existsSync(f)) continue;
+      const want = bare(read(f)).split("\n");
+      const got = bare(readFileSync(join(dir, f), "utf8")).split("\n");
+      if (want.join("\n") === got.join("\n")) continue;
+      let i = 0;
+      while (i < want.length && want[i] === got[i]) i++;
+      behind.push(f + " (from line " + (i + 1) + ")");
+    }
+    if (behind.length) {
+      const e = new Error(behind.join(", ") + " — not what tools/build-policy.mjs writes. Port a " +
+        "hand edit into the generator before anybody runs it; es/ is built from these pages.");
+      e.warning = true;
+      throw e;
+    }
+    return OUT.length + " pages, each exactly what the generator writes";
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 /* ── a class the page writes and the stylesheet has never heard of ────────
@@ -2250,7 +2500,30 @@ await check("no regex in a portal lost its backslash", () => {
       "one backslash, so `\\d` in tools/build-portal.mjs has to be written `\\\\d`. The regex " +
       "will compile either way and match the wrong thing in silence.");
   }
-  return PAGES.length + " pages, no character class missing its backslash";
+
+  /* The same bite, on an escaped slash — and worse, because it does not match
+     the wrong thing, it stops being a test at all. /^https?:\/\//i written in
+     the generator reached /admin as /^https?:///i, which JavaScript reads as
+     the regex /^https?:/ followed by a // comment. socialLink()'s `safe` was
+     then a RegExp object, always truthy, and every URL an applicant typed —
+     javascript: included — became an href in front of staff. The inert-text
+     fallback beneath it was dead code for as long as the page existed.
+
+     The signature is a regex that opens, reaches a colon and then three
+     slashes, in code: after =, (, !, a comma or a logical operator. The same
+     characters in a sentence about the bug — which the fix now carries — are
+     preceded by a word, and are left alone. */
+  const EATEN = /[=(!,&|?:]\s*\/\^?[a-z?]*:\/\/\//gi;
+  const eaten = [];
+  for (const f of PAGES) {
+    for (const m of read(f).matchAll(EATEN)) eaten.push(f + ": " + m[0].trim());
+  }
+  if (eaten.length) {
+    throw new Error([...new Set(eaten)].join(", ") + " — an escaped slash the template " +
+      "literal ate: the regex ends at the colon and the rest of the line is a comment, so " +
+      "the test is always true. Write \\\\/ in tools/build-portal.mjs.");
+  }
+  return PAGES.length + " pages, no character class or slash missing its backslash";
 });
 
 /* The bill a client reads before they pay us, driven with more than one
@@ -2446,6 +2719,45 @@ await check("the admin panel shows the grade the scorer reached", async () => {
     return (out.match(/^ {2}ok/gm) || []).length + " behaviours, verdict and what is provisional";
   } catch (e) {
     throw new Error("tools/test-sit-panel.mjs failed — run it directly for the detail");
+  }
+});
+
+/* The two newest tests were written, passed, committed — and never added here,
+   so the deploy gate did not run them. Each guards a regression that had
+   already shipped once: /es building its validation messages in English, and
+   /status forwarding a signed-in business to /seats only to be asked to sign
+   in again. A test the build does not run guards the commit it arrived in and
+   nothing after it. */
+await check("/es builds its own sentences in Spanish", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-es-runtime.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, say() out of the built pages";
+  } catch (e) {
+    throw new Error("tools/test-es-runtime.mjs failed — run it directly for the detail");
+  }
+});
+
+await check("/status hands a business to /seats without a second sign-in", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-session-slots.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, and nobody else's session overwritten";
+  } catch (e) {
+    throw new Error("tools/test-session-slots.mjs failed — run it directly for the detail");
+  }
+});
+
+/* api/invite.js had no test at all, and its one subtle line — redirect_to is a
+   query parameter on that endpoint, silently ignored in the body — is the kind
+   that goes wrong without a single error anywhere. */
+await check("a client invite lands on /seats, and a failure is logged, not thrown", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-invite.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok/gm) || []).length + " behaviours, api/invite.js with fetch stubbed";
+  } catch (e) {
+    throw new Error("tools/test-invite.mjs failed — run it directly for the detail");
   }
 });
 
@@ -3887,13 +4199,27 @@ await check("the admin queue fetches the interview times it draws", () => {
    Compared as a plain substring: this file has eaten an escape seven times in
    three days, and a regular expression describing a regular expression is two
    trips for every backslash. */
-await check("the address rule is one rule, in all three places", () => {
+/* Three places became seven on 29 September. 092 put the same rule on
+   contact_messages, so the contact form has to carry it before 092 is pasted
+   — a page that lets through an address the trigger refuses shows "That did
+   not send" to somebody who typed a real message. And the two endpoints that
+   mail an address a row holds (the client invite, and notify's reply-to)
+   check it with the same characters, so a row one of them skips is one the
+   others would have refused. contact.html is only held to it once 092 is in
+   the folder: before that there is no trigger for it to disagree with. */
+await check("the address rule is one rule, in every place that checks one", () => {
   const RULE = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$";
+  const sql092 = readdirSync("sql").find((f) => /^092-.*\.sql$/.test(f));
   const where = [
     ["careers.html", "the apply form"],
     ["index.html", "the seat request form"],
-    ["sql/073-an-application-needs-an-address.sql", "the constraint"]
-  ];
+    ["sql/073-an-application-needs-an-address.sql", "the constraint"],
+    ["api/invite.js", "the client invite"],
+    ["api/notify.js", "notify's reply-to"]
+  ].concat(sql092 ? [
+    ["sql/" + sql092, "the contact trigger"],
+    ["contact.html", "the contact form, which must agree before 092 is pasted"]
+  ] : []);
   const without = where.filter(([f]) => read(f).indexOf(RULE) < 0);
   if (without.length) {
     throw new Error(without.map(([f, what]) => what + " (" + f + ")").join(" and ") +
@@ -3918,7 +4244,14 @@ await check("the address rule is one rule, in all three places", () => {
    application last moved, and what 031's decline mail reads to tell somebody
    the date they may apply again. A fifth writer that forgets it does not
    break anything visibly; it tells one person the wrong date, once, in an
-   email about being turned down. */
+   email about being turned down.
+
+   074 (29 September) put a trigger behind it for writes from a page: the
+   database now sets the stamp itself whenever a page changes status, and
+   ignores whatever the page sent. The SQL editor and the definer functions are
+   exempt from that trigger on purpose, so the SQL half below still matters as
+   much as it did; the page half is now belt and braces, and /admin keeps
+   sending the stamp so a database without 074 is still right. */
 await check("nothing moves an application's status without stamping it", () => {
   const offenders = [];
 
@@ -4000,6 +4333,32 @@ if (!existsSync("dist/index.html")) {
       return canon;
     });
   }
+
+  /* Every Spanish page linked out to the English site — nav, footer, "see our
+     pricing", and "Empleos", which the artifact rewrite turned into /careers.
+     build.mjs now points a link on a Spanish page at the Spanish twin; this is
+     the check that it did, read from what ships. The two links that exist to
+     leave — the EN toggle and "Read the English version" on the legal pages —
+     say hreflang="en" and are the only ones let through. */
+  await check("dist/es: a Spanish page links to Spanish pages", () => {
+    const TWINS = /^\/(|careers|contact|privacy|terms|refunds)(#.*)?$/;
+    const esPages = existsSync("dist/es")
+      ? readdirSync("dist/es").filter((f) => f.endsWith(".html")) : [];
+    if (!esPages.length) throw new Error("no dist/es pages — build.mjs did not write the Spanish half");
+    const out = [];
+    for (const f of esPages) {
+      for (const m of read("dist/es/" + f).matchAll(/<a\b[^>]*>/g)) {
+        if (/\bhreflang\s*=\s*["']?en\b/i.test(m[0])) continue;
+        const href = (m[0].match(/\bhref="([^"]*)"/) || [])[1];
+        if (href !== undefined && TWINS.test(href)) out.push("es/" + f + " -> " + href);
+      }
+    }
+    if (out.length) {
+      throw new Error(out.length + " link(s) from a Spanish page to an English one, first: " +
+        out.slice(0, 3).join(", ") + " — see spanishLinks() in build.mjs");
+    }
+    return esPages.length + " pages, every link to a translated page stays in Spanish";
+  });
 }
 
 /* ── against the running site ────────────────────────────────────────────── */

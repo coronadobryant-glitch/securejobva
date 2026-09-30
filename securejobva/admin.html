@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -282,13 +323,16 @@ img{max-width:100%}
 .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
 .opt__box{
   width:18px;height:18px;flex:none;margin-top:.18rem;
-  border:1.5px solid var(--line);border-radius:5px;background:var(--surface);
+  border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
 .opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
 .opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
+/* --muted on the tinted ground of a picked option is 4.10:1, under the 4.5
+   small text needs, so the description darkens with the pick. */
+.opt:has(input:checked) .opt__d,.opt.is-on .opt__d{color:var(--ink-2)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 /* ---------- portal ---------- */
@@ -1133,6 +1177,41 @@ function readToken(tok) {
   } catch (e) { return null; }
 }
 
+/* The client portal keeps its session in a slot of its own (seats.html sets
+   SLOT = "client"), so sending somebody there hands them a page that cannot
+   see they are signed in: the sign-in card, with no explanation, having
+   clicked nothing. The slots exist so three audiences stop evicting each
+   other — not so that this page's own redirect can land on a wall.
+
+   So put the same token in the client drawer before going, which is exactly
+   what signing in again at /seats would have put there. It grants nothing:
+   the lock is the signature on the token and Postgres checks it either way.
+
+   The one thing that must not be overwritten is a LIVE session belonging to
+   somebody else, because that is the eviction the slots were added to stop.
+   An expired one is already spent, so it is fair game. When we will not
+   overwrite, this returns false and the caller stays here and offers the link
+   instead, which is still better than the wall. */
+function handToClientSlot() {
+  var s = loadSession();
+  if (!s || !s.access_token) return false;
+  var mine = readToken(s.access_token);
+  if (!mine || !mine.email) return false;
+
+  var raw = null;
+  try { raw = localStorage.getItem("sjva-session-client"); } catch (e) { return false; }
+  if (raw) {
+    var theirs = null;
+    try { theirs = JSON.parse(raw); } catch (e) { theirs = null; }
+    var t = theirs && theirs.access_token ? readToken(theirs.access_token) : null;
+    if (t && t.email && t.email !== mine.email && t.exp && t.exp * 1000 > Date.now()) return false;
+  }
+
+  try { localStorage.setItem("sjva-session-client", JSON.stringify(s)); }
+  catch (e) { return false; }
+  return true;
+}
+
 /* ── whose rows are these? ────────────────────────────────────
 
    Every portal page below asks the database for its rows and, until now, took
@@ -1555,6 +1634,71 @@ function api(path, opts) {
   }
 }
 
+/* The sentence the database meant for her, when it refused on purpose.
+
+   A deliberate refusal in sql/ raises with a hint that starts "sjva-" and a
+   message written for the person reading it — "that time has already passed",
+   "that is not a link". api() throws the raw PostgREST body, so without this
+   every one of them arrived as "That did not save. Check your connection",
+   which sends her off to fix a connection that was never the problem.
+
+   Anything else — a dropped connection, a 500, a refusal nobody wrote words
+   for — gives back "", and the caller says what it always said. */
+function ourWords(e) {
+  var t = String((e && e.message) || e || "");
+  try {
+    var j = JSON.parse(t);
+    if (j && j.message && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0) return String(j.message);
+  } catch (x) {}
+  return "";
+}
+
+/* The server's clock, as an offset from this device's.
+
+   A part's deadline is the server's opening time plus its minutes, and the
+   page used to hold that against Date.now() — this device's clock. A laptop
+   running 25 minutes fast therefore opened a 20-minute part already over, and
+   the page closed it on the spot with nothing in it. She could not reopen it.
+   The database (sql/078) judges the deadline by its own clock, so the page has
+   to judge by the same one or the two will disagree about when she ran out.
+
+   rpc/server_time (sql/078) answers with now(). The offset is the difference,
+   read once per part opened rather than trusted from the first page load, so
+   a clock corrected halfway through is caught at the next part. If the call
+   fails — 078 not pasted, a blip — the offset stays where it was, which is 0
+   the first time: exactly the old behaviour, and no worse than before.
+
+   The same clock serves the two interview pages. On /hub it decides which
+   interview times have already passed, and it has to agree with sql/082,
+   which refuses a pick by the database's own now(): a phone clock a few
+   minutes out would otherwise offer a time the database then refuses, or hide
+   one it would still take. On /seats it decides whether the interview card is
+   still in play and whether a time the client is about to offer is in the
+   past, at the same moment /hub decides it for the assistant. Both read the
+   offset once as they load; if that fails the offset stays 0, which is exactly
+   how the pages behaved before.
+
+   It lives here, once, because this block is the same on all five pages. It
+   used to be pasted into three of them with three different comments, and the
+   generator can only write one. */
+var SKEW = 0;
+
+function serverNow() {
+  return Date.now() + SKEW;
+}
+
+function syncClock() {
+  var sent = Date.now();
+  return api("rpc/server_time", { method: "POST", body: {} })
+    .then(function (iso) {
+      var t = Date.parse(iso);
+      if (isNaN(t)) return;
+      /* Half the round trip, so a slow answer is not read as a slow clock. */
+      SKEW = t - Math.round((sent + Date.now()) / 2);
+    })
+    .catch(function () {});
+}
+
 /* Storage lives beside PostgREST on the same project. */
 function storageBase() {
   return SB + "/storage/v1";
@@ -1598,19 +1742,42 @@ function signDoc(path) {
   });
 }
 
+/* Three things this used to get wrong, all found the same afternoon.
+
+   A second click while the first was still signing opened the file twice, so
+   a button that is already busy is left alone.
+
+   The tab was opened after the signing request came back, which is no longer
+   "in the click" as far as a popup blocker is concerned. Safari refuses that
+   without a word, so on an iPhone the button said "Opening…", then went back
+   to the filename, and nothing ever opened. The tab is now opened blank while
+   the click is still happening and pointed at the file when the link arrives.
+   It is opened without "noopener" only because that makes window.open hand
+   back null, and there would be nothing to point; the opener is cut by hand
+   straight after, which is the same protection.
+
+   And a failure put the label back at once: the last .then ran after the
+   .catch and found the button still disabled, so "Could not open" was
+   replaced before anybody could read it. Only success puts the label back
+   now; a failure waits its 2.2 seconds as it was always meant to. */
 function openDoc(btn) {
+  if (btn.disabled) return;
   var path = btn.getAttribute("data-doc");
   var was = btn.textContent;
+  var tab = null;
+  try { tab = window.open("", "_blank"); } catch (e) { tab = null; }
+  if (tab) { try { tab.opener = null; } catch (e) {} }
   btn.disabled = true;
   btn.textContent = "Opening…";
   signDoc(path).then(function (url) {
-    window.open(url, "_blank", "noopener");
-  }).catch(function (e) {
+    if (tab && !tab.closed) tab.location.href = url;
+    else window.open(url, "_blank", "noopener");
+    btn.textContent = was;
+    btn.disabled = false;
+  }, function (e) {
+    if (tab && !tab.closed) { try { tab.close(); } catch (x) {} }
     btn.textContent = e.message === "signed out" ? "Signed out" : "Could not open";
     setTimeout(function () { btn.textContent = was; btn.disabled = false; }, 2200);
-    return;
-  }).then(function () {
-    if (btn.disabled) { btn.textContent = was; btn.disabled = false; }
   });
 }
 
@@ -1915,14 +2082,24 @@ function wireTz() {
 
     /* Upsert by hand: one row per user, and whether it exists yet depends on
        whether they have ever opened this card. Prefer resolution=merge-duplicates
-       makes the first save and the tenth the same request. */
+       makes the first save and the tenth the same request.
+
+       No user_id in the body. PostgREST turns every column it is sent into
+       the SET list of ON CONFLICT DO UPDATE, and Postgres wants UPDATE
+       permission on each of them before it looks for a conflict at all, even
+       on a first save that never conflicts. 059 grants update on time_zone
+       only, so sending user_id asked to update user_id, which nobody may, and
+       every save came back a 42501, "permission denied for table
+       user_settings", with nothing ever stored. sql/080
+       gives the column a default of auth.uid(), so the row is still hers
+       without the page naming her, and the policy pins it either way. */
     api("user_settings", {
       method: "POST",
       headers: {
         Prefer: "resolution=merge-duplicates,return=minimal",
         "Content-Profile": "public"
       },
-      body: { user_id: MY_USER, time_zone: pick }
+      body: { time_zone: pick }
     }).then(function () {
       MY_TZ = pick;
       tzFlash(ok, "Saved");
@@ -2037,6 +2214,28 @@ function slotState(slots) {
          : live.length ? "waiting_on_assistant"
          : "not_started"
   };
+}
+
+/* When a declined applicant may apply again: three months after the decline,
+   the rule sql/027 and 075 enforce (status_changed_at + interval '3 months').
+
+   075 took the date out of the refusal the careers form shows, because that
+   form answers anybody who types an address, and the date told a stranger who
+   had been turned down and when. This page only ever shows her own
+   application, so the date moves here, where it is hers to see.
+
+   Month arithmetic the way Postgres does it, in UTC: the same day three months
+   on, or the last day of that month when it is shorter. setMonth rolls over
+   instead — 30 November plus three would be 2 March, not 28 February — so the
+   day is clamped by hand. Null when there is nothing to count from. */
+function againFrom(a) {
+  var t = Date.parse((a && (a.status_changed_at || a.created_at)) || "");
+  if (isNaN(t)) return null;
+  var d = new Date(t);
+  var y = d.getUTCFullYear(), m = d.getUTCMonth() + 3, day = d.getUTCDate();
+  var last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(day, last),
+    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()));
 }
 
 function when(iso) {
@@ -2299,11 +2498,23 @@ function options(cur) {
 
 /* A handle is shown as a link only when it is one. Anything typed into those
    boxes is a stranger's text, so a link is built from an http(s) URL and
-   nothing else -- a "handle" of javascript:... stays inert text. */
+   nothing else -- a "handle" of javascript:... stays inert text.
+
+   That was the intention, and for as long as this page has been built it was
+   not what shipped. The test was written /^https?:\/\//i inside the
+   generator's template literal, where a single backslash is eaten, so the
+   page received /^https?:///i -- which JavaScript reads as the regex
+   /^https?:/ followed by a // comment. "safe" was a RegExp object, always
+   truthy, and every url an applicant typed became an href, javascript: and
+   all. In tools/build-portal.mjs every backslash in these tests has to be
+   written twice for the page to receive it once. The rule is the one sql/081
+   holds new rows to: http or https, then no space, quote or angle bracket
+   anywhere. Old rows written before 081 still reach this function, which is
+   why the page checks as well as the database. */
 function socialLink(s) {
   var name = s.platform.charAt(0).toUpperCase() + s.platform.slice(1);
   var href = String(s.url || "");
-  var safe = /^https?:///i.test(href);
+  var safe = /^https?:\/\/[^\s"'<>]+$/i.test(href);
   var shown = s.handle || href || "";
   if (safe) {
     return '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer nofollow">' +
@@ -2532,13 +2743,17 @@ function noteBox(a) {
   );
 }
 
+/* When a note was written, in the reader's own chosen zone like every other
+   timestamp on the page. This was the one that ignored the setting and used
+   the browser's, so the same note read one time here and another on a card
+   drawn through tzOpts. */
 function whenStamp(iso) {
   if (!iso) return "";
   var d = new Date(iso);
   if (isNaN(d)) return "";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(undefined, tzOpts({
     day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
-  });
+  }));
 }
 
 var DISC_STYLE = {
@@ -2638,17 +2853,60 @@ function forgetCounts(id) {
       .then(function (r) { return (r || []).length; })
       ["catch"](function () { return null; });
   };
+  /* The weeks are read with their status rather than counted, because two
+     kinds of week decide whether this can happen at all: an approved one is a
+     bill somebody agreed to, and one a client payment has been allocated to
+     is money already reconciled against it. sql/088 refuses the delete while
+     either exists, so the panel says so before anybody types a name, rather
+     than after. */
+  var weeks = api("timesheets?select=id,status&application_id=eq." + encodeURIComponent(id))
+    ["catch"](function () { return null; });
+  var paid = weeks.then(function (w) {
+    if (!w) return null;
+    if (!w.length) return 0;
+    return api("client_payment_weeks?select=timesheet_id&timesheet_id=in.(" +
+               w.map(function (x) { return encodeURIComponent(x.id); }).join(",") + ")")
+      .then(function (r) { return (r || []).length; })
+      ["catch"](function () { return null; });
+  });
   return Promise.all([
-    one("application_notes"),
+    /* The log, not the old table. application_notes is one row per
+       application and 024 stopped writing to it; every note anybody has
+       added since lives in application_note_log, which is what this page
+       reads and writes everywhere else. Counting the old table told
+       somebody about to erase a person with nine notes that there was one,
+       or none. */
+    one("application_note_log"),
     one("application_disc"),
     one("application_assessment"),
-    one("timesheets"),
+    weeks,
     one("placements"),
     api("application_documents?select=id,path,filename&application_id=eq." + encodeURIComponent(id))
-      ["catch"](function () { return []; })
+      ["catch"](function () { return []; }),
+    paid
   ]).then(function (r) {
-    return { notes: r[0], disc: r[1], sit: r[2], weeks: r[3], places: r[4], docs: r[5] || [] };
+    var w = r[3];
+    return {
+      notes: r[0], disc: r[1], sit: r[2],
+      weeks: w ? w.length : null,
+      approved: w ? w.filter(function (x) { return x.status === "approved"; }).length : null,
+      paid: r[6],
+      places: r[4], docs: r[5] || []
+    };
   });
+}
+
+/* A stored document path back to the name storage knows the object by.
+   careers.html and status.html write application_documents.path WITH the
+   bucket in front -- "applicant-docs/<id>/cv.pdf" -- because signDoc posts
+   that whole string to /object/sign/. The delete names the bucket in its
+   URL, so the prefix has to come off first. It did not, and every erasure
+   asked storage for applicant-docs/applicant-docs/<id>/cv.pdf, a key that
+   has never existed: the application went, the CV stayed, and the panel
+   said the file "could not be removed". */
+function objectName(p) {
+  var s = String(p || "");
+  return s.indexOf("applicant-docs/") === 0 ? s.slice("applicant-docs/".length) : s;
 }
 
 function openForget(row, a) {
@@ -2659,6 +2917,10 @@ function openForget(row, a) {
   forgetCounts(a.id).then(function (c) {
     var n = function (v) { return v === null ? "?" : String(v); };
     var s = function (v, one, many) { return v === 1 ? one : many; };
+    /* Known to be billed, not merely unknown. A count that could not be read
+       prints as a question mark above and leaves the decision to the person
+       and to 088; only a real approved or paid week takes the box away. */
+    var billed = !!(c.approved || c.paid);
     box.innerHTML =
       '<div class="danger">' +
         '<p class="danger__t">Remove ' + esc(who) + " entirely</p>" +
@@ -2671,19 +2933,33 @@ function openForget(row, a) {
           "<li><b>" + n(c.notes) + "</b> private " + s(c.notes, "note", "notes") + "</li>" +
           "<li><b>" + n(c.disc) + "</b> strengths " + s(c.disc, "questionnaire", "questionnaires") + "</li>" +
           "<li><b>" + n(c.sit) + "</b> " + s(c.sit, "assessment", "assessments") + "</li>" +
-          "<li><b>" + n(c.weeks) + "</b> " + s(c.weeks, "week", "weeks") + " filed</li>" +
+          "<li><b>" + n(c.weeks) + "</b> " + s(c.weeks, "week", "weeks") + " filed" +
+            (c.approved ? ", <b>" + c.approved + "</b> of them approved" : "") + "</li>" +
+          "<li><b>" + n(c.paid) + "</b> " + s(c.paid, "week", "weeks") +
+            " a client payment has been matched to</li>" +
           "<li><b>" + n(c.places) + "</b> " + s(c.places, "placement", "placements") + "</li>" +
           '<li class="' + (c.docs.length ? "is-file" : "") + '"><b>' + c.docs.length + "</b> " +
             s(c.docs.length, "file", "files") + ", bytes and all</li>" +
         "</ul>" +
-        '<div class="type">' +
-          '<input type="text" data-forget-name autocomplete="off" spellcheck="false" ' +
-            'placeholder="Type their name to confirm" aria-label="Type the name to confirm">' +
-          '<button class="btn btn--stop" data-forget-go type="button" disabled>Remove ' +
-            esc(who) + "</button>" +
-        "</div>" +
-        '<span class="hint" data-forget-say>Counted just now, not when the page loaded. ' +
-          "The name has to match.</span>" +
+        (billed
+          ? '<p class="msg msg--bad">This cannot be done from here. Approved weeks and weeks a ' +
+            "client has paid for are billing records, and removing this person would delete " +
+            "them with everything else. The database refuses it (sql/088); an erasure for " +
+            "somebody who has been billed has to be handled by hand.</p>"
+          : "") +
+        /* No box to type into when it is known to be refused. Offering the
+           confirmation for something the database will turn down only moves
+           the refusal one step later, after somebody has decided. */
+        (billed
+          ? ""
+          : '<div class="type">' +
+              '<input type="text" data-forget-name autocomplete="off" spellcheck="false" ' +
+                'placeholder="Type their name to confirm" aria-label="Type the name to confirm">' +
+              '<button class="btn btn--stop" data-forget-go type="button" disabled>Remove ' +
+                esc(who) + "</button>" +
+            "</div>" +
+            '<span class="hint" data-forget-say>Counted just now, not when the page loaded. ' +
+              "The name has to match.</span>") +
       "</div>";
     box.setAttribute("data-forget-want", String(who).trim().toLowerCase());
     box.setAttribute("data-forget-docs", JSON.stringify(c.docs.map(function (d) { return d.path; })));
@@ -2709,6 +2985,29 @@ function doForget(row, a, go) {
     method: "DELETE",
     headers: { Prefer: "return=minimal" }
   }).then(function () {
+    /* The files application_documents knew about, and then whatever else is
+       still in her folder. The second half is what catches the typing
+       screenshot: /status uploaded it with her own token, and until sql/077
+       her token could not write the row that records it, so it was in the
+       bucket with nothing pointing at it and this list never had it. With
+       the application gone, everything under <id>/ is exactly what
+       orphan_document_paths() reports -- asked now, after the row, for the
+       same reason the files come second. Before 053 is pasted the function
+       does not exist and the list is simply the recorded files. */
+    return api("rpc/orphan_document_paths", { method: "POST", body: {} })
+      .then(function (r) {
+        var mine = String(a.id) + "/";
+        (r || []).forEach(function (o) {
+          if (String(o.path || "").indexOf(mine) === 0) paths.push(o.path);
+        });
+      })["catch"](function () { return null; });
+  }).then(function () {
+    var seen = {};
+    paths = paths.map(objectName).filter(function (p) {
+      if (!p || seen[p]) return false;
+      seen[p] = true;
+      return true;
+    });
     if (!paths.length) return { ok: 0, bad: 0 };
     return liveSession().then(function (sess) {
       if (!sess) throw new Error("signed out");
@@ -2747,6 +3046,11 @@ function doForget(row, a, go) {
       ALL = ALL.filter(function (x) { return x.id !== a.id; });
       paint();
     }, 3200);
+    /* And the panel the message above sends people to. It was counted when
+       the page loaded, so after a file failed here it still said "Nothing to
+       clear" until a reload -- the one place told to look disagreeing with
+       the sentence that told them to. */
+    loadOrphans();
   })["catch"](function (e) {
     go.disabled = false;
     say.textContent = "Did not remove it: " + why(e);
@@ -2767,9 +3071,10 @@ function doForget(row, a, go) {
    each one asks who is calling — the page is granted no insert or update on
    interview_slots at all. */
 /* Offering a time reads the box next to the button, because a datetime-local
-   is local to the browser and the function takes an absolute moment. new Date
-   on the value does that conversion, which is the same thing localDateTime
-   undoes when the date box is drawn. */
+   has no zone and the function takes an absolute moment. fromLocalDateTime
+   reads the box as Central — the clock the list above it is printed in — and
+   localDateTime undoes that when the date box is drawn. It used to be new Date
+   on the value, which read it in whatever zone the laptop was set to. */
 function ivOffer(btn) {
   var wrap = btn.closest(".ivo");
   var at = wrap ? wrap.querySelector("[data-ivat]") : null;
@@ -2777,10 +3082,10 @@ function ivOffer(btn) {
   var say = function (m) { if (err) err.textContent = m; };
   say("");
   if (!at || !at.value) { say("Pick a time first."); return; }
-  var when = new Date(at.value);
-  if (isNaN(when)) { say("That is not a time."); return; }
+  var when = fromLocalDateTime(at.value);
+  if (!when) { say("That is not a time."); return; }
   ivAct(btn, "rpc/offer_application_interview",
-    { app: btn.getAttribute("data-ivoffer"), at_time: when.toISOString(), mins: 30 },
+    { app: btn.getAttribute("data-ivoffer"), at_time: when, mins: 30 },
     "Offering…", err);
 }
 
@@ -2873,15 +3178,15 @@ function ivResched(btn) {
   say("");
 
   if (!at || !at.value) { say("Pick the new time first."); return; }
-  var when = new Date(at.value);
-  if (isNaN(when)) { say("That is not a time."); return; }
+  /* Same conversion the offer box does: the box is read as Central, and the
+     function takes an absolute moment. */
+  var when = fromLocalDateTime(at.value);
+  if (!when) { say("That is not a time."); return; }
 
-  /* Same conversion the offer box does: a datetime-local is local to this
-     browser and the function takes an absolute moment. */
   var why = wrap ? wrap.querySelector("[data-ivwhy]") : null;
   ivAct(btn, "rpc/reschedule_application_interview",
     { slot: btn.getAttribute("data-ivresched"),
-      at_time: when.toISOString(),
+      at_time: when,
       why: why && why.value ? why.value.slice(0, 500) : null },
     "Moving…", err);
 }
@@ -2957,7 +3262,9 @@ function ivOffered(a) {
   }).join("");
 
   return '<div class="ivo">' +
-    '<span class="ivo__h">Times offered</span>' +
+    /* Named, because the boxes below are read in the same clock and nothing
+       else on this card says which one that is. */
+    '<span class="ivo__h">Times offered &middot; Central time</span>' +
     (slots.length ? '<ul class="ivo__l">' + list + "</ul>" : "") +
     (declined
       ? '<p class="ivo__msg">She said none of these work. Offer a new set.</p>'
@@ -2973,12 +3280,22 @@ function ivOffered(a) {
        it later mails her the details that were promised. */
     (confirmed
       ? '<div class="ivo__link">' +
-          (confirmed.meeting_url
+          /* A link only when it is a web address. 062's confirm path stored
+             whatever was pasted until sql/081, so an older row can hold
+             "meet.google.com/abc" — which as an href resolves against this
+             site and 404s — or anything else. Those are printed as text, so
+             the problem is visible rather than one click away. Inline rather
+             than a helper: tools/test-iv-booking.mjs lifts this function. */
+          (confirmed.meeting_url && /^https?:\/\/[^\s"'<>]+$/i.test(confirmed.meeting_url)
             ? '<span class="ivo__have"><b>Joining link</b> ' +
               '<a href="' + esc(confirmed.meeting_url) + '" target="_blank" ' +
               'rel="noopener noreferrer">' + esc(confirmed.meeting_url) + "</a></span>"
-            : '<span class="ivo__none">No joining link yet &mdash; she has been told the ' +
-              "details will follow.</span>") +
+            : confirmed.meeting_url
+              ? '<span class="ivo__none">The joining link saved here is not a web address ' +
+                "&mdash; <b>" + esc(confirmed.meeting_url) + "</b>. Replace it with the whole " +
+                "address, starting https://.</span>"
+              : '<span class="ivo__none">No joining link yet &mdash; she has been told the ' +
+                "details will follow.</span>") +
           '<span class="ivo__add">' +
             '<input type="url" data-ivurl maxlength="500" placeholder="https://meet.google.com/… or a Zoom link" ' +
             'aria-label="Where she joins the interview">' +
@@ -3002,7 +3319,7 @@ function ivOffered(a) {
            yet; this is for when there is. */
         '<div class="ivo__off">' +
           '<input type="datetime-local" data-ivmove ' +
-            'aria-label="Move this interview to">' +
+            'aria-label="Move this interview to, in Central time" title="Central time">' +
           '<button class="btn btn--ghost ivo__b" type="button" data-ivresched="' +
             esc(confirmed.id) + '">Move it</button>' +
         "</div>" +
@@ -3014,7 +3331,8 @@ function ivOffered(a) {
             esc(confirmed.id) + '">Cancel this interview</button>' +
         "</div>"
       : '<span class="ivo__add">' +
-        '<input type="datetime-local" data-ivat aria-label="A time to offer her">' +
+        '<input type="datetime-local" data-ivat aria-label="A time to offer her, in Central time" ' +
+          'title="Central time">' +
         '<button class="btn btn--ghost ivo__b" type="button" data-ivoffer="' + esc(a.id) + '">Offer</button>' +
         "</span>") +
     '<span class="ivo__err" data-iverr></span>' +
@@ -3047,9 +3365,12 @@ function rowHtml(a) {
         (can("applications.edit")
           ? '<select data-status aria-label="Stage the applicant sees">' + options(a.status) + "</select>" +
             '<select data-pipe aria-label="Internal pipeline">' + pipeOptions(a.pipeline) + "</select>" +
-            '<label class="cal__set">Interview' +
+            /* Central, and labelled Central: localDateTime and
+               fromLocalDateTime read and write this box in the business's
+               clock, the one Times offered is printed in beside it. */
+            '<label class="cal__set">Interview, Central' +
               '<input type="datetime-local" data-interview value="' +
-                esc(localDateTime(a.interview_at)) + '" aria-label="Interview date and time">' +
+                esc(localDateTime(a.interview_at)) + '" aria-label="Interview date and time, Central">' +
             "</label>" +
             ivOffered(a) +
             '<label class="chk"><input type="checkbox" data-replied' +
@@ -3238,17 +3559,33 @@ function sitLine(a) {
          panels down. Rows written while the proof was a pasted link still hold
          a URL, and those still work as a plain link rather than being asked to
          sign a path that is not one. The test is the scheme, not a guess: a
-         storage path has no colon in it. */
+         storage path has no colon in it.
+
+         Both values are hers to write, straight to the table if she likes,
+         so each shape is held to exactly what it claims to be. A link has to
+         be a whole http(s) address -- the old test was indexOf("http"),
+         which "httpx:" or "http:javascript" also passes. A path has to sit in
+         the applicant bucket. Anything else is printed as the text it is,
+         never as an href: a javascript: URL in her speed-test box used to
+         become a link on a staff screen whose token sits in localStorage.
+         sql/081 now refuses those values going in; this is for the rows
+         already written. The regex is inline rather than a helper because
+         tools/test-sit-panel.mjs lifts this function on its own. */
       (s.typing_proof
-        ? (s.typing_proof.indexOf("http") === 0
+        ? (/^https?:\/\/[^\s"'<>]+$/i.test(s.typing_proof)
             ? '<a class="sit__lnk" href="' + esc(s.typing_proof) +
               '" target="_blank" rel="noopener noreferrer">open her proof</a>'
-            : '<button class="sit__lnk" type="button" data-doc="' + esc(s.typing_proof) +
-              '">open her proof</button>')
+            : String(s.typing_proof).indexOf("applicant-docs/") === 0 &&
+              String(s.typing_proof).indexOf("..") < 0
+              ? '<button class="sit__lnk" type="button" data-doc="' + esc(s.typing_proof) +
+                '">open her proof</button>'
+              : '<span class="sit__off">proof is not a link: ' + esc(s.typing_proof) + "</span>")
         : '<span class="sit__off">no proof sent</span>') +
       (s.connection_proof
-        ? '<a class="sit__lnk" href="' + esc(s.connection_proof) +
-          '" target="_blank" rel="noopener noreferrer">speed test</a>'
+        ? (/^https?:\/\/[^\s"'<>]+$/i.test(s.connection_proof)
+            ? '<a class="sit__lnk" href="' + esc(s.connection_proof) +
+              '" target="_blank" rel="noopener noreferrer">speed test</a>'
+            : '<span class="sit__off">speed test is not a link: ' + esc(s.connection_proof) + "</span>")
         : '<span class="sit__off">no speed test</span>') +
     "</div>" +
 
@@ -3668,16 +4005,24 @@ function wireClients(box, rows) {
     btn.disabled = true;
     msg.textContent = "Uploading…";
 
-    var sess = session();
-    fetch(SB + "/storage/v1/object/client-logos/" + path, {
-      method: "POST",
-      headers: {
-        apikey: ANON,
-        Authorization: "Bearer " + sess.access_token,
-        "Content-Type": f.type,
-        "x-upsert": "false"
-      },
-      body: f
+    /* liveSession, as signDoc and the erasure do. This read session(), which
+       never renews, so the first logo added more than an hour into a shift
+       carried a dead token and storage refused it — every retry the same way
+       until some other request happened to renew. And with no session at all
+       it threw on sess.access_token, after the button above had already been
+       disabled, leaving Add greyed out with nothing said. */
+    liveSession().then(function (sess) {
+      if (!sess) throw new Error("signed out");
+      return fetch(SB + "/storage/v1/object/client-logos/" + path, {
+        method: "POST",
+        headers: {
+          apikey: ANON,
+          Authorization: "Bearer " + sess.access_token,
+          "Content-Type": f.type,
+          "x-upsert": "false"
+        },
+        body: f
+      });
     }).then(function (r) {
       if (!r.ok) throw new Error("the upload was refused");
       return api("client_logos", {
@@ -3688,6 +4033,10 @@ function wireClients(box, rows) {
           image_url: SB + "/storage/v1/object/public/client-logos/" + path,
           link: link || null,
           sort_order: rows.length ? Math.max.apply(null, rows.map(function (x) { return x.sort_order; })) + 1 : 0,
+          /* Sent, and not believed. sql/083 writes added_by and added_at from
+             the verified token whatever arrives here, as 046 already does for
+             contacted_by; it stays in the body only so a database without
+             083 still records somebody. */
           added_by: ME
         }
       });
@@ -3697,7 +4046,9 @@ function wireClients(box, rows) {
     }).catch(function (e) {
       btn.disabled = false;
       msg.className = "msg msg--bad";
-      msg.textContent = e.message || "That did not go through.";
+      /* Through why(), so "signed out" reads as what to do about it and a
+         refusal from PostgREST reads as its sentence rather than its JSON. */
+      msg.textContent = why(e);
     });
   });
 
@@ -3747,21 +4098,73 @@ function wireClients(box, rows) {
   });
 }
 
-/* A datetime-local input speaks local wall-clock with no zone. The database
-   stores an instant. These two convert between them explicitly rather than
-   letting toISOString() quietly shift a 9am booking by the offset. */
+/* A datetime-local input speaks wall-clock with no zone. The database stores
+   an instant. These two convert between them explicitly rather than letting
+   toISOString() quietly shift a 9am booking by the offset.
+
+   The wall clock is Central's, by name, and not this browser's. It used to be
+   the browser's, while the Times offered list beside the same box printed
+   Central — so a contractor in Manila read "9:00 AM" in the list, typed 9:00
+   into the box meaning the same clock, and booked 9:00 AM Manila, which is
+   eight the previous evening in Central. The applicant was mailed that time.
+   Every interview box on this page now reads and writes Central and says so,
+   the same way todayCentral() below stamps dates, so the list, the boxes and
+   the Interviews tab are one clock wherever the person is sitting.
+
+   Should the runtime have no zone data at all, both fall back to the browser's
+   own clock, which is what they did before. */
+function centralParts(d) {
+  var o = {};
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: CENTRAL, hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  }).formatToParts(d).forEach(function (p) { o[p.type] = p.value; });
+  /* Some engines answer midnight as 24 even when asked for h23. */
+  if (o.hour === "24") o.hour = "00";
+  return o;
+}
 function localDateTime(iso) {
   if (!iso) return "";
   var d = new Date(iso);
   if (isNaN(d)) return "";
-  var p = function (n) { return String(n).padStart(2, "0"); };
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
-    "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  try {
+    var o = centralParts(d);
+    return o.year + "-" + o.month + "-" + o.day + "T" + o.hour + ":" + o.minute;
+  } catch (e) {
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+      "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
 }
+/* The other way: "2026-09-08T09:00" read as 9:00 AM in Central. Take the
+   digits as if they were UTC, ask what Central's clock says at that moment,
+   and move by the difference — twice, so a guess that lands on the other side
+   of a daylight-saving change is corrected by the offset that actually
+   applies. */
 function fromLocalDateTime(v) {
   if (!v) return null;
-  var d = new Date(v);
-  return isNaN(d) ? null : d.toISOString();
+  var halves = String(v).split("T");
+  var ymd = (halves[0] || "").split("-").map(Number);
+  var hm = (halves[1] || "").split(":").map(Number);
+  if (ymd.length !== 3 || hm.length < 2 ||
+      ymd.concat(hm.slice(0, 2)).some(function (n) { return isNaN(n); })) {
+    return null;
+  }
+  var wall = Date.UTC(ymd[0], ymd[1] - 1, ymd[2], hm[0], hm[1]);
+  try {
+    var offset = function (t) {
+      var o = centralParts(new Date(t));
+      return Date.UTC(+o.year, +o.month - 1, +o.day, +o.hour, +o.minute, +o.second) -
+        Math.floor(t / 1000) * 1000;
+    };
+    var t = wall - offset(wall);
+    t = wall - offset(t);
+    return new Date(t).toISOString();
+  } catch (e) {
+    var d = new Date(v);
+    return isNaN(d) ? null : d.toISOString();
+  }
 }
 /* Today, in the company's own time, which is Central.
 
@@ -3929,25 +4332,52 @@ function drawCalendar() {
     return;
   }
 
-  /* Grouped by day, because that is how somebody reads a schedule. */
+  /* Grouped by day, because that is how somebody reads a schedule.
+
+     Central's day and Central's clock, the same as the Times offered list and
+     the Interview box on each row. This used to group and print in the
+     browser's zone, so from Manila one interview read 9:00 AM on the row and
+     10:00 PM here, filed under a different day. The zone is written out
+     rather than read from CENTRAL because tools/test-interview-flags.mjs
+     lifts this function on its own; it is the same name. If the runtime has
+     no zone data it falls back to the browser's, as before. */
+  var ZONE = "America/Chicago";
+  var inZone = function (o) {
+    var out = {};
+    for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) out[k] = o[k];
+    out.timeZone = ZONE;
+    return out;
+  };
+  var dayKey = function (d) {
+    try {
+      return new Intl.DateTimeFormat("en-CA", inZone({
+        year: "numeric", month: "2-digit", day: "2-digit"
+      })).format(d);
+    } catch (e) {
+      return d.toDateString();
+    }
+  };
+  var shown = function (d, o) {
+    try { return d.toLocaleString(undefined, inZone(o)); }
+    catch (e) { return d.toLocaleString(undefined, o); }
+  };
   var days = {};
   upcoming.forEach(function (a) {
-    var d = new Date(a.interview_at);
-    var key = d.toDateString();
+    var key = dayKey(new Date(a.interview_at));
     (days[key] = days[key] || []).push(a);
   });
 
   var list = Object.keys(days).map(function (key) {
-    var d = new Date(key);
-    var today = d.toDateString() === new Date().toDateString();
+    var d = new Date(days[key][0].interview_at);
+    var today = key === dayKey(new Date());
     return (
       '<div class="cal__day">' +
-        '<h4 class="cal__dh">' + esc(d.toLocaleDateString(undefined, {
+        '<h4 class="cal__dh">' + esc(shown(d, {
           weekday: "long", day: "numeric", month: "long"
         })) + (today ? ' <span class="cal__today">today</span>' : "") + "</h4>" +
         days[key].map(function (a) {
           return '<div class="cal__row">' +
-            '<span class="cal__t">' + esc(new Date(a.interview_at).toLocaleTimeString(undefined, {
+            '<span class="cal__t">' + esc(shown(new Date(a.interview_at), {
               hour: "numeric", minute: "2-digit"
             })) + "</span>" +
             '<span class="cal__n">' + esc(a.name || a.email) + "</span>" +
@@ -3966,9 +4396,14 @@ function drawCalendar() {
                  the call is a bad time to discover it was never sent. */
               (function () {
                 var v = (a.slots || []).filter(function (x) { return x.confirmed_at; })[0];
-                if (v && v.meeting_url) {
+                /* A web address or nothing, as on the row: a link saved
+                   before sql/081 can be anything that was pasted. */
+                if (v && v.meeting_url && /^https?:\/\/[^\s"'<>]+$/i.test(v.meeting_url)) {
                   return ' &middot; <a href="' + esc(v.meeting_url) + '" target="_blank" ' +
                     'rel="noopener noreferrer">Join</a>';
+                }
+                if (v && v.meeting_url) {
+                  return ' &middot; <span class="cal__nolink">joining link is not a web address</span>';
                 }
                 return ' &middot; <span class="cal__nolink">no joining link</span>';
               })() + "</span>" +
@@ -3982,7 +4417,8 @@ function drawCalendar() {
     '<h2 class="edit__h">Interviews</h2>' +
     issues +
     (upcoming.length
-      ? '<p class="msg" style="margin-top:1rem">' + upcoming.length + " coming up.</p>" + list
+      ? '<p class="msg" style="margin-top:1rem">' + upcoming.length +
+        " coming up. Days and times are Central.</p>" + list
       : '<p class="msg" style="margin-top:1rem">Nothing upcoming.</p>');
 }
 
@@ -4552,10 +4988,19 @@ function wireRemovals(box) {
     b.addEventListener("click", function () {
       var row = b.closest("[data-place]");
       var id = row.getAttribute("data-place");
+      /* What sql/089 made true. Before it, a placement with any week filed
+         against it could not be removed at all — the weeks' foreign key
+         refused with a raw 23503 — while this box promised that only the
+         match would go. Now weeks nobody has approved or paid are kept and
+         come loose from the placement, and a placement with a billed week is
+         refused in a sentence (sjva-billed-weeks), which why() shows as
+         written. */
       if (!window.confirm(
             "Remove this placement?\n\nIts two rates, the agreed start and any interview " +
             "times offered on it go with it. The assistant and the client both stay — only " +
-            "the match between them goes.")) {
+            "the match between them goes. Weeks already recorded are kept and become " +
+            "unattached. If any of its weeks has been approved or paid, it cannot be " +
+            "removed — end it instead.")) {
         return;
       }
       b.disabled = true;
@@ -4909,6 +5354,8 @@ function drawNotices(box, rows) {
         body: b.value.trim(),
         pinned: document.getElementById("nt-pin").checked,
         published_at: published ? new Date().toISOString() : null,
+        /* Overwritten from the token by sql/083 on insert and frozen after,
+           so a notice cannot be signed with somebody else's address. */
         created_by: ME
       }
     }).then(loadNotices)
@@ -5040,6 +5487,7 @@ function drawSeats(box, rows) {
       api("seat_requests?id=eq." + encodeURIComponent(id), {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
+        /* The date is sql/074's to set, from the database clock; see save(). */
         body: { status: st, status_changed_at: new Date().toISOString() }
       }).then(function () {
         var pill = row.querySelector(".pill");
@@ -5722,13 +6170,30 @@ function drawInbox(box, rows) {
       " &middot; " + rows.length + " in total.</p>" +
     '<div class="rows" style="margin-top:1rem">' +
       rows.map(function (r) {
+        /* The address is whatever the contact form was sent, and until
+           sql/092 the database took anything up to its length limit. A
+           mailto: is a URL, and esc() makes text safe in HTML without making
+           it safe in a URL: "someone@x.com?bcc=them@elsewhere&" came out as a
+           Reply that quietly copied a stranger on the answer. So a mailto is
+           built only from an address that passes the contact form's own rule
+           (073's, the same one 092 enforces), with each half percent-encoded
+           so that no ?, & or # in it can start a header. Anything else is
+           shown as text with no Reply button. */
+        var addr = String(r.email || "").trim();
+        var at = addr.lastIndexOf("@");
+        var mailable = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(addr);
+        var mailto = mailable
+          ? "mailto:" + encodeURIComponent(addr.slice(0, at)) + "@" + encodeURIComponent(addr.slice(at + 1))
+          : "";
         return (
           '<div class="row' + (r.handled_at ? " is-done" : "") + '" data-msg="' + esc(r.id) + '">' +
             '<div class="row__top">' +
               "<span>" +
                 '<span class="row__n">' + esc(r.name || "(no name)") + "</span> " +
                 '<span class="row__meta">' +
-                  '<a href="mailto:' + esc(r.email) + '">' + esc(r.email) + "</a>" +
+                  (mailable
+                    ? '<a href="' + esc(mailto) + '">' + esc(addr) + "</a>"
+                    : esc(addr || "(no address)") + " (not an address we can reply to)") +
                   (r.phone ? " &middot; " + esc(r.phone) : "") +
                 "</span>" +
               "</span>" +
@@ -5739,9 +6204,11 @@ function drawInbox(box, rows) {
             "</div>" +
             '<p class="msg__body">' + esc(r.message || "") + "</p>" +
             '<div class="row__ctl">' +
-              '<a class="btn btn--ghost" style="padding:.45rem .8rem;font-size:.85rem" href="mailto:' +
-                esc(r.email) + "?subject=" + encodeURIComponent("Re: " + (r.reason || "your message")) +
-                '">Reply</a>' +
+              (mailable
+                ? '<a class="btn btn--ghost" style="padding:.45rem .8rem;font-size:.85rem" href="' +
+                  esc(mailto + "?subject=" + encodeURIComponent("Re: " + (r.reason || "your message"))) +
+                  '">Reply</a>'
+                : "") +
               (r.handled_at
                 ? '<button class="btn btn--ghost" data-msg-open type="button" style="padding:.45rem .8rem;font-size:.85rem">Mark unanswered</button>'
                 : '<button class="btn btn--ghost" data-msg-done type="button" style="padding:.45rem .8rem;font-size:.85rem">Mark answered</button>') +
@@ -5790,6 +6257,11 @@ function drawInbox(box, rows) {
       api("contact_messages?id=eq." + encodeURIComponent(id), {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
+        /* Both stamps are the database's once sql/083 is pasted: it writes
+           now() and the verified token's address when a message goes from
+           open to answered, keeps them when it was already answered, and
+           clears both on Mark unanswered. What is sent here is what a
+           database without 083 falls back on. */
         body: done
           ? { handled_at: new Date().toISOString(), handled_by: ME }
           : { handled_at: null, handled_by: null }
@@ -6129,6 +6601,12 @@ function addNote(row) {
 function repaintSummaries() {
   drawKpis();
   if (can("analytics.view")) drawStats();
+  /* And the counts on the rail, which are a third summary of the same ALL.
+     They were only ever repainted by paint(), so moving somebody from Applied
+     to Assessment left "New applicants 5 / Assessment 2" standing until the
+     next keystroke in the search box. The row itself stays where it is until
+     then, on purpose — see save() — but a number is not somebody's focus. */
+  paintStageCounts();
 }
 
 /* ── the queue, in stages rather than one list ────────────────────────────
@@ -6321,6 +6799,11 @@ function save(row) {
 
   var jobs = [];
   if (st !== null && (!rec || rec.status !== st)) {
+    /* status_changed_at is sent because tools/check.mjs asks every stage
+       write to carry it, but this browser's clock is not what is kept:
+       sql/074 sets it to the database's now() on a stage change. It feeds
+       the three-month re-apply date, which a laptop set a day wrong would
+       otherwise move. */
     jobs.push(api("applications?id=eq." + encodeURIComponent(id), {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
@@ -6345,8 +6828,9 @@ function save(row) {
     if (ivEl) {
       var iv = fromLocalDateTime(ivEl.value);
       var wasIv = rec ? (rec.interview_at || null) : undefined;
-      /* Compared as instants, not strings: the input gives local time and the
-         stored value is UTC, so the same moment is two different strings. */
+      /* Compared as instants, not strings: the input gives Central wall time
+         and the stored value is UTC, so the same moment is two different
+         strings. */
       var same = wasIv && iv && new Date(wasIv).getTime() === new Date(iv).getTime();
       if (wasIv === undefined || (!same && (wasIv || iv))) {
         t.interview_at = iv;
@@ -6370,7 +6854,19 @@ function save(row) {
     /* Marking contacted stamps the time and the person, which is the whole
        point of the field: "someone reached out" is not answerable later. */
     if (row.getAttribute("data-mark-contacted") === "1") {
-      t.pipeline = "contacted";
+      /* Forward only. The button is on every row, including people already
+         interviewed or hired, and it used to set contacted on all of them —
+         a hired assistant you had just emailed dropped out of the hired
+         count, and somebody interviewed and not yet scored stopped being
+         flagged, because both of those read the pipeline. Contacting
+         somebody who is past that point is still recorded, by the clock
+         below; it just no longer moves them backwards. Only new and
+         reviewed come before contacted. The current value is the select's,
+         so a stage changed and not yet saved is the one respected. Written
+         out rather than looked up in PIPE, which tools/test-admin-save.mjs
+         does not hand this function. */
+      var curPipe = pipe !== null ? pipe : (rec && rec.pipeline) || "new";
+      if (curPipe === "new" || curPipe === "reviewed") t.pipeline = "contacted";
       t.last_contacted_at = new Date().toISOString();
       /* contacted_by is no longer sent. sql/046 stamps it from the verified
          token whenever last_contacted_at moves, the same way 008 already
@@ -6399,8 +6895,18 @@ function save(row) {
            so it is not sent — but the row is redrawn from rec straight after,
            and rec has never heard of it. The name appeared only on the next
            load, which on a card whose whole point is "somebody sat in that
-           call and formed a view" is the wrong moment to be anonymous. */
-        if (row.querySelector("[data-score]")) rec.scored_by = ME;
+           call and formed a view" is the wrong moment to be anonymous.
+
+           Only when a score was actually in this save. The test used to be
+           whether the row HAD a score box, which every editable row does, so
+           ticking "replied" on somebody a colleague had scored relabelled the
+           card as scored by you until the next load. The trigger only stamps
+           when a score moves, and this now mirrors exactly that. */
+        var scoredNow = false;
+        row.querySelectorAll("[data-score]").forEach(function (el) {
+          if (el.getAttribute("data-score") in t) scoredNow = true;
+        });
+        if (scoredNow) rec.scored_by = ME;
         if (typeof t.response_received === "boolean") rec.response_received = t.response_received;
         if ("interview_at" in t) rec.interview_at = t.interview_at;
         /* Every score column that was sent, read off the row rather than off
@@ -6481,9 +6987,14 @@ function save(row) {
     /* drawCalendar() reads the date, the stage and the scores. Watching only
        the date left it stale for the two problems it exists to raise: "at
        interview with no date set" moves when the stage does, and
-       "interviewed, not scored" clears when a score arrives. */
+       "interviewed, not scored" clears when a score arrives.
+
+       The interview scorecard's columns are iv_*, from 065, and this watched
+       for score_* alone — so scoring an interview never redrew the tab, and
+       the count and the badge sat there until a reload. Both prefixes. */
     if (Object.keys(t).some(function (k) {
-      return k === "interview_at" || k === "pipeline" || k.indexOf("score_") === 0;
+      return k === "interview_at" || k === "pipeline" ||
+             k.indexOf("score_") === 0 || k.indexOf("iv_") === 0;
     })) drawCalendar();
   }).catch(function (e) {
     flash(ok, why(e), true);
@@ -6507,6 +7018,15 @@ function why(e) {
   if (t === "signed out") return "Signed out — reload and sign in again";
   try {
     var j = JSON.parse(t);
+    /* A refusal the database wrote on purpose carries a hint beginning
+       sjva- — sjva-link, sjva-billed-weeks, sjva-time-passed — and its
+       message is already the sentence meant for the person. The hint is a
+       label for code to match on, so it is not printed after the sentence,
+       and the sentence is not cut at 180 characters when it is one of ours:
+       088's explains why an erasure cannot be done here and runs longer. */
+    if (j && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0 && j.message) {
+      return String(j.message);
+    }
     return [j.message, j.hint].filter(Boolean).join(" — ").slice(0, 180) || t.slice(0, 180);
   } catch (x) {}
   return t.slice(0, 180) || "That did not save";
@@ -6764,6 +7284,17 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
       var cwrap = ivc.closest(".ivo__cf");
       var curl = cwrap ? cwrap.querySelector("[data-ivurl]") : null;
       var cval = curl ? String(curl.value || "").trim() : "";
+      /* Checked here as well as by the database. The box is type=url but
+         not in a form, so the browser never validates it, and 062's confirm
+         path stored whatever it was handed until sql/081 — a pasted
+         "meet.google.com/abc" was mailed to her and became a Join button
+         that 404s on this site at the moment of the interview. 081 now
+         refuses it; saying so before the round trip names the fix. */
+      if (cval && !/^https?:\/\/[^\s"'<>]+$/i.test(cval)) {
+        var cerr = ivc.closest(".ivo").querySelector("[data-iverr]");
+        if (cerr) cerr.textContent = "A joining link is the whole web address, starting https://.";
+        return;
+      }
       ivAct(ivc, "rpc/confirm_application_interview",
         { slot: ivc.getAttribute("data-ivconfirm"), url: cval || null }, "Confirming…");
       return;
@@ -6773,9 +7304,15 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
       var lwrap = ivl.closest(".ivo__add");
       var lurl = lwrap ? lwrap.querySelector("[data-ivurl]") : null;
       var lval = lurl ? String(lurl.value || "").trim() : "";
+      var lerr = ivl.closest(".ivo").querySelector("[data-iverr]");
       if (!lval) {
-        var lerr = ivl.closest(".ivo").querySelector("[data-iverr]");
         if (lerr) lerr.textContent = "Paste the joining link first.";
+        return;
+      }
+      /* The same test as Confirm, for the same reason: 067 refuses anything
+         else, and this says what to paste instead before it gets the chance. */
+      if (!/^https?:\/\/[^\s"'<>]+$/i.test(lval)) {
+        if (lerr) lerr.textContent = "A joining link is the whole web address, starting https://.";
         return;
       }
       ivAct(ivl, "rpc/set_application_interview_link",

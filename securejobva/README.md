@@ -80,16 +80,25 @@ occasionally an hour.
 
 ### Other hosts
 
-`_headers`, `_redirects` and `.htaccess` are kept for Cloudflare Pages, Netlify
-and Apache respectively. They are not copied into `dist/` — add them back to
-`ASSETS` in `build.mjs` if you ever move.
+`vercel.json` is the one list of headers and redirects the live site uses.
+`.htaccess` is kept for a move to Apache and says so itself; it is not copied
+into `dist/`, because a host config copied into the output is just a file
+anybody can download, so on a move it goes into the document root by hand. `_headers` and `_redirects` (Cloudflare Pages and
+Netlify) used to sit here too, with comments saying the host read them from
+the publish directory — nothing ever put them there, so they were deleted
+rather than left describing a deploy that did not exist. Write them again from
+`vercel.json` if you ever move to one of those hosts.
 
 ## Forms
 
 Both dialogs POST JSON to Supabase. Everything the database needs lives in
 **`sql/`** — numbered files you copy and paste into the Supabase SQL editor, in
-order. `sql/README.md` explains the workflow; the short version is that every
-file is safe to run twice, so when in doubt, run it.
+order, each one once. `sql/README.md` explains the workflow. The short version:
+when you are unsure whether a file has run, ask the database (`node
+tools/status.mjs`, or `select n from public.schema_migrations`) rather than
+running it again. Each file is repeatable on its own, but re-running an older
+one after a later file has replaced a function it defines puts the older body
+back, silently.
 
 That folder is the shared surface between whoever is working on this. Add a
 schema change as the next numbered file, push, and the other person has it.
@@ -154,19 +163,46 @@ more than INSERT, and that `dist/` carries its meta with no artifact URLs
 left in it. Add `--live` to also check the running site's routes, redirects and
 canonical host. It also runs `tools/test-queue.mjs`, which pulls the queue code
 straight out of `index.html` and drives it against a mocked store — parking,
-draining, the cap, the expiry, and storage being blocked outright.
+draining, the cap, the expiry, and storage being blocked outright — and every
+other `tools/test-*.mjs`, each of which is offline: nothing in them reaches the
+network, the database or a mail provider. A new test is not guarding anything
+until it has a line in `check.mjs`; two once sat outside it for a week.
 
-**Is it all running? — `node tools/status.mjs`.** One command for the whole picture: whether both repos are in sync, whether the build and every check pass, whether the live site serves its routes with the right headers and is actually current, which migrations have landed in the database, and whether the two forms still accept work. Nothing it does writes a row — every probe fails on a constraint or names a column that does not exist. It prints what it cannot see too: anything behind sign-in is invisible to the public key by design, so it hands you the two URLs to open instead.
+Two of its checks are about files that write other files. `tools/audit.mjs`
+(duplicate ids, dead anchors, missing labels) sweeps every page `build.mjs`
+ships, read from `build.mjs` — it used to stop at nine and never saw `/hub`,
+`/pay` or the Spanish pages. And `status.html`, `admin.html`, `hub.html`,
+`seats.html` and `pay.html` are written by `tools/build-portal.mjs`, which
+never reads them: an edit made in one of those pages and not in the generator
+is undone, silently, the next time somebody runs it. `check.mjs` runs the
+generator in a scratch folder and warns, page by page, while what it writes
+and what is in the repo differ. While that warning is up, port the edits into
+the generator before running it here.
+
+**Is it all running? — `node tools/status.mjs`.** One command for the whole picture: whether both repos are in sync, whether the build and every check pass, whether the live site serves its routes with the right headers and is actually current, which migrations have landed in the database, and whether the two forms still accept work. It prints what it cannot see too: anything behind sign-in is invisible to the public key by design, so it hands you the two URLs to open instead.
+
+What it touches: it runs `git fetch --all`, rebuilds `dist/` with `build.mjs`, and against the database only reads, plus insert probes that each fail on a constraint or a column that does not exist, so no row is written. With `.env.local` present it also reads the paying half with the service role key. The one write is opt-in: `node tools/status.mjs --auth-probe` asks GoTrue where emailed links land by minting five password-recovery links on one real account — no mail is sent, but each rewrites that account's recovery token, so a reset link already in their inbox stops working. It picks the account least likely to have one (the oldest link, never one from the last hour) and its last line names the account it used. Run bare it skips that section and says so; this paragraph used to say nothing it does writes a row, which was not true once `.env.local` was there.
 
 It asks about the migrations twice, because the two answers fail differently. The probes infer: a table that exists but refuses the public key has landed. That covers most migrations and misses whole shapes — a trigger function or a column granted to nobody is invisible to PostgREST however well it ran, which left 034, 040 and 043 with no check at all and made the newest schema change the one nothing could see. So `sql/044` gave every migration a place to write its own number, and the second answer reads that rather than guessing. A file with no row is reported by which side of 044 it falls on: after it, a missing stamp means the file did not run; before it, only that 044 had no artifact to detect. Those two silences mean opposite things and saying so is the whole point — reporting the second as missing would light up a dozen red lines nobody can ever clear, and a check that cries wolf gets switched off.
 
 **Against the database — `node tools/guard-rls.mjs`.** Asserts that the
-publishable key still cannot `SELECT` from any of the eleven tables behind
-sign-in, that the SECURITY DEFINER functions refuse it, and that the two intake
-tables still accept an insert. This is the one rule below, checked rather than believed: it is a
-single dashboard toggle away from being untrue, and nothing in this repo would
-change when it happened. Nothing it does writes a row — the insert probe names
-a column that does not exist on purpose. Worth running on a schedule.
+publishable key still cannot `SELECT` from any table or view behind sign-in —
+every one a numbered file in `sql/` creates, read from the folder, so a table
+added tomorrow is guarded the day it is pasted — that the SECURITY DEFINER
+functions refuse it, that the `applicant-docs` bucket is neither public nor
+listable, and that the two intake tables still accept an insert. This is the
+one rule below, checked rather than believed: it is a single dashboard toggle
+away from being untrue, and nothing in this repo would change when it happened.
+Run bare it writes nothing — the insert probe names a column that does not
+exist on purpose — and it is worth running on a schedule.
+
+`--probe-signup` adds the one check that cannot be made without writing: that
+sign-up issues no session until the address is confirmed. It signs up a
+made-up `@securejobva-guard.invalid` address, which creates a row in
+`auth.users` and makes GoTrue try to send it a confirmation mail (a bounce, and
+a unit of the auth email rate limit real sign-ups share), then deletes it with
+the service role key if `.env.local` has one. Run it after touching the auth
+settings, not on a schedule.
 
 **The paying half — `node tools/walk-paying.mjs`.** The one tool here that
 writes rows, and the reason it exists is that on 7 September 2026 every table
@@ -191,11 +227,16 @@ worked rather than assuming it did.
 database that serves the site. And it is not quiet: moving a placement and
 deciding a week both notify the assistant, so it sends about five real emails,
 which is deliberate — a walk that silenced its own mail would not be walking
-the half of this a person actually sees. It says whose inbox it is about to
-fill before it fills it, borrows an assistant who is already hired rather than
-inventing and then erasing a person, and refuses rather than clearing anybody
-else's placement out of the way. Point it at a test account with
-`--as=<address>`.
+the half of this a person actually sees. So whose inbox that is must be typed
+every time — `node tools/walk-paying.mjs --go --as=<address>` — and `--go`
+without `--as=` refuses before it reads or writes anything; there is no default
+address in the file any more. It borrows an assistant who is already hired
+rather than inventing and then erasing a person, and refuses rather than
+clearing anybody else's placement out of the way. Every row it makes is written
+to `tools/.walk-made.json` the moment it exists — each week as soon as it is
+inserted, before its days — so `--sweep` can always take back a run that was
+killed part-way. Weeks of the assistant's own that 043 adopted onto the walk's
+placement are put back unattached, never deleted.
 
 ## Notifications
 
@@ -237,11 +278,16 @@ Not every notification is a Database Webhook. A timesheet decision, a leave
 answer, a swap request and an interview carry an `application_id` or a
 `placement_id` and no address, so the person they are about has to be looked up
 -- which is ordinary in the database and impossible in a function holding no
-credential. Those post from a trigger instead: `sql/031`, `035`, `036`, `037`, `040` and
-`058`. Each one carries `__WEBHOOK_SECRET__` as a placeholder and posts nothing
-until it is replaced, which is what the `*.local.sql` copies are for -- copy the
-file, paste the secret into the copy, run the copy, delete it. `.gitignore`
-keeps `*.local.sql` out of the repo so the real secret is never committed.
+credential. Those post from a trigger instead: `sql/031`, `035`, `036`, `037`,
+`040`, `058` and `093` (the receipt a client is sent when a payment is recorded
+against them, to the contact address on the client, if there is one). Each one
+carries `__WEBHOOK_SECRET__` as a placeholder and posts nothing until it is
+replaced — as do `019`, `021` and `028`, which wire the three intake tables to
+the same endpoint from SQL — which is what the `*.local.sql` copies are for --
+copy the file, paste the secret into the copy, run the copy, delete it.
+`.gitignore` keeps `*.local.sql` out of the repo so the real secret is never
+committed, and `.vercelignore` keeps it out of a deploy made from this folder
+with the CLI, which does not read `.gitignore`.
 
 In `058` replace only the quoted placeholder on the `x-webhook-secret` line.
 That file has a check at the bottom that looks for the placeholder in the

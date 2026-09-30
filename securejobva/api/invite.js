@@ -26,11 +26,27 @@
  * way to live for somebody who signs in once a week to approve hours.
  */
 
+import { createHash, timingSafeEqual } from "node:crypto";
+
 /* Public values. They are in the source of every page this site serves, so
  * there is nothing to protect here — the env vars exist so a second project
  * does not need a code change, not because these are secret. */
 const SB = process.env.SUPABASE_URL || "https://hmgravlkatfmerzbozct.supabase.co";
 const ANON = process.env.SUPABASE_ANON_KEY || "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY";
+
+/* The same address rule the rest of the schema holds people to (073, 092):
+   something, an @, something, a dot, two or more. */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/* The shared secret, compared in constant time — see api/notify.js, which
+   does the same for the same reason. Hashing both sides first gives
+   timingSafeEqual two buffers of one length, so a wrong guess's length is not
+   given away either. */
+function sameSecret(given, expected) {
+  const a = createHash("sha256").update(String(given || "")).digest();
+  const b = createHash("sha256").update(String(expected)).digest();
+  return timingSafeEqual(a, b);
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -43,18 +59,31 @@ export default async function handler(req, res) {
   if (!expected) {
     return res.status(500).json({ error: "WEBHOOK_SECRET is not set" });
   }
-  if (req.headers["x-webhook-secret"] !== expected) {
+  if (!sameSecret(req.headers["x-webhook-secret"], expected)) {
     return res.status(401).json({ error: "bad secret" });
   }
 
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  /* A body that is not JSON is the caller's mistake, and says so with a 400
+     rather than crashing the function into a stack trace and a 500. */
+  let body;
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  } catch (e) {
+    return res.status(400).json({ error: "bad json" });
+  }
+  if (!body || typeof body !== "object") {
+    return res.status(400).json({ error: "bad json" });
+  }
   const email = String(body.email || "").trim();
 
-  /* Not an error, and answered 200 so Postgres does not retry it forever. A
-     client with no address on file is a normal state — the field is optional
-     in /admin — and it means there is nobody to write to, not that something
+  /* Not an error, and answered 200 so it does not read as one in
+     net._http_response. (Nothing retries this call either way: the trigger in
+     040 is a pg_net post, which fires once and keeps the answer — see the note
+     on send() in api/notify.js.) A client with no address on file, or one
+     that is not an address, is a normal state — the field is optional in
+     /admin — and it means there is nobody to write to, not that something
      went wrong. */
-  if (!email || email.indexOf("@") < 1) {
+  if (!EMAIL.test(email)) {
     return res.status(200).json({ skipped: "no address on the client" });
   }
 
@@ -87,9 +116,15 @@ export default async function handler(req, res) {
   /* Logged rather than thrown. A placement that saved and an email that did
      not is a person to chase; a placement rolled back because an email failed
      is worse, and the trigger already refuses to let this call take the
-     transaction down with it. */
+     transaction down with it.
+
+     The log names the business, not the address. Vercel keeps function logs
+     where anybody with the project can read them, and the business is enough
+     to find the client in /admin and send the invite again by hand. The auth
+     server's own refusal can quote the address back, so it is scrubbed too. */
   if (!out.ok) {
-    console.error("[invite] could not send to " + email, out.status, out.detail || "");
+    console.error("[invite] could not send the invite for " + String(body.business || "a client"),
+      out.status, String(out.detail || "").replace(/[^\s@"'<>,;:]+@[^\s@"'<>,;:]+/g, "<address>"));
     return res.status(200).json({ sent: 0, why: out.status });
   }
 

@@ -83,15 +83,19 @@ const hub = new Function("esc",
    sandbox needs its helpers as well as its rows. C_SLOTS stays empty through
    this walk — the person it follows is placed and long past the interview —
    which is precisely the state that card is supposed to render as nothing at
-   all, and worth having the walk assert by not tripping over it. */
+   all, and worth having the walk assert by not tripping over it.
+
+   placeBlock now asks serverNow() whether an interview time has passed (the
+   shared clock offset, sql/078), so that comes in too, with the offset at 0:
+   no server here, which is also what the page does when the call fails. */
 const seatFns = ["when", "tzOpts", "browserTz", "slotDay", "slotClock", "slotLabel",
                  "slotAlso", "slotState", "cIso", "cFrom", "cHours", "cNum", "cMoney",
                  "cWeekLabel", "cDays", "todayLocal", "slotRow", "interviewBlock",
-                 "clientBlock", "placeBlock"];
+                 "clientBlock", "placeBlock", "serverNow"];
 const seats = new Function("esc",
   varOf(SEATS, "C_LABEL") + "\n" + 'var C_DAY = ["M","T","W","T","F","S","S"];\n' +
   "var C_PLACE = [], C_RATE = {}, C_WEEKS = [], C_SWAPS = [], C_STARTS = [], C_NAMES = [], C_OFF = false;\n" +
-  "var C_SLOTS = [], MY_TZ = null, CENTRAL = 'America/Chicago';\n" +
+  "var C_SLOTS = [], MY_TZ = null, CENTRAL = 'America/Chicago', SKEW = 0;\n" +
   "var C_WEEK_LIMIT = 260, C_TRUNCATED = false;\n" +
   seatFns.map((n) => grab(SEATS, n)).join("\n") +
   "\nreturn { set: function (s) { C_PLACE = s.C_PLACE; C_RATE = s.C_RATE; C_WEEKS = s.C_WEEKS;" +

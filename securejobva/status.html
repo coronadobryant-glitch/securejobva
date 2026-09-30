@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -282,13 +323,16 @@ img{max-width:100%}
 .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
 .opt__box{
   width:18px;height:18px;flex:none;margin-top:.18rem;
-  border:1.5px solid var(--line);border-radius:5px;background:var(--surface);
+  border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
 .opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
 .opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
+/* --muted on the tinted ground of a picked option is 4.10:1, under the 4.5
+   small text needs, so the description darkens with the pick. */
+.opt:has(input:checked) .opt__d,.opt.is-on .opt__d{color:var(--ink-2)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 /* ---------- portal ---------- */
@@ -1636,6 +1680,71 @@ function api(path, opts) {
   }
 }
 
+/* The sentence the database meant for her, when it refused on purpose.
+
+   A deliberate refusal in sql/ raises with a hint that starts "sjva-" and a
+   message written for the person reading it — "that time has already passed",
+   "that is not a link". api() throws the raw PostgREST body, so without this
+   every one of them arrived as "That did not save. Check your connection",
+   which sends her off to fix a connection that was never the problem.
+
+   Anything else — a dropped connection, a 500, a refusal nobody wrote words
+   for — gives back "", and the caller says what it always said. */
+function ourWords(e) {
+  var t = String((e && e.message) || e || "");
+  try {
+    var j = JSON.parse(t);
+    if (j && j.message && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0) return String(j.message);
+  } catch (x) {}
+  return "";
+}
+
+/* The server's clock, as an offset from this device's.
+
+   A part's deadline is the server's opening time plus its minutes, and the
+   page used to hold that against Date.now() — this device's clock. A laptop
+   running 25 minutes fast therefore opened a 20-minute part already over, and
+   the page closed it on the spot with nothing in it. She could not reopen it.
+   The database (sql/078) judges the deadline by its own clock, so the page has
+   to judge by the same one or the two will disagree about when she ran out.
+
+   rpc/server_time (sql/078) answers with now(). The offset is the difference,
+   read once per part opened rather than trusted from the first page load, so
+   a clock corrected halfway through is caught at the next part. If the call
+   fails — 078 not pasted, a blip — the offset stays where it was, which is 0
+   the first time: exactly the old behaviour, and no worse than before.
+
+   The same clock serves the two interview pages. On /hub it decides which
+   interview times have already passed, and it has to agree with sql/082,
+   which refuses a pick by the database's own now(): a phone clock a few
+   minutes out would otherwise offer a time the database then refuses, or hide
+   one it would still take. On /seats it decides whether the interview card is
+   still in play and whether a time the client is about to offer is in the
+   past, at the same moment /hub decides it for the assistant. Both read the
+   offset once as they load; if that fails the offset stays 0, which is exactly
+   how the pages behaved before.
+
+   It lives here, once, because this block is the same on all five pages. It
+   used to be pasted into three of them with three different comments, and the
+   generator can only write one. */
+var SKEW = 0;
+
+function serverNow() {
+  return Date.now() + SKEW;
+}
+
+function syncClock() {
+  var sent = Date.now();
+  return api("rpc/server_time", { method: "POST", body: {} })
+    .then(function (iso) {
+      var t = Date.parse(iso);
+      if (isNaN(t)) return;
+      /* Half the round trip, so a slow answer is not read as a slow clock. */
+      SKEW = t - Math.round((sent + Date.now()) / 2);
+    })
+    .catch(function () {});
+}
+
 /* Storage lives beside PostgREST on the same project. */
 function storageBase() {
   return SB + "/storage/v1";
@@ -1679,19 +1788,42 @@ function signDoc(path) {
   });
 }
 
+/* Three things this used to get wrong, all found the same afternoon.
+
+   A second click while the first was still signing opened the file twice, so
+   a button that is already busy is left alone.
+
+   The tab was opened after the signing request came back, which is no longer
+   "in the click" as far as a popup blocker is concerned. Safari refuses that
+   without a word, so on an iPhone the button said "Opening…", then went back
+   to the filename, and nothing ever opened. The tab is now opened blank while
+   the click is still happening and pointed at the file when the link arrives.
+   It is opened without "noopener" only because that makes window.open hand
+   back null, and there would be nothing to point; the opener is cut by hand
+   straight after, which is the same protection.
+
+   And a failure put the label back at once: the last .then ran after the
+   .catch and found the button still disabled, so "Could not open" was
+   replaced before anybody could read it. Only success puts the label back
+   now; a failure waits its 2.2 seconds as it was always meant to. */
 function openDoc(btn) {
+  if (btn.disabled) return;
   var path = btn.getAttribute("data-doc");
   var was = btn.textContent;
+  var tab = null;
+  try { tab = window.open("", "_blank"); } catch (e) { tab = null; }
+  if (tab) { try { tab.opener = null; } catch (e) {} }
   btn.disabled = true;
   btn.textContent = "Opening…";
   signDoc(path).then(function (url) {
-    window.open(url, "_blank", "noopener");
-  }).catch(function (e) {
+    if (tab && !tab.closed) tab.location.href = url;
+    else window.open(url, "_blank", "noopener");
+    btn.textContent = was;
+    btn.disabled = false;
+  }, function (e) {
+    if (tab && !tab.closed) { try { tab.close(); } catch (x) {} }
     btn.textContent = e.message === "signed out" ? "Signed out" : "Could not open";
     setTimeout(function () { btn.textContent = was; btn.disabled = false; }, 2200);
-    return;
-  }).then(function () {
-    if (btn.disabled) { btn.textContent = was; btn.disabled = false; }
   });
 }
 
@@ -1996,14 +2128,24 @@ function wireTz() {
 
     /* Upsert by hand: one row per user, and whether it exists yet depends on
        whether they have ever opened this card. Prefer resolution=merge-duplicates
-       makes the first save and the tenth the same request. */
+       makes the first save and the tenth the same request.
+
+       No user_id in the body. PostgREST turns every column it is sent into
+       the SET list of ON CONFLICT DO UPDATE, and Postgres wants UPDATE
+       permission on each of them before it looks for a conflict at all, even
+       on a first save that never conflicts. 059 grants update on time_zone
+       only, so sending user_id asked to update user_id, which nobody may, and
+       every save came back a 42501, "permission denied for table
+       user_settings", with nothing ever stored. sql/080
+       gives the column a default of auth.uid(), so the row is still hers
+       without the page naming her, and the policy pins it either way. */
     api("user_settings", {
       method: "POST",
       headers: {
         Prefer: "resolution=merge-duplicates,return=minimal",
         "Content-Profile": "public"
       },
-      body: { user_id: MY_USER, time_zone: pick }
+      body: { time_zone: pick }
     }).then(function () {
       MY_TZ = pick;
       tzFlash(ok, "Saved");
@@ -2118,6 +2260,28 @@ function slotState(slots) {
          : live.length ? "waiting_on_assistant"
          : "not_started"
   };
+}
+
+/* When a declined applicant may apply again: three months after the decline,
+   the rule sql/027 and 075 enforce (status_changed_at + interval '3 months').
+
+   075 took the date out of the refusal the careers form shows, because that
+   form answers anybody who types an address, and the date told a stranger who
+   had been turned down and when. This page only ever shows her own
+   application, so the date moves here, where it is hers to see.
+
+   Month arithmetic the way Postgres does it, in UTC: the same day three months
+   on, or the last day of that month when it is shorter. setMonth rolls over
+   instead — 30 November plus three would be 2 March, not 28 February — so the
+   day is clamped by hand. Null when there is nothing to count from. */
+function againFrom(a) {
+  var t = Date.parse((a && (a.status_changed_at || a.created_at)) || "");
+  if (isNaN(t)) return null;
+  var d = new Date(t);
+  var y = d.getUTCFullYear(), m = d.getUTCMonth() + 3, day = d.getUTCDate();
+  var last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(day, last),
+    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()));
 }
 
 function when(iso) {
@@ -2328,8 +2492,14 @@ var QBANK = {"scenarios":[["A customer emails angry that they were charged twice
 var SCEN = QBANK.scenarios;
 /* Which measures gate which track. The page uses this for one thing only —
    whether to show the sales part — and the database decides the verdict from
-   its own copy, so a browser that lies about its track gets asked different
-   questions and scored on the same rules either way. */
+   its own copy.
+
+   This comment used to add that a browser lying about its track would be
+   "scored on the same rules either way". It was not true: the verdict reads
+   the row's own track, and until sql/079 the page chose it on insert. Since
+   079 the database writes it from her application, so the claim finally
+   holds — a lie changes which questions she is shown and nothing about how
+   she is scored. */
 var TRACK_AXES = {"Customer Service":["english","customer"],"Admin Tasks":["english","detail"],"Sales & Marketing":["english","sales","customer"]};
 var TYPE_TARGET = 40;
 var TYPE_MIN_ACC = 95;
@@ -2429,10 +2599,22 @@ function ivCard(a) {
       (confirmed ? "Booked" : chosen ? "Waiting on us" : declined ? "New times coming" : "Pick a time") +
     "</span></div>";
 
+  /* The Join button is an href on this origin, and the link in it was typed by
+     staff into a box that accepted anything. esc() stops it breaking out of
+     the attribute; it does nothing about a link that is not a web address in
+     the first place. sql/081 now refuses those, but rows written before it
+     can still hold one, so the page only makes a button of a whole web
+     address and otherwise says the link is coming. The test is the one /admin
+     uses, character for character: checking the scheme alone let
+     "https://meet.google.com/abc def" through as a broken Join button while
+     /admin printed the same row as "not a web address", and two pages telling
+     different stories about one row is how nobody fixes it. */
+  var joinable = confirmed && /^https?:\/\/[^\s"'<>]+$/i.test(String(confirmed.meeting_url || ""));
+
   if (confirmed) {
     return '<div class="card">' + head +
       '<ol class="iv"><li class="iv__s iv__s--on">' + twoZones(confirmed) +
-      (confirmed.meeting_url
+      (joinable
         ? '<a class="btn btn--ghost" href="' + esc(confirmed.meeting_url) +
           '" target="_blank" rel="noopener noreferrer">Join</a>'
         : '<span class="iv__note">link to follow</span>') +
@@ -2447,18 +2629,35 @@ function ivCard(a) {
       "a new set &mdash; nothing else is needed from you.</p></div>";
   }
 
+  /* A time that has already started is not a choice. Times offered for Monday
+     were still drawn with a Choose button on Wednesday; she picked one, the
+     card said "we will confirm", and she waited on an interview that had
+     happened without her. sql/082 now refuses the pick, and this stops
+     offering it. Judged by serverNow(), the same clock the database uses.
+
+     When every time left has passed, the card says so and keeps the "none of
+     these" button — pressing it is how we find out she needs a new set. */
+  var now = serverNow();
+  var passed = function (v) { return new Date(v.starts_at).getTime() <= now; };
+  var open = live.filter(function (v) { return !v.chosen_at && !passed(v); });
+  var allGone = !chosen && !open.length;
+
   return '<div class="card">' + head +
     /* The instruction stops once it has been followed. The badge above already
        says "Waiting on us"; telling her to pick underneath it is the card
        disagreeing with its own heading. */
     '<p class="msg" style="margin:1rem 0 0">One interview with us &mdash; how you work, and a ' +
     "check of your machine and connection." +
-    (chosen ? "" : " Pick whichever time suits you.") + "</p>" +
+    (chosen ? ""
+      : allGone ? " <b>These times have passed.</b> Press the button below and we will send a new set."
+      : " Pick whichever time suits you.") + "</p>" +
     '<ol class="iv">' + live.map(function (v) {
       var on = !!v.chosen_at;
       return '<li class="iv__s' + (on ? " iv__s--on" : "") + '">' + twoZones(v) +
         (on
           ? '<span class="iv__note">picked &mdash; we will confirm</span>'
+          : passed(v)
+          ? '<span class="iv__note">this time has passed</span>'
           : '<button class="btn btn--solid iv__go" type="button" data-slot="' + esc(v.id) +
             '">Choose</button>') +
         "</li>";
@@ -2494,11 +2693,11 @@ function wireIv(a) {
       b.textContent = "Choosing…";
       api("rpc/choose_application_interview", { method: "POST", body: { slot: b.dataset.slot } })
         .then(function () { return loadApplications(); })
-        .catch(function () {
+        .catch(function (e) {
           busy = false;
           b.disabled = false;
           b.textContent = "Choose";
-          say("That did not save. Check your connection and try again.");
+          say(ourWords(e) || "That did not save. Check your connection and try again.");
         });
     });
   });
@@ -2532,11 +2731,11 @@ function wireIv(a) {
       none.textContent = "Telling them…";
       api("rpc/decline_application_interviews", { method: "POST", body: { app: a.id } })
         .then(function () { return loadApplications(); })
-        .catch(function () {
+        .catch(function (e) {
           busy = false;
           none.disabled = false;
           none.textContent = "None of these work for me";
-          say("That did not save. Check your connection and try again.");
+          say(ourWords(e) || "That did not save. Check your connection and try again.");
         });
     });
   }
@@ -2563,7 +2762,21 @@ function assessCard(a, s) {
      questions that cannot affect their result — and the database agrees,
      because sales is in no other track's axes, so an empty bank scores zero
      and gates nothing. */
-  var wantsSales = (TRACK_AXES[a.track] || []).indexOf("sales") > -1;
+  /* And which track that is has to be the one she is scored on, or the two
+     disagree about whether Sales exists. This read a.track — the old single
+     column, which the careers form stopped sending when it grew checkboxes,
+     so it is null on every new application. The Sales part was hidden from
+     everyone, while the row was created with tracks[0] and scored on it: a
+     Sales & Marketing applicant finished five parts, scored nothing on a
+     sixth she was never shown, and fell below the line however well she did.
+
+     So: the row's own track once it exists, because that is what the verdict
+     reads, and before it exists the same value the row will get —
+     tracks[0], then track. sql/079 has the database write exactly that into
+     the row whatever the page sends, so the card and the score cannot part
+     company again. */
+  var track = (s && s.track) || trackFor(a);
+  var wantsSales = (TRACK_AXES[track] || []).indexOf("sales") > -1;
 
   /* Finished, not merely started. Read from part_done, which only closePart
      writes — answers appearing in a column mean she has begun, and 051 made
@@ -2602,7 +2815,7 @@ function assessCard(a, s) {
     if (!MINS[k]) return null;
     var at = Date.parse(OPEN[OPEN_KEY[k]] || "");
     if (isNaN(at)) return null;
-    return at + MINS[k] * 60000 - Date.now();
+    return at + MINS[k] * 60000 - serverNow();
   }
 
   function clockText(ms) {
@@ -2717,12 +2930,22 @@ function fmtLeft(ms) {
   return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
 }
 
+/* The track her assessment is scored on, before the row exists to say so.
+   One definition, used by the card that decides whether to show Sales and by
+   the insert that creates the row, so the two cannot drift apart again. It is
+   the same expression sql/079 uses — coalesce(tracks[1], track,
+   'Customer Service') — and 079 overwrites whatever is sent with it, so this
+   is what the page expects rather than what it decides. */
+function trackFor(a) {
+  return (a && a.tracks && a.tracks[0]) || (a && a.track) || "Customer Service";
+}
+
 function startRow(a) {
   if (SIT) return Promise.resolve(SIT);
   return api("application_assessment", {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: { application_id: a.id, track: (a.tracks && a.tracks[0]) || a.track || "Customer Service" }
+    body: { application_id: a.id, track: trackFor(a) }
   }).then(function (r) { SIT = (r && r[0]) || {}; return SIT; });
 }
 
@@ -2747,6 +2970,18 @@ function savePart(patch) {
    So finishing is recorded rather than inferred. sql/054 holds the moment, the
    same way 051 holds the moment a part was opened, and neither is a guess
    about the other. */
+/* It answers true or false, and never throws.
+
+   It used to swallow every failure and answer nothing, which left the typing
+   part's Save button disabled on "Saving…" for good: the only code that put
+   the button back was a .catch on the caller, and nothing ever reached it.
+   The message said to try again beside a button that could not be pressed.
+   So a caller that disabled something now hears whether to put it back.
+
+   The message is the database's own when it refused on purpose — a speed test
+   link that is not a web address comes back from sql/081 as a sentence saying
+   so, and "check your connection" would have sent her looking in the wrong
+   place. */
 function closePart(patch, part, err) {
   if (TICK) { clearInterval(TICK); TICK = null; }
   var e = document.getElementById("a-err");
@@ -2757,9 +2992,10 @@ function closePart(patch, part, err) {
       return part ? api("rpc/close_part", { method: "POST", body: { part: part } }) : null;
     })
     .then(function () { return loadApplications(); })
-    .catch(function () {
+    .then(function () { return true; }, function (x) {
       if (e) { e.style.display = ""; e.textContent =
-        "That did not save. Check your connection and try the part again."; }
+        ourWords(x) || "That did not save. Check your connection and try the part again."; }
+      return false;
     });
 }
 
@@ -2806,13 +3042,17 @@ function closePart(patch, part, err) {
    Fails toward letting her sit the part. If the call does not come back we run
    the clock from now rather than refusing to open anything — a generous
    deadline costs a few minutes, a blocked applicant costs the applicant. */
+/* The deadline it returns is on the server's clock, and so is every test of it
+   below — serverNow(), never Date.now(). See syncClock for the laptop that
+   lost a part the moment it opened one. */
 function openPart(part, mins) {
-  return api("rpc/open_part", { method: "POST", body: { part: part } })
-    .then(function (at) {
+  return syncClock().then(function () {
+    return api("rpc/open_part", { method: "POST", body: { part: part } });
+  }).then(function (at) {
       var t = Date.parse(at);
-      return isNaN(t) ? Date.now() + mins * 60000 : t + mins * 60000;
+      return isNaN(t) ? serverNow() + mins * 60000 : t + mins * 60000;
     }, function () {
-      return Date.now() + mins * 60000;
+      return serverNow() + mins * 60000;
     });
 }
 
@@ -2863,7 +3103,7 @@ function flushProgress() {
    here. Pass 0 for a part with no clock. */
 function partShell(title, ends, inner, doneLabel, pill) {
   ENDS = ends || 0;
-  var mins = ends ? Math.max(0, ends - Date.now()) / 60000 : 0;
+  var mins = ends ? Math.max(0, ends - serverNow()) / 60000 : 0;
   view('<div class="card">' +
     '<div class="row__top"><span><span class="row__n">' + title + "</span></span>" +
     '<span class="pill pill--assessment" id="a-clock">' +
@@ -2876,8 +3116,8 @@ function partShell(title, ends, inner, doneLabel, pill) {
   TICK = setInterval(function () {
     var el = document.getElementById("a-clock");
     if (!el) { clearInterval(TICK); TICK = null; return; }
-    el.textContent = fmtLeft(ENDS - Date.now());
-    if (Date.now() >= ENDS) {
+    el.textContent = fmtLeft(ENDS - serverNow());
+    if (serverNow() >= ENDS) {
       clearInterval(TICK); TICK = null;
       var done = document.getElementById("a-done");
       if (done) done.click();
@@ -3007,6 +3247,13 @@ function typingPart() {
     if (a === "" || !(Number(a) >= 0 && Number(a) <= 100)) {
       return fail("Put in the accuracy from your result page, as a percentage.", acc);
     }
+    /* Whole numbers, because both columns are smallint. A result page that
+       prints 97.5% was typed in as 97.5, PostgREST refused it, and she was
+       told to check her connection. Rounded here instead: the figure that
+       counts is the one somebody reads off her screenshot, so half a point
+       either way in what she types changes nothing that is scored. */
+    var wN = Math.round(Number(w));
+    var aN = Math.round(Number(a));
     if (!shot && !shotPath) {
       return fail("Attach the screenshot of your result — it is what we check the numbers against.", file);
     }
@@ -3027,12 +3274,22 @@ function typingPart() {
        the next save names it. The apply form learned this the other way round
        and left the bucket holding a CV nothing pointed at. */
     (shot ? sendShot(shot) : Promise.resolve(shotPath)).then(function (path) {
+      /* The screenshot is in the bucket from here on, so a second press must
+         not send it again — it becomes the one already attached. */
+      shotPath = path;
+      shot = null;
       return closePart({
-        typing_wpm: Number(w),
-        typing_accuracy: Number(a),
+        typing_wpm: wN,
+        typing_accuracy: aN,
         typing_proof: path,
         connection_proof: c
       }, "typing");
+    }).then(function (ok) {
+      /* closePart has already said what went wrong; all that is left is to
+         give her the button back so she can do something about it. */
+      if (ok) return;
+      done.disabled = false;
+      done.textContent = "Save this part";
     })["catch"](function (e) {
       done.disabled = false;
       done.textContent = "Save this part";
@@ -3067,7 +3324,15 @@ function typingPart() {
       if (!r.ok) throw new Error("upload failed");
       /* The record of it, which is what the lists read. If this half fails the
          file is still there and the path still goes on the row, so the proof
-         opens — it just will not be in her document list until the next save. */
+         opens — it just will not be in her document list until the next save.
+
+         For its first months this half failed every time, silently: a
+         signed-in applicant had no INSERT on application_documents at all, so
+         the screenshot never reached her list or /admin's erasure count.
+         sql/077 grants it for her own application, provided the path is
+         applicant-docs/<her application>/<file> — exactly what is built above.
+         The swallow stays for the same reason as before: the proof still
+         opens without the row. */
       return api("application_documents", {
         method: "POST",
         body: {
@@ -3091,7 +3356,7 @@ function writtenPart() {
        this, not when she last opened it, and a part whose time has gone is
        closed with what she had rather than handed back for another twenty
        minutes. */
-    if (Date.now() >= ends) {
+    if (serverNow() >= ends) {
       var e = document.getElementById("a-card-err");
       if (e) {
         e.style.display = "";
@@ -3276,7 +3541,7 @@ function bankPart(key, title, mins, column, intro) {
        decide — whatever was saved as she went is what the part is worth, and
        the part is over. Closing it rather than reopening it is the difference
        between a deadline and a suggestion. */
-    if (Date.now() >= ends) {
+    if (serverNow() >= ends) {
       var e = document.getElementById("a-card-err");
       if (e) {
         e.style.display = "";
@@ -3611,7 +3876,11 @@ function render(user, apps) {
         "</div>" +
         (declined
           ? '<div class="note note--warn" style="margin-top:1.2rem"><b>This application was not taken forward.</b> ' +
-            "You are welcome to apply again — tell us what has changed since.</div>"
+            /* Judged on the server's clock, like every other "has this passed". */
+            (againFrom(a) && againFrom(a).getTime() > serverNow()
+              ? "You are welcome to apply again from " + esc(when(againFrom(a).toISOString())) +
+                " &mdash; tell us what has changed since.</div>"
+              : "You are welcome to apply again — tell us what has changed since.</div>")
           : stages(a)) +
         '<ul class="meta">' +
           "<li><b>Shifts you offered</b><span>" + esc((a.shifts || []).join(", ") || "—") + "</span></li>" +
@@ -3644,12 +3913,19 @@ function render(user, apps) {
   wireAssess(apps[0]);
   wireIv(apps[0]);
   document.getElementById("out").addEventListener("click", signOut);
-  root.addEventListener("click", function (e) {
-    var d = e.target.closest("[data-doc]");
-    if (d) openDoc(d);
-  });
+  /* The document buttons are wired once, below start(), not here. This used
+     to add a listener to #pt-root on every render — and render runs again
+     after every part closed and every interview choice — so after three parts
+     one click on her CV sent four signing requests and opened four tabs. */
   wireEdit(apps[0]);
 }
+
+/* #pt-root is never replaced, only refilled, so one delegated listener on it
+   covers every document button any render will ever draw. */
+root.addEventListener("click", function (e) {
+  var d = e.target.closest && e.target.closest("[data-doc]");
+  if (d) openDoc(d);
+});
 
 function start() {
   captureRedirect();
@@ -3673,13 +3949,27 @@ function start() {
        first date is drawn. It never rejects — a missing table, a missing row
        and a zone this browser cannot use all leave MY_TZ null — so it cannot
        be the thing that stops the portal loading. */
-    loadMyTz()
+    loadMyTz(),
+    /* The server's clock, so the interview card can tell a time that has
+       passed from one that has not by the same clock the database uses.
+       Never rejects; a failure leaves the offset at 0. */
+    syncClock()
   ]).then(function (r) {
+    /* All four of those swallow their own errors, including the one that
+       matters here: a refresh token the server refused. That clears the
+       session, and loadApplications then read the token of a session that no
+       longer existed, threw inside a promise nobody was listening to, and
+       left "Looking up your application…" spinning for good — no sign-in
+       form, no Sign out. Signing out on a phone revokes every refresh token
+       she has, so this was the laptop she opened the next day. */
+    if (!session()) { signedOut("Your session expired. Sign in again."); return; }
     var perms = r[0] || [];
     STAFF = perms.indexOf("applications.view_all") > -1;
     BUSINESS = perms.indexOf("seats.view") > -1;
     REQUESTS = r[1] || [];
-    loadApplications();
+    return loadApplications();
+  }).catch(function () {
+    signedOut("Your session expired. Sign in again.");
   });
 }
 
@@ -3791,11 +4081,19 @@ function staffBanner() {
   return out;
 }
 
+/* Returns its promise, so a caller that re-renders after a save — closePart,
+   the interview buttons — can wait for the page to be redrawn. It never
+   rejects: every failure lands on a screen with a way out. */
 function loadApplications() {
-  var claims = readToken(session().access_token);
+  var s0 = session();
+  var claims = s0 && readToken(s0.access_token);
+  if (!claims || !claims.email) {
+    signedOut("Your session expired. Sign in again.");
+    return Promise.resolve();
+  }
   var user = { email: claims.email, name: (claims.user_metadata || {}).full_name || "" };
 
-  Promise.all([
+  return Promise.all([
     /* email and user_id are read to be filtered on, not to be shown: they are
        what onlyMine() compares, and without them it cannot tell. */
     api("applications?select=id,created_at,email,user_id,tracks,track,experience,shifts,country,region,availability,has_equipment,phone,cv,note,status,status_changed_at,skill_english,skill_customer,skill_data_entry,skill_social,skill_bookkeeping&order=created_at.desc"),

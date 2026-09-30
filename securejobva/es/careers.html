@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -481,8 +522,10 @@ img{max-width:100%}
 }
 .intake__x:hover{border-color:var(--accent);color:var(--accent)}
 
-/* three real steps, so the rail is a sequence and not decoration */
-.rail{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;padding:0 2rem 1.3rem}
+/* Five real steps, so five columns. This was copied from the seat request,
+   which has three, and the apply rail wrapped 3 + 2: steps four and five sat
+   under one and two, and the bar stopped reading as a sequence. */
+.rail{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;padding:0 2rem 1.3rem}
 .disc{display:grid;gap:.9rem;margin-top:1.1rem}
 .disc__g{border:1px solid var(--line);border-radius:11px;padding:.85rem .95rem;margin:0}
 .disc__n{
@@ -544,13 +587,16 @@ img{max-width:100%}
 .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
 .opt__box{
   width:18px;height:18px;flex:none;margin-top:.18rem;
-  border:1.5px solid var(--line);border-radius:5px;background:var(--surface);
+  border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);
   display:grid;place-items:center;color:var(--accent-ink);
 }
 .opt__box svg{opacity:0;transition:opacity .12s ease}
 .opt__t{font-weight:600;font-size:1.02rem;line-height:1.3;display:block}
 .opt__d{font-size:.88rem;color:var(--muted);display:block;margin-top:.18rem;line-height:1.4}
 .opt:has(input:checked),.opt.is-on{border-color:var(--accent);background:var(--accent-soft)}
+/* --muted on the tinted ground of a picked option is 4.10:1, under the 4.5
+   small text needs, so the description darkens with the pick. */
+.opt:has(input:checked) .opt__d,.opt.is-on .opt__d{color:var(--ink-2)}
 .opt:has(input:checked) .opt__box,.opt.is-on .opt__box{background:var(--accent);border-color:var(--accent)}
 .opt:has(input:checked) .opt__box svg,.opt.is-on .opt__box svg{opacity:1}
 
@@ -608,14 +654,18 @@ img{max-width:100%}
   text-transform:uppercase;color:var(--ink-2);
 }
 .field > label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.8}
+/* The field edge is --muted, not --line. --line on white is 1.23:1, so a text
+   box had no boundary anybody with low vision could find; 1.4.11 asks 3:1 of
+   the edge of a control, and --muted gives 4.6:1. Hover moves to --ink-2 so
+   it is still a visible change. */
 .field input,.field textarea,.field select{
   font-family:inherit;font-size:1.12rem;color:var(--ink);background:var(--paper);
-  border:1.5px solid var(--line);border-radius:9px;padding:.95rem 1.05rem;width:100%;
+  border:1.5px solid var(--muted);border-radius:9px;padding:.95rem 1.05rem;width:100%;
   text-overflow:ellipsis;
   transition:border-color .15s ease;
 }
 .field textarea{min-height:6.5rem;resize:vertical;line-height:1.55}
-.field input:hover,.field textarea:hover,.field select:hover{border-color:var(--muted)}
+.field input:hover,.field textarea:hover,.field select:hover{border-color:var(--ink-2)}
 /* The border a field gets when it is wrong, and it has to be a different
    colour from the one it gets when it is focused. This said var(--accent),
    which is the focus colour, so on step 3 an invalid field and the field you
@@ -648,8 +698,10 @@ img{max-width:100%}
   padding:1.1rem 2rem;border-top:1px solid var(--line);background:var(--surface-2);
 }
 .intake__foot[hidden]{display:none}
+/* --ink-2, not --muted: --muted on the footer's --surface-2 is 4.19:1, and
+   "Step 1 of 5" is small text. */
 .intake__count{
-  font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--ink-2);
   margin-right:auto;font-variant-numeric:tabular-nums;
 }
 .intake .btn{padding:.8rem 1.4rem;font-size:1rem}
@@ -775,7 +827,13 @@ html{scroll-behavior:smooth}
 .jump a.jump--hi::after{opacity:.6}
 .jump a.jump--hi:hover{border-color:var(--signal);color:var(--signal-ink)}
 
-/* ---------- top bar: live openings ---------- */
+/* ---------- top bar ----------
+   It used to be "live openings": a pulsing dot, "only 17 of 40 seats left this
+   month" and a meter drawn to 23 of 40. None of it was live — the numbers were
+   typed into the markup on 25 Aug and read the same in September — and a
+   scarcity count that does not count anything is not something to put in
+   front of people looking for work. The counter is gone rather than
+   reworded; what is left is the one line the bar says that is true. */
 .bar{
   background:var(--price-bg);color:var(--price-fg);
   border-bottom:1px solid var(--line);
@@ -785,34 +843,9 @@ html{scroll-behavior:smooth}
   display:grid;justify-items:center;gap:.6rem;
   padding:1.05rem 0 1.1rem;text-align:center;
 }
-.bar__lead{
-  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
-  gap:.25rem .6rem;font-size:.95rem;letter-spacing:.02em;line-height:1.35;
-}
-.bar__lead b{font-weight:500;color:var(--signal)}
-.bar__n{
-  font-family:"Bricolage Grotesque",sans-serif;font-weight:800;
-  font-size:1.6rem;letter-spacing:-.035em;line-height:1;
-  color:var(--signal);font-variant-numeric:tabular-nums;
-}
-/* Seats already taken, drawn to scale: 23 of 40. */
-.bar__meter{
-  width:min(100%,30rem);height:7px;border-radius:999px;overflow:hidden;
-  background:color-mix(in srgb,var(--price-fg) 16%,transparent);
-}
-.bar__meter i{display:block;height:100%;background:var(--signal);border-radius:999px}
 .bar__sub{
   font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;
   opacity:.74;line-height:1.6;max-width:56ch;
-}
-.bar__dot{
-  width:9px;height:9px;flex:none;border-radius:50%;background:var(--signal);
-  animation:barpulse 2.4s ease-out infinite;
-}
-@keyframes barpulse{
-  0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--signal) 65%,transparent)}
-  70%{box-shadow:0 0 0 7px transparent}
-  100%{box-shadow:0 0 0 0 transparent}
 }
 
 /* ---------- paid-training callout ---------- */
@@ -850,6 +883,10 @@ html{scroll-behavior:smooth}
 }
 .copied[data-on]{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(prefers-reduced-motion:reduce){.copied{transition:none}}
+
+/* The two lines the apply dialog asks for last, just above Send. */
+.agree{display:grid;gap:.55rem;margin-top:1.4rem;padding-top:1.2rem;border-top:1px solid var(--line)}
+.agree .opt__d a{color:var(--accent-deep)}
 </style>
 
 <script>
@@ -874,19 +911,10 @@ html{scroll-behavior:smooth}
   </defs>
 </svg>
 
-<!-- Live openings bar. The seat counts live here and nowhere else on the page,
-     so this block is the only place to edit when the numbers move. The meter
-     width is the filled share: 23 of 40 taken is 57.5%. -->
+<!-- The top bar. It carried a seat counter ("only 17 of 40 seats left this
+     month") that nothing ever counted; see the .bar rule for why it went. -->
 <div class="bar">
   <div class="wrap bar__in">
-    <p class="bar__lead">
-      <span class="bar__dot" aria-hidden="true"></span>
-      Vacantes abiertas para candidatos calificados &mdash; quedan solo
-      <span class="bar__n">17</span> <b>de 40 puestos este mes</b>
-    </p>
-    <div class="bar__meter" role="img" aria-label="23 de los 40 puestos de este mes ya están ocupados">
-      <i style="width:57.5%"></i>
-    </div>
     <p class="bar__sub">La formación se paga <b>solo después de que</b> apruebes los exámenes y seas aceptado &middot; Una prueba de fortalezas te coloca donde vas a destacar</p>
   </div>
 </div>
@@ -894,7 +922,7 @@ html{scroll-behavior:smooth}
 <header class="nav">
   <div class="wrap">
     <div class="nav__in">
-      <a class="brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="Inicio de SecureJobVA">
+      <a class="brand" href="/es" aria-label="Inicio de SecureJobVA">
         <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
           <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -943,6 +971,7 @@ html{scroll-behavior:smooth}
       <a href="#faq">Preguntas</a>
       <a class="nav__cross" id="to-business-mob" href="#top">Empresas</a>
       <a class="nav__signin" href="/status">Entrar</a>
+      <a class="nav__book" data-apply href="#apply-now">Postular</a>
     </div>
   </div>
 </header>
@@ -953,7 +982,7 @@ html{scroll-behavior:smooth}
       <div>
         <span class="eyebrow">Empleos en línea &middot; Contratamos en todo el mundo &middot; 40 h/semana &middot; Horario de EE. UU.</span>
         <h1><span class="hl">Empleos en línea</span> con formación pagada y, después, un puesto de tiempo completo.</h1>
-        <p class="lede">Aprueba los exámenes y pasa la selección: solo entonces te formamos, con nuestra nómina y no la tuya. Después, <b>cuarenta horas a la semana</b> en horario fijo de Estados Unidos &mdash; atención al cliente, ventas y marketing, o soporte administrativo. Estos son empleos en línea de tiempo completo.</p>
+        <p class="lede">Aprueba los exámenes y pasa la selección: solo entonces te formamos, y te pagamos por esa formación. Después, <b>cuarenta horas a la semana</b> en horario fijo de Estados Unidos &mdash; atención al cliente, ventas y marketing, o soporte administrativo. Estos son empleos en línea de tiempo completo.</p>
         <div class="ptrain">
           <span class="ptrain__i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 9 12 4 2 9l10 5 10-5Z"></path><path d="M6 11.5V17c0 1.6 3 3 6 3s6-1.4 6-3v-5.5"></path></svg></span>
           <p class="ptrain__t">
@@ -1194,7 +1223,7 @@ html{scroll-behavior:smooth}
           <span class="gap__n">04</span>
           <h3>Carga de formación</h3>
           <p class="gap__p">Los clientes subestiman las semanas que toma incorporar a alguien, sobre todo en tareas especializadas &mdash; justo el tiempo que querían recuperar.</p>
-          <p class="gap__ask"><b>Lo que te pedimos:</b> Te formamos con nuestra nómina, en las herramientas y los guiones del cliente, antes de tu primer turno. Llegas listo, no aprendiendo.</p>
+          <p class="gap__ask"><b>Lo que te pedimos:</b> Te formamos, y te pagamos por ello, en las herramientas y los guiones del cliente antes de tu primer turno. Llegas listo, no aprendiendo.</p>
         </div>
         <div class="gap">
           <span class="gap__n">05</span>
@@ -1298,7 +1327,7 @@ html{scroll-behavior:smooth}
       <p>Nuestros empleos en línea están abiertos en las tres áreas. Cinco minutos ahora, una respuesta de una persona en cualquier caso &mdash; y formación pagada la semana en que seas aceptado.</p>
       <div class="hero__actions" style="margin-top:0">
         <a class="btn btn--solid" data-apply href="mailto:support@securejobva.com">Empieza tu postulación</a>
-        <a class="btn btn--ghost" href="mailto:support@securejobva.com">Escríbanos por correo</a>
+        <a class="btn btn--ghost" href="mailto:support@securejobva.com">O escríbenos</a>
       </div>
     </div>
   </section>
@@ -1308,7 +1337,7 @@ html{scroll-behavior:smooth}
   <div class="wrap">
     <div class="foot__grid">
       <div>
-        <a class="brand foot__brand" href="https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7" aria-label="Inicio de SecureJobVA">
+        <a class="brand foot__brand" href="/es" aria-label="Inicio de SecureJobVA">
           <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 2.5 28 7.5v9.2c0 7.1-4.9 11.7-12 13.8C8.9 28.4 4 23.8 4 16.7V7.5L16 2.5Z" fill="url(#brandShield)"></path>
             <path d="M16 5.2 25.7 9.2v7.2c0 5.8-4 9.6-9.7 11.3-5.7-1.7-9.7-5.5-9.7-11.3V9.2L16 5.2Z" fill="var(--mark-bg)"></path>
@@ -1355,10 +1384,10 @@ html{scroll-behavior:smooth}
       <span>&copy; 2026 Secure Job VA &middot; Houston, Texas</span>
       <span>Nunca le pedimos dinero a un postulante.</span>
       <span>
-        <a href="/privacy">Privacidad</a> &middot;
-        <a href="/terms">Términos</a> &middot;
-        <a href="/refunds">Reembolsos</a> &middot;
-        <a href="/contact">Contacto</a>
+        <a href="/es/privacy">Privacidad</a> &middot;
+        <a href="/es/terms">Términos</a> &middot;
+        <a href="/es/refunds">Reembolsos</a> &middot;
+        <a href="/es/contact">Contacto</a>
       </span>
     </div>
   </div>
@@ -1385,7 +1414,7 @@ html{scroll-behavior:smooth}
     <div class="rail" id="apply-rail" aria-hidden="true">
       <div class="rail__i" data-on><div class="rail__bar"></div><div class="rail__l">1 &middot; Área</div></div>
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">2 &middot; Equipo</div></div>
-      <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">3 &middot; Usted</div></div>
+      <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">3 &middot; Contacto</div></div>
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">4 &middot; Redes</div></div>
       <div class="rail__i"><div class="rail__bar"></div><div class="rail__l">5 &middot; Estilo</div></div>
     </div>
@@ -1414,13 +1443,13 @@ html{scroll-behavior:smooth}
         </div>
         <p class="err" id="err-track" aria-live="polite"></p>
 
-        <h3 class="q q--again">¿Cuánto tiempo llevas haciendo este tipo de trabajo?</h3>
+        <h3 class="q q--again" id="q-exp">¿Cuánto tiempo llevas haciendo este tipo de trabajo?</h3>
         <p class="q__sub">Trabajo pagado en cualquier entorno &mdash; oficina, centro de llamadas o remoto.</p>
-        <div class="seg">
+        <div class="seg" role="radiogroup" aria-labelledby="q-exp">
           <label><input type="radio" name="exp" value="Under 1 year"><span>Menos de 1 año</span></label>
           <label><input type="radio" name="exp" value="1 to 3 years"><span>1&ndash;3 años</span></label>
           <label><input type="radio" name="exp" value="3 to 5 years"><span>3&ndash;5 años</span></label>
-          <label><input type="radio" name="exp" value="5 years or more"><span>Más de 5 años</span></label>
+          <label><input type="radio" name="exp" value="5 years or more"><span>5 años o más</span></label>
         </div>
         <p class="err" id="err-exp" aria-live="polite"></p>
       </section>
@@ -1452,9 +1481,9 @@ html{scroll-behavior:smooth}
         </div>
         <p class="err" id="err-shift" aria-live="polite"></p>
 
-        <h3 class="q q--again">La velocidad de tu conexión</h3>
+        <h3 class="q q--again" id="q-speed">La velocidad de tu conexión</h3>
         <p class="q__sub">Haz una prueba de velocidad en la conexión por cable con la que trabajarías.</p>
-        <div class="seg">
+        <div class="seg" role="radiogroup" aria-labelledby="q-speed">
           <label><input type="radio" name="speed" value="Under 10 Mbps"><span>Menos de 10</span></label>
           <label><input type="radio" name="speed" value="10 to 25 Mbps"><span>10&ndash;25</span></label>
           <label><input type="radio" name="speed" value="25 to 50 Mbps"><span>25&ndash;50</span></label>
@@ -1495,29 +1524,29 @@ html{scroll-behavior:smooth}
              fields applicants most need to read back before they send. -->
         <div class="field">
           <label for="ap-name">Nombre completo</label>
-          <input id="ap-name" name="name" type="text" autocomplete="name">
+          <input id="ap-name" name="name" type="text" autocomplete="name" maxlength="200">
           <p class="err" aria-live="polite"></p>
         </div>
         <div class="field">
           <label for="ap-email">Correo electrónico</label>
-          <input id="ap-email" name="email" type="email" autocomplete="email" inputmode="email" spellcheck="false">
+          <input id="ap-email" name="email" type="email" autocomplete="email" inputmode="email" spellcheck="false" maxlength="320">
           <p class="err" aria-live="polite"></p>
         </div>
         <div class="fields2">
           <div class="field field--split">
             <label for="ap-country">País donde vives</label>
-            <input id="ap-country" name="country" type="text" autocomplete="country-name">
+            <input id="ap-country" name="country" type="text" autocomplete="country-name" maxlength="100">
             <p class="err" aria-live="polite"></p>
           </div>
           <div class="field field--split">
             <label for="ap-region">Estado o región <em>&mdash; opcional</em></label>
-            <input id="ap-region" name="region" type="text" autocomplete="address-level1">
+            <input id="ap-region" name="region" type="text" autocomplete="address-level1" maxlength="120">
           </div>
         </div>
         <div class="fields2">
           <div class="field field--split">
             <label for="ap-phone">WhatsApp o teléfono</label>
-            <input id="ap-phone" name="phone" type="tel" autocomplete="tel">
+            <input id="ap-phone" name="phone" type="tel" autocomplete="tel" maxlength="60">
             <p class="err" aria-live="polite"></p>
           </div>
         </div>
@@ -1529,12 +1558,12 @@ html{scroll-behavior:smooth}
         </div>
         <div class="field">
           <label for="ap-cv">O un enlace a él <em>&mdash; Drive, Dropbox o LinkedIn</em></label>
-          <input id="ap-cv" name="cv" type="url" inputmode="url" spellcheck="false" placeholder="https://">
+          <input id="ap-cv" name="cv" type="url" inputmode="url" spellcheck="false" maxlength="1000" placeholder="https://">
           <p class="err" aria-live="polite"></p>
         </div>
         <div class="field">
           <label for="ap-avail">Horas que puedes trabajar <em>&mdash; en horario de Estados Unidos</em></label>
-          <input id="ap-avail" name="availability" type="text" placeholder="p. ej. 9:00-18:00 del Este, o de madrugada">
+          <input id="ap-avail" name="availability" type="text" maxlength="200" placeholder="p. ej. 9:00-18:00 del Este, o de madrugada">
         </div>
         <label class="opt" style="margin-bottom:1.05rem">
           <input type="checkbox" id="ap-kit-own" name="has_equipment">
@@ -1543,7 +1572,7 @@ html{scroll-behavior:smooth}
         </label>
         <div class="field">
           <label for="ap-note">¿Algo que debamos saber? <em>&mdash; opcional</em></label>
-          <textarea id="ap-note" name="note" placeholder="Cuatro años en una cola de Zendesk para un comercio de EE. UU., turnos de madrugada&hellip;"></textarea>
+          <textarea id="ap-note" name="note" maxlength="4000" placeholder="Cuatro años en una cola de Zendesk para un comercio de EE. UU., turnos de madrugada&hellip;"></textarea>
         </div>
         <p class="err" id="err-apply" aria-live="polite"></p>
       </section>
@@ -1552,9 +1581,9 @@ html{scroll-behavior:smooth}
         <h3 class="q">¿Cómo te calificarías?</h3>
         <p class="q__sub">Tu propia lectura honesta. Nadie es rechazado por ser principiante &mdash; nos dice en qué puesto ponerte, y los exámenes lo resuelven de todos modos.</p>
         <div class="skill">
-          <span class="skill__t">Inglés</span>
+          <span class="skill__t" id="t-skill_english">Inglés</span>
           <span class="skill__d">Leer, escribir y hablar en una llamada en vivo</span>
-          <div class="seg seg--sm">
+          <div class="seg seg--sm" role="radiogroup" aria-labelledby="t-skill_english">
             <label><input type="radio" name="skill_english" value="beginner"><span>Principiante</span></label>
             <label><input type="radio" name="skill_english" value="intermediate"><span>Intermedio</span></label>
             <label><input type="radio" name="skill_english" value="advanced"><span>Avanzado</span></label>
@@ -1563,9 +1592,9 @@ html{scroll-behavior:smooth}
           <p class="err" data-skill-err="skill_english" aria-live="polite"></p>
         </div>
         <div class="skill">
-          <span class="skill__t">Atención al cliente</span>
+          <span class="skill__t" id="t-skill_customer">Atención al cliente</span>
           <span class="skill__d">Colas, escalamientos, personas difíciles</span>
-          <div class="seg seg--sm">
+          <div class="seg seg--sm" role="radiogroup" aria-labelledby="t-skill_customer">
             <label><input type="radio" name="skill_customer" value="beginner"><span>Principiante</span></label>
             <label><input type="radio" name="skill_customer" value="intermediate"><span>Intermedio</span></label>
             <label><input type="radio" name="skill_customer" value="advanced"><span>Avanzado</span></label>
@@ -1573,9 +1602,9 @@ html{scroll-behavior:smooth}
           <p class="err" data-skill-err="skill_customer" aria-live="polite"></p>
         </div>
         <div class="skill">
-          <span class="skill__t">Captura de datos</span>
+          <span class="skill__t" id="t-skill_data_entry">Captura de datos</span>
           <span class="skill__d">Exactitud y rapidez en una hoja de cálculo o un CRM</span>
-          <div class="seg seg--sm">
+          <div class="seg seg--sm" role="radiogroup" aria-labelledby="t-skill_data_entry">
             <label><input type="radio" name="skill_data_entry" value="beginner"><span>Principiante</span></label>
             <label><input type="radio" name="skill_data_entry" value="intermediate"><span>Intermedio</span></label>
             <label><input type="radio" name="skill_data_entry" value="advanced"><span>Avanzado</span></label>
@@ -1583,9 +1612,9 @@ html{scroll-behavior:smooth}
           <p class="err" data-skill-err="skill_data_entry" aria-live="polite"></p>
         </div>
         <div class="skill">
-          <span class="skill__t">Redes sociales</span>
+          <span class="skill__t" id="t-skill_social">Redes sociales</span>
           <span class="skill__d">Programar, responder, escribir textos</span>
-          <div class="seg seg--sm">
+          <div class="seg seg--sm" role="radiogroup" aria-labelledby="t-skill_social">
             <label><input type="radio" name="skill_social" value="beginner"><span>Principiante</span></label>
             <label><input type="radio" name="skill_social" value="intermediate"><span>Intermedio</span></label>
             <label><input type="radio" name="skill_social" value="advanced"><span>Avanzado</span></label>
@@ -1593,9 +1622,9 @@ html{scroll-behavior:smooth}
           <p class="err" data-skill-err="skill_social" aria-live="polite"></p>
         </div>
         <div class="skill">
-          <span class="skill__t">Contabilidad y administración</span>
+          <span class="skill__t" id="t-skill_bookkeeping">Contabilidad y administración</span>
           <span class="skill__d">Facturas, cuentas por cobrar, registros</span>
-          <div class="seg seg--sm">
+          <div class="seg seg--sm" role="radiogroup" aria-labelledby="t-skill_bookkeeping">
             <label><input type="radio" name="skill_bookkeeping" value="beginner"><span>Principiante</span></label>
             <label><input type="radio" name="skill_bookkeeping" value="intermediate"><span>Intermedio</span></label>
             <label><input type="radio" name="skill_bookkeeping" value="advanced"><span>Avanzado</span></label>
@@ -1608,21 +1637,21 @@ html{scroll-behavior:smooth}
 
         <div class="field">
           <label for="ap-fb">Facebook <em>&mdash; enlace al perfil o a la página</em></label>
-          <input id="ap-fb" name="social_facebook" type="url" inputmode="url" spellcheck="false" placeholder="https://facebook.com/&hellip;">
+          <input id="ap-fb" name="social_facebook" type="url" inputmode="url" spellcheck="false" maxlength="500" placeholder="https://facebook.com/&hellip;">
         </div>
         <div class="fields2">
           <div class="field field--split">
             <label for="ap-ig">Instagram <em>&mdash; usuario</em></label>
-            <input id="ap-ig" name="social_instagram" type="text" spellcheck="false" placeholder="@tuusuario">
+            <input id="ap-ig" name="social_instagram" type="text" spellcheck="false" maxlength="200" placeholder="@tuusuario">
           </div>
           <div class="field field--split">
             <label for="ap-tt">TikTok <em>&mdash; usuario</em></label>
-            <input id="ap-tt" name="social_tiktok" type="text" spellcheck="false" placeholder="@tuusuario">
+            <input id="ap-tt" name="social_tiktok" type="text" spellcheck="false" maxlength="200" placeholder="@tuusuario">
           </div>
         </div>
         <div class="field">
           <label for="ap-li">LinkedIn <em>&mdash; opcional</em></label>
-          <input id="ap-li" name="social_linkedin" type="url" inputmode="url" spellcheck="false" placeholder="https://linkedin.com/in/&hellip;">
+          <input id="ap-li" name="social_linkedin" type="url" inputmode="url" spellcheck="false" maxlength="500" placeholder="https://linkedin.com/in/&hellip;">
         </div>
 
 
@@ -1769,6 +1798,26 @@ html{scroll-behavior:smooth}
 <!-- disc:end -->
         </div>
         <p class="err" id="err-disc" aria-live="polite"></p>
+
+        <!-- The two things the form never asked (sql/084). Here, directly above
+             Send, because agreeing is part of sending rather than a question
+             about the person. Neither checkbox has a name: they are not answers
+             to restore from a draft, they are given fresh each time. What is
+             stored is the text of the second label exactly as it reads on the
+             page, so /es stores the Spanish she actually agreed to. -->
+        <div class="agree">
+          <label class="opt">
+            <input type="checkbox" id="ap-adult">
+            <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
+            <span><span class="opt__t">Tengo 18 años o más.</span></span>
+          </label>
+          <label class="opt" id="ap-consent-l">
+            <input type="checkbox" id="ap-consent">
+            <span class="opt__box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></span>
+            <span><span class="opt__t">He leído la Política de privacidad y acepto que SecureJobVA use lo que envío aquí para evaluar mi solicitud y para contactarme sobre ella.</span><span class="opt__d">Lee los <a href="/es/terms" target="_blank" rel="noopener">Términos del servicio</a> y la <a href="/es/privacy" target="_blank" rel="noopener">Política de privacidad</a>.</span></span>
+          </label>
+          <p class="err" id="err-agree" aria-live="polite"></p>
+        </div>
       </section>
 
       <section class="step" data-step="5" hidden>
@@ -1788,7 +1837,7 @@ html{scroll-behavior:smooth}
     </form>
 
     <div class="intake__foot" id="apply-foot">
-      <span class="intake__count" id="apply-count">Paso 1 de 3</span>
+      <span class="intake__count" id="apply-count">Paso 1 de 5</span>
       <button class="btn btn--ghost" id="apply-back" type="button" hidden>Atrás</button>
       <button class="btn btn--solid" id="apply-next" type="button">Continuar</button>
     </div>
@@ -1816,7 +1865,7 @@ html{scroll-behavior:smooth}
    there is one thing to read and nothing to keep in step. Values arrive as
    {named} placeholders rather than by concatenation, because "Group " + n +
    " is not finished" cannot be put into Spanish a fragment at a time. */
-var SAYS = {" and ":" y ","Pick one.":"Elige una.","One rating is missing: {what}.":"Falta una valoración: {what}.","{n} ratings are missing: {list}.":"Faltan {n} valoraciones: {list}.","Tick one word as most like you and one as least.":"Marca una palabra como la que más se parece a ti y otra como la que menos.","Still needs a most.":"Todavía falta la que más.","Still needs a least.":"Todavía falta la que menos.","The same word cannot be both.":"La misma palabra no puede ser las dos.","Group {n} is not finished — it is marked below.":"El grupo {n} está sin terminar — está marcado abajo.","{n} groups are not finished: {list}. Each one is marked below.":"Hay {n} grupos sin terminar: {list}. Cada uno está marcado abajo.","That word":"Esa palabra","“{word}” cannot be both. Pick a different word as {which}.":"«{word}» no puede ser las dos. Elige otra palabra como {which}.","Choose at least one track you are applying for.":"Elige al menos un área a la que estás postulando.","How long have you done this kind of work? Under a year is fine — we train from scratch.":"¿Cuánto tiempo llevas haciendo este tipo de trabajo? Menos de un año está bien — formamos desde cero.","Pick at least one shift you can hold — it decides which seats we can match you to.":"Elige al menos un turno al que te puedas comprometer — decide con qué puestos podemos emparejarte.","Pick the speed you actually get — run a test on the connection you would work on.":"Indica la velocidad que realmente tienes — haz una prueba en la conexión con la que trabajarías.","We need your full name.":"Necesitamos tu nombre completo.","Which country do you work from?":"¿Desde qué país trabajas?","Check this address — every update goes here.":"Revisa esta dirección — todas las novedades llegan aquí.","A number we can reach you on for the interview.":"Un número donde podamos localizarte para la entrevista.","Careers":"Áreas","Shifts":"Turnos","Based in":"Ubicación","Experience":"Experiencia","Working style":"Estilo de trabajo","answered — we score it, not you":"respondido — lo puntuamos nosotros, no tú","Application in.":"Solicitud recibida.","We have it, and a confirmation is on its way to {email}. A person reads every application and answers either way, usually within three working days. You can watch where it has got to on your own page.":"La tenemos, y va camino una confirmación a {email}. Una persona lee cada solicitud y responde en cualquier caso, normalmente en un plazo de tres días hábiles. Puedes seguir su avance en tu propia página.","See your application":"Ver tu solicitud","Back to the page":"Volver a la página","One tap left.":"Falta un toque.","Your application is written and ready — send it and we reply either way.":"Tu solicitud está escrita y lista — envíala y te respondemos en cualquier caso.","Send the application":"Enviar la solicitud","That file is over 10 MB. Send a link instead, or a smaller scan.":"Ese archivo supera los 10 MB. Envía un enlace, o un escaneo más pequeño.","PDF, Word or an image, please.":"PDF, Word o una imagen, por favor.","Sending…":"Enviando…","We already have you.":"Ya te tenemos.","Your application":"Tu solicitud","That did not send, so we saved it and will keep trying. Use the email button below to reach us now.":"No se envió, así que lo guardamos y seguiremos intentándolo. El botón de correo de abajo sirve para escribirnos ahora.","Send it":"Enviar","Step {n} of {last}":"Paso {n} de {last}","Continue":"Continuar","{name} — {kb} KB, ready to send":"{name} — {kb} KB, listo para enviar","Up to 10 MB. A photo of a printed CV is fine.":"Hasta 10 MB. Una foto de un currículum impreso sirve.","Copied  {what}":"Copiado  {what}","most":"la que más","least":"la que menos"};
+var SAYS = {" and ":" y ","English":"Inglés","Customer service":"Atención al cliente","Data entry":"Captura de datos","Social media":"Redes sociales","Bookkeeping":"Contabilidad","Pick one.":"Elige una.","One rating is missing: {what}.":"Falta una valoración: {what}.","{n} ratings are missing: {list}.":"Faltan {n} valoraciones: {list}.","Tick one word as most like you and one as least.":"Marca una palabra como la que más se parece a ti y otra como la que menos.","Still needs a most.":"Todavía falta la que más.","Still needs a least.":"Todavía falta la que menos.","The same word cannot be both.":"La misma palabra no puede ser las dos.","Group {n} is not finished — it is marked below.":"El grupo {n} está sin terminar — está marcado abajo.","{n} groups are not finished: {list}. Each one is marked below.":"Hay {n} grupos sin terminar: {list}. Cada uno está marcado abajo.","That word":"Esa palabra","“{word}” cannot be both. Pick a different word as {which}.":"«{word}» no puede ser las dos. Elige otra palabra como {which}.","Choose at least one track you are applying for.":"Elige al menos un área a la que estás postulando.","How long have you done this kind of work? Under a year is fine — we train from scratch.":"¿Cuánto tiempo llevas haciendo este tipo de trabajo? Menos de un año está bien — formamos desde cero.","Pick at least one shift you can hold — it decides which seats we can match you to.":"Elige al menos un turno al que te puedas comprometer — decide con qué puestos podemos emparejarte.","Pick the speed you actually get — run a test on the connection you would work on.":"Indica la velocidad que realmente tienes — haz una prueba en la conexión con la que trabajarías.","We need your full name.":"Necesitamos tu nombre completo.","Which country do you work from?":"¿Desde qué país trabajas?","Check this address — every update goes here.":"Revisa esta dirección — todas las novedades llegan aquí.","A number we can reach you on for the interview.":"Un número donde podamos localizarte para la entrevista.","Tick both boxes above to send: that you are 18 or older, and that you have read the Privacy Policy.":"Marca las dos casillas de arriba para enviar: que tienes 18 años o más, y que has leído la Política de privacidad.","Tick the box to confirm you are 18 or older. We only take applications from adults.":"Marca la casilla para confirmar que tienes 18 años o más. Solo aceptamos solicitudes de personas adultas.","Tick the box to say you have read the Privacy Policy and agree to how we use your application.":"Marca la casilla para indicar que has leído la Política de privacidad y que aceptas cómo usamos tu solicitud.","Careers":"Áreas","Shifts":"Turnos","Based in":"Ubicación","Experience":"Experiencia","Working style":"Estilo de trabajo","answered — we score it, not you":"respondido — lo puntuamos nosotros, no tú","Application in.":"Solicitud recibida.","We have it, and a confirmation is on its way to {email}. A person reads every application and answers either way, usually within three working days. You can watch where it has got to on your own page.":"La tenemos, y va camino una confirmación a {email}. Una persona lee cada solicitud y responde en cualquier caso, normalmente en un plazo de tres días hábiles. Puedes seguir su avance en tu propia página.","See your application":"Ver tu solicitud","Back to the page":"Volver a la página","One tap left.":"Falta un toque.","Your application is written and ready — send it and we reply either way.":"Tu solicitud está escrita y lista — envíala y te respondemos en cualquier caso.","Send the application":"Enviar la solicitud","That file is over 10 MB. Send a link instead, or a smaller scan.":"Ese archivo supera los 10 MB. Envía un enlace, o un escaneo más pequeño.","PDF, Word or an image, please.":"PDF, Word o una imagen, por favor.","Put just your name in the name box.":"Escribe solo tu nombre en la casilla del nombre.","Pick one or more of the three roles on the form.":"Elige una o más de las tres áreas del formulario.","Something in the form is longer than we can store. Shorten your note and send it again.":"Algo del formulario es más largo de lo que podemos guardar. Acorta tu nota y envíala de nuevo.","We already have you.":"Ya te tenemos.","There is already an application under this email address. Sign in on the \"Your application\" page with it to see where it stands.":"Ya hay una solicitud con esta dirección de correo. Inicia sesión con ella en la página de tu solicitud («Your application») para ver en qué punto está.","Your application":"Tu solicitud","We could not take this one here.":"No pudimos recibir esta solicitud aquí.","That is more submissions than we accept from one place in an hour. Write to support@securejobva.com and a person will pick it up.":"Son más envíos de los que aceptamos desde un mismo lugar en una hora. Un correo a support@securejobva.com llega a una persona que se encarga.","That did not send, so we saved it and will keep trying. Use the email button below to reach us now.":"No se envió, así que lo guardamos y seguiremos intentándolo. El botón de correo de abajo sirve para escribirnos ahora.","Attach your CV file to that email — a saved application cannot carry it.":"Adjunta tu currículum a ese correo — una solicitud guardada no puede llevar el archivo.","Sending…":"Enviando…","Uploading your CV…":"Subiendo tu currículum…","Your CV file did not upload, though. Email it to support@securejobva.com from the same address and we will add it.":"Pero tu currículum no se subió. Envíalo a support@securejobva.com desde la misma dirección y lo añadimos.","Send it":"Enviar","Continue":"Continuar","Step {n} of {last}":"Paso {n} de {last}","{name} — {kb} KB, ready to send":"{name} — {kb} KB, listo para enviar","Up to 10 MB. A photo of a printed CV is fine.":"Hasta 10 MB. Una foto de un currículum impreso sirve.","Copied  {what}":"Copiado  {what}","most":"la que más","least":"la que menos"};
 function say(en, vars) {
   var s = Object.prototype.hasOwnProperty.call(SAYS, en) ? SAYS[en] : en;
   if (!vars) return s;
@@ -1884,7 +1933,7 @@ function sayList(items) {
 /* Link back to the client-facing site. Set SITE_URL to the hosted address
    (or "index.html" once both pages sit on the same domain). */
 (function () {
-  var SITE_URL = "https://claude.ai/code/artifact/8b71696b-b927-4756-86d8-fb33f7c314f7";
+  var SITE_URL = "/es";
   ["to-business", "to-business-mob", "to-business-foot"].forEach(function (id) {
     var el = document.getElementById(id);
     if (el && SITE_URL) el.setAttribute("href", SITE_URL);
@@ -1992,13 +2041,18 @@ function sayList(items) {
      rows is the same problem the questionnaire had.
 
      None of them is a trick question — the step says nobody is rejected for
-     answering beginner, and the exams settle it either way. */
+     answering beginner, and the exams settle it either way.
+
+     The names go through say() because they are spliced into the sentence
+     that lists what is missing, and /es/careers said "Faltan 2 valoraciones:
+     Customer service y Bookkeeping". They are labels, never values: what is
+     submitted is the radio's name and value, which stay English. */
   var SKILLS = [
-    ["skill_english", "English"],
-    ["skill_customer", "Customer service"],
-    ["skill_data_entry", "Data entry"],
-    ["skill_social", "Social media"],
-    ["skill_bookkeeping", "Bookkeeping"]
+    ["skill_english", say("English")],
+    ["skill_customer", say("Customer service")],
+    ["skill_data_entry", say("Data entry")],
+    ["skill_social", say("Social media")],
+    ["skill_bookkeeping", say("Bookkeeping")]
   ];
 
   function validSkills() {
@@ -2119,14 +2173,27 @@ function sayList(items) {
 
   /* Sent after the application lands, like the handles are, and for the same
      reason: a questionnaire that fails to store is a gap in the admin view,
-     never a failure screen for somebody who has finished applying. */
-  function postDisc() {
+     never a failure screen for somebody who has finished applying.
+
+     It returns its promise now, and send() waits for it. It used to be fired
+     and forgotten straight before the done screen, whose first button leaves
+     the page — so a quick click on "See your application" could abort it in
+     flight, and finish() had already deleted the draft it was built from.
+     The row is also what a parked application carries (see park()), so a
+     queued application sends its answers once its own row finally lands.
+     keepalive lets the browser finish a small request after navigation. */
+  function discRow() {
     var answers = discAnswers();
-    if (!answers) return;
-    fetch(CFG.endpoint.replace("/applications", "/application_disc"), {
+    return answers ? { application_id: DRAFT_ID, answers: answers } : null;
+  }
+
+  function postDisc(row) {
+    if (!row) return Promise.resolve();
+    return fetch(CFG.endpoint.replace("/applications", "/application_disc"), {
       method: "POST",
       headers: hdrs(),
-      body: JSON.stringify({ application_id: DRAFT_ID, answers: answers })
+      keepalive: true,
+      body: JSON.stringify(row)
     })["catch"](function () {});
   }
 
@@ -2163,7 +2230,16 @@ function sayList(items) {
         okSpeed ? "" : say("Pick the speed you actually get — run a test on the connection you would work on.");
       return okShift && okSpeed;
     }
-    if (step === 4) return validDisc();
+    if (step === 4) {
+      /* Both, not the first to fail: somebody who finished the grid and
+         missed a box should not have to press Send twice to find out. */
+      var okDisc = validDisc();
+      var okAgree = validAgree();
+      if (okDisc && !okAgree) {
+        document.getElementById("err-agree").scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      return okDisc && okAgree;
+    }
     if (step === 3) return validSkills();
     if (step === 2) {
       var name = document.getElementById("ap-name");
@@ -2175,6 +2251,11 @@ function sayList(items) {
       ok = mark(mail, /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail.value.trim())
         ? "" : say("Check this address — every update goes here.")) && ok;
       ok = mark(phone, phone.value.trim() ? "" : say("A number we can reach you on for the interview.")) && ok;
+      /* A file that is too big or the wrong kind used to be skipped in
+         silence at send time: the note under the box turned red, Continue
+         still worked, and the application arrived without the CV she thought
+         she had attached. It stops her here, where she can pick another. */
+      ok = mark(document.getElementById("ap-file"), fileProblem(pickedFile())) && ok;
       if (!ok) {
         var bad = form.querySelector(".is-bad input");
         if (bad) bad.focus();
@@ -2213,7 +2294,7 @@ function sayList(items) {
       phone: val("ap-phone"),
       cv: val("ap-cv"),
       note: val("ap-note"),
-      page: location.href,
+      page: location.href.slice(0, 500),
       id: DRAFT_ID,
       region: val("ap-region"),
       availability: val("ap-avail"),
@@ -2222,8 +2303,47 @@ function sayList(items) {
       skill_customer: one("skill_customer") || null,
       skill_data_entry: one("skill_data_entry") || null,
       skill_social: one("skill_social") || null,
-      skill_bookkeeping: one("skill_bookkeeping") || null
+      skill_bookkeeping: one("skill_bookkeeping") || null,
+      adult_confirmed: checked("ap-adult"),
+      privacy_consent_text: checked("ap-consent") ? consentText() : null
     };
+  }
+
+  /* What she agreed to, in the words she read (sql/084). Taken from the label
+     itself rather than kept as a copy in this script, so the stored sentence
+     cannot drift from the one on screen — and on /es it is the Spanish,
+     because that is the page build-es.mjs wrote. privacy_consent_at is not
+     sent: the database stamps it, and anon may not write it at all, so
+     sending it would lose the whole application to a 42501. */
+  function consentText() {
+    var el = document.getElementById("ap-consent-l");
+    if (!el) return null;
+    /* The sentence and the line under it, as two sentences. The label's
+       whole textContent ran them together ("…about it.Read the Terms…"),
+       because the gap between them is layout, not a character. */
+    var parts = Array.prototype.map.call(el.querySelectorAll(".opt__t, .opt__d"), function (p) {
+      return p.textContent.replace(/\s+/g, " ").trim();
+    });
+    return parts.join(" ").slice(0, 2000);
+  }
+
+  /* Both boxes above Send. They are asked last because agreeing is part of
+     sending rather than a question about the person, and both are required:
+     the site only takes applications from adults, and an application is
+     assessed on what she sends, which is what the second box says. */
+  function validAgree() {
+    var adult = checked("ap-adult");
+    var agreed = checked("ap-consent");
+    var msg = "";
+    if (!adult && !agreed) {
+      msg = say("Tick both boxes above to send: that you are 18 or older, and that you have read the Privacy Policy.");
+    } else if (!adult) {
+      msg = say("Tick the box to confirm you are 18 or older. We only take applications from adults.");
+    } else if (!agreed) {
+      msg = say("Tick the box to say you have read the Privacy Policy and agree to how we use your application.");
+    }
+    document.getElementById("err-agree").textContent = msg;
+    return !msg;
   }
 
   /* Handles live in their own table, so they are a second insert rather than
@@ -2366,10 +2486,36 @@ function sayList(items) {
     return el && el.files && el.files[0] ? el.files[0] : null;
   }
 
+  /* The same five kinds, by the end of the name. A browser only knows a
+     file's type if the machine told it, and a Windows laptop without Office
+     or an Android file picker often says nothing about a .docx — f.type
+     comes back empty. That is still a Word file, and turning it away with
+     "PDF, Word or an image, please" told her the one thing she had sent
+     was the wrong thing. */
+  var BY_EXT = {
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg"
+  };
+
+  /* The type to check and to send. What the browser said wins when it said
+     anything; only an empty type is filled in from the name. The upload's
+     Content-Type and the content_type on the row both come from here, so an
+     empty type no longer reaches the bucket as an empty header either. */
+  function typeOf(f) {
+    if (f.type) return f.type;
+    var dot = f.name.lastIndexOf(".");
+    var ext = dot > -1 ? f.name.slice(dot + 1).toLowerCase() : "";
+    return Object.prototype.hasOwnProperty.call(BY_EXT, ext) ? BY_EXT[ext] : "";
+  }
+
   function fileProblem(f) {
     if (!f) return "";
     if (f.size > MAX_BYTES) return say("That file is over 10 MB. Send a link instead, or a smaller scan.");
-    if (OK_TYPES.indexOf(f.type) < 0) return say("PDF, Word or an image, please.");
+    if (OK_TYPES.indexOf(typeOf(f)) < 0) return say("PDF, Word or an image, please.");
     return "";
   }
 
@@ -2383,27 +2529,36 @@ function sayList(items) {
     return "cv-" + Date.now() + (ext ? "." + ext.slice(0, 8) : "");
   }
 
+  /* Resolves to "none" (nothing attached), "ok", or "failed", and never
+     rejects. send() waits for it before the done screen and says so when the
+     CV did not go: sql/077 lets the public key upload into an application's
+     folder only within an hour of that application arriving, so there is no
+     second attempt from this page later and the person has to be told now,
+     while the file is still on the machine in front of her. */
   function uploadFile() {
     var f = pickedFile();
-    if (!f || fileProblem(f)) return Promise.resolve(null);
+    if (!f) return Promise.resolve("none");
+    if (fileProblem(f)) return Promise.resolve("failed");
 
-    /* Held in a local, and that is the whole fix for a bug that lost every CV
-       ever attached.
+    /* Held in a local, and that was the whole fix for a bug that lost every
+       CV ever attached.
 
-       send() fires this without waiting and then calls finish(), whose last
-       act is to mint a new DRAFT_ID so a second application in the same visit
-       does not collide with the first. finish() runs synchronously, so it
-       always wins the race against a network round trip. The path below was
-       already read synchronously and was therefore right — the file landed in
-       the correct folder every time. The application_id on the row recording
-       it was read inside the .then(), by which point DRAFT_ID named an
-       application that did not exist, so the insert failed its foreign key and
-       the catch swallowed it.
+       send() used to fire this without waiting and then call finish(), whose
+       last act is to mint a new DRAFT_ID so a second application in the same
+       visit does not collide with the first. finish() ran synchronously, so
+       it always won the race against a network round trip. The path below was
+       read synchronously and was therefore right — the file landed in the
+       correct folder every time. The application_id on the row recording it
+       was read inside the .then(), by which point DRAFT_ID named an
+       application that did not exist, so the insert failed its foreign key
+       and the catch swallowed it. The file was in the bucket and nothing
+       pointed at it, so /admin and /status, which list documents from
+       application_documents alone, never showed it.
 
-       The file was in the bucket and nothing pointed at it. /admin and /status
-       both build their document lists from application_documents alone, so the
-       CV was invisible to the applicant and to the person deciding on her, and
-       there is no re-upload anywhere to recover it with. */
+       send() now waits for this before finish(), so today the race is gone.
+       The local stays anyway: this function should not depend on who calls
+       it and when, and reading the id once is what makes the folder and the
+       row agree whatever happens to DRAFT_ID meanwhile. */
     var id = DRAFT_ID;
     var path = id + "/" + safeName(f.name);
     var base = CFG.endpoint.replace("/rest/v1/applications", "/storage/v1/object");
@@ -2413,14 +2568,16 @@ function sayList(items) {
       headers: {
         apikey: CFG.headers.apikey,
         Authorization: CFG.headers.Authorization,
-        "Content-Type": f.type,
+        "Content-Type": typeOf(f),
         "x-upsert": "false"
       },
       body: f
     }).then(function (r) {
-      if (!r.ok) return null;
+      if (!r.ok) return "failed";
       /* Recorded in a table so the admin page can show the original filename
-         without listing a bucket. */
+         without listing a bucket. The path keeps exactly this shape —
+         applicant-docs/<application id>/<file> — because sql/077 refuses any
+         other (sjva-document-path). */
       return fetch(CFG.endpoint.replace("/applications", "/application_documents"), {
         method: "POST",
         headers: hdrs(),
@@ -2428,19 +2585,37 @@ function sayList(items) {
           application_id: id,
           path: "applicant-docs/" + path,
           filename: f.name.slice(0, 260),
-          content_type: f.type,
+          content_type: typeOf(f),
           bytes: f.size
         })
-      })["catch"](function () { return null; });
-    })["catch"](function () { return null; });
+      }).then(function (r2) { return r2.ok ? "ok" : "failed"; },
+              function () { return "failed"; });
+    })["catch"](function () { return "failed"; });
   }
 
-  function postSocials() {
-    var rows = socials();
-    if (!rows.length) return;
-    fetch(CFG.endpoint.replace("/applications", "/application_socials"), {
-      method: "POST", headers: hdrs(), body: JSON.stringify(rows)
+  /* Takes its rows rather than building them, for the same reason postDisc()
+     does: a parked application carries the rows it was sent with, and they
+     go out after that row lands rather than never. */
+  function postSocials(rows) {
+    if (!rows || !rows.length) return Promise.resolve();
+    return fetch(CFG.endpoint.replace("/applications", "/application_socials"), {
+      method: "POST", headers: hdrs(), keepalive: true, body: JSON.stringify(rows)
     })["catch"](function () {});
+  }
+
+  function hasConsent(d) {
+    return !!d && ("adult_confirmed" in d || "privacy_consent_text" in d);
+  }
+
+  /* A copy, never the row itself: the caller still holds d, and a parked
+     row should keep the consent it was sent with for the day 084 is in. */
+  function withoutConsent(d) {
+    var out = {};
+    for (var k in d) {
+      if (Object.prototype.hasOwnProperty.call(d, k) &&
+          k !== "adult_confirmed" && k !== "privacy_consent_text") out[k] = d[k];
+    }
+    return out;
   }
 
   function post(d) {
@@ -2472,9 +2647,34 @@ function sayList(items) {
              prefix rather than one exact hint means the next deliberate rule
              is understood the day it is written, instead of being reported as
              a technical failure and parked in a queue it can never leave. */
+          /* The hint travels with the sentence. The sentence is English —
+             the database only has the one language — and /es/careers used to
+             print it raw under a Spanish heading; send() reads the hint to
+             say it in the page's own words, and to know which of the rules
+             said no, because they do not all want the same screen. */
           if (j && typeof j.hint === "string" &&
               j.hint.indexOf("sjva-") === 0 && j.message) {
-            return { refused: String(j.message) };
+            return { refused: String(j.message), hint: j.hint };
+          }
+          /* 23514 is a CHECK constraint: something is longer than the table
+             takes. Every retry is refused the same way, so parking it is the
+             same broken promise as parking a deliberate no. The fields carry
+             the table's own limits now; this is the net under them. */
+          if (j && j.code === "23514") {
+            return { refused: String(j.message || "too long"), hint: "23514" };
+          }
+          /* PGRST204 is PostgREST saying a column in the body does not exist.
+             The two consent columns only exist once sql/084 is pasted, and
+             nothing makes the paste happen before this page deploys — if it
+             goes out first, every application would be refused whole for two
+             fields the table cannot hold yet. So they are dropped and the
+             row is sent again without them: the application is what matters,
+             and the boxes were still ticked on screen before Send would go.
+             Only these two, and only once, so a different missing column is
+             still reported as the fault it is. */
+          if (j && j.code === "PGRST204" && hasConsent(d) &&
+              /adult_confirmed|privacy_consent_text/.test(String(j.message || ""))) {
+            return post(withoutConsent(d));
           }
           return "dead";
         })["catch"](function () { return "dead"; });
@@ -2501,9 +2701,15 @@ function sayList(items) {
     } catch (e) {}
   }
 
-  function park(d) {
+  /* The handles and the DISC answers are parked with the row. drain() used to
+     re-send only the application, so an application that landed on a later
+     visit arrived without either — the questionnaire's draft had been deleted
+     by finish() the moment it was parked. A CV file cannot be parked: a File
+     does not survive localStorage, and the storage rule in sql/077 would
+     refuse it an hour after the row lands anyway. send() tells the person so. */
+  function park(d, socialRows, disc) {
     var q = queueRead();
-    q.push({ at: Date.now(), body: d });
+    q.push({ at: Date.now(), body: d, socials: socialRows || [], disc: disc || null });
     queueWrite(q);
   }
 
@@ -2525,9 +2731,82 @@ function sayList(items) {
            comment above promises we keep trying; keeping trying at something
            that has been answered is not that. */
         if (verdict !== "ok" && !(verdict && verdict.refused)) keep.push(q[i]);
-        step(i + 1);
+        if (verdict !== "ok") { step(i + 1); return; }
+        /* Landed at last, so what hangs off it goes now, and only now: both
+           tables refer to the application, so sending them earlier would
+           only have been refused. */
+        postSocials(q[i].socials).then(function () {
+          return postDisc(q[i].disc);
+        }).then(function () { step(i + 1); });
       });
     })(0);
+  }
+
+  /* The Spanish sentence on /es, and the database's own words on the English
+     page. SAYS is empty only on the English page, so there the reader gets
+     exactly what the database said, whichever version of a rule is pasted;
+     on /es the hint is what was read, and the Spanish is ours. Each call site
+     hands this say() with its sentence as a literal, which is what lets
+     build-es.mjs find the sentence and refuse to ship /es without it. */
+  function said(translated, fallback) {
+    for (var k in SAYS) {
+      if (Object.prototype.hasOwnProperty.call(SAYS, k)) return translated;
+    }
+    return fallback;
+  }
+
+  /* A deliberate no, and the rules do not all want the same screen. Two of
+     them are about something on the form and are answered on the form, where
+     it can be fixed; the rest end here with the reason and a way to reach a
+     person. */
+  function refused(v, d) {
+    if (v.hint === "sjva-name-is-a-name") {
+      show(2);
+      mark(document.getElementById("ap-name"),
+        said(say("Put just your name in the name box."), v.refused));
+      return;
+    }
+    if (v.hint === "sjva-unknown-track") {
+      show(0);
+      document.getElementById("err-track").textContent =
+        said(say("Pick one or more of the three roles on the form."), v.refused);
+      return;
+    }
+    if (v.hint === "23514") {
+      show(2);
+      document.getElementById("err-apply").textContent =
+        say("Something in the form is longer than we can store. Shorten your note and send it again.");
+      return;
+    }
+    finish("handoff", d);
+    if (v.hint === "sjva-one-application") {
+      document.getElementById("apply-done-h").textContent = say("We already have you.");
+      document.getElementById("apply-done-p").textContent =
+        said(say("There is already an application under this email address. Sign in on the " +
+                 "\"Your application\" page with it to see where it stands."), v.refused);
+      document.getElementById("apply-actions").innerHTML =
+        '<a class="btn btn--solid" href="/status">' + say("Your application") + '</a>';
+      return;
+    }
+    /* The throttle, and any rule written after this page. The handoff's email
+       button stays, because every one of them ends with "write to us". */
+    document.getElementById("apply-done-h").textContent = say("We could not take this one here.");
+    document.getElementById("apply-done-p").textContent = v.hint === "sjva-throttled"
+      ? said(say("That is more submissions than we accept from one place in an hour. " +
+                 "Write to support@securejobva.com and a person will pick it up."), v.refused)
+      : v.refused;
+  }
+
+  /* Saved on this machine to try again. The sentence used to be written into
+     step 3's error line — which finish() had just hidden along with the rest
+     of step 3 — so the one thing the person needed to read was never on
+     screen. It goes where she is looking now. */
+  function parked(d, hasFile) {
+    finish("handoff", d);
+    document.getElementById("apply-done-p").textContent =
+      say("That did not send, so we saved it and will keep trying. Use the email " +
+          "button below to reach us now.") +
+      (hasFile ? " " + say("Attach your CV file to that email — a saved application cannot carry it.") : "");
   }
 
   function send() {
@@ -2546,43 +2825,49 @@ function sayList(items) {
 
     /* One immediate retry covers the ordinary case — a dropped connection, a
        cold function — without making anyone sit through a real backoff. */
+    /* Built now, while DRAFT_ID still names this application — finish()
+       mints the next one. */
+    var socialRows = socials();
+    var disc = discRow();
+    var hasFile = !!pickedFile();
+
     post(d).then(function (v) {
       return v === "retry" ? post(d) : v;
     }).then(function (v) {
       if (v === "ok") {
-        /* Deliberately not awaited and deliberately unable to fail loudly. The
-           application is already saved; a handle that does not attach is worth
-           a gap in the admin view, never a failure screen for someone who has
-           just finished applying. */
-        postSocials();
-        postDisc();
-        uploadFile();
-        finish("sent", d);
-        return;
+        /* Waited for, and still unable to fail loudly. These used to be fired
+           and forgotten right before the done screen, whose first button
+           leaves the page — one quick click and the CV upload was aborted in
+           flight, and nobody ever knew. The application is already saved, so
+           a handle or a questionnaire that does not attach is still a gap in
+           the admin view rather than a failure screen; only the CV is worth a
+           sentence, because only the CV cannot be sent again from here. */
+        if (hasFile) next.textContent = say("Uploading your CV…");
+        return Promise.all([postSocials(socialRows), postDisc(disc), uploadFile()])
+          .then(function (res) {
+            finish("sent", d);
+            if (res[2] === "failed") {
+              document.getElementById("apply-done-p").textContent +=
+                " " + say("Your CV file did not upload, though. Email it to " +
+                  "support@securejobva.com from the same address and we will add it.");
+            }
+          });
       }
       /* Refused on purpose. Not parked, not retried, and not dressed up as a
          technical failure — the person is told the actual reason and what to
-         do about it, which is either sign in or come back on a date. */
-      if (v && v.refused) {
-        finish("handoff", d);
-        document.getElementById("apply-done-h").textContent = say("We already have you.");
-        document.getElementById("apply-done-p").textContent = v.refused;
-        document.getElementById("apply-actions").innerHTML =
-          '<a class="btn btn--solid" href="/status">' + say("Your application") + '</a>';
-        return;
-      }
-      park(d);
-      finish("handoff", d);
-      document.getElementById("err-apply").textContent =
-        say("That did not send, so we saved it and will keep trying. Use the email " +
-            "button below to reach us now.");
+         do about it. */
+      if (v && v.refused) { refused(v, d); return; }
+      park(d, socialRows, disc);
+      parked(d, hasFile);
     })["catch"](function () {
-      park(d);
-      finish("handoff", d);
+      park(d, socialRows, disc);
+      parked(d, hasFile);
     }).then(function () {
       next.disabled = false;
       next.removeAttribute("aria-busy");
-      next.textContent = say("Send it");
+      /* refused() can send her back a step to fix a field, and that step's
+         button says Continue, not Send it. */
+      next.textContent = at === LAST - 1 ? say("Send it") : say("Continue");
     });
   }
 
@@ -2728,6 +3013,7 @@ function sayList(items) {
     var info = document.getElementById("ap-file-info");
     var f = pickedFile();
     var bad = fileProblem(f);
+    if (!bad) mark(e.target, "");
     info.className = "fileinfo" + (bad ? " is-bad" : "");
     info.textContent = bad
       ? bad
@@ -2769,6 +3055,14 @@ function sayList(items) {
     if (e.target.closest(".is-bad")) mark(e.target, "");
   });
 
+  /* The two boxes above Send follow the same rule: once the line under them
+     has spoken, it is kept true as she ticks, rather than left saying both
+     are missing after she has ticked one. */
+  form.addEventListener("change", function (e) {
+    if (e.target.id !== "ap-adult" && e.target.id !== "ap-consent") return;
+    if (document.getElementById("err-agree").textContent) validAgree();
+  });
+
   form.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
       e.preventDefault();
@@ -2777,6 +3071,21 @@ function sayList(items) {
   });
 
   document.getElementById("apply-x").addEventListener("click", function () { dlg.close(); });
+
+  /* "Back to the page" on the done screen. It is a link to #requirements, and
+     nothing listened for it — so, the dialog being modal, a click only
+     scrolled the page hidden behind it and the dialog stayed exactly where it
+     was. It closes the dialog first and then goes where it says. Delegated,
+     because finish() writes the button fresh each time. */
+  document.getElementById("apply-actions").addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("#apply-close2") : null;
+    if (!a) return;
+    e.preventDefault();
+    opener = null;
+    dlg.close();
+    var to = document.getElementById("requirements");
+    if (to) to.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   dlg.addEventListener("click", function (e) {
     if (e.target === dlg) dlg.close();

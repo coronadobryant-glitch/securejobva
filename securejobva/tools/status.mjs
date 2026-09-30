@@ -1,15 +1,38 @@
 /* Is everything actually running?
 
    One command that answers it end to end: the repos, the build, the live site,
-   and which migrations have really landed in the database. Nothing here writes
-   a row — every insert probe deliberately violates a constraint or names a
-   column that does not exist, so it fails before anything is stored.
+   and which migrations have really landed in the database.
 
-   Run: node tools/status.mjs
+   What it touches, said plainly, because this header used to say "nothing here
+   writes a row" and was believed — by a checkup brief that listed this script
+   as known safe — while it was minting password-recovery tokens on a real
+   account five times a run:
+
+     - git fetch --all, so the repo comparison is against the remotes as they
+       are now rather than as they were the last time somebody fetched.
+     - node build.mjs, which rewrites dist/ in this checkout.
+     - the database, through the publishable key: reads, and insert probes that
+       each violate a constraint or name a column that does not exist, so they
+       fail before anything is stored. No row is written by those.
+     - with the service role key from .env.local: reads of the paying half.
+       Reads only.
+     - ONLY with --auth-probe (and the service key): five calls to GoTrue's
+       admin generate_link, type recovery, on one real account. No email is
+       sent, but each call rewrites that account's recovery token in
+       auth.users, so any reset link already in that person's inbox stops
+       working. That is a write, on somebody else's row, to answer a question
+       about dashboard configuration — so it is asked for by name, never done
+       by default. The section below says how it picks the account.
+
+   Run: node tools/status.mjs                  everything except the auth probe
+        node tools/status.mjs --auth-probe     also check where emailed links land
 
    Exit status is 1 if something is wrong, so it can be scheduled. */
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+
+const AUTH_PROBE = process.argv.includes("--auth-probe");
 
 const B = "https://hmgravlkatfmerzbozct.supabase.co/rest/v1";
 const KEY = (readFileSync("index.html", "utf8").match(/"apikey":\s*"([^"]+)"/) || [])[1];
@@ -20,8 +43,10 @@ const bad = [];
 const soft = [];
 
 const pad = (s, n) => String(s).padEnd(n);
+/* "skip" is a check deliberately not run — not a failure, and not something
+   worth a look either, so it is counted as neither. */
 function line(state, what, note) {
-  const mark = state === "ok" ? "ok  " : state === "warn" ? "warn" : "FAIL";
+  const mark = state === "ok" ? "ok  " : state === "warn" ? "warn" : state === "skip" ? "skip" : "FAIL";
   console.log("  " + mark + "  " + pad(what, 42) + (note || ""));
   if (state === "fail") bad.push(what);
   if (state === "warn") soft.push(what);
@@ -62,6 +87,9 @@ async function column(tbl, col, filler) {
 /* ── the repos ───────────────────────────────────────────────────────────── */
 
 head("repos");
+/* Kept outside the block: the deployed-page comparison further down needs to
+   know whether the pages it just built are the committed ones. */
+let dirty = "";
 try {
   execFileSync("git", ["fetch", "--all", "--quiet"], { stdio: "pipe" });
   const local = execFileSync("git", ["rev-parse", "--short", "HEAD"]).toString().trim();
@@ -76,7 +104,7 @@ try {
     line(behind ? "warn" : ahead ? "warn" : "ok", r + " " + tip,
       behind ? behind + " commit(s) to pull" : ahead ? ahead + " commit(s) to push" : "in sync with local " + local);
   }
-  const dirty = execFileSync("git", ["status", "--porcelain", "."]).toString().trim();
+  dirty = execFileSync("git", ["status", "--porcelain", "."]).toString().trim();
   line(dirty ? "warn" : "ok", "working tree", dirty ? dirty.split("\n").length + " uncommitted file(s)" : "clean");
   if (synced && !dirty) { /* nothing */ }
 } catch (e) {
@@ -195,20 +223,53 @@ try {
 
   const v = deployVerdict(shipped, built, here, behind, seen);
   line(v.state, "deployed build is current", v.note);
-  /* Within a twentieth, not equal — dist/ is what was built here and the live
-     copy has been through the CDN. The note prints both so a drift that stays
-     under the tolerance is still visible to somebody reading. */
-  line(Math.abs(live.length - local.length) < live.length * 0.05 ? "ok" : "warn",
-    "deployed size within 5% of local", live.length + " vs " + local.length + " bytes");
+  /* The same page, compared by content rather than by length.
+
+     This used to pass when the two lengths were within a twentieth of each
+     other, and print both. The gap it printed every day — about two percent —
+     was line endings: git here checks the sources out with CRLF, build.mjs
+     copies them as they are, and the deploy is built on Linux from LF. Take
+     the carriage returns out, and the build stamp (which is meant to differ
+     when the commits do), and all seventeen pages were byte-identical. So the
+     number on screen suggested a content drift that did not exist, while the
+     tolerance would have let a real one of up to five percent through.
+
+     Normalised, hashed, equal or not. The lengths are printed only when they
+     differ, as a clue to how much. And only when the deploy is this commit:
+     a different commit is meant to be a different page, and the line above
+     has already said so. */
+  const norm = (t) => t.replace(/\r/g, "").replace(/<meta name="build" content="[^"]*">\n?/g, "");
+  const hash = (t) => createHash("sha256").update(norm(t)).digest("hex").slice(0, 12);
+  if (v.state !== "ok") {
+    line("skip", "deployed page matches local dist/", "not compared — the deploy is not this commit");
+  } else if (hash(live) === hash(local)) {
+    line("ok", "deployed page matches local dist/",
+      "identical, line endings and build stamp aside (" + hash(live) + ")");
+  } else {
+    /* dist/ was rebuilt a few lines up, so it cannot be stale. What it can be
+       is built from a working tree with uncommitted edits, under the same HEAD
+       stamp — the usual cause by far, and the one to name first. Only a clean
+       tree leaves the edge as the suspect. */
+    line("warn", "deployed page matches local dist/",
+      "same commit, different page — " + norm(live).length + " vs " + norm(local).length +
+      " bytes. " + (dirty
+        ? "The working tree has uncommitted edits, and dist/ was built from it under the same commit"
+        : "The tree is clean, so something between this build and the edge is changing it"));
+  }
 } catch { line("warn", "deployed build", "could not compare"); }
 
 /* ── the migrations ──────────────────────────────────────────────────────── */
 
 head("migrations — what has actually landed");
 
+/* The tracks probe sends a real track. It sent ["x"], which reached the length
+   constraint on name only because nothing looked at the value first; 091 now
+   refuses a track that is not one of the three before any constraint runs,
+   so "x" would come back as a refusal this reads as "unclear", and 002 would
+   look missing on a database that has every file in it. */
 const checks = [
   ["001 forms",           () => table("seat_requests"),        ["locked"]],
-  ["002 tracks",          () => column("applications", "tracks", ["x"]), ["present"]],
+  ["002 tracks",          () => column("applications", "tracks", ["Customer Service"]), ["present"]],
   ["003 portal",          () => table("admins"),               ["locked"]],
   ["003 is_admin()",      () => fn("is_admin"),                ["locked"]],
   ["004 roles",           () => table("user_roles"),           ["locked"]],
@@ -370,7 +431,14 @@ if (existsSync(envFile)) {
   if (m) SERVICE = m[1].trim().replace(/^"|"$/g, "");
 }
 
-if (!SERVICE) {
+/* What this run wrote, for the last line. It used to end "No rows were
+   written" whatever had happened above it, the five tokens included. */
+const minted = { count: 0, on: null };
+
+if (!AUTH_PROBE) {
+  line("skip", "redirect targets", "not asked — it rewrites a real account's recovery token. " +
+    "Run with --auth-probe when you mean to");
+} else if (!SERVICE) {
   line("warn", "redirect targets", "no service role key here — run this where .env.local is");
 } else {
   const AUTH = B.replace(/\/rest\/v1$/, "") + "/auth/v1";
@@ -399,8 +467,18 @@ if (!SERVICE) {
   const LIVE_LINK_MS = 60 * 60 * 1000;
   let probe = null, probeHeld = null;
   try {
-    const u = await (await fetch(AUTH + "/admin/users?per_page=100", { headers: H2 })).json();
-    const pick = chooseProbe(u.users || [], Date.now(), LIVE_LINK_MS);
+    /* Every account, a page at a time. This read the first hundred and
+       stopped, so past a hundred users the "oldest link" it chose was only
+       the oldest of whichever hundred came back first — and the safety
+       property above is a claim about all of them. */
+    const users = [];
+    for (let page = 1; page <= 100; page++) {
+      const u = await (await fetch(AUTH + "/admin/users?per_page=200&page=" + page, { headers: H2 })).json();
+      const got = (u && u.users) || [];
+      users.push(...got);
+      if (got.length < 200) break;
+    }
+    const pick = chooseProbe(users, Date.now(), LIVE_LINK_MS);
     probe = pick.email;
     probeHeld = pick.held;
   } catch { /* handled below */ }
@@ -417,6 +495,11 @@ if (!SERVICE) {
      is. Every reading agreed with every other because none of them were
      measurements. */
   const ask = async (target) => {
+    /* Counted before the answer is read: a call that errors afterwards may
+       still have rewritten the token, and the last line should not undersell
+       what was done. */
+    minted.count++;
+    minted.on = probe;
     const r = await fetch(AUTH + "/admin/generate_link", {
       method: "POST",
       headers: H2,
@@ -562,17 +645,26 @@ console.log("  was granted — that is step 9, not a broken login.");
 
 /* ── verdict ─────────────────────────────────────────────────────────────── */
 
+/* Said on every exit, pass or fail, because what a run wrote does not depend
+   on whether it found anything. */
+const wrote = minted.count
+  ? "No table rows were written. " + minted.count + " password-recovery token(s) were minted on " +
+    minted.on + " (--auth-probe) — any reset link already in that inbox no longer works."
+  : "Nothing was written to the database. dist/ was rebuilt here.";
+
 console.log("");
 if (bad.length) {
   console.log("FAILED: " + bad.join(", "));
   if (soft.length) console.log("also worth a look: " + soft.join(", "));
+  console.log(wrote);
   console.log("");
   process.exit(1);
 }
 if (soft.length) {
   console.log("Running, with " + soft.length + " thing(s) worth a look: " + soft.join(", "));
+  console.log(wrote);
   console.log("");
   process.exit(0);
 }
-console.log("Everything checked is running. No rows were written.");
+console.log("Everything checked is running. " + wrote);
 console.log("");

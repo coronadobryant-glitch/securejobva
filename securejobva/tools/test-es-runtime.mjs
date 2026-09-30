@@ -33,7 +33,14 @@ function sayFrom(file) {
   const html = readFileSync(file, "utf8");
   const at = html.indexOf("var SAYS = ");
   if (at < 0) throw new Error(file + ": no SAYS to lift");
-  const decl = html.slice(at, html.indexOf(";\n", at) + 1);
+  /* The declaration ends at the first semicolon that closes a line, CRLF or
+     LF. This looked for ";\n" alone, which a Windows checkout (autocrlf, so
+     every page is CRLF) never contains: the slice came back empty, SAYS was
+     never declared, and the test died with a ReferenceError that said
+     nothing about Spanish. It only ever passed where the files are LF. */
+  const end = html.slice(at).search(/;\r?\n/);
+  if (end < 0) throw new Error(file + ": the SAYS declaration never ends a line");
+  const decl = html.slice(at, at + end + 1);
 
   const lift = (n) => {
     const a = html.indexOf("function " + n + "(");
@@ -97,10 +104,16 @@ if (!existsSync("dist/es/careers.html")) {
   const es = sayFrom("dist/es/index.html");
   is("the seat form counts in Spanish too",
     es.say("Step {n} of {last}", { n: 2, last: 4 }), "Paso 2 de 4");
+  /* The sentence changed on 29 September: the form promised a shortlist
+     "within one working day", which is not what happens — the scoping call
+     comes first — so it now says so. The test follows the page. */
   is("and names the company where Spanish wants it",
-    es.say("A shortlist for {company} lands in {email} within one working day.",
+    es.say("Next is the 20-minute scoping call — pick a time below. The shortlist for " +
+      "{company} follows in {email} within three working days of the call.",
       { company: "Rosehill", email: "a@b.com" }),
-    "Una preselección para Rosehill llega a a@b.com en un día hábil.");
+    "Lo siguiente es la llamada de 20 minutos para definir el alcance — elija un horario " +
+    "abajo. La preselección para Rosehill llega a a@b.com en un plazo de tres días hábiles " +
+    "después de la llamada.");
 }
 
 /* ── the two registers ─────────────────────────────────────────────────────

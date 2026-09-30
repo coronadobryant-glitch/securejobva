@@ -106,6 +106,47 @@ function governingNotice(html, out) {
   return html.slice(0, cut) + notice + html.slice(cut);
 }
 
+/* A Spanish page links to Spanish pages.
+
+   flipToggle() above used to be the only href this file rewrote, so every nav
+   item, footer link and "see our pricing" on /es pointed back at the English
+   twin — and "Empleos" pointed at the careers page's artifact address, which
+   build.mjs turns into /careers, the English form. A Spanish-speaking
+   applicant was one tap from the English apply dialog wherever she started.
+
+   So a link to one of the six pages that have a twin goes to the twin: / to
+   /es, /careers to /es/careers and so on, with the fragment kept (/#pricing
+   becomes /es#pricing). The artifact addresses are resolved first, through
+   build.mjs's own REWRITE list, read rather than copied so the two cannot
+   disagree — including careers.html's SITE_URL, a string in a script rather
+   than an href, which is where its "back to the site" link goes.
+
+   Two kinds of link stay English, and both say hreflang="en": the EN toggle,
+   and the "Read the English version" line on the legal pages. They exist to
+   leave. build.mjs makes the same rewrite at build time, as a net; doing it
+   here as well means the es/ files are what ships rather than something
+   corrected on the way out, and a hand edit to them is caught by --check. */
+const ES_TWIN = { "": "/es", careers: "/es/careers", contact: "/es/contact",
+                  privacy: "/es/privacy", terms: "/es/terms", refunds: "/es/refunds" };
+
+const ARTIFACTS = [...readFileSync("build.mjs", "utf8")
+  .matchAll(/\[\s*"(https:\/\/claude\.ai\/code\/artifact\/[0-9a-f-]+)"\s*,\s*"(\/[a-z]*)"\s*\]/g)]
+  .map((m) => [m[1], m[2]]);
+
+function spanishLinks(html) {
+  for (const [from, path] of ARTIFACTS) {
+    const page = path.replace(/^\//, "");
+    if (Object.prototype.hasOwnProperty.call(ES_TWIN, page)) html = html.split(from).join(ES_TWIN[page]);
+  }
+  return html.replace(/<a\b[^>]*>/g, (tag) => {
+    if (/\bhreflang\s*=\s*["']?en\b/i.test(tag)) return tag;
+    return tag.replace(/\bhref="\/([a-z]*)(#[^"]*)?"/, (all, page, frag) =>
+      Object.prototype.hasOwnProperty.call(ES_TWIN, page)
+        ? 'href="' + ES_TWIN[page] + (frag || "") + '"'
+        : all);
+  });
+}
+
 mkdirSync("es", { recursive: true });
 
 let bad = 0;
@@ -154,7 +195,7 @@ for (const [src, out, , backTo] of PAGES) {
     report.push({ src, out, pct, done, total, missing: [], noToggle: true });
     continue;
   }
-  const built = governingNotice(flipped.html, out);
+  const built = spanishLinks(governingNotice(flipped.html, out));
   if (CHECK) {
     const have = existsSync(out) ? readFileSync(out, "utf8") : null;
     if (have === null) {
@@ -162,7 +203,11 @@ for (const [src, out, , backTo] of PAGES) {
       report.push({ src, out, pct, done, total, missing: [], stale: "has never been written" });
       continue;
     }
-    if (have !== built) {
+    /* Line endings aside. build-policy.mjs writes its four pages with CRLF and
+       the copies in the repo have been saved with LF, so the same English
+       page gave a Spanish one that differed in nothing but \r — and was
+       reported stale for it, on a checkout where nothing was behind. */
+    if (have.replace(/\r/g, "") !== built.replace(/\r/g, "")) {
       bad++;
       report.push({ src, out, pct, done, total, missing: [],
         stale: "is not what the generator produces from the English page and es/strings.json" });

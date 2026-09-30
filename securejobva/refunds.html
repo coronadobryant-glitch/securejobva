@@ -87,6 +87,12 @@ h1,h2,h3,h4{
   line-height:1.04;
   letter-spacing:-.022em;
   text-wrap:balance;
+  /* A word longer than the column breaks rather than pushing the page
+     sideways. At 320px the Spanish home page scrolled 24px wide on one word,
+     "aproximadamente", in a heading at display size; hyphens:auto breaks it
+     where the language allows, since the built pages carry <html lang>. */
+  overflow-wrap:break-word;
+  hyphens:auto;
   margin:0;
 }
 p{margin:0}
@@ -132,7 +138,6 @@ img{max-width:100%}
 .nav__in{display:flex;align-items:center;gap:1.25rem;height:68px}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;font-weight:800;font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em;font-size:1.12rem}
 .brand__mark{width:26px;height:26px;flex:none}
-.brand__word{display:inline}
 .brand__va{color:var(--accent)}
 .nav__links{display:none;gap:1.15rem;margin-left:auto;font-size:.92rem;font-weight:500}
 /* When the links outrun the bar, scroll them instead of letting the row
@@ -142,8 +147,21 @@ img{max-width:100%}
 .nav__links{overflow-x:auto;min-width:0;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
 .nav__links::-webkit-scrollbar{display:none}
 .nav__links a{flex:none;white-space:nowrap}
-/* Only the links give way; the brand and the controls keep their size. */
+/* Only the links give way; the controls keep their size.
+
+   The brand used to be flex:none as well, and so did everything else in the
+   bar on a phone — so nothing could give at all. At 375px this page measured
+   388px wide (407px in Spanish) and scrolled sideways, with "Apply now"
+   clipped off the right edge. The brand may now shrink, and its word is cut
+   with an ellipsis before the row is ever allowed to overflow — below 600px
+   only, in the block further down. Above that the links are what give way,
+   as they always did: letting the brand shrink everywhere cut "SecureJobVA"
+   to "SecureJ…" at 900px, where the links still had room to scroll.
+
+   This block is inside the part lib-chrome.mjs lifts, so the policy pages and
+   /contact get the same bar behaviour from here. */
 .brand{flex:none}
+.brand__word{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav__tools{flex:none}
 .nav__links a{text-decoration:none;color:var(--ink-2)}
 .nav__links a:hover{color:var(--accent)}
@@ -256,10 +274,33 @@ img{max-width:100%}
 }
 .mobnav a:last-child{border-bottom:none}
 .mobnav a:hover{color:var(--accent)}
+/* The call-to-action's place on a phone. The bar has no room for it there, so
+   the menu carries it, filled like the button it stands in for. */
+.mobnav__in a.nav__book{
+  display:inline-flex;align-items:center;justify-content:center;margin-top:.5rem;
+  padding:.75rem .95rem;border-radius:8px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);font-weight:700;line-height:1;
+}
+.mobnav__in a.nav__book:hover{color:var(--accent-ink);filter:brightness(1.07)}
 
-@media(max-width:559px){
+/* Below 600px the header button goes, and the menu carries it instead.
+
+   Trimming its padding — which is all this block used to do, at 559px — was
+   never going to be enough: brand, three 38px controls and a button do not
+   fit in 375px however tight the button is. 600 rather than 560 because the
+   Spanish labels still pushed the row past the edge between the two.
+
+   At the narrowest phones (320px, a 280px bar once the gutters are taken) the
+   brand and three controls are themselves 7px too wide, so the controls lose
+   four pixels each and the gaps close up. */
+@media(max-width:599px){
   .nav__in{gap:.6rem}
-  .nav__cta{padding:.62rem .95rem;font-size:.9rem}
+  .nav__cta{display:none}
+  .brand{flex:0 1 auto;min-width:0}
+}
+@media(max-width:379px){
+  .nav__tools{gap:.4rem}
+  .themetog,.navtog,.langtog{width:34px;height:34px}
 }
 @media(min-width:900px){
   .nav__links{display:flex}
@@ -314,12 +355,29 @@ img{max-width:100%}
 .cform .fld{display:grid;gap:.35rem;margin-bottom:1rem}
 .cform label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .cform label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
-.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
+/* --muted, not --line, for the same reason as the two dialogs: --line on white
+   is 1.23:1, and the edge of a text box needs 3:1 to be findable at all. */
+.cform input,.cform select,.cform textarea{font-family:inherit;font-size:.98rem;padding:.7rem .85rem;border:1px solid var(--muted);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
 .cform textarea{min-height:8rem;resize:vertical}
 .cform input:focus-visible,.cform select:focus-visible,.cform textarea:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
 .cform .err{color:#B3261E;font-size:.85rem;margin:.15rem 0 0;min-height:1.1em}
 :root[data-theme="dark"] .cform .err{color:#F2B8B5}
 @media(min-width:560px){.cform__two{display:grid;grid-template-columns:1fr 1fr;gap:0 .9rem}}
+/* The agree box. The markup is the .opt pattern from the two dialogs, but its
+   rules never came with it — they sit after the hero marker in careers.html,
+   outside what lib-chrome.mjs lifts — so the page showed a raw checkbox, a
+   tick that was always visible, and the whole label forced into the
+   uppercase mono of .cform label. These are those rules, scoped to the form. */
+.cform label.opt{display:flex;align-items:flex-start;gap:.7rem;position:relative;cursor:pointer;font-family:inherit;font-size:.95rem;letter-spacing:0;text-transform:none;color:var(--ink);margin-bottom:.25rem}
+.cform .opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.cform .opt__box{width:18px;height:18px;flex:none;margin-top:.15rem;border:1.5px solid var(--muted);border-radius:5px;background:var(--surface);display:grid;place-items:center;color:var(--accent-ink)}
+.cform .opt__box svg{opacity:0;transition:opacity .12s ease}
+.cform .opt input:checked ~ .opt__box{background:var(--accent);border-color:var(--accent)}
+.cform .opt input:checked ~ .opt__box svg{opacity:1}
+.cform .opt input:focus-visible ~ .opt__box{outline:2.5px solid var(--accent);outline-offset:2px}
+.cform .opt__t{display:block;font-weight:600;line-height:1.35}
+.cform .opt__d{display:block;font-size:.85rem;color:var(--ink-2);margin-top:.15rem}
+.cform .opt__d a{color:var(--accent)}
 .cform__ok{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.15rem 1.3rem}
 .contact__at{display:grid;gap:.8rem;margin:1.4rem 0 2.2rem}
 .contact__row{display:flex;flex-wrap:wrap;gap:.5rem 1rem;padding-bottom:.7rem;border-bottom:1px solid var(--line)}
@@ -365,8 +423,26 @@ img{max-width:100%}
         <a href="/careers">Careers</a>
         <a href="/contact">Contact</a>
         <a class="nav__signin" href="/status">Sign in</a>
-        <a class="langtog" id="langtog" href="/es/refunds" hreflang="es" lang="es" aria-label="Ver esta página en español">ES</a>
       </nav>
+      <div class="nav__tools">
+        <button class="navtog" id="navtog" type="button" aria-expanded="false" aria-controls="mobnav" aria-label="Menu">
+          <svg class="i-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+          <svg class="i-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+          </svg>
+        </button>
+        <a class="langtog" id="langtog" href="/es/refunds" hreflang="es" lang="es" aria-label="Ver esta página en español">ES</a>
+      </div>
+    </div>
+  </div>
+  <div class="mobnav" id="mobnav" hidden>
+    <div class="wrap mobnav__in">
+      <a href="/">Hiring a VA?</a>
+      <a href="/careers">Careers</a>
+      <a href="/contact">Contact</a>
+      <a class="nav__signin" href="/status">Sign in</a>
     </div>
   </div>
 </header>
@@ -376,12 +452,12 @@ img{max-width:100%}
     <div class="wrap doc__wrap">
       <span class="eyebrow">Site policies</span>
       <h1>Refund Policy</h1>
-      <p class="doc__meta">Last updated 26 August 2026</p>
-      <p>This policy covers fees paid by Clients. It does not apply to Applicants, who are never charged anything &mdash; see section 5.</p>
+      <p class="doc__meta">Last updated 30 September 2026</p>
+      <p>This policy covers fees paid by Clients. It does not apply to Applicants, who are never charged anything &mdash; see section 6.</p>
       <h2 id="r1">1. The free first week</h2>
-      <p>A new seat&rsquo;s first week is not billed. If you decide during that week that the fit is wrong, you are not charged for the hours worked and there is nothing to refund. A card and a deposit are set up before the week begins so the seat can start on the day you approve it; the deposit is applied to your first billed week, or returned if you do not continue.</p>
+      <p>A new seat&rsquo;s first week is not billed. If you decide during that week that the fit is wrong, you are not charged for the hours worked and there is nothing to refund. Billing begins in the second week, for hours already worked.</p>
       <h2 id="r2">2. If the seat never starts</h2>
-      <p>If a seat does not begin work on the agreed start date and the reason is ours &mdash; we could not staff it, or the assistant withdrew &mdash; anything you have paid toward it is refunded in full, including the deposit. There is nothing to argue about: no work happened.</p>
+      <p>If a seat does not begin work on the agreed start date and the reason is ours &mdash; we could not staff it, or the assistant withdrew &mdash; anything you have paid toward it is refunded in full. There is nothing to argue about: no work happened.</p>
       <p>If the delay is yours &mdash; a change of plan, a project put back &mdash; tell us and we will hold the seat or release it. Nothing is billed for hours nobody worked either way.</p>
       <h2 id="r3">3. Replacement, or a refund, at your choice</h2>
       <p>If an assistant is not working out, our first answer is to replace them, at no cost, with the handover done for us rather than by you. There is no replacement fee and no charge for the overlap while the handover happens.</p>
@@ -423,4 +499,27 @@ img{max-width:100%}
     </div>
   </div>
 </footer>
+<script>
+(function () {
+  var btn = document.getElementById("navtog");
+  var panel = document.getElementById("mobnav");
+  if (!btn || !panel) return;
+  function setOpen(open) {
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) { panel.removeAttribute("hidden"); } else { panel.setAttribute("hidden", ""); }
+  }
+  btn.addEventListener("click", function () {
+    setOpen(btn.getAttribute("aria-expanded") !== "true");
+  });
+  panel.addEventListener("click", function (e) {
+    if (e.target.closest("a")) setOpen(false);
+  });
+  window.addEventListener("resize", function () {
+    if (window.innerWidth >= 900) setOpen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setOpen(false);
+  });
+})();
+</script>
 

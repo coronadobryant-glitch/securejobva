@@ -1,6 +1,6 @@
 {
   "_": [
-    "The sentences index.html and careers.html build after they have loaded.",
+    "The sentences index.html, careers.html and contact.html build after they have loaded.",
     "",
     "es/strings.json holds the markup; this holds what the two step forms write",
     "at runtime, because tools/build-es.mjs walks text nodes and never steps",
@@ -35,6 +35,7 @@
   " and ": " y ",
   "One tap left.": "Falta un toque.",
   "That did not send, so we saved it and will keep trying. Use the email button below to reach us now.": "No se envió, así que lo guardamos y seguiremos intentándolo. El botón de correo de abajo sirve para escribirnos ahora.",
+  "That is more submissions than we accept from one place in an hour. Write to support@securejobva.com and a person will pick it up.": "Son más envíos de los que aceptamos desde un mismo lugar en una hora. Un correo a support@securejobva.com llega a una persona que se encarga.",
 
   "_2": "── the seat form on the home page: an employer, usted ──",
 
@@ -50,13 +51,16 @@
   "Estimate": "Estimado",
   "{money} / week": "{money} / semana",
   "We have it.": "La tenemos.",
-  "A shortlist for {company} lands in {email} within one working day.": "Una preselección para {company} llega a {email} en un día hábil.",
+  "Next is the 20-minute scoping call — pick a time below. The shortlist for {company} follows in {email} within three working days of the call.": "Lo siguiente es la llamada de 20 minutos para definir el alcance — elija un horario abajo. La preselección para {company} llega a {email} en un plazo de tres días hábiles después de la llamada.",
   "Pick your time": "Elija su horario",
   "Email us directly": "Escríbanos directamente",
-  "Your email is written and ready — send it and we reply the same working day.": "Su correo está escrito y listo — envíelo y respondemos el mismo día hábil.",
+  "Your email is written and ready — send it and we reply within one to two business days.": "Su correo está escrito y listo — envíelo y respondemos en uno o dos días hábiles.",
   "Send the email": "Enviar el correo",
   "Or pick a time": "O elija un horario",
   "One moment.": "Un momento.",
+  "{money} <span>/ week</span>": "{money} <span>/ semana</span>",
+  "{h} hrs &times; ${rate}/hr<br>&asymp; {month} a month": "{h} h &times; ${rate}/hora<br>&asymp; {month} al mes",
+  "Something in the form is longer than we can store. Shorten your note and send it again, or use the email button below.": "Algo del formulario es más largo de lo que podemos guardar. Acorte su nota y envíelo de nuevo, o use el botón de correo de abajo.",
 
   "_3": "── the application dialog on /careers: an applicant, tú ──",
 
@@ -83,6 +87,12 @@
   "Check this address — every update goes here.": "Revisa esta dirección — todas las novedades llegan aquí.",
   "A number we can reach you on for the interview.": "Un número donde podamos localizarte para la entrevista.",
 
+  "English": "Inglés",
+  "Customer service": "Atención al cliente",
+  "Data entry": "Captura de datos",
+  "Social media": "Redes sociales",
+  "Bookkeeping": "Contabilidad",
+
   "Careers": "Áreas",
   "Shifts": "Turnos",
   "Based in": "Ubicación",
@@ -98,11 +108,35 @@
   "Send the application": "Enviar la solicitud",
   "We already have you.": "Ya te tenemos.",
   "Your application": "Tu solicitud",
+  "We could not take this one here.": "No pudimos recibir esta solicitud aquí.",
+  "Put just your name in the name box.": "Escribe solo tu nombre en la casilla del nombre.",
+  "Pick one or more of the three roles on the form.": "Elige una o más de las tres áreas del formulario.",
+  "There is already an application under this email address. Sign in on the \"Your application\" page with it to see where it stands.": "Ya hay una solicitud con esta dirección de correo. Inicia sesión con ella en la página de tu solicitud («Your application») para ver en qué punto está.",
+  "Something in the form is longer than we can store. Shorten your note and send it again.": "Algo del formulario es más largo de lo que podemos guardar. Acorta tu nota y envíala de nuevo.",
+  "Uploading your CV…": "Subiendo tu currículum…",
+  "Your CV file did not upload, though. Email it to support@securejobva.com from the same address and we will add it.": "Pero tu currículum no se subió. Envíalo a support@securejobva.com desde la misma dirección y lo añadimos.",
+  "Attach your CV file to that email — a saved application cannot carry it.": "Adjunta tu currículum a ese correo — una solicitud guardada no puede llevar el archivo.",
+
+  "Tick both boxes above to send: that you are 18 or older, and that you have read the Privacy Policy.": "Marca las dos casillas de arriba para enviar: que tienes 18 años o más, y que has leído la Política de privacidad.",
+  "Tick the box to confirm you are 18 or older. We only take applications from adults.": "Marca la casilla para confirmar que tienes 18 años o más. Solo aceptamos solicitudes de personas adultas.",
+  "Tick the box to say you have read the Privacy Policy and agree to how we use your application.": "Marca la casilla para indicar que has leído la Política de privacidad y que aceptas cómo usamos tu solicitud.",
 
   "That file is over 10 MB. Send a link instead, or a smaller scan.": "Ese archivo supera los 10 MB. Envía un enlace, o un escaneo más pequeño.",
   "PDF, Word or an image, please.": "PDF, Word o una imagen, por favor.",
   "{name} — {kb} KB, ready to send": "{name} — {kb} KB, listo para enviar",
   "Up to 10 MB. A photo of a printed CV is fine.": "Hasta 10 MB. Una foto de un currículum impreso sirve.",
 
-  "Copied  {what}": "Copiado  {what}"
+  "Copied  {what}": "Copiado  {what}",
+
+  "_4": "── the contact form on /contact: tú, like the page around it ──",
+
+  "Send message": "Enviar mensaje",
+  "Tell us your name.": "Dinos tu nombre.",
+  "We need an address we can reply to.": "Necesitamos una dirección a la que podamos responder.",
+  "Tell us what you need.": "Cuéntanos qué necesitas.",
+  "Please agree to the Terms and Privacy Policy.": "Acepta los Términos y la Política de privacidad, por favor.",
+  "That email address does not look complete. Check it and send again.": "Esa dirección de correo no parece completa. Revísala y envía de nuevo.",
+  "<b>Message sent.</b> We answer within one to two business days, at {email}.": "<b>Mensaje enviado.</b> Respondemos en uno o dos días hábiles, a {email}.",
+  "<b>That did not send.</b> Your message is ready to email instead &mdash; {link}.": "<b>No se envió.</b> Tu mensaje está listo para mandarlo por correo &mdash; {link}.",
+  "send it now": "envíalo ahora"
 }

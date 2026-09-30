@@ -205,6 +205,25 @@ const PAGES = [
     title: "Política de reembolsos — SecureJobVA",
     description: "La primera semana gratis, el reemplazo sin costo y cuándo se reembolsa. La versión en inglés es la que rige.",
     ogTitle: "Política de reembolsos"
+  },
+
+  /* ── the page for an address that has none ─────────────────────────────
+     Vercel serves dist/404.html, with a 404 status, for any path it has no
+     file for; the Apache config points ErrorDocument at the same file. Before
+     this there was no such file and a typo got Vercel's plain-text NOT_FOUND.
+
+     No canonical and no og:url: it is served at every address that does not
+     exist, so there is no one address to name, and naming /404 would tell a
+     search engine a page lives there. Bilingual in one file because the host
+     picks it before anything knows which language the visitor was in. */
+  {
+    src: "404.html",
+    path: "/404",
+    title: "Page not found — SecureJobVA",
+    description: "There is no page at this address. Página no encontrada.",
+    ogTitle: "Page not found",
+    noindex: true,
+    canonical: false
   }
 ];
 
@@ -215,7 +234,89 @@ const REWRITE = [
   ["https://claude.ai/code/artifact/59e78011-5885-43c0-bd9a-8c4754a13d45", "/careers"]
 ];
 
+/* ── a Spanish page links to Spanish pages ─────────────────────────────────
+   The es/ files are translations of the English ones, links and all, so every
+   nav item, footer link and "see our pricing" on /es pointed back at the
+   English twin — and the artifact rewrite above turned "Empleos" into
+   /careers, the English form. A Spanish-speaking applicant was one tap from
+   the English apply dialog wherever she started.
+
+   So on a Spanish page, a link to one of the six pages that have a twin goes
+   to the twin: / to /es, /careers to /es/careers, and so on, fragment kept
+   (/#pricing becomes /es#pricing). Two kinds of link are left alone, and both
+   say hreflang="en": the EN toggle, and the "Read the English version" line
+   on the legal pages, which exist to leave. Pages with no Spanish version —
+   /status and the other signed-in ones — are not in the list and stay as
+   they are.
+
+   Done here rather than in the es/ files so it cannot drift: a new footer
+   link copied in from English is right the first time it is built. */
+const ES_TWIN = { "": "/es", careers: "/es/careers", contact: "/es/contact",
+                  privacy: "/es/privacy", terms: "/es/terms", refunds: "/es/refunds" };
+
+function spanishLinks(html) {
+  return html.replace(/<a\b[^>]*>/g, (tag) => {
+    if (/\bhreflang\s*=\s*["']?en\b/i.test(tag)) return tag;
+    return tag.replace(/\bhref="\/([a-z]*)(#[^"]*)?"/, (all, page, frag) =>
+      Object.prototype.hasOwnProperty.call(ES_TWIN, page)
+        ? 'href="' + ES_TWIN[page] + (frag || "") + '"'
+        : all);
+  });
+}
+
+/* Copied into dist/ as they are. Host configs are not in this list and should
+   not be: Vercel reads vercel.json from the project, not from dist/, and a
+   config file copied into the output is just a file anybody can download.
+   _headers and _redirects used to sit beside this list claiming a host read
+   them "from the publish directory" when nothing ever put them there; they
+   were deleted, and vercel.json is the one list of headers and redirects.
+   .htaccess stays in the repo for a move to Apache and says so itself. */
 const ASSETS = ["og.png", "og.svg", "favicon.svg", "robots.txt"];
+
+/* ── structured data ──────────────────────────────────────────────────────
+   What a search engine can read about the business without guessing from the
+   prose: its name, its address on the web, its mark, and the city the footer
+   already names. Nothing here that the pages do not already say — no rating,
+   no price, no opening hours — because this is the one place a claim reaches
+   a search result without a person reading the page around it.
+
+   Home pages only, English and Spanish. A job listing (JobPosting) would
+   want a posting date, a closing date and a pay figure per role, which are
+   business decisions this file cannot make up; it is left out until those
+   exist somewhere to read them from. */
+function jsonLd(page) {
+  if (page.path !== "/" && page.path !== "/es") return "";
+  const data = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": SITE + "/#org",
+        name: "SecureJobVA",
+        alternateName: "Secure Job VA",
+        url: SITE + "/",
+        logo: SITE + "/favicon.svg",
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: "Houston",
+          addressRegion: "TX",
+          addressCountry: "US"
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": SITE + "/#site",
+        name: "SecureJobVA",
+        url: SITE + "/",
+        inLanguage: ["en", "es"],
+        publisher: { "@id": SITE + "/#org" }
+      }
+    ]
+  };
+  /* "<" escaped so no value can ever close the script element early. */
+  return '<script type="application/ld+json">' +
+    JSON.stringify(data).replace(/</g, "\\u003c") + "</script>";
+}
 
 /* Everything before the page header is head material: <title>, the font links,
    the stylesheet and the pre-paint theme script. */
@@ -239,6 +340,7 @@ function title(html) {
 function build(page) {
   let html = readFileSync(page.src, "utf8");
   for (const [from, to] of REWRITE) html = html.split(from).join(to);
+  if (page.lang === "es") html = spanishLinks(html);
 
   const cut = BODY_STARTS
     .map((m) => html.indexOf(m))
@@ -268,6 +370,10 @@ function build(page) {
       ].join(String.fromCharCode(10))
     : "";
 
+  /* A page served at many addresses (the 404) names none of them. */
+  const canonical = page.canonical === false ? "" : '<link rel="canonical" href="' + url + '">';
+  const ogUrl = page.canonical === false ? "" : '<meta property="og:url" content="' + url + '">';
+
   const doc = `<!doctype html>
 <html lang="${page.lang || "en"}">
 <head>
@@ -275,13 +381,13 @@ function build(page) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="build" content="${BUILD_SHA} ${BUILD_AT}">
 <meta name="description" content="${page.description}">
-<link rel="canonical" href="${url}">
+${canonical}
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#080F1C" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SecureJobVA">
-<meta property="og:url" content="${url}">
+${ogUrl}
 <meta property="og:title" content="${page.ogTitle}">
 <meta property="og:description" content="${page.description}">
 <meta property="og:image" content="${SITE}/og.png">
@@ -294,6 +400,7 @@ function build(page) {
 <meta name="twitter:image" content="${SITE}/og.png">
 ${robots}
 ${alt}
+${jsonLd(page)}
 ${head}
 </head>
 <body>

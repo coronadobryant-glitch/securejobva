@@ -321,10 +321,17 @@ check("the page sends answers and never a score", () => {
   /* sql/021 grants anon application_id and answers. Anything else in the body
      makes the whole insert 42501 — so this is the check that keeps the
      questionnaire storable at all. */
-  const at = js.indexOf("function postDisc(");
-  assert(at > -1, "postDisc() is gone");
+  /* The row is built in discRow() now and handed to postDisc(), so a parked
+     application can carry it and send it once its own row lands. So the keys
+     are read where they are written: the object discRow() returns when the
+     page has one, the object postDisc() stringifies when it builds the body
+     itself, as it used to. */
+  assert(js.indexOf("function postDisc(") > -1, "postDisc() is gone");
+  const built = js.indexOf("function discRow(") > -1;
+  const at = js.indexOf(built ? "function discRow(" : "function postDisc(");
   const body = js.slice(at, js.indexOf("\n  }", at));
-  const keys = [...body.matchAll(/JSON\.stringify\(\{([^}]*)\}/g)]
+  const lit = built ? /\{\s*(application_id[^{}]*)\}/g : /JSON\.stringify\(\{([^}]*)\}/g;
+  const keys = [...body.matchAll(lit)]
     .flatMap((m) => m[1].split(",").map((p) => p.split(":")[0].trim()))
     .filter(Boolean);
   assert(keys.length === 2 && keys.includes("application_id") && keys.includes("answers"),

@@ -8,9 +8,34 @@ SQL editor.
 
 ## Running them
 
-Numbered, and run in order. Every file is idempotent — running it twice does
-nothing the second time — so when you are unsure whether a file has been run,
-run it. That is always safer than guessing.
+Numbered, and run in order, each one once.
+
+**When you are unsure whether a file has run, ask the database — do not re-run
+it.** `node tools/status.mjs` reads `schema_migrations` and says which numbers
+have landed; from the SQL editor it is
+
+```sql
+select n, landed_at from public.schema_migrations order by n desc limit 10;
+```
+
+This used to say the opposite — "when you are unsure, run it" — on the grounds
+that every file is idempotent. Each file is, on its own. What none of them is,
+is safe to run AFTER a later file that replaced something it defines:
+`create or replace` puts the older body straight back, the columns survive
+(they are `if not exists`), and only the logic goes backwards. Re-running 045
+after 063 hands the assessment back to the 045 scorer and advances people on
+typing they reported themselves; re-running the repo copy of 058 puts the
+`__WEBHOOK_SECRET__` placeholder back into every interview email, which then
+get a 401 and are never sent, silently. 020 exists because a re-run of 001 took
+grants with it. So the rule is:
+
+- **Never re-run a file numbered below the highest one that has landed.** If an
+  old file really must run again, run every later file it names in its
+  `DO NOT RE-RUN THIS FILE ON ITS OWN` block straight afterwards, in order —
+  and when a file has no such block, every later file that touches the same
+  tables.
+- **A file that failed partway may be run again** — that is what idempotent is
+  for — as long as nothing numbered after it has run since.
 
 | File | What it does |
 | --- | --- |
@@ -43,6 +68,28 @@ run it. That is always safer than guessing.
 | `027-one-application.sql` | One application per person, and three months after a decline |
 | `028-notify-applications.sql` | The third webhook, moved out of the dashboard — needs the secret pasted in |
 | `029-no-staff-requests.sql` | Staff can no longer be asked for — it is granted under Accounts |
+| … | 030–073: see each file's header, and `schema_migrations` for what has landed |
+| `074-only-staff-move-an-application.sql` | An applicant can no longer set her own stage; the stage date is the server's |
+| `075-one-answer-for-every-address.sql` | The duplicate-application refusal no longer says who applied or when they were declined |
+| `076-the-address-a-caller-cannot-type.sql` | The throttle counts by `cf-connecting-ip`, not a header the caller writes |
+| `077-an-upload-belongs-to-its-moment.sql` | Anon uploads only in the hour after applying; the typing screenshot gets its row |
+| `078-a-part-closes-when-its-time-is-up.sql` | Answers cannot change after a part closes or runs out (and are refused before it opens); `server_time()` |
+| `079-the-track-she-applied-for.sql` | The assessment's track is taken from the application, not the browser |
+| `080-a-time-zone-saved-in-one-request.sql` | The time-zone Save works: `user_id` defaults to the caller |
+| `081-a-link-is-a-web-address.sql` | Every stored link is http(s), without quotes or spaces |
+| `082-a-time-that-has-passed.sql` | An interview time that has passed cannot be picked |
+| `083-who-did-it-is-not-typed.sql` | handled_by, created_by, added_by come from the token |
+| `084-an-application-says-what-she-agreed-to.sql` | Consent and 18+ columns on applications (nullable, not yet required) |
+| `085-a-trial-is-counted-in-days.sql` | `timesheet_charges` and `client_balances()`: trial and placement dates by the day |
+| `086-a-day-outside-the-placement.sql` | Hours outside the placement's dates are refused |
+| `087-a-draft-is-not-the-clients-yet.sql` | A client no longer sees a week still in draft |
+| `088-billed-weeks-outlive-an-erasure.sql` | An application with approved or paid weeks cannot be deleted from a page |
+| `089-removing-a-placement-that-has-weeks.sql` | Removing a placement lets go of its unbilled weeks, refuses billed ones |
+| `090-who-an-interview-is-waiting-on.sql` | `interview_state` stops saying "declined" after new times are offered |
+| `091-a-track-is-one-of-three.sql` | A new application's tracks are the three on the form |
+| `092-a-message-needs-an-address.sql` | A contact message needs a real address — deploy contact.html first |
+| `093-a-receipt-for-a-payment.sql` | A receipt email when a payment is recorded — needs the secret pasted in |
+| `rescore-sales-without-a-sales-part.sql` | Not a migration. One-off, by hand: Sales applicants never shown the Sales part |
 | `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
 
 On a fresh database: 001 through the highest number in order, then `verify.sql`
@@ -71,8 +118,14 @@ safe to re-run:
 Two habits that keep this working:
 
 **Write it so it can run twice.** `create table if not exists`, `add column if
-not exists`, `drop policy if exists` before `create policy`. Neither of you will
-remember what has been run on which database, and with these you do not have to.
+not exists`, `drop policy if exists` before `create policy`. A paste that fails
+halfway then only needs pasting again. That is what idempotent buys — a safe
+retry of the file you just ran — and not a licence to re-run an older one (see
+Running them).
+
+**Replacing a function an older file defines?** Add the `DO NOT RE-RUN THIS FILE
+ON ITS OWN` block to the older file, naming yours. `node tools/check.mjs` fails
+until you do.
 
 **Never edit a file that has already been run.** The database has no memory of
 what a file used to say. Add the next number instead.
@@ -98,6 +151,13 @@ there on the file says so itself.
 tables hold applicants' names, emails, phone numbers and CV links. `anon` may
 INSERT and do nothing else — no select, no update, no delete.
 
+Two declared exceptions, both readable and neither writable: `client_logos`
+(015 — the marketing strip, shown to visitors who are not signed in) and
+`schema_migrations(n)` (044 — migration numbers only, so `tools/status.mjs` can
+work on the publishable key). Each is named in `MAY_BE_PUBLIC` in
+`tools/check.mjs` and declared with an `-- ANON MAY READ` line in its file;
+nothing else may be.
+
 Reading is for `authenticated`: a session Supabase issues only after Google has
 vouched for an email, and every read is still fenced by a policy. An applicant
 sees their own row and no one else's. Everything wider requires being listed in
@@ -122,8 +182,13 @@ schema have to move together.
 to grant that, and to whom.
 
 **`23514 — violates check constraint`** — the value is outside what the column
-allows. Usually a status that is not one of the five, or a field over its length
+allows. Usually a status that is not one of the six, or a field over its length
 cap.
+
+**A message with a hint starting `sjva-`** — a rule this database enforces on
+purpose, written for the person to read (027's one application, 047's throttle,
+074's "only SecureJobVA can move an application", and the ones from 077 on).
+Pages show the message rather than treating it as a failure.
 
 ## Reading the data
 

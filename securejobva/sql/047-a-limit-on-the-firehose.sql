@@ -15,6 +15,9 @@
 --   throttle_intake
 --     -> re-run 052-the-counter-forgets.sql to restore
 --
+--   caller_ip
+--     -> re-run 076-the-address-a-caller-cannot-type.sql to restore
+--
 -- So if you ever run this file again, run every later file it names above,
 -- in number order, straight afterwards. tools/check.mjs keeps this list
 -- honest: a new file that supersedes something here fails the build until

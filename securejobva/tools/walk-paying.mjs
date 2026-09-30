@@ -17,7 +17,9 @@
  * being able to know again after somebody changes it.
  *
  *   node tools/walk-paying.mjs          reads what is there and checks it holds
- *   node tools/walk-paying.mjs --go     writes a client and walks the whole thing
+ *   node tools/walk-paying.mjs --go --as=<address>
+ *                                       writes a client and walks the whole thing,
+ *                                       borrowing the hired assistant at <address>
  *   node tools/walk-paying.mjs --sweep  removes what a killed run left behind
  *
  * ==========================================================================
@@ -42,8 +44,18 @@
  * default: the only witness that any of this mail reads right is an inbox
  * somebody opens, the Resend key is send-only, and a walk that suppressed its
  * own mail would be quietly not testing the half of this that a person sees.
- * Borrow a test account, not somebody's real one. It says whose inbox it is
- * about to fill, and waits for --go to mean it.
+ * Borrow a test account, not somebody's real one.
+ *
+ * Whose inbox that is has to be said on the command line, every time:
+ *
+ *   node tools/walk-paying.mjs --go --as=<address of a hired test assistant>
+ *
+ * This used to fall back to an address written into the file, and the header
+ * said it "says whose inbox it is about to fill, and waits for --go to mean
+ * it". It did not wait: the address was printed in the same instant the
+ * writing started, and --go without --as mailed whoever the file named. There
+ * is no default now. --go without --as= refuses before it reads or writes
+ * anything, and the address printed is the one you typed.
  *
  * ==========================================================================
  * WHY THE CLEANUP IS NOT ONLY A finally
@@ -87,10 +99,11 @@ function fromEnv(key) {
 const URL_BASE = fromEnv("SUPABASE_URL");
 const SERVICE = fromEnv("SUPABASE_SERVICE_ROLE_KEY");
 
-/* The address of the assistant to borrow. An argument first, so nobody has to
-   edit this file to walk it against their own test account. */
+/* The address of the assistant to borrow. An argument and nothing else: a
+   default here is a real inbox that --go mails without anybody having typed
+   it, which is what it did until 29 September. See the header. */
 const asArg = process.argv.find((a) => a.startsWith("--as="));
-const BORROW = asArg ? asArg.slice(5) : "glogin959@gmail.com";
+const BORROW = asArg ? asArg.slice(5).trim() : "";
 const GO = process.argv.includes("--go");
 const SWEEP = process.argv.includes("--sweep");
 
@@ -370,8 +383,9 @@ async function walk() {
 
   const weeks = await freeWeeks(who.id);
   if (!weeks) {
-    console.log("\n      Every week for the last year already has a timesheet on it, so");
-    console.log("      there is nowhere to put one. Walk against a quieter account.\n");
+    console.log("\n      Every week hours may still be recorded for (the last " + RANGE_WEEKS + ", per");
+    console.log("      sql/046) already has a timesheet on it, so there is nowhere to put");
+    console.log("      one. Walk against a quieter account.\n");
     return;
   }
   say("weeks to use", weeks[0] + " and " + weeks[1]);
@@ -391,6 +405,9 @@ async function walk() {
     await api("client_private", {
       method: "POST", headers: { Prefer: "return=minimal" },
       body: {
+        /* No contact address, and that is load-bearing since 093: a payment
+           recorded against a client with one mails that address a receipt,
+           and this client is fake. With none, the trigger stays quiet. */
         client_id: made.client.id, contact_name: "the walk",
         contact_email: null, billing_cycle: "weekly"
       }
@@ -428,14 +445,12 @@ async function walk() {
       say("moved to", st);
     }
 
+    /* oneWeek() writes the week into made and the ledger itself, straight
+       after the insert — see why there. */
     act("The trial week — worked, sent, approved");
-    made.weeks.push(await oneWeek(who.id, made.place.id, weeks[0],
-      [8, 8, 8, 8, 8], true));
-    remember(made);
+    await oneWeek(made, who.id, made.place.id, weeks[0], [8, 8, 8, 8, 8], true);
     act("The first chargeable week");
-    made.weeks.push(await oneWeek(who.id, made.place.id, weeks[1],
-      [8, 8, 8, 8, 7.5], false));
-    remember(made);
+    await oneWeek(made, who.id, made.place.id, weeks[1], [8, 8, 8, 8, 7.5], false);
 
     act("What the weeks refuse");
     const tuesday = isoOf(new Date(new Date(weeks[1] + "T00:00:00Z").getTime() + 86400000));
@@ -468,6 +483,36 @@ async function walk() {
        the total is rounded once here rather than per week. quoted() on /seats
        exists for the same fifty cents. */
     ok("39.5 h at $7.75 comes to $306.13", b.cents === 30613, money(b.cents));
+
+    /* Since 085 the pages do not work the bill out themselves: /seats and /pay
+       read each week's amount from the timesheet_charges view, which counts
+       the trial day by day against the placement's start. The arithmetic above
+       is this file's own, kept so there is something to compare with — a
+       checker that reads its answer from the thing it checks agrees with it by
+       construction. This walk's weeks start on the placement's first day, so
+       day-by-day and week-by-week must come to the same cents; if they do not,
+       it is the view that is wrong, on a bill a client pays. Skipped, and said
+       so, on a database 085 has not reached.
+
+       Only this walk's own weeks. Moving the placement to trial makes 043
+       adopt the borrowed assistant's other unplaced weeks onto it — teardown
+       below says as much — and those are this client's in the view too. Summed
+       by client, their hours landed on this total and the two disagreed with
+       nothing wrong in either. */
+    try {
+      const rows = await api("timesheet_charges?select=timesheet_id,hours_free,hours_billable,amount_cents" +
+        "&client_id=eq." + made.client.id + "&timesheet_id=in.(" + made.weeks.join(",") + ")");
+      const view = rows.reduce((s, r) => s + Number(r.amount_cents || 0), 0);
+      const vFree = rows.reduce((s, r) => s + Number(r.hours_free || 0), 0);
+      ok("the database's own bill agrees, to the cent", view === b.cents,
+        money(view) + " from timesheet_charges, " + vFree + " h free");
+    } catch (e) {
+      if (e.status === 404 || /could not find the table|does not exist/i.test(e.message)) {
+        say("timesheet_charges", "not in this database yet (sql/085) — the pages' bill was not compared");
+      } else {
+        ok("the database's own bill can be read", false, e.message);
+      }
+    }
 
     act("Somebody pays, against the week it settles");
     made.payment = (await api("client_payments", {
@@ -519,30 +564,58 @@ function mondayOf(d) {
 }
 const isoOf = (d) => d.toISOString().slice(0, 10);
 
+/* How far back a week may start. sql/046 refuses a timesheet whose
+   week_starts_on is before current_date - 26 weeks ("that week is outside the
+   range hours may be recorded for"), through a BEFORE INSERT trigger that
+   binds the service role too. */
+const RANGE_WEEKS = 26;
+
 async function freeWeeks(appId) {
   const had = new Set((await api("timesheets?application_id=eq." + appId +
     "&select=week_starts_on")).map((w) => w.week_starts_on));
   let m = mondayOf(new Date());
-  /* A year back is far enough that a real account would have to be full to
-     defeat it, and near enough that failing says something true. */
-  for (let i = 0; i < 52; i++) {
+  /* This used to search a year back, "far enough that a real account would
+     have to be full to defeat it". Half of that year is weeks 046 refuses.
+     On an account whose recent half-year was full, it returned a pair from
+     the refused half, and the walk then created a client and a placement —
+     which mails the assistant — before the first timesheet insert failed on
+     the range rule, reporting a failure that was really this search. So the
+     search stops where the database does, compared as dates rather than as
+     a count of loops, because the earlier week of the pair is the one that
+     has to be inside. */
+  const t = new Date();
+  const oldest = isoOf(new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) -
+    RANGE_WEEKS * 7 * 86400000));
+  for (;;) {
     const b = isoOf(m);
     const a = isoOf(new Date(m.getTime() - 7 * 86400000));
+    if (a < oldest) return null;
     if (!had.has(a) && !had.has(b)) return [a, b];
     m = new Date(m.getTime() - 7 * 86400000);
   }
-  return null;
 }
 
 /* One week: created as a draft, filled in, sent, and approved — in that order,
    because the order is the thing being walked. A week that arrives already
-   approved never crosses the boundary the client is on the other side of. */
-async function oneWeek(appId, placeId, monday, hours, trial) {
+   approved never crosses the boundary the client is on the other side of.
+
+   The week goes into made and onto the ledger the moment the insert returns,
+   before a single day is written. It used to be handed back at the end and
+   recorded by the caller, so anything that stopped this part-way — a refused
+   day, a dropped connection, the libuv abort in the header — left a timesheet
+   nobody had written down, still pointing at the placement. The placement's
+   delete then failed on that foreign key (033 declares it with no ON DELETE),
+   the client's failed behind it, and every --sweep replayed the same short
+   list and failed the same way: a live placement on a fake client, blocking
+   the borrowed assistant from being placed for real. */
+async function oneWeek(made, appId, placeId, monday, hours, trial) {
   const ts = (await api("timesheets", {
     method: "POST", headers: { Prefer: "return=representation" },
     body: { application_id: appId, placement_id: placeId, week_starts_on: monday,
             status: "draft", trial_week: trial }
   }))[0];
+  made.weeks.push(ts.id);
+  remember(made);
   const start = new Date(monday + "T00:00:00Z");
   for (let i = 0; i < hours.length; i++) {
     const d = new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10);
@@ -582,6 +655,26 @@ async function teardown(made) {
     await drop("a week", "timesheets?id=eq." + id);
   }
   if (made.place) {
+    /* Anything else still pointing at the placement would stop its delete on
+       the foreign key. The walk's own weeks are all in made.weeks now, so what
+       is left here is not the walk's: 043 adopts an assistant's unplaced weeks
+       onto a placement the moment it leaves matched, and the walk moves this
+       one to trial. Those are real weeks the borrowed assistant recorded, so
+       they are put back the way they were — unattached — never deleted. The
+       same thing 089 does when a page removes a placement. */
+    try {
+      const mine = new Set(made.weeks);
+      const others = (await api("timesheets?placement_id=eq." + made.place.id + "&select=id"))
+        .filter((w) => !mine.has(w.id));
+      for (const w of others) {
+        await api("timesheets?id=eq." + w.id, { method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: { placement_id: null, trial_week: false } });
+      }
+      if (others.length) say("weeks given back", others.length + " the placement had adopted, now unattached again");
+    } catch (e) {
+      console.log("      COULD NOT DETACH the placement's other weeks: " + e.message);
+      bad++; failed++;
+    }
     await drop("the billing rate", "placement_billing?placement_id=eq." + made.place.id);
     await drop("the pay rate", "placement_pay?placement_id=eq." + made.place.id);
     await drop("the placement", "placements?id=eq." + made.place.id);
@@ -716,7 +809,15 @@ if (SWEEP) {
   /* Refused rather than warned. Walking on top of a stranded run strands two,
      and the second is then hard to tell from the first — which is how one fake
      client becomes a pair nobody can safely delete by eye. */
-  if (left) {
+  if (!BORROW || BORROW.indexOf("@") < 1) {
+    /* Before the ledger check and before any read: nothing about this run
+       should begin until somebody has typed whose inbox it fills. */
+    console.log("\n  --go needs --as=<address>: the hired test assistant to borrow, whose");
+    console.log("  inbox receives about five real emails. There is no default on purpose.");
+    console.log("\n    node tools/walk-paying.mjs --go --as=<address>\n");
+    brokeDown = true;
+    process.exitCode = 1;
+  } else if (left) {
     console.log("\n  The last run was killed before it put anything back, and what it");
     console.log("  made is still there. Walking again would place a second fake client");
     console.log("  on top of the first. Clear that one up first:");
@@ -740,8 +841,8 @@ if (SWEEP) {
     console.log("  put anything back, so some of what is counted above is its leftovers.");
     console.log("  Remove them with:  node tools/walk-paying.mjs --sweep");
   }
-  console.log("\n  Read-only. --go writes a client and walks the whole thing," +
-    "\n  and says whose inbox it will fill before it does.");
+  console.log("\n  Read-only. --go --as=<address> writes a client and walks the whole" +
+    "\n  thing, mailing the assistant at the address you give it.");
 }
 
 } catch (e) {
