@@ -187,7 +187,8 @@ insert into public.schema_migrations (n) values (94) on conflict (n) do nothing;
 --                     has been going nowhere since the last change. 096 fixes
 --                     it by making every sender read the stored one.
 --   placeholder       this copy never got a secret at all. Same: 096 fixes it.
---   reads the store   096 has run, and this sender has no copy of its own.
+--   reads the store   096 has run, and this sender has no copy of its own: it
+--                     posts through notify_send, which reads the row above.
 --   (no row)          that sender does not exist on this database.
 --
 -- And nobody but the owner may call the reader: 'anon can call' or
@@ -200,7 +201,10 @@ fn_copies as (
   select p.proname::text as copy_in,
          'function' as kind,
          substring(p.prosrc from 'x-webhook-secret'',\s*''([^'']+)') as found_it,
-         p.prosrc like '%private.webhook_secret()%' as reads_store
+         -- After 096 a sender hands its post to public.notify_send() (095), and
+         -- that is what reads the store; the sender's own body never names it.
+         (p.prosrc like '%private.webhook_secret()%'
+          or p.prosrc like '%public.notify\_send(%') as reads_store
   from pg_proc p
   where p.pronamespace = 'public'::regnamespace
     and p.proname in ('notify_decision', 'notify_swap', 'invite_the_client',
