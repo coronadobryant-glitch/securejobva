@@ -1820,6 +1820,27 @@ function sayList(items) {
     return lines.join("\n");
   }
 
+  /* The booking link, filled in. cal.com reads name, email and notes off the
+     address into its own form, so the visitor does not type them twice — and,
+     the part that matters to us, the booking arrives carrying the same
+     address and company as the request, which is what staff match on when
+     they move it to "Call booked" in /admin. metadata[seat_request] is the
+     request's id: cal.com keeps it on the booking and hands it to a webhook
+     unchanged, so the day one is set up it can find the row by id rather
+     than by guessing from an address.
+
+     Every value through encodeURIComponent, so a quote or an ampersand in a
+     company name cannot end the attribute or start a parameter of its own;
+     esc() at the call site turns the joining & into &amp; for the HTML. */
+  function booking(d) {
+    var q = [];
+    if (d.name) q.push("name=" + encodeURIComponent(d.name));
+    if (d.email) q.push("email=" + encodeURIComponent(d.email));
+    if (d.company) q.push("notes=" + encodeURIComponent("Seat request for " + d.company));
+    if (d.id) q.push("metadata[seat_request]=" + encodeURIComponent(d.id));
+    return CFG.scheduler + (q.length ? (CFG.scheduler.indexOf("?") > -1 ? "&" : "?") + q.join("&") : "");
+  }
+
   function finish(mode, d) {
     var actions = document.getElementById("done-actions");
 
@@ -1841,14 +1862,22 @@ function sayList(items) {
        same working day" while /contact said one to two. Whichever of two
        promises somebody remembers, the other one is the one they were let
        down by. */
+    /* The receipt is api/notify.js's CONFIRM.seat_requests, sent off the same
+       insert that tells us — the business used to get nothing but this screen,
+       so somebody who closed it before booking had no reminder in their inbox
+       of the request or of the call. The sentence is only said on "sent":
+       a parked or refused request has written nothing yet, so nothing is on
+       its way. */
     if (mode === "sent") {
       document.getElementById("done-h").textContent = say("We have it.");
       document.getElementById("done-p").textContent =
         say("Next is the 20-minute scoping call — pick a time below. The shortlist for " +
             "{company} follows in {email} within three working days of the call.",
-            { company: d.company, email: d.email });
+            { company: d.company, email: d.email }) + " " +
+        say("A confirmation is on its way to {email}.",
+            { email: d.email });
       actions.innerHTML = CFG.scheduler
-        ? "<a class=\"btn btn--solid\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">" + say("Pick your time") + "</a>"
+        ? "<a class=\"btn btn--solid\" href=\"" + esc(booking(d)) + "\" target=\"_blank\" rel=\"noopener\">" + say("Pick your time") + "</a>"
         : "<a class=\"btn btn--ghost\" href=\"mailto:" + CFG.email + "\">" + say("Email us directly") + "</a>";
     } else {
       document.getElementById("done-h").textContent = say("One tap left.");
@@ -1860,7 +1889,7 @@ function sayList(items) {
       actions.innerHTML =
         "<a class=\"btn btn--solid\" href=\"" + href + "\">" + say("Send the email") + "</a>" +
         (CFG.scheduler
-          ? "<a class=\"btn btn--ghost\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">" + say("Or pick a time") + "</a>"
+          ? "<a class=\"btn btn--ghost\" href=\"" + esc(booking(d)) + "\" target=\"_blank\" rel=\"noopener\">" + say("Or pick a time") + "</a>"
           : "");
     }
 

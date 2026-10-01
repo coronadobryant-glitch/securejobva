@@ -241,15 +241,70 @@ placement are put back unattached, never deleted.
 ## Notifications
 
 An application, a seat request or a contact message sends one email to whoever
-is listed in `NOTIFY_TO`. It hangs off the row landing rather than the form
-submitting, so a lead the queue parked on somebody's device and drained three
-days later still tells you when it finally arrives.
+is listed in `NOTIFY_TO`, and the applicant or the business gets a receipt of
+their own -- the seat request one says a person reads every request and links
+the 20-minute call and `/seats` (F11). It hangs off the row landing rather than
+the form submitting, so a lead the queue parked on somebody's device and drained
+three days later still tells you when it finally arrives.
 
-`api/notify.js` receives a Supabase Database Webhook and sends through Resend.
-It deliberately does NOT use the service role key: a webhook carries the whole
-row in its payload, so there is nothing to go back and read, and the most
+Everything else the database emails -- a stage decision, an interview booked or
+moved, a timesheet waiting, a swap answered, a placement ended, a payment
+receipt, the client's sign-in invite -- comes from a trigger, because the person
+it is about has to be looked up and a function holding no credential cannot look
+anybody up.
+
+`api/notify.js` (and `api/invite.js` for the client invite) receives the post
+and sends through Resend. It deliberately does NOT use the service role key: the
+post carries the whole row, so there is nothing to go back and read, and the most
 dangerous credential in the project stays out of a function reachable from the
 internet.
+
+### How an email leaves
+
+Every sender goes the same way, and nothing posts on its own any more:
+
+- **One secret, in one place** (`sql/094`). The shared secret lives in
+  `private.webhook_secret`, a row in a schema nobody but the database owner can
+  read, behind a function granted to nobody. It used to be pasted into every
+  sender's body, so changing it meant finding every copy, and a copy you missed
+  was one kind of email that quietly stopped (F52). To change it now:
+  `update private.webhook_secret set value = '<new>', set_at = now();` in the
+  SQL editor, and the same string as `WEBHOOK_SECRET` on Vercel -- either order;
+  the outbox below tries again until both agree.
+- **Every post through the outbox** (`sql/095`). `notify_send()` writes the
+  payload to `public.notify_outbox` and posts it with the secret and an
+  `x-idempotency-key` that stays the same on every try of that row. The pg_cron
+  job `sjva-notify-outbox` runs every minute, reads the answer and decides:
+  a 2xx is delivered, a 400/405/413/422 is given up on at once (the same
+  payload will be refused every time), anything else is tried again after
+  1, 2, 4 ... 128 minutes and then every 4 hours -- ten tries, about 8 hours,
+  well inside Resend's 24-hour idempotency window. A row given up on sends the
+  team one alert, and shows on /admin under *Emails that did not go* with a
+  button that calls `retry_notify()` and sends it again under the same key, so
+  it can never arrive twice.
+- **The three forms too** (`sql/096`). `notify_form()` is the trigger on
+  `applications`, `seat_requests` and `contact_messages`, AFTER INSERT, and it
+  posts exactly the body a Supabase Database Webhook would
+  (`{type:'INSERT', table, schema, record, old_record:null}`) -- through the
+  outbox like everything else. It drops and recreates the three dashboard
+  webhooks under their own trigger names (`notify-applications`,
+  `notify-seat-requests`, `notify-contact-messages`), so there is nothing to set
+  up in Supabase -> Database -> Webhooks any more. A webhook added there under
+  another name would mail the same row twice, so do not add one.
+
+The contract between the two halves is the status code, because the outbox acts
+on it:
+
+- **200** means done -- sent, or refused for good (a dead address), said in the
+  body. Ten more tries would get ten more refusals.
+- **503** (502 for the alert to the team, as it always was) means try again --
+  Resend down or rate-limited, the network gone. The retry is safe: the same
+  key makes Resend answer with the first send and send nothing new.
+
+Anything `api/notify.js` does not recognise answers `200 skipped`, which the
+outbox records as delivered -- so the endpoint's templates are deployed before
+the SQL that starts posting them. `sql/README.md` and the "Paste + deploy order"
+for each fix run say which comes first.
 
 ### Setting it up
 
@@ -259,41 +314,32 @@ Four environment variables on the Vercel project, Production:
 RESEND_API_KEY      from resend.com -> API Keys
 RESEND_FROM         support@securejobva.com
 NOTIFY_TO           comma separated
-WEBHOOK_SECRET      any long random string
+WEBHOOK_SECRET      the same string as private.webhook_secret
 ```
 
 Without `WEBHOOK_SECRET` the endpoint refuses everything rather than defaulting
-to open.
+to open. `api/invite.js` also needs `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
-Then one webhook per table in Supabase -> Database -> Webhooks, on INSERT for
-`applications`, `seat_requests` and `contact_messages`, pointed at
-`https://www.securejobva.com/api/notify` with an HTTP header
-`x-webhook-secret` carrying the same string.
+On the database side: paste `094`, `095` (it needs the pg_cron extension -- if
+the paste says it cannot create it, enable pg_cron under Database -> Extensions
+and paste again) and `096`, then `verify.sql`, whose section 5 says whether the
+secret is filled, whether any function still holds its own copy and whether the
+outbox job is running. Every file from `094` on is pasted exactly as committed --
+no placeholder, no `.local.sql` copy.
 
-`node tools/test-notify.mjs` drives all of it without Supabase, Resend or a
+The older senders -- `019`, `021`, `028`, `031`, `035`, `036`, `037`, `040`,
+`058`, `093` -- carry a `__WEBHOOK_SECRET__` placeholder and their own
+`net.http_post`. `096` (and `097`/`099` after it) replaced every one of them.
+Pasting one again puts back a sender that bypasses the outbox; the ones from
+`031` on open with a DO NOT RE-RUN note naming the file to paste straight after,
+and for `019`, `021` and `028` that file is `096`. `.gitignore` and `.vercelignore` still keep `*.local.sql` out of the repo
+and out of a CLI deploy, for anything left over from the old way.
+
+`node tools/test-notify.mjs` drives the endpoint without Supabase, Resend or a
 deploy -- the refusals as much as the sending, since the endpoint is public and
-describes real applicants.
-
-Not every notification is a Database Webhook. A timesheet decision, a leave
-answer, a swap request and an interview carry an `application_id` or a
-`placement_id` and no address, so the person they are about has to be looked up
--- which is ordinary in the database and impossible in a function holding no
-credential. Those post from a trigger instead: `sql/031`, `035`, `036`, `037`,
-`040`, `058` and `093` (the receipt a client is sent when a payment is recorded
-against them, to the contact address on the client, if there is one). Each one
-carries `__WEBHOOK_SECRET__` as a placeholder and posts nothing until it is
-replaced — as do `019`, `021` and `028`, which wire the three intake tables to
-the same endpoint from SQL — which is what the `*.local.sql` copies are for --
-copy the file, paste the secret into the copy, run the copy, delete it.
-`.gitignore` keeps `*.local.sql` out of the repo so the real secret is never
-committed, and `.vercelignore` keeps it out of a deploy made from this folder
-with the CLI, which does not read `.gitignore`.
-
-In `058` replace only the quoted placeholder on the `x-webhook-secret` line.
-That file has a check at the bottom that looks for the placeholder in the
-function body, and a blanket find-and-replace rewrites the check too -- so it
-starts hunting for the secret and reports "nothing will be emailed" about a copy
-that emails perfectly well.
+describes real applicants -- and `node tools/test-sql-senders.mjs` reads `sql/`
+and fails if any sender posts around the outbox or carries its own secret.
+`node tools/check.mjs` runs both.
 
 ### The mail DNS, both directions
 

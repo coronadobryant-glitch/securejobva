@@ -2729,7 +2729,13 @@ function sayList(items) {
            object, which is not the string "ok", so a row 027 had already
            refused was re-sent on every page load until its week ran out. The
            comment above promises we keep trying; keeping trying at something
-           that has been answered is not that. */
+           that has been answered is not that.
+
+           sql/101 does not strand anything parked here. A row this page
+           parked carries both boxes as they were ticked, and a row parked by
+           the page before the boxes existed carries neither, which 101 still
+           accepts until eight days after the first application that did — one
+           day past the week a row may sit here. */
         if (verdict !== "ok" && !(verdict && verdict.refused)) keep.push(q[i]);
         if (verdict !== "ok") { step(i + 1); return; }
         /* Landed at last, so what hangs off it goes now, and only now: both
@@ -2755,7 +2761,7 @@ function sayList(items) {
     return fallback;
   }
 
-  /* A deliberate no, and the rules do not all want the same screen. Two of
+  /* A deliberate no, and the rules do not all want the same screen. Three of
      them are about something on the form and are answered on the form, where
      it can be fixed; the rest end here with the reason and a way to reach a
      person. */
@@ -2770,6 +2776,41 @@ function sayList(items) {
       show(0);
       document.getElementById("err-track").textContent =
         said(say("Pick one or more of the three roles on the form."), v.refused);
+      return;
+    }
+    /* sql/101: the database now asks for both boxes itself, so an application
+       sent without them is refused rather than taken with the answers blank.
+       This page cannot send one — validAgree() stops Send first — so reaching
+       here means the boxes were lost on the way (a draft from an older page,
+       a label the consent text could not be read from). Either way the fix is
+       hers and it is two ticks, so she goes back to the step that has them,
+       with the words under the boxes, and nothing is parked: a retry without
+       the ticks would be refused the same way.
+
+       Only when what was sent really lacked them, though. validAgree() has
+       already passed, so the boxes on screen are ticked; if the payload said
+       yes to both as well, the fault is in what this page read, not in
+       anything she did, and "tick both boxes" would ask for what she has
+       already done — and Send would go out the same and be refused the same,
+       a loop with no way out. That case ends on the handoff screen with the
+       email button. Otherwise both boxes are cleared, so the line under them
+       is true and the next tick reads them afresh. */
+    if (v.hint === "sjva-consent-needed") {
+      var saidYes = d && d.adult_confirmed === true &&
+        typeof d.privacy_consent_text === "string" && /\S/.test(d.privacy_consent_text);
+      if (!saidYes) {
+        document.getElementById("ap-adult").checked = false;
+        document.getElementById("ap-consent").checked = false;
+        show(LAST - 1);
+        document.getElementById("err-agree").textContent =
+          said(say("Tick both boxes above to send: that you are 18 or older, and that you have read the Privacy Policy."), v.refused);
+        return;
+      }
+      finish("handoff", d);
+      document.getElementById("apply-done-h").textContent = say("We could not take this one here.");
+      document.getElementById("apply-done-p").textContent =
+        say("You ticked both boxes, but your answers to them did not reach us with the application. " +
+            "Use the email button below and a person will take it from there.");
       return;
     }
     if (v.hint === "23514") {

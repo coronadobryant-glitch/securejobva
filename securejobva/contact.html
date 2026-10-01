@@ -577,7 +577,8 @@ function sayList(items) {
   "use strict";
 
   /* Same shape as the two intake forms: post to PostgREST, and if that fails
-     fall back to a written email rather than losing the message. */
+     keep the message on this device to send again (the guard below), with a
+     written email offered as well for anyone who wants to reach us now. */
   var ENDPOINT = "https://hmgravlkatfmerzbozct.supabase.co/rest/v1/contact_messages";
   var HEADERS = {
     "apikey": "sb_publishable_rDJAEC5owqmunkIgcRRktg_Y6xIBxdY",
@@ -612,6 +613,116 @@ function sayList(items) {
      through — and that address then went out as the reply-to on the staff
      notification, where Resend refused the whole email over it. */
   var ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  /* "sent" | "retry" | "dead", or a refusal the person can act on. A 4xx
+     carrying an sjva- hint is a rule saying no on purpose — sql/092 refusing
+     an address — and the fix is theirs to make in the form, so it is shown on
+     the field rather than dressed up as the database being down and parked to
+     be refused again on every visit. Any other 4xx is the payload's own
+     fault and will not get better by itself, but it is kept all the same,
+     as the seat form keeps its own: a message we could not store is exactly
+     the one worth holding where it can still go out once the fault is fixed.
+     A 5xx, a 429 or no answer at all is the ordinary outage. */
+  function post(d) {
+    return fetch(ENDPOINT, { method: "POST", headers: HEADERS, body: JSON.stringify(d) })
+      .then(function (r) {
+        if (r.ok) return "sent";
+        if (r.status < 400 || r.status >= 500 || r.status === 429) return "retry";
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (x) {}
+          if (j && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0 && j.message) {
+            return { hint: j.hint, message: String(j.message) };
+          }
+          return "dead";
+        }, function () { return "dead"; });
+      })
+      ["catch"](function () { return "retry"; }); /* offline, DNS, CORS */
+  }
+
+  /* ── Message guard ──────────────────────────────────────────────────────
+     The seat form's lead guard in index.html, for the one form that had
+     none. A message that did not send is parked in localStorage and sent
+     again the next time this page opens; it is dropped after a week, and
+     there are never more than twenty, whether or not they ever went.
+
+     The parked rows are a name, an address and whatever somebody chose to
+     tell us, held on their own machine: the same trade the seat form makes,
+     for the same reason — the alternative is the message vanishing.
+
+     One difference, and it is the database's: contact_messages does not let
+     the public key send an id (sql/010 grants six columns), so a resend
+     cannot be recognised as one. A send whose answer was lost after the row
+     landed is therefore parked and arrives twice. A message twice is a
+     nuisance in the inbox; a message never is the bug this exists to fix. */
+  var QUEUE     = "sjva-queue-contact";
+  var QUEUE_TTL = 7 * 24 * 60 * 60 * 1000;
+  var QUEUE_MAX = 20;
+
+  function queueRead() {
+    var raw;
+    try { raw = localStorage.getItem(QUEUE); } catch (e) { return []; }
+    if (!raw) return [];
+    var q;
+    try { q = JSON.parse(raw); } catch (e) { return []; }
+    if (!q || !q.length) return [];
+    var cut = Date.now() - QUEUE_TTL;
+    return q.filter(function (row) { return row && row.at > cut; });
+  }
+
+  /* true when what was asked for is what is now stored — park() needs to
+     know, because the screen after it promises a resend only when one will
+     happen. */
+  function queueWrite(q) {
+    try {
+      if (q.length) localStorage.setItem(QUEUE, JSON.stringify(q.slice(-QUEUE_MAX)));
+      else localStorage.removeItem(QUEUE);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function park(d) {
+    var q = queueRead();
+    q.push({ at: Date.now(), body: d });
+    return queueWrite(q);
+  }
+
+  /* One row at a time, never in parallel, and never touching the page:
+     somebody who has come back only to read must not see anything about a
+     message they already finished. A row already on its way is not sent a
+     second time by a second call (the "online" event can fire while the
+     load-time drain is still running), and anything parked meanwhile is
+     kept rather than overwritten by the list this call started with. */
+  var draining = false;
+  function drain() {
+    if (draining) return;
+    var q = queueRead();
+    if (!q.length) { queueWrite(q); return; }
+    draining = true;
+    var gone = [];
+    (function step(i) {
+      if (i >= q.length) {
+        var now = queueRead().filter(function (row) {
+          for (var k = 0; k < gone.length; k++) {
+            if (gone[k].at === row.at && JSON.stringify(gone[k].body) === JSON.stringify(row.body)) return false;
+          }
+          return true;
+        });
+        queueWrite(now);
+        draining = false;
+        return;
+      }
+      post(q[i].body).then(function (verdict) {
+        /* Sent is done with, and so is a deliberate refusal — re-sending
+           something that has already been answered is not "keeping trying".
+           Except the hourly limit (sql/047), which is a no for now rather
+           than a no: an hour on, the same message is let through. */
+        if (verdict === "sent" ||
+            (verdict && verdict.hint && verdict.hint !== "sjva-throttled")) gone.push(q[i]);
+        step(i + 1);
+      });
+    })(0);
+  }
 
   var btn = document.getElementById("c-send");
   function ready() {
@@ -649,25 +760,11 @@ function sayList(items) {
     btn.disabled = true;
     btn.textContent = say("Sending…");
 
-    /* "sent", "failed", or a refusal the person can act on. A 4xx carrying an
-       sjva- hint is a rule saying no on purpose — sql/092 refusing an address
-       — and the fix is theirs to make in the form, so it is shown on the
-       field rather than dressed up as the database being down and turned
-       into an email they would then have to send by hand. */
-    fetch(ENDPOINT, { method: "POST", headers: HEADERS, body: JSON.stringify(d) })
-      .then(function (r) {
-        if (r.ok) return "sent";
-        if (r.status < 400 || r.status >= 500) return "failed";
-        return r.text().then(function (t) {
-          var j = null;
-          try { j = JSON.parse(t); } catch (x) {}
-          if (j && typeof j.hint === "string" && j.hint.indexOf("sjva-") === 0 && j.message) {
-            return { hint: j.hint, message: String(j.message) };
-          }
-          return "failed";
-        }, function () { return "failed"; });
-      })
-      ["catch"](function () { return "failed"; })
+    /* One immediate retry covers a dropped connection or a cold start, the
+       same as the two intake forms, before anything is parked. */
+    post(d).then(function (v) {
+      return v === "retry" ? post(d) : v;
+    })
       .then(function (v) {
         if (v && v.hint) {
           ready();
@@ -695,6 +792,23 @@ function sayList(items) {
           return;
         }
         var sent = v === "sent";
+        /* Kept on this device when it did not go. The email link was the
+           only net, and on most phones and in webmail a mailto: link opens
+           nothing at all — so the message somebody had just typed was gone
+           and nobody knew it had ever been written. park() answers whether
+           it could keep it: storage can be blocked, and then the screen
+           must not promise a resend that will never happen. A "dead" send
+           is parked as well, quietly, in case the fault is fixed within the
+           week — but the screen only says it will go by itself after an
+           outage. "dead" is a 4xx the database will give the same payload
+           every time until somebody changes something on our side, so for
+           her the honest screen is the email one. */
+        var parkedIt = !sent && park(d);
+        var kept = v === "retry" && parkedIt;
+        var link = '<a href="mailto:support@securejobva.com?subject=' +
+          encodeURIComponent(d.reason + " — " + d.name) +
+          '&body=' + encodeURIComponent(d.message + "\n\n" + d.name + "\n" + d.email + (d.phone ? "\n" + d.phone : "")) +
+          '">' + say("send it now") + '</a>';
         form.setAttribute("hidden", "");
         done.removeAttribute("hidden");
         done.innerHTML = sent
@@ -702,16 +816,26 @@ function sayList(items) {
               say("<b>Message sent.</b> We answer within one to two business days, at {email}.",
                   { email: esc(d.email) }) +
             '</div>'
+          : kept
+          ? '<div class="cform__ok">' +
+              say("<b>That did not send yet.</b> Your message is saved on this device and goes " +
+                  "to us by itself the next time you open this page. To reach us sooner, {link}.",
+                  { link: link }) +
+            '</div>'
           /* Not lost: the message is written into an email the visitor sends
              themselves, which works even when our database does not. */
           : '<div class="cform__ok">' +
               say("<b>That did not send.</b> Your message is ready to email instead &mdash; {link}.",
-                  { link: '<a href="mailto:support@securejobva.com?subject=' +
-                      encodeURIComponent(d.reason + " — " + d.name) +
-                      '&body=' + encodeURIComponent(d.message + "\n\n" + d.name + "\n" + d.email + (d.phone ? "\n" + d.phone : "")) +
-                      '">' + say("send it now") + '</a>' }) +
+                  { link: link }) +
             '</div>';
       });
   });
+
+  /* Anything parked on an earlier visit goes now, and again whenever the
+     browser says it is back online — a phone that lost signal mid-send is
+     the commonest way a message gets parked, and it may well still be on
+     this page when the signal comes back. */
+  drain();
+  window.addEventListener("online", drain);
 })();
 </script>

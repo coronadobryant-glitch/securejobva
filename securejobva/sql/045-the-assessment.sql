@@ -16,7 +16,7 @@
 --     -> re-run 049-four-things-measured-once-each.sql to restore,
 --        then 063-the-verdict-does-not-wait.sql
 --   advance_on_assessment
---     -> re-run 063-the-verdict-does-not-wait.sql to restore
+--     -> re-run 097-a-pass-moves-on-when-the-typing-is-checked.sql to restore
 --   submit_assessment
 --     -> re-run 051-the-clock-and-the-send-button.sql to restore
 --

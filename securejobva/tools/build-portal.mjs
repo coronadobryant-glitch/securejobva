@@ -2347,8 +2347,11 @@ function ivCard(a) {
 
   if (declined) {
     return '<div class="card">' + head +
-      '<p class="msg" style="margin-top:1rem">You told us none of those worked. We will send ' +
-      "a new set &mdash; nothing else is needed from you.</p></div>";
+      /* "We will send" used to rest on somebody opening /admin. sql/099 now
+         emails the team the moment she turns the set down, so the card can
+         say they have been told rather than hope it. */
+      '<p class="msg" style="margin-top:1rem">You told us none of those worked, and the team ' +
+      "has been told. We will send a new set &mdash; nothing else is needed from you.</p></div>";
   }
 
   /* A time that has already started is not a choice. Times offered for Monday
@@ -2384,9 +2387,14 @@ function ivCard(a) {
             '">Choose</button>') +
         "</li>";
     }).join("") + "</ol>" +
+    /* "Waiting on us" was true and said nothing about how long: nobody on the
+       team heard about a pick until they opened the Interviews tab. sql/099
+       alerts them as she picks, and confirming is what sends her the "booked"
+       email (070), so both are said here as facts. */
     (chosen
-      ? '<p class="msg" style="margin-top:.9rem">Picked a different one? Choose it and we will ' +
-        "take the last one back.</p>"
+      ? '<p class="msg" style="margin-top:.9rem">The team has been told which time you picked; ' +
+        "you will get an email when it is confirmed. " +
+        "Picked a different one? Choose it and we will take the last one back.</p>"
       : '<button class="iv__none" type="button" data-none="' + esc(a.id) + '">' +
         "None of these work for me</button>") +
     '<p class="msg msg--bad" id="iv-err" style="display:none"></p>' +
@@ -2464,6 +2472,40 @@ function wireIv(a) {
 }
 
 
+/* What happens after she presses Send, said while it is still ahead of her.
+
+   This used to be "We have it ... you will hear from us either way", and that
+   was all she got: no person was told the work had arrived, and a pass sat at
+   Assessment until somebody happened to open /admin, type in her typing
+   figures and then move her by hand as well. So "either way" had no day
+   attached to it and depended on luck.
+
+   Both halves are now in the database, and this says exactly what they do:
+   sql/098 alerts the team the moment submitted_at is written, and sql/097
+   moves a passed sitting to Interview by itself once a person has checked her
+   typing screenshot — which emails her "interview next" (031). That email
+   does not carry times: they are offered afterwards, and come in an email of
+   their own ("pick a time"), so the card says the two in that order rather
+   than promising times with the move. A sitting below the line is still
+   declined by a person, and that emails her too. The timing is the same
+   three working days the careers page and the confirmation email give for
+   reading an application. Nothing enforces it for this check; it is the pace
+   the team keeps, and the card says "usually" for that reason.
+
+   Only while she is still at Assessment. Once she has been moved on, either
+   way, the next step has happened and her stage on the ladder above says
+   which; promising it again under a card she is past would be wrong. */
+function assessNext(a) {
+  if (a.status !== "assessment") {
+    return "We have it. There is nothing more for you to do on this part.";
+  }
+  return "We have it, and the team is told the moment it arrives. " +
+    "A person now checks your typing screenshot against the figures you entered. " +
+    "If your results clear the line, that check moves you to Interview and we email you, " +
+    "then send the interview times to pick from in an email of their own; if they do not, we email you to say so. " +
+    "That is usually within three working days &mdash; there is nothing more for you to do on this part.";
+}
+
 function assessCard(a, s) {
   /* Nothing to show unless she is actually at this stage. A finished
      assessment stays visible so she can see it was received — an empty space
@@ -2476,8 +2518,7 @@ function assessCard(a, s) {
       '<div class="row__top"><span><span class="row__n">Your assessment</span>' +
       '<span class="row__meta"> &middot; sent ' + esc(when(s.submitted_at)) + "</span></span>" +
       '<span class="pill pill--approved">Received</span></div>' +
-      '<p class="msg" style="margin-top:1rem">We have it. There is nothing more for you ' +
-      "to do on this part &mdash; you will hear from us either way.</p></div>";
+      '<p class="msg" style="margin-top:1rem">' + assessNext(a) + "</p></div>";
   }
 
   /* Sales is only asked of the track it gates. Nobody else answers eight
@@ -4106,7 +4147,7 @@ var C_PAY_METHOD = {
 };
 `;
 
-const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\n/* No signedOut() of its own — the shared one carries Google, email and\n   password, create-an-account and reset. This page used to shadow it with the\n   Google button alone, which left a client contact on a company address with\n   no way in at all: they never apply, never set a password, and nothing ever\n   invited them. Creating an account is the path they actually need, so the\n   line below points at it. */\nSIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your seats. ' +\n  'No account yet? Create one with that address and it becomes how you sign in. ' +\n  'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.';\n\n/* Whole dollars only, which is what a seat request's rounded `weekly` column\n   can express. Kept for the rows written before sql/046 added the exact one. */\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\n/* The quote, to the cent, exactly as the visitor was shown it on the home\n   page. 30 hours at $7.75 is $232.50 there; the integer `weekly` column holds\n   233, and this page used to print that back to the same person under the word\n   \"Quoted\". Fifty cents is not much money and it is the whole argument the\n   site makes, so it is worth a column and a formatter.\n\n   Falls back to the rounded figure for rows taken before 046 ran — those never\n   carried the cents and guessing them back would be inventing a number rather\n   than reporting one. */\nfunction quoted(r) {\n  if (r.weekly_cents !== null && r.weekly_cents !== undefined) {\n    return \"$\" + (r.weekly_cents / 100).toLocaleString(\"en-US\", {\n      minimumFractionDigits: 2, maximumFractionDigits: 2\n    });\n  }\n  return money(r.weekly);\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<span style=\"display:flex;gap:.5rem\">' +\n      /* A client who arrived by link has no password at all. Offering one here\n         is the difference between signing in and waiting for an email every\n         time; declining it is perfectly reasonable, so it is a quiet button\n         rather than a prompt. */\n      '<button class=\"btn btn--ghost\" id=\"setpw\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Set a password</button>' +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n      \"</span>\" +\n    \"</div>\";\n\n  /* Arriving by a link is not the same as being able to come back. On a\n     phone the link opens inside the mail app\u2019s own browser, so the session\n     lands in that webview\u2019s storage and is simply not there when they open\n     Safari or Chrome. It looks like the link failed. It did not \u2014 it worked\n     somewhere they cannot get back to. A password is what survives that, so\n     this offers one at the only moment they are certain to see it. */\n  if (CAME_FROM_LINK) {\n    who += '<div class=\"note\" style=\"margin-bottom:1.2rem\"><b>You came in by a link.</b> ' +\n      'A link signs you in wherever you clicked it \u2014 on a phone that is usually the mail ' +\n      'app rather than your browser, so you may find yourself signed out again there. ' +\n      'Set a password and you can sign in anywhere. ' +\n      '<button class=\"lnk\" id=\"nudgepw\" type=\"button\">Set one now</button></div>';\n  }\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  /* A client made in /admin has no seat_requests row \u2014 that table is the\n     enquiry form on the home page, and a business we matched by hand never\n     filled it in. This branch used to return here, so the placement, the week\n     waiting to be approved and the statement were all unreachable for every\n     client who arrived the way clients actually arrive. The note below is\n     about seat requests, so it now only stands in when there is genuinely\n     nothing else to show.\n\n     And the bill goes with it. This branch drew the placement cards and\n     stopped, so the one card that subtracts what has been paid \u2014 Left to pay,\n     the payments received, the credit note \u2014 never appeared for the very\n     clients this branch exists for. Worse, clientBlock() draws only placements\n     that have not ended, so a hand-matched client whose placement had ended\n     with weeks still unpaid was told there was nothing under their address and\n     to try another email, while /pay showed them a balance. The bill is drawn\n     whenever there is any placement at all, ended or not, and the \"nothing\n     here\" note is chosen by whether there is anything, not by whether anything\n     is live. */\n  if (!rows.length) {\n    var only = clientBlock();\n    var owes = billingBlock();\n    view(who + ((only + owes) ||\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\") + tzCard());\n    if (only) wireClient();\n    wireTz();\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly || r.weekly_cents ? \"<li><b>Quoted</b><span>\" + esc(quoted(r)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  html += billingBlock();\n  html += tzCard();\n  view(html);\n  wireTz();\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n  noteAuthError();\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  loadMyTz().then(function () {\n\n  /* The policy returns the rows carrying this address and, for anybody\n     holding a role, everybody else's as well - that trailing or on\n     has_permission is what makes /admin possible at all. So being handed your\n     own is half the database's job and half this page's, and the half that was\n     missing put another company's name on this account. */\n  api(\"seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc\")\n    .then(function (rows) { return loadClient(claims.email, onlyMine(rows || [])); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n  });\n}\n\nstart();" + `
+const SEATS_SCRIPT = "var root = document.getElementById(\"pt-root\");\nvar lead = document.getElementById(\"pt-lead\");\n\nfunction view(html) { root.innerHTML = html; }\n\n/* The five stages the home page already promises. Kept in one place so the\n   wording a client reads here matches the wording that sold them the seat. */\nvar SEAT_STAGES = [\n  [\"received\",    \"Request received\",  \"We have it. A person reads every one.\"],\n  [\"call_booked\", \"Call booked\",       \"Twenty minutes to agree the hours, the tasks and the rate.\"],\n  [\"matching\",    \"Matching\",          \"We are shortlisting from assistants already trained in your track.\"],\n  [\"shortlist\",   \"Shortlist sent\",    \"Names with you. You choose; we handle the handover.\"],\n  [\"running\",     \"Seat running\",      \"Your assistant is working the hours you set.\"]\n];\nvar SEAT_LABEL = {\n  received: \"Received\", call_booked: \"Call booked\", matching: \"Matching\",\n  shortlist: \"Shortlist\", running: \"Running\", closed: \"Closed\"\n};\n\nfunction seatStageIndex(s) {\n  for (var i = 0; i < SEAT_STAGES.length; i++) if (SEAT_STAGES[i][0] === s) return i;\n  return -1;\n}\n\n/* No signedOut() of its own — the shared one carries Google, email and\n   password, create-an-account and reset. This page used to shadow it with the\n   Google button alone, which left a client contact on a company address with\n   no way in at all: they never apply, never set a password, and nothing ever\n   invited them. Creating an account is the path they actually need, so the\n   line below points at it. */\nSIGNIN_HINT = 'Use the address we hold for your business &mdash; that is how we find your seats. ' +\n  'No account yet? Create one with that address and it becomes how you sign in. ' +\n  'If you have not asked us for a seat yet, <a href=\"/#book\">book a call</a> first.';\n\n/* Whole dollars only, which is what a seat request's rounded `weekly` column\n   can express. Kept for the rows written before sql/046 added the exact one. */\nfunction money(n) {\n  if (n === null || n === undefined) return \"\";\n  return \"$\" + Number(n).toLocaleString(\"en-US\");\n}\n\n/* The quote, to the cent, exactly as the visitor was shown it on the home\n   page. 30 hours at $7.75 is $232.50 there; the integer `weekly` column holds\n   233, and this page used to print that back to the same person under the word\n   \"Quoted\". Fifty cents is not much money and it is the whole argument the\n   site makes, so it is worth a column and a formatter.\n\n   Falls back to the rounded figure for rows taken before 046 ran — those never\n   carried the cents and guessing them back would be inventing a number rather\n   than reporting one. */\nfunction quoted(r) {\n  if (r.weekly_cents !== null && r.weekly_cents !== undefined) {\n    return \"$\" + (r.weekly_cents / 100).toLocaleString(\"en-US\", {\n      minimumFractionDigits: 2, maximumFractionDigits: 2\n    });\n  }\n  return money(r.weekly);\n}\n\nfunction stages(r) {\n  if (r.status === \"closed\") {\n    return '<div class=\"note note--warn\" style=\"margin-top:1.2rem\"><b>This request is closed.</b> ' +\n           'If you want to pick it up again, <a href=\"/#book\">book a call</a> and we will start from what we already know.</div>';\n  }\n  var at = seatStageIndex(r.status);\n  var out = \"\";\n  for (var i = 0; i < SEAT_STAGES.length; i++) {\n    var st = SEAT_STAGES[i];\n    var done = at > i;\n    var now = at === i;\n    out +=\n      '<li class=\"' + (now ? \"is-now is-done\" : done ? \"is-done\" : \"\") + '\">' +\n        '<span class=\"stg__dot\">' + (done ? \"&#10003;\" : String(i + 1)) + \"</span>\" +\n        \"<span>\" +\n          '<span class=\"stg__t\">' + st[1] + \"</span>\" +\n          '<span class=\"stg__d\">' + st[2] + \"</span>\" +\n          (now ? '<span class=\"stg__badge\">You are here</span>' : \"\") +\n        \"</span>\" +\n      \"</li>\";\n  }\n  return '<ol class=\"stg\">' + out + \"</ol>\";\n}\n\nfunction render(email, rows) {\n  var initial = (email || \"?\").charAt(0).toUpperCase();\n  var who =\n    '<div class=\"who\">' +\n      '<div class=\"who__id\"><span class=\"who__av\">' + esc(initial) + \"</span>\" +\n      '<span class=\"who__t\"><span class=\"who__n\">' +\n      esc((rows[0] && rows[0].company) || \"Your account\") + \"</span>\" +\n      '<span class=\"who__e\">' + esc(email) + \"</span></span></div>\" +\n      '<span style=\"display:flex;gap:.5rem\">' +\n      /* A client who arrived by link has no password at all. Offering one here\n         is the difference between signing in and waiting for an email every\n         time; declining it is perfectly reasonable, so it is a quiet button\n         rather than a prompt. */\n      '<button class=\"btn btn--ghost\" id=\"setpw\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Set a password</button>' +\n      '<button class=\"btn btn--ghost\" id=\"out\" type=\"button\" style=\"padding:.5rem .9rem;font-size:.88rem\">Sign out</button>' +\n      \"</span>\" +\n    \"</div>\";\n\n  /* Arriving by a link is not the same as being able to come back. On a\n     phone the link opens inside the mail app\u2019s own browser, so the session\n     lands in that webview\u2019s storage and is simply not there when they open\n     Safari or Chrome. It looks like the link failed. It did not \u2014 it worked\n     somewhere they cannot get back to. A password is what survives that, so\n     this offers one at the only moment they are certain to see it. */\n  if (CAME_FROM_LINK) {\n    who += '<div class=\"note\" style=\"margin-bottom:1.2rem\"><b>You came in by a link.</b> ' +\n      'A link signs you in wherever you clicked it \u2014 on a phone that is usually the mail ' +\n      'app rather than your browser, so you may find yourself signed out again there. ' +\n      'Set a password and you can sign in anywhere. ' +\n      '<button class=\"lnk\" id=\"nudgepw\" type=\"button\">Set one now</button></div>';\n  }\n\n  lead.textContent = \"Signed in as \" + email + \".\";\n\n  /* A client made in /admin has no seat_requests row \u2014 that table is the\n     enquiry form on the home page, and a business we matched by hand never\n     filled it in. This branch used to return here, so the placement, the week\n     waiting to be approved and the statement were all unreachable for every\n     client who arrived the way clients actually arrive. The note below is\n     about seat requests, so it now only stands in when there is genuinely\n     nothing else to show.\n\n     And the bill goes with it. This branch drew the placement cards and\n     stopped, so the one card that subtracts what has been paid \u2014 Left to pay,\n     the payments received, the credit note \u2014 never appeared for the very\n     clients this branch exists for. Worse, clientBlock() drew only placements\n     that had not ended (it keeps a line for each ended one now), so a hand-matched client whose placement had ended\n     with weeks still unpaid was told there was nothing under their address and\n     to try another email, while /pay showed them a balance. The bill is drawn\n     whenever there is any placement at all, ended or not, and the \"nothing\n     here\" note is chosen by whether there is anything, not by whether anything\n     is live. */\n  if (!rows.length) {\n    var only = clientBlock();\n    var owes = billingBlock();\n    view(who + ((only + owes) ||\n      '<div class=\"card\">' +\n        '<div class=\"note\"><b>Nothing here under this address yet.</b> ' +\n        \"A seat request appears here once you have sent one. If you booked a call with a \" +\n        \"different email, sign out and use that one.</div>\" +\n        '<p style=\"margin-top:1.2rem\"><a class=\"btn btn--solid\" href=\"/#book\">Book a 20-minute call</a></p>' +\n      \"</div>\") + tzCard());\n    if (only) wireClient();\n    wireTz();\n    document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n    return;\n  }\n\n  var html = who;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    /* weekly is what the dialog quoted at the time. Shown as the quote it was\n       rather than as a live price, because the rate is agreed on the call and\n       this row is a record of what was asked for. */\n    html +=\n      '<div class=\"card\">' +\n        '<div class=\"row__top\">' +\n          \"<span>\" +\n            '<span class=\"row__n\">' +\n              esc((r.seats && r.seats.length ? r.seats.join(\" + \") : \"Seat\")) + \"</span>\" +\n            '<span class=\"row__meta\"> &middot; asked ' + esc(when(r.created_at)) + \"</span>\" +\n          \"</span>\" +\n          '<span class=\"pill pill--' + esc(r.status) + '\">' +\n            esc(SEAT_LABEL[r.status] || r.status) + \"</span>\" +\n        \"</div>\" +\n        stages(r) +\n        '<ul class=\"meta\">' +\n          \"<li><b>Hours a week</b><span>\" + esc(r.hours || \"—\") + \"</span></li>\" +\n          (r.weekly || r.weekly_cents ? \"<li><b>Quoted</b><span>\" + esc(quoted(r)) + \" a week</span></li>\" : \"\") +\n          \"<li><b>Cover</b><span>\" + esc((r.blocks || []).join(\", \") || \"—\") + \"</span></li>\" +\n          \"<li><b>Your time zone</b><span>\" + esc(r.timezone || \"—\") + \"</span></li>\" +\n          \"<li><b>Last updated</b><span>\" +\n            esc(when(r.status_changed_at) || when(r.created_at)) + \"</span></li>\" +\n        \"</ul>\" +\n      \"</div>\";\n  }\n\n  html += '<p class=\"msg\">Something not right? Reply to the email we sent you, or write to ' +\n          '<a href=\"mailto:support@securejobva.com\">support@securejobva.com</a>.</p>';\n  html += clientBlock();\n  html += billingBlock();\n  html += tzCard();\n  view(html);\n  wireTz();\n  wireClient();\n  document.getElementById(\"out\").addEventListener(\"click\", signOut);\n  document.getElementById(\"setpw\").addEventListener(\"click\", function () { passwordForm(\"\", start); });\n  var nudge = document.getElementById(\"nudgepw\");\n  if (nudge) nudge.addEventListener(\"click\", function () { passwordForm(\"\", start); });\n}\n\nfunction start() {\n  captureRedirect();\n  if (CAME_FROM_RESET) { passwordForm(\"\"); return; }\n  var err = authError();\n  if (!session()) { signedOut(err); return; }\n  noteAuthError();\n\n  var claims = readToken(session().access_token);\n  if (!claims || !claims.email) {\n    clearSession();\n    signedOut(\"That sign-in did not carry an email address.\");\n    return;\n  }\n\n  view('<div class=\"card\"><span class=\"spin\"></span>Looking up your seats&hellip;</div>');\n\n  loadMyTz().then(function () {\n\n  /* The policy returns the rows carrying this address and, for anybody\n     holding a role, everybody else's as well - that trailing or on\n     has_permission is what makes /admin possible at all. So being handed your\n     own is half the database's job and half this page's, and the half that was\n     missing put another company's name on this account. */\n  seatRows()\n    /* Narrowed inside loadClient now, by mySeatRows: a request is mine by its\n       address OR by the client it was linked to (sql/102), and the second half\n       needs MY_CLIENTS, which loadClient is what fills. */\n    .then(function (rows) { return loadClient(claims.email, rows || []); })\n    .catch(function (e) {\n      if (String(e.message) === \"signed out\") { signedOut(\"Your session expired. Sign in again.\"); return; }\n      view('<div class=\"card\"><p class=\"msg msg--bad\">We could not load your seats just now. ' +\n           \"Refresh, or try again in a minute.</p>\" +\n           '<button class=\"btn btn--ghost\" id=\"out-error\" type=\"button\" style=\"margin-top:1.1rem\">Sign out</button></div>');\n      document.getElementById(\"out-error\").addEventListener(\"click\", signOut);\n    });\n  });\n}\n\nstart();" + `
 
 /* ── the client's own portal ──
    Everything above this line is about seats somebody once asked us for.
@@ -4164,7 +4205,18 @@ function loadClient(email, rows) {
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
         "trial_week,timesheet_days(worked_on,hours)&status=neq.draft&order=week_starts_on.desc,id.desc&limit=" + C_WEEK_LIMIT),
-    api("swap_requests?select=id,placement_id,reason,status,created_at&order=created_at.desc"),
+    /* resolution_note is 107's — what staff told the client when they dealt
+       with it — and until 107 is pasted the column does not exist, PostgREST
+       refuses the whole select, and the catch below would hide every
+       placement behind it. So the old select is the fallback, and a request
+       handled before then simply has no words to show. */
+    api("swap_requests?select=id,placement_id,reason,status,created_at,resolved_at,resolution_note" +
+        "&order=created_at.desc")
+      .catch(function (e) {
+        if (String(e.message) === "signed out") throw e;
+        return api("swap_requests?select=id,placement_id,reason,status,created_at,resolved_at" +
+                   "&order=created_at.desc");
+      }),
     /* 042. A row here means this client has already said when the work starts,
        so the card asking them stops asking. */
     api("placement_starts?select=placement_id,starts_on,confirmed_at"),
@@ -4273,7 +4325,36 @@ function loadClient(email, rows) {
     C_SETTLED = {};
     (r[7] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
     C_SLOTS = (r[8] || []).filter(function (w) { return onMine[w.placement_id]; });
-    render(email, rows);
+    render(email, mySeatRows(rows));
+  });
+}
+
+/* The seat requests, with the client they were linked to when there is one.
+
+   sql/102 gave a request a client_id, because matching the enquiry to the
+   account by address alone split one business in two the moment staff typed a
+   different contact address from the one on the form: the request under one
+   sign-in, the assistant and the bill under another. Asked for here, and the
+   old select kept as the fallback, because until 102 is pasted the column is
+   not granted and PostgREST refuses the whole query — which would take the
+   seats half of the page down for every client. */
+function seatRows() {
+  return api("seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks," +
+             "timezone,company,status,status_changed_at,client_id&order=created_at.desc")
+    .catch(function (e) {
+      if (String(e.message) === "signed out") throw e;
+      return api("seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks," +
+                 "timezone,company,status,status_changed_at&order=created_at.desc");
+    });
+}
+
+/* Mine by the address on it, as before, or by the client staff linked it to —
+   but only a client this address is the contact for. The policy hands staff
+   everybody's, and both halves of this test hold for a role exactly as they
+   hold for anybody else: a role is not a client, and not every address. */
+function mySeatRows(rows) {
+  return (rows || []).filter(function (r) {
+    return isMine(r) || !!(r.client_id && MY_CLIENTS[r.client_id]);
   });
 }
 
@@ -4304,13 +4385,42 @@ function cDays(w) {
    her hours were missing from the statement entirely — a total that looked
    right, was internally consistent, and was wrong. */
 function clientBlock() {
-  var live = [];
+  var live = [], ended = [];
   for (var i = 0; i < C_PLACE.length; i++) {
     if (C_PLACE[i].status !== "ended") live.push(C_PLACE[i]);
+    else ended.push(C_PLACE[i]);
   }
-  if (!live.length) return "";
 
-  return live.map(function (pl, k) { return placeBlock(pl, k); }).join("");
+  /* An ended placement keeps one line. Its card used to vanish without a
+     word while its weeks stayed on the bill below, so a client looking for
+     the person they had just stopped working with found a total and nobody
+     it belonged to. The line says when, and where the money went. */
+  /* An ended placement with no ended_on is sql/109's "ended before
+     starting": called off before her first day, with not one hour logged.
+     It has no last day to name, and nothing of it is on the bill, so it says
+     it did not go ahead rather than "ended" and a promise about weeks. */
+  var gone = ended.map(function (pl) {
+    var name = "Your assistant";
+    for (var n = 0; n < C_NAMES.length; n++) {
+      if (C_NAMES[n].application_id === pl.application_id && C_NAMES[n].name) {
+        name = C_NAMES[n].name;
+        break;
+      }
+    }
+    return '<div class="card" data-place-ended="' + esc(pl.id) + '">' +
+      '<div class="row__top"><span><span class="row__n">' + esc(name) + "</span>" +
+        '<span class="row__meta"> &middot; ' +
+          (pl.ended_on ? "ended on " + esc(when(pl.ended_on)) : "did not go ahead") + "</span></span>" +
+        '<span class="pill pill--pl_ended">' + esc(C_LABEL.ended) + "</span></div>" +
+      (pl.ended_on
+        ? '<p class="msg" style="margin:.5rem 0 0">This placement has ended. Any weeks you approved ' +
+          "stay on your bill below.</p>"
+        : '<p class="msg" style="margin:.5rem 0 0">This placement ended before her first day, ' +
+          "so there is nothing of it on your bill.</p>") +
+    "</div>";
+  }).join("");
+
+  return live.map(function (pl, k) { return placeBlock(pl, k); }).join("") + gone;
 }
 
 /* ── the bill ──────────────────────────────────────────────────────────────
@@ -4443,10 +4553,16 @@ function billingBlock() {
            provider rather than before it. */
         '<div class="bill__pay">' +
           '<p class="bill__payh">Paying this</p>' +
-          '<p class="bill__payp">Card payment is not switched on yet. For now we invoice you ' +
-            "separately and you pay us the way we agreed on the call. When card payment is " +
-            "live it appears here, and this total is the number it will charge. " +
-            'Your <a href="/pay">payment page</a> has the same figure with the details on it.</p>' +
+          /* It used to say "we invoice you separately". Nothing does: there is
+             no invoice and no weekly summary sent from here, and a client
+             waiting for one would wait for good. What is true is that this
+             page is the statement, and the bank details come from a person. */
+          '<p class="bill__payp">Card payment is not switched on yet. Pay by bank transfer, the ' +
+            "way we agreed on the call. No invoice or summary is sent to you automatically: this " +
+            "total is what you owe, and it moves as you approve hours. For our bank details, or " +
+            'an invoice for your records, write to <a href="mailto:support@securejobva.com">' +
+            "support@securejobva.com</a>. " +
+            'Your <a href="/pay">payment page</a> has the same figure.</p>' +
         "</div>"
       : '<p class="msg">Nothing to pay yet. Approved hours appear here as they come in.</p>') +
   "</div>";
@@ -4475,15 +4591,26 @@ function interviewBlock(live) {
      point at; the code finds the fields by data attribute inside the card
      that was clicked. */
   var sfx = "-" + live.id;
-  var who = "your assistant";
+  /* first is what goes in a sentence ("we email Ana and you"). Cut from the
+     fallback it used to read "we email your and you", so it stays whole
+     when there is no name to cut. */
+  var who = "your assistant", first = who;
   for (var n = 0; n < C_NAMES.length; n++) {
     if (C_NAMES[n].application_id === live.application_id && C_NAMES[n].name) {
       who = C_NAMES[n].name;
+      first = who.split(" ")[0];
     }
   }
 
+  /* A trial with no times at all is a client who has already said yes to
+     the start date — either the interview they had booked was called off
+     (sql/100), or they agreed the date without one. Meeting her is optional
+     by then, so the card offers it rather than reading as a step still owed. */
+  var optional = live.status === "trial" && !mine.length;
   var head = '<div class="card" data-iv="' + esc(live.id) + '"><h2>' +
-    (st.state === "confirmed" ? "Your interview" : "Arrange the interview") + "</h2>";
+    (st.state === "confirmed" ? "Your interview"
+      : optional ? "Talk to " + esc(first) + " before she starts?"
+      : "Arrange the interview") + "</h2>";
 
   /* ── it is on ── */
   if (st.confirmed) {
@@ -4514,14 +4641,40 @@ function interviewBlock(live) {
          work. It called withdraw_interview_slot, which refuses a confirmed
          slot in so many words — "that interview is confirmed, change the time
          instead" — so a client who pressed it and agreed to the dialog was
-         told to use the button they had just used. No function moves or calls
-         off a confirmed placement interview yet (070 did that for applicants
-         only), and one needs its own email to the assistant before it can
-         exist. Until then the honest control is an address. */
-      '<p class="hint" style="margin-top:.9rem">Something come up? This page cannot move a ' +
-        "confirmed interview yet. Write to " +
-        '<a href="mailto:support@securejobva.com">support@securejobva.com</a> and we will ' +
-        "sort out a new time with you both.</p>" +
+         told to use the button they had just used. The honest control was an
+         address until sql/100 gave a confirmed placement interview its own
+         two functions, each of which emails her and the client before it
+         changes anything: reschedule_placement_interview moves it, and
+         cancel_placement_interview calls it off and deletes the time, which
+         puts this card back to offering times.
+
+         Only while it is still ahead. Once the time has gone the meeting has
+         happened or it has not, and either way moving it is not the question
+         any more — the card under the placement asks the one that is. */
+      (new Date(c.starts_at).getTime() + (Number(c.minutes) || 30) * 60000 > serverNow()
+        ? '<p class="hint" style="margin-top:.9rem">Something come up? Move it, or call it off. ' +
+            "Either way we email " + esc(first) + " and you straight away.</p>" +
+          '<div class="iv__add">' +
+            '<div class="fld"><label for="iv-day' + sfx + '">New day</label>' +
+              '<input id="iv-day' + sfx + '" data-iv-day type="date" min="' + esc(todayLocal()) + '"></div>' +
+            '<div class="fld"><label for="iv-at' + sfx + '">Starting at' +
+              ((MY_TZ || browserTz())
+                ? " <em>&mdash; " + esc((MY_TZ || browserTz()).replace(/_/g, " ")) + " time</em>" : "") +
+              "</label>" +
+              '<input id="iv-at' + sfx + '" data-iv-at type="time" value="09:00"></div>' +
+            /* sql/100 quotes this in the email to her and in yours, so the
+               label says both of you will read it. */
+            '<div class="fld"><label for="iv-why' + sfx + '">A line for ' + esc(first) +
+              " <em>&mdash; optional, and in your copy too</em></label>" +
+              '<input id="iv-why' + sfx + '" data-iv-why type="text" maxlength="500"></div>' +
+            '<button class="btn btn--ghost" data-iv-move="' + esc(c.id) + '" type="button">Move it</button>' +
+          "</div>" +
+          '<div class="edit__foot"><span class="hint">Calling it off frees the time, and you can ' +
+            "offer new ones here.</span>" +
+            '<span class="edit__act"><span class="row__ok" data-iv-ok></span>' +
+            '<button class="btn btn--ghost" data-iv-cancel="' + esc(c.id) + '" type="button">' +
+            "Call it off</button></span></div>"
+        : "") +
     "</div>";
   }
 
@@ -4561,6 +4714,10 @@ function interviewBlock(live) {
       '<div class="iv__slots">' +
         st.slots.map(function (s) { return slotRow(s, "", "Offered"); }).join("") +
       "</div>";
+  } else if (optional) {
+    body += '<p class="msg" style="margin-top:0">Her start date is agreed, so there is nothing ' +
+      "you have to do here. If you would like to talk to " + esc(first) + " first, offer a few " +
+      "times that suit you and she will pick one.</p>";
   } else {
     body += '<p class="msg" style="margin-top:0">' + esc(who) + " is matched to your seat. Offer " +
       "a few times that suit you and she will pick one. Twenty to thirty minutes is usually " +
@@ -4648,8 +4805,37 @@ function wireInterview() {
     var offer = e.target.closest("[data-iv-offer]");
     if (offer) { if (!offer.disabled) offerSlot(offer, card, ok); return; }
 
-    /* Only a time not yet confirmed can be taken back from here — see
-       interviewBlock for why a confirmed one has no button at all. */
+    /* sql/100. A confirmed interview moves or is called off through its own
+       functions; withdraw_interview_slot below still refuses one, by design. */
+    var move = e.target.closest("[data-iv-move]");
+    if (move) {
+      if (move.disabled) return;
+      var to = ivTypedAt(card, ok);
+      if (!to) return;
+      ivCall("rpc/reschedule_placement_interview", {
+        slot: move.getAttribute("data-iv-move"),
+        at_time: to.toISOString(),
+        why: ivReason(card)
+      }, move, ok);
+      return;
+    }
+
+    var off = e.target.closest("[data-iv-cancel]");
+    if (off) {
+      if (off.disabled) return;
+      /* Asked first, because it cannot be taken back: the email to her goes
+         the moment it is pressed, and the time is gone from both pages. */
+      if (!window.confirm("Call off this interview? We will email you both, and you can " +
+                          "offer new times on this page.")) return;
+      ivCall("rpc/cancel_placement_interview", {
+        slot: off.getAttribute("data-iv-cancel"),
+        why: ivReason(card)
+      }, off, ok);
+      return;
+    }
+
+    /* Only a time not yet confirmed can be taken back from here — a
+       confirmed one is moved or called off above. */
     var drop = e.target.closest("[data-iv-drop]");
     if (drop) {
       if (drop.disabled) return;
@@ -4677,15 +4863,38 @@ function wireInterview() {
 }
 
 function offerSlot(btn, card, ok) {
+  var when_ = ivTypedAt(card, ok);
+  if (!when_) return;
+  var mins = card.querySelector("[data-iv-mins]");
+
+  ivCall("rpc/offer_interview", {
+    placement: btn.getAttribute("data-iv-offer"),
+    at_time: when_.toISOString(),
+    mins: Number(mins && mins.value) || 30
+  }, btn, ok);
+}
+
+/* The optional line that goes to her with a move or a call-off. 100 refuses
+   more than 500 characters; the field stops at 500, so that is never met. */
+function ivReason(card) {
+  var el = card.querySelector("[data-iv-why]");
+  var t = el ? el.value.trim() : "";
+  return t || null;
+}
+
+/* The day and time typed on the card, as the instant they mean, or null with
+   the reason flashed beside the button. Shared by offering a time and moving
+   a confirmed one, because both are typed into the same pair of fields and
+   both must be read in the same zone the label names. */
+function ivTypedAt(card, ok) {
   /* From the card that was clicked, never from the document — see the note
      on sfx in interviewBlock. */
   var day = card.querySelector("[data-iv-day]");
   var at = card.querySelector("[data-iv-at]");
-  var mins = card.querySelector("[data-iv-mins]");
-  if (!day || !at) return;
+  if (!day || !at) return null;
 
-  if (!day.value) { ivFlash(ok, "Pick a day", true); day.focus(); return; }
-  if (!at.value) { ivFlash(ok, "Pick a time", true); at.focus(); return; }
+  if (!day.value) { ivFlash(ok, "Pick a day", true); day.focus(); return null; }
+  if (!at.value) { ivFlash(ok, "Pick a time", true); at.focus(); return null; }
 
   /* Built from the parts and sent as an instant. The parts are a wall-clock
      time in the zone the field is labelled with: the zone saved on the
@@ -4697,14 +4906,9 @@ function offerSlot(btn, card, ok) {
      no zone saved the two are the same thing, and the browser does it. */
   var when_ = MY_TZ ? zonedInstant(day.value, at.value, MY_TZ)
                     : new Date(day.value + "T" + at.value);
-  if (!when_ || isNaN(when_)) { ivFlash(ok, "That is not a time we can read", true); return; }
-  if (when_.getTime() < serverNow()) { ivFlash(ok, "That time has already passed", true); return; }
-
-  ivCall("rpc/offer_interview", {
-    placement: btn.getAttribute("data-iv-offer"),
-    at_time: when_.toISOString(),
-    mins: Number(mins && mins.value) || 30
-  }, btn, ok);
+  if (!when_ || isNaN(when_)) { ivFlash(ok, "That is not a time we can read", true); return null; }
+  if (when_.getTime() < serverNow()) { ivFlash(ok, "That time has already passed", true); return null; }
+  return when_;
 }
 
 /* "2026-09-08" and "09:00" read as a wall-clock time in a named zone, as the
@@ -4744,7 +4948,7 @@ function zonedInstant(dayStr, timeStr, zone) {
   return new Date(at);
 }
 
-/* One path for all five, because they fail the same way and every one of them
+/* One path for all seven, because they fail the same way and every one of them
    ends with the page being redrawn from what the database now says rather than
    from what this browser thinks it just did. */
 function ivCall(fn, body, btn, ok) {
@@ -4789,13 +4993,18 @@ function placeBlock(live, k) {
 
   /* Matched up here rather than embedded — see loadClient for why that embed
      was a 400 and what it cost. */
-  var who = "your assistant";
+  /* first goes in sentences and on the keep-on button. Cut from the
+     fallback it read "Happy with your?" and "We're keeping your on". */
+  var who = "your assistant", whoFirst = who;
   for (var n = 0; n < C_NAMES.length; n++) {
     if (C_NAMES[n].application_id === live.application_id && C_NAMES[n].name) {
       who = C_NAMES[n].name;
+      whoFirst = who.split(" ")[0];
       break;
     }
   }
+  /* The same at the start of a sentence: "Your assistant has been told". */
+  var WhoFirst = whoFirst.charAt(0).toUpperCase() + whoFirst.slice(1);
   var rate = C_RATE[live.id];
   var mine = C_WEEKS.filter(function (w) { return w.placement_id === live.id; });
   var waiting = mine.filter(function (w) { return w.status === "submitted"; });
@@ -4816,13 +5025,49 @@ function placeBlock(live, k) {
   var asked = C_SWAPS.filter(function (s) {
     return s.placement_id === live.id && s.status === "open";
   });
+  /* sql/107. The last request staff dealt with, and what they said. It used
+     to vanish the moment it was marked handled — the "we are on it" note went
+     and the form came back, as if the client had never asked. Shown for two
+     months after it was dealt with, which is long enough to be read and short
+     enough not to sit on the page for good. Newest first, as read. */
+  var nowMs = serverNow();
+  var lastDone = null;
+  for (var sd = 0; sd < C_SWAPS.length; sd++) {
+    var sw = C_SWAPS[sd];
+    if (sw.placement_id === live.id && sw.status === "resolved" &&
+        (!sw.resolved_at || nowMs - new Date(sw.resolved_at).getTime() < 60 * 86400000)) {
+      lastDone = sw;
+      break;
+    }
+  }
+
+  /* Today on the office's calendar, which is the one 108 and 109 count days
+     on. Worked out here rather than by a helper so the harnesses that lift
+     this function out of the page need nothing new to run it. */
+  var todayC = "";
+  try {
+    todayC = new Intl.DateTimeFormat("en-CA", {
+      timeZone: CENTRAL, year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date(nowMs));
+  } catch (e) {}
+  /* Not started: matched, or on trial with a first day still ahead. Before
+     that day she has worked nothing and nothing has been billed, and the
+     cards below must not say otherwise. */
+  var started = live.status === "matched" ? false
+              : live.status !== "trial" ? true
+              : !live.started_on || !todayC || live.started_on <= todayC;
 
   var html =
     '<section data-place-block="' + esc(live.id) + '">' +
     '<div class="card">' +
       '<div class="row__top"><span><span class="row__n">' + esc(who) + "</span>" +
         '<span class="row__meta"> &middot; ' +
-          (live.started_on ? "with you since " + esc(when(live.started_on)) + " &middot; " : "") +
+          (live.started_on
+            ? (started ? "with you since " : "starting ") + esc(when(live.started_on)) + " &middot; "
+            : "") +
+          /* 109. Staff can now set the last day ahead of time; the placement
+             stays live until then, and the client should see the date. */
+          (live.ended_on ? "last day " + esc(when(live.ended_on)) + " &middot; " : "") +
           esc(live.hours_per_week) + " hours a week</span></span>" +
         '<span class="pill pill--pl_' + esc(live.status) + '">' +
           esc(C_LABEL[live.status] || live.status) + "</span></div>" +
@@ -4850,13 +5095,19 @@ function placeBlock(live, k) {
      the client was emailed to confirm, and there was nothing on this page to
      confirm it with. Nothing else about the interview depends on the status,
      so the card now follows the slots. Only times still ahead count: an
-     offer nobody took, months ago, is not an interview being arranged. */
-  var nowMs = serverNow();
+     offer nobody took, months ago, is not an interview being arranged.
+
+     And on a trial that has not started and has no times at all. That is
+     where calling off a confirmed interview (sql/100) leaves a client who had
+     already said yes to the start date: cancel_placement_interview deletes the
+     time, and without this the card that offers new ones went with it. */
   var inPlay = C_SLOTS.some(function (x) {
     return x.placement_id === live.id && !x.declined_at && !x.confirmed_at &&
            new Date(x.starts_at).getTime() > nowMs;
   });
+  var anySlot = C_SLOTS.some(function (x) { return x.placement_id === live.id; });
   if (live.status === "matched" || inPlay ||
+      (live.status === "trial" && !started && !anySlot) ||
       (live.status === "trial" && C_SLOTS.some(function (x) {
         return x.placement_id === live.id && x.confirmed_at;
       }))) {
@@ -4869,7 +5120,7 @@ function placeBlock(live, k) {
         "<h2>When can they start?</h2>" +
         (said
           ? '<div class="note"><b>You said ' + esc(when(said.starts_on)) + ".</b> " +
-            esc(who.split(" ")[0]) + " has been told, and the trial runs from that day.</div>"
+            esc(WhoFirst) + " has been told, and the trial runs from that day.</div>"
           : '<p class="msg" style="margin-top:0">We have pencilled in <b>' +
               esc(when(live.started_on) || "a date to agree") + "</b>. Confirm it, or give us " +
               "the day that actually suits you &mdash; the trial is counted from the day work " +
@@ -4970,7 +5221,8 @@ function placeBlock(live, k) {
       '<div class="card">' +
         "<h2>Your statement</h2>" +
         '<p class="msg" style="margin-top:0">What the hours you have approved come to. ' +
-          "This is a running total rather than a bill &mdash; we invoice you separately.</p>" +
+          "This is a running total for this person &mdash; what you owe across everybody is in " +
+          '<a href="#billing">your bill</a> below.</p>' +
         '<ul class="meta">' +
           "<li><b>Chargeable hours</b><span>" + esc(cNum(billedH)) + "</span></li>" +
           /* Shown rather than quietly left out. A client who adds up the weeks
@@ -5011,31 +5263,89 @@ function placeBlock(live, k) {
       '<div class="card">' +
         "<h2>Your statement</h2>" +
         '<div class="note note--warn"><b>We have not finished setting up your rate.</b> ' +
-          esc(who.split(" ")[0]) + "&rsquo;s hours are being recorded and nothing is lost &mdash; " +
+          esc(WhoFirst) + "&rsquo;s hours are being recorded and nothing is lost &mdash; " +
           "the statement appears here as soon as the rate is on your account. " +
           'If that is not within a day, write to <a href="mailto:support@securejobva.com">' +
           "support@securejobva.com</a>.</div>" +
       "</div>";
   }
 
-  /* ── asking for somebody different ── */
+  /* ── keeping her on ──
+     sql/108. Staff used to hear "we are keeping her" by email and flip the
+     status in /admin before she was told. The client can say it here now,
+     once the trial has actually begun; keep_placement_on refuses anything
+     else with its own sentence, shown as written. It changes nothing about
+     the bill — the trial's free days are counted from the first day whatever
+     the status says (085) — and the card says so, because "keep her on"
+     sounds like the moment charging starts. */
+  /* And only with a first day on record. keep_placement_on (sql/108)
+     refuses a trial with no started_on as not started yet, so without this
+     a trial missing its date offered a button that could only be refused.
+     started itself is left counting it as started, because 109 lets hours
+     be logged on it and the cards below must not say nothing is billed. */
+  if (live.status === "trial" && started && live.started_on) {
+    html +=
+      '<div class="card">' +
+        "<h2>After the trial</h2>" +
+        '<p class="msg" style="margin-top:0">Happy with ' + esc(whoFirst) +
+          "? Tell us you are keeping her on and we will let her know straight away. " +
+          "It does not change what you pay: the free trial days end on their own date either way.</p>" +
+        '<p class="err" data-keep-err aria-live="polite"></p>' +
+        '<div class="edit__foot"><span></span><span class="edit__act">' +
+          '<span class="row__ok" data-keep-ok></span>' +
+          '<button class="btn btn--solid" data-keep-go type="button" data-place="' +
+            esc(live.id) + '" data-who="' + esc(whoFirst) + '">' +
+            "We&rsquo;re keeping " + esc(whoFirst) + " on</button>" +
+        "</span></div>" +
+      "</div>";
+  }
+
+  /* ── asking for somebody different ──
+     Two cards in one, chosen by whether she has started. After the interview
+     and before her first day, the question a client actually has is "not
+     this person", and the old copy answered it with "she keeps working and
+     you keep being billed as normal" — neither of which was true of somebody
+     who had not worked a minute. Same request either way (swap_requests, and
+     107 tells the client by email when it arrives and when it is dealt with);
+     only the words change, to what is true at that moment. */
+  var first = esc(whoFirst);
   html +=
     '<div class="card">' +
-      "<h2>Not working out?</h2>" +
+      "<h2>" + (started ? "Not working out?" : "Not the right person?") + "</h2>" +
+      (lastDone && !asked.length
+        ? '<div class="note" style="margin-top:0;margin-bottom:1rem"><b>We dealt with your request of ' +
+          esc(when(lastDone.created_at)) + ".</b> " +
+          (lastDone.resolution_note
+            ? "What we told you: &ldquo;" + esc(lastDone.resolution_note) + "&rdquo;"
+            : "If you have not heard from us about it, write to " +
+              '<a href="mailto:support@securejobva.com">support@securejobva.com</a>.') +
+          "</div>"
+        : "") +
       (asked.length
-        ? '<div class="note"><b>You have asked us for somebody different.</b> ' +
-          "We are on it, and we will come back to you. Nothing changes in the meantime &mdash; " +
-          esc(who.split(" ")[0]) + " is still working and you are billed as normal.</div>"
-        : '<p class="msg" style="margin-top:0">Tell us what is not working and we will find you ' +
-          "somebody else. Nothing changes today: " + esc(who.split(" ")[0]) +
-          " keeps working and you keep being billed as normal until a replacement is agreed with you.</p>" +
-          '<div class="fld"><label for="c-why' + sfx + '">What is not working?</label>' +
+        ? (started
+          ? '<div class="note"><b>You have asked us for somebody different.</b> ' +
+            "We are on it, and we will come back to you. Nothing changes in the meantime &mdash; " +
+            first + " is still working and you are billed as normal.</div>"
+          : '<div class="note"><b>You have told us ' + first + " is not the right fit.</b> " +
+            "We are on it, and we will come back to you. She has not started, so nothing is " +
+            "being billed.</div>")
+        : (started
+          ? '<p class="msg" style="margin-top:0">Tell us what is not working and we will find you ' +
+            "somebody else. Nothing changes today: " + first +
+            " keeps working and you keep being billed as normal until a replacement is agreed with you.</p>"
+          : '<p class="msg" style="margin-top:0">Met ' + first + " and she is not the one? Tell us " +
+            "why and we will look for somebody else. She has not started, and nothing has been " +
+            "billed.</p>") +
+          '<div class="fld"><label for="c-why' + sfx + '">' +
+            (started ? "What is not working?" : "What did not fit?") + "</label>" +
             '<textarea id="c-why' + sfx + '" data-swap-why rows="3"></textarea></div>' +
           '<p class="err" data-swap-err aria-live="polite"></p>' +
           '<div class="edit__foot"><span></span><span class="edit__act">' +
             '<span class="row__ok" data-swap-ok></span>' +
             '<button class="btn btn--ghost" data-swap-go type="button" data-place="' +
-              esc(live.id) + '">Ask for a different assistant</button>' +
+              esc(live.id) + '">' +
+              (started ? "Ask for a different assistant" : "Not this person &mdash; find somebody else") +
+              "</button>" +
           "</span></div>") +
     "</div>" +
     "</section>";
@@ -5060,6 +5370,35 @@ function wireClient() {
     wireWeeks(sec);
     wireStart(sec);
     wireSwap(sec);
+    wireKeep(sec);
+  });
+}
+
+/* sql/108. Asked first, because the email to her goes the moment it saves
+   and there is no taking back "they would like to keep you on". */
+function wireKeep(sec) {
+  var go = sec.querySelector("[data-keep-go]");
+  if (!go) return;
+  go.addEventListener("click", function () {
+    if (go.disabled) return;
+    var err = sec.querySelector("[data-keep-err]");
+    var ok = sec.querySelector("[data-keep-ok]");
+    if (!window.confirm("Keep " + (go.getAttribute("data-who") || "her") + " on? We will email " +
+                        "her to say so.")) return;
+    err.textContent = "";
+    go.disabled = true;
+    ok.textContent = "Saving…";
+    ok.classList.add("is-on");
+    api("rpc/keep_placement_on", { method: "POST", body: { placement: go.getAttribute("data-place") } })
+      .then(function () { location.reload(); })
+      .catch(function (e) {
+        go.disabled = false;
+        ok.classList.remove("is-on");
+        /* keep_placement_on's refusals ("sjva-keep-not-trial",
+           "sjva-keep-not-started") carry a sentence written for the client;
+           ivWhy shows it rather than a generic failure. */
+        err.textContent = ivWhy(e);
+      });
   });
 }
 
@@ -5090,16 +5429,30 @@ function wireWeeks(sec) {
       ok.classList.remove("is-bad");
       ok.textContent = "Saving…";
       ok.classList.add("is-on");
-      api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-week")), {
+      /* return=representation, and the select keeps it to two columns the
+         page already reads. A PATCH the policy refuses — the week is no
+         longer 'submitted' because SecureJobVA decided it while this page sat
+         open — is not an error to PostgREST: it answers 200 with no rows. With
+         return=minimal that looked exactly like success, the page reloaded,
+         and a client who was not watching closely took the staff's decision
+         for their own. An empty answer now says what happened instead. */
+      api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-week")) + "&select=id,status", {
         method: "PATCH",
-        headers: { Prefer: "return=minimal" },
+        headers: { Prefer: "return=representation" },
         /* The note reaches the assistant now. Until sql/046 the trigger from
            030 put it back to whatever it had been for anybody without
            applications.edit — which is every client — so this field was
            required by the form above, sent, discarded before it was stored,
            and then left out of the email telling her a week needed changing. */
         body: yes ? { status: "approved" } : { status: "returned", note: note }
-      }).then(function () { location.reload(); })
+      }).then(function (saved) {
+        if (saved && saved.length) { location.reload(); return; }
+        ok.classList.add("is-bad");
+        ok.innerHTML = "SecureJobVA had already decided this week, so your click did not change it. " +
+          '<button class="lnk" type="button" data-c-reload>Refresh to see what we decided</button>';
+        var again = ok.querySelector("[data-c-reload]");
+        if (again) again.addEventListener("click", function () { location.reload(); });
+      })
         .catch(function (e) {
           Array.prototype.forEach.call(pair, function (x) { x.disabled = false; });
           ok.textContent = "Did not save";
@@ -5293,6 +5646,50 @@ function notAdmin(email) {
    Only the control is relabelled. LABEL still draws the pill on her own page
    and on the row, where a short word is the right word. */
 var SET_LABEL = { approved: "Approved — in training" };
+
+/* What moving her to each stage emails her, in the words she will read.
+
+   Picking a stage writes it on the spot, and sql/031's trigger mails her the
+   moment it lands — so one slip of the mouse on this dropdown used to send a
+   real person "About your application" or "You are on the team" with no way
+   to call it back (F31). The seat-request dropdown has asked before it saves
+   for a while; this one, which mails a person rather than a business, did
+   not.
+
+   The subjects are api/notify.js's own (STAGE_MAIL, and the decline), copied
+   so the question names the exact email. tools/test-admin-stage-mail.mjs
+   reads both files and fails when they drift apart. Applied is the one stage
+   that sends nothing, so it is not in here and is not asked about. */
+var STAGE_MAIL_SAYS = {
+  assessment: ["Your application — the exams are next",
+               "that she has moved on to the exams and the strengths test"],
+  interview:  ["Your application — interview next",
+               "that she has moved on to the interview and times will follow"],
+  approved:   ["You are through — paid training starts within a week",
+               "that she is approved and paid training starts within a week"],
+  hired:      ["You are on the team — your portal is open",
+               "that she is hired and her portal is open"],
+  declined:   ["About your application",
+               "that we are not taking her application forward, and when she can apply again"]
+};
+
+/* Asked before the stage is written, and only when the move mails her. A
+   no puts the dropdown back, so it never shows a stage the database does not
+   hold. Returns whether to go ahead. */
+function stageOk(sel, rec) {
+  var was = rec ? rec.status : null;
+  var st = sel.value;
+  var mail = STAGE_MAIL_SAYS[st];
+  if (!mail || was === st) return true;
+  var go = window.confirm(
+    "Move " + ((rec && (rec.name || rec.email)) || "her") + " from “" +
+      (LABEL[was] || was || "?") + "” to “" + (LABEL[st] || st) + "”?\\n\\n" +
+    "This emails her straight away: “" + mail[0] + "”, telling her " + mail[1] + ".\\n\\n" +
+    "An email cannot be taken back."
+  );
+  if (!go && was) sel.value = was;
+  return go;
+}
 
 function options(cur) {
   var keys = ["applied", "assessment", "interview", "approved", "hired", "declined"];
@@ -5507,11 +5904,34 @@ function contactLine(a) {
   );
 }
 
-function pipeOptions(cur) {
+/* Hired is said in one place, and it is the stage (sql/111). The pipeline
+   used to be a second, hand-set "Hired" beside the stage dropdown, and when
+   somebody set one and forgot the other the hired tile and the Breakdown bar
+   counted different people. 111 now moves the pipeline to hired when the
+   stage gets there and back off it when the stage leaves, and refuses a page
+   that sets either half alone (sjva-hired-is-the-stage).
+
+   So on a row the option is still listed — a hired row has to be able to show
+   what it is — but it cannot be picked: you hire somebody with the stage, and
+   the pipeline follows. forRow is false for the queue filter above the rows,
+   where choosing "Hired" is a question, not a write. */
+function pipeOptions(cur, forRow) {
   return PIPE.map(function (k) {
-    return '<option value="' + k + '"' + (k === cur ? " selected" : "") + ">" +
-           PIPE_LABEL[k] + "</option>";
+    var fixed = forRow && k === "hired";
+    return '<option value="' + k + '"' + (k === cur ? " selected" : "") +
+           (fixed ? " disabled" : "") + ">" +
+           PIPE_LABEL[k] + (fixed ? " (set by the stage)" : "") + "</option>";
   }).join("");
+}
+
+/* The pipeline as the numbers count it. The stage decides hired; a row whose
+   pipeline still says hired while its stage does not is one 111's check lists
+   for a person to settle, and until they do it counts where 111 would put it
+   when a stage leaves hired, which is Interviewed. */
+function pipeOf(a) {
+  if (a.status === "hired") return "hired";
+  if (a.pipeline === "hired") return "interviewed";
+  return a.pipeline;
 }
 
 /* The log, newest first. Three, because the answer to "what is going on with
@@ -6172,14 +6592,31 @@ function rowHtml(a) {
       '<div class="row__ctl">' +
         (can("applications.edit")
           ? '<select data-status aria-label="Stage the applicant sees">' + options(a.status) + "</select>" +
-            '<select data-pipe aria-label="Internal pipeline">' + pipeOptions(a.pipeline) + "</select>" +
+            /* Shut while she is hired: 111 refuses moving the pipeline off
+               hired until the stage moves, so offering it would only be
+               offering a refusal. */
+            '<select data-pipe aria-label="Internal pipeline"' +
+              (a.status === "hired"
+                ? ' disabled title="She is hired, and the pipeline follows the stage. Move her stage to change it."'
+                : "") + ">" +
+              pipeOptions(a.pipeline, true) + "</select>" +
             /* Central, and labelled Central: localDateTime and
                fromLocalDateTime read and write this box in the business's
-               clock, the one Times offered is printed in beside it. */
-            '<label class="cal__set">Interview, Central' +
+               clock, the one Times offered is printed in beside it.
+
+               And labelled as ours. A date typed here is saved for staff and
+               nobody else: she is not emailed and her page does not show it,
+               which the plain "Interview, Central" never said, so a time put
+               in here looked arranged when she had been told nothing (F36).
+               Offer and Confirm below are how she hears; this box is the
+               diary, and Confirm writes it for you. */
+            '<label class="cal__set">Staff diary only, Central' +
               '<input type="datetime-local" data-interview value="' +
-                esc(localDateTime(a.interview_at)) + '" aria-label="Interview date and time, Central">' +
+                esc(localDateTime(a.interview_at)) + '" aria-label="Interview date and time for staff only, Central. She is not told; use Offer to tell her" ' +
+                'title="Not sent to her. Offer a time below and Confirm her pick to tell her.">' +
             "</label>" +
+            '<span class="ivo__none" style="flex-basis:100%">The diary date is for us &mdash; she is not ' +
+              "emailed and does not see it. Offer times below to tell her.</span>" +
             ivOffered(a) +
             '<label class="chk"><input type="checkbox" data-replied' +
               (a.response_received ? " checked" : "") + "> replied</label>" +
@@ -6298,6 +6735,25 @@ function rowHtml(a) {
      the writing not marked   english is scored on the multiple choice half
                               alone until then, and marking it re-scores the
                               row and can change the verdict either way */
+/* Whether saving the assessment panel could move her to Interview, and so
+   mail her (sql/097). 097 moves her when, after the save, the verdict is
+   'passed' and a checked typing figure is set, and the save either turned the
+   verdict to 'passed' or wrote the checked figures. 063 re-scores on all three
+   figures, so a change to any of them can turn the verdict. The page cannot
+   predict the new verdict, so this says yes to every save that could be that
+   update: she is at Assessment, a checked figure will be set afterwards, and
+   something the scorer reads has changed. A save that changes nothing, or
+   leaves no checked figure, moves nobody and asks nothing. */
+function sitSaveMayMove(me, body) {
+  if (!me || me.status !== "assessment" || !me.sit) return false;
+  var s0 = me.sit;
+  if (body.typing_verified_wpm === null && body.typing_verified_accuracy === null) return false;
+  function was(k) { return s0[k] === undefined || s0[k] === null ? null : Number(s0[k]); }
+  return body.typing_verified_wpm !== was("typing_verified_wpm") ||
+    body.typing_verified_accuracy !== was("typing_verified_accuracy") ||
+    body.written_score !== was("written_score");
+}
+
 function sitLine(a) {
   var s = a.sit;
   if (!s || !s.submitted_at) return "";
@@ -6346,7 +6802,11 @@ function sitLine(a) {
       /* The one consequence somebody would otherwise have to work out from a
          stage that has not moved. */
       (s.verdict === "passed" && needTyping
-        ? '<span class="sit__wait">not invited until the typing is checked</span>'
+        /* And what checking it does, which since sql/097 is true: save the
+           figures you read off her proof and, if they still pass, she moves
+           to Interview and is emailed that she has. */
+        ? '<span class="sit__wait">not invited until the typing is checked &mdash; ' +
+          "if the checked figures still pass, saving them moves her to Interview and emails her</span>"
         : "") +
     "</div>" +
 
@@ -6476,6 +6936,25 @@ function wireSit(box) {
         return;
       }
 
+      /* Since sql/097 this save can be the thing that moves her to Interview,
+         and that move mails her. So it asks, the way the stage dropdown does
+         (F31, F34), whenever the save COULD cause the move -- not only on the
+         first words-per-minute figure. 097 moves her in more cases than that:
+         either checked figure counts as checked; a correction to the checked
+         figures re-runs 063's scoring and can lift a below-the-line verdict to
+         a pass; and so can a mark for the writing once the typing is checked,
+         because 063 scores English on it. The page cannot know the new verdict
+         before the server works it out, so the question says "if this leaves
+         her passing". sitSaveMayMove() is the test. */
+      var me = ALL.filter(function (x) { return x.id === id; })[0];
+      if (sitSaveMayMove(me, body) &&
+          !window.confirm(
+            "Save these figures?\\n\\nIf this leaves her passing, it moves " +
+            (me.name || "her") + " to Interview and emails her straight away: " +
+            "“Your application — interview next”. An email cannot be taken back.")) {
+        return;
+      }
+
       b.disabled = true;
       flash(ok, "Saving…");
       api("application_assessment?application_id=eq." + encodeURIComponent(id), {
@@ -6516,23 +6995,46 @@ function loadRoles() {
   });
 }
 
+/* Requests from the old sign-up chooser (sql/009), which is gone — nobody can
+   make a new one, so this list only ever holds what was asked before it went,
+   and it is not drawn at all when it is empty.
+
+   And approving most of them did nothing (F29). A business sees /seats and
+   /pay when its address is the contact on a client record — nothing reads a
+   "business" role — and an applicant's own page opens for whoever applied
+   with that address. Approve on those granted a role that unlocks nothing,
+   and read as though it had let somebody in. So only a role that means
+   something here is offered Approve; the rest say where access really comes
+   from and can be cleared. */
+var REQ_INSTEAD = {
+  business: "A business gets its portal when this address is the contact on a client. " +
+    "Set it in Clients; nothing here does that.",
+  applicant: "Her page at /status opens for whoever applied with this address. " +
+    "There is nothing to approve."
+};
+
 function drawRequests(box, reqs) {
   if (!reqs.length) return "";
   return (
-    '<h2 class="edit__h" style="margin-top:1.4rem">Waiting for approval</h2>' +
-    '<p class="msg" style="margin-top:0">What somebody says they are is a claim until one of us agrees with it.</p>' +
+    '<h2 class="edit__h" style="margin-top:1.4rem">Old requests from the sign-up chooser</h2>' +
+    '<p class="msg" style="margin-top:0">Asked before the chooser was taken off the sign-in page. ' +
+      "Nobody can make a new one.</p>" +
     '<div class="acctlist">' +
       reqs.map(function (r) {
+        var instead = REQ_INSTEAD[r.requested_role];
         return (
           '<div class="acct" data-req="' + esc(r.user_email) + '" data-role="' + esc(r.requested_role) + '">' +
             "<span>" +
               '<span class="acct__e">' + esc(r.user_email) + "</span> " +
               '<span class="pill">' + esc(r.requested_role) + "</span>" +
               (r.note ? '<span class="acct__note">' + esc(r.note) + "</span>" : "") +
+              (instead ? '<span class="acct__note">' + esc(instead) + "</span>" : "") +
             "</span>" +
             '<span class="acct__r">' +
-              '<button class="btn btn--ghost" data-decide="yes" style="padding:.35rem .7rem;font-size:.82rem">Approve</button> ' +
-              '<button class="btn btn--ghost" data-decide="no" style="padding:.35rem .7rem;font-size:.82rem">Decline</button>' +
+              (instead
+                ? '<button class="btn btn--ghost" data-decide="no" style="padding:.35rem .7rem;font-size:.82rem">Clear it</button>'
+                : '<button class="btn btn--ghost" data-decide="yes" style="padding:.35rem .7rem;font-size:.82rem">Approve</button> ' +
+                  '<button class="btn btn--ghost" data-decide="no" style="padding:.35rem .7rem;font-size:.82rem">Decline</button>') +
             "</span>" +
           "</div>"
         );
@@ -6694,7 +7196,10 @@ function drawStats() {
     var w = days(a.waiting_since);
     return a.is_ghosted || (w !== null && w >= 7 && !a.response_received);
   }).length;
-  var hired = ALL.filter(function (a) { return a.pipeline === "hired"; }).length;
+  /* The stage, as the hired tile at the top already reads it. Counted off
+     the pipeline this disagreed with that tile whenever the two had been set
+     apart by hand (F32). */
+  var hired = ALL.filter(function (a) { return a.status === "hired"; }).length;
   var week = ALL.filter(function (a) {
     var d = days(a.created_at);
     return d !== null && d <= 7;
@@ -6721,30 +7226,58 @@ function drawStats() {
     '<h2 class="edit__h">Breakdown</h2>' +
     tiles +
     '<div class="barsgrid">' +
-      bars("Pipeline", countBy(ALL, "pipeline"), PIPE, PIPE_LABEL) +
+      bars("Pipeline", countBy(ALL, pipeOf), PIPE, PIPE_LABEL) +
       bars("Track", countBy(ALL, "tracks")) +
       bars("English", countBy(ALL, "skill_english"), LEVELS, LEVEL_LABEL) +
     "</div>";
 }
 
-/* ── client logos ──
+/* ── home page logos ──
    The strip on the home page reads from the same table. Uploading here is the
-   whole workflow: no deploy, no HTML edit. */
-function loadClients() {
-  var box = document.getElementById("clients-card");
+   whole workflow: no deploy, no HTML edit.
+
+   This tab was called Clients, and it is not the client list — it is the
+   logos that scroll across the home page, which need not be clients at all.
+   Staff looking for a business went here first and found pictures (F46). It
+   is Logos now, and Clients is the real list: contacts, addresses, invites. */
+/* note is a sentence to leave under the redrawn panel — the one thing a
+   removal has to say after the list it happened in has been replaced. Only a
+   string counts: this is also handed straight to .then(), which passes it
+   whatever the request answered. */
+function loadLogos(note) {
+  var box = document.getElementById("logos-card");
   if (!box) return;
-  box.innerHTML = '<span class="spin"></span>Loading clients&hellip;';
+  box.innerHTML = '<span class="spin"></span>Loading logos&hellip;';
   api("client_logos?select=id,name,image_url,link,sort_order,visible&order=sort_order.asc,added_at.asc")
-    .then(function (rows) { drawClients(box, rows || []); })
+    .then(function (rows) {
+      drawLogos(box, rows || []);
+      var m = typeof note === "string" ? document.getElementById("cl-msg") : null;
+      if (m) { m.className = "msg msg--bad"; m.textContent = note; }
+    })
     .catch(function (e) {
-      box.innerHTML = '<p class="msg msg--bad">Could not load clients. ' + esc(e.message) + "</p>";
+      box.innerHTML = '<p class="msg msg--bad">Could not load the logos. ' + esc(e.message) + "</p>";
     });
 }
 
-function drawClients(box, rows) {
+/* Where a logo's file sits in the client-logos bucket, read back off the
+   public address the row was saved with. Only an address in this project's
+   own public bucket gives a path, and never one that climbs out of it: a row
+   pasted in by hand with somebody else's URL is a row to remove, not a file
+   of ours to delete. */
+function logoPath(url) {
+  var mark = "/storage/v1/object/public/client-logos/";
+  var s = String(url || "");
+  if (s.indexOf(SB + mark) !== 0) return null;
+  var p = s.slice((SB + mark).length).split("?")[0];
+  if (!p || p.indexOf("..") > -1 || p.charAt(0) === "/") return null;
+  return p;
+}
+
+function drawLogos(box, rows) {
   box.innerHTML =
-    '<h2 class="edit__h">Businesses on the home page</h2>' +
-    '<p class="msg" style="margin-top:0">These slide across the home page. Hidden ones stay here but are not shown to visitors. Drag order is the number beside each one &mdash; lower goes first.</p>' +
+    '<h2 class="edit__h">Logos on the home page</h2>' +
+    '<p class="msg" style="margin-top:0">These slide across the home page. Hidden ones stay here but are not shown to visitors. Drag order is the number beside each one &mdash; lower goes first. ' +
+      "This is only the logo strip &mdash; the businesses we work for, their contacts and invites are under <b>Clients</b>.</p>" +
 
     '<div class="cl__add">' +
       '<div class="fld"><label for="cl-name">Business name</label>' +
@@ -6777,10 +7310,10 @@ function drawClients(box, rows) {
         }).join("") + "</div>"
       : '<p class="msg">No businesses added yet. The strip stays hidden on the home page until there is at least one.</p>');
 
-  wireClients(box, rows);
+  wireLogos(box, rows);
 }
 
-function wireClients(box, rows) {
+function wireLogos(box, rows) {
   var msg = document.getElementById("cl-msg");
   var info = document.getElementById("cl-info");
   var MAX = 2 * 1024 * 1024;
@@ -6850,7 +7383,7 @@ function wireClients(box, rows) {
       });
     }).then(function () {
       msg.textContent = "";
-      loadClients();
+      loadLogos();
     }).catch(function (e) {
       btn.disabled = false;
       msg.className = "msg msg--bad";
@@ -6866,7 +7399,7 @@ function wireClients(box, rows) {
       var on = b.textContent.trim() === "Show";
       api("client_logos?id=eq." + encodeURIComponent(row.getAttribute("data-cl")), {
         method: "PATCH", headers: { Prefer: "return=minimal" }, body: { visible: on }
-      }).then(loadClients).catch(function () {
+      }).then(loadLogos).catch(function () {
         msg.className = "msg msg--bad";
         msg.textContent = "Could not change that.";
       });
@@ -6879,7 +7412,7 @@ function wireClients(box, rows) {
       api("client_logos?id=eq." + encodeURIComponent(row.getAttribute("data-cl")), {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: { sort_order: Number(el.value) || 0 }
-      }).then(loadClients).catch(function () {
+      }).then(loadLogos).catch(function () {
         msg.className = "msg msg--bad";
         msg.textContent = "Could not reorder that.";
       });
@@ -6896,9 +7429,36 @@ function wireClients(box, rows) {
         setTimeout(function () { if (b.textContent === "Sure?") b.textContent = "Remove"; }, 3000);
         return;
       }
-      api("client_logos?id=eq." + encodeURIComponent(row.getAttribute("data-cl")), {
+      var lid = row.getAttribute("data-cl");
+      var rec = rows.filter(function (x) { return x.id === lid; })[0];
+      var path = rec ? logoPath(rec.image_url) : null;
+      /* The row first, then its file (F45). Removing only the row took the
+         logo off the home page and left the image public in storage, where
+         anybody who had saved its address could still open it. 015's policy
+         "staff remove client logos" has always allowed the delete; nothing
+         asked for it. Row first because the row is what the home page reads:
+         if the file then fails, the logo is already gone from the site and
+         the message says what is left over, rather than the other way round
+         leaving a broken image on the home page. */
+      var fileGone = true;
+      api("client_logos?id=eq." + encodeURIComponent(lid), {
         method: "DELETE", headers: { Prefer: "return=minimal" }
-      }).then(loadClients).catch(function () {
+      }).then(function () {
+        if (!path) return null;
+        return liveSession().then(function (sess) {
+          if (!sess) throw new Error("signed out");
+          return fetch(SB + "/storage/v1/object/client-logos/" + encodeURI(path), {
+            method: "DELETE",
+            headers: { apikey: ANON, Authorization: "Bearer " + sess.access_token }
+          });
+        }).then(function (r) {
+          if (!r.ok) fileGone = false;
+        }, function () { fileGone = false; });
+      }).then(function () {
+        loadLogos(fileGone ? null :
+          "Removed from the home page, but its image file could not be deleted " +
+          "from storage (" + path + "). Remove it in Supabase, Storage, client-logos.");
+      }).catch(function () {
         msg.className = "msg msg--bad";
         msg.textContent = "Could not remove that.";
       });
@@ -7136,7 +7696,8 @@ function drawCalendar() {
 
   if (!booked.length && !atInterviewNoDate.length && !saidNo.length) {
     box.innerHTML = '<h2 class="edit__h">Interviews</h2>' +
-      '<p class="msg">Nothing booked. Set a date on any row in the Applications tab and it appears here.</p>';
+      '<p class="msg">Nothing booked. Offer her times on her row in Applications; the one she picks ' +
+      "and you confirm appears here, and she is emailed it.</p>";
     return;
   }
 
@@ -7246,7 +7807,8 @@ var ICON = (function () {
     team:    s('<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5"></path><path d="M17 6.5a3.5 3.5 0 010 7"></path>'),
     accts:   s('<path d="M12 3.5l7 3.2v5.6c0 4.2-2.8 7.2-7 8.2-4.2-1-7-4-7-8.2V6.7z"></path>'),
     hours:   s('<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5.2l3.3 2"></path>'),
-    place:   s('<path d="M12 21s7-5.2 7-11a7 7 0 10-14 0c0 5.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.6"></circle>')
+    place:   s('<path d="M12 21s7-5.2 7-11a7 7 0 10-14 0c0 5.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.6"></circle>'),
+    logos:   s('<rect x="3.5" y="5" width="17" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.8"></circle><path d="M20.5 16l-5-5-8 8"></path>')
   };
 })();
 
@@ -7257,7 +7819,8 @@ function badge(id, n) {
   if (!el) return;
   el.textContent = n ? String(n) : "";
   el.classList.toggle("is-warn",
-    id === "tab-unread" || id === "tab-leave" || id === "tab-hours" || id === "tab-place"
+    id === "tab-unread" || id === "tab-leave" || id === "tab-hours" || id === "tab-place" ||
+    id === "tab-clients"
       ? !!n : false);
 }
 
@@ -7402,7 +7965,21 @@ function drawLeave(box, rows) {
                   '<span class="row__ok" data-leave-ok></span>' +
                 "</div>"
               : '<p class="msg" style="margin:.3rem 0 0">' + esc(r.status) + " by " +
-                esc(r.decided_by || "somebody") + " on " + esc(when(r.decided_at)) + "</p>") +
+                esc(r.decided_by || "somebody") + " on " + esc(when(r.decided_at)) + "</p>" +
+                /* The other answer stays one press away (F44). The buttons
+                   used to vanish with the decision, so a wrong click, or leave
+                   later called off, could only be fixed in the database. The
+                   trigger restamps who and when, and the email she gets leads
+                   with "we have changed our answer" (sql/096 sends what it
+                   replaced as previous). */
+                (r.status === "approved" || r.status === "declined"
+                  ? '<div class="row__ctl">' +
+                      (r.status === "approved"
+                        ? '<button class="btn btn--ghost" data-leave-no data-leave-change type="button" style="padding:.45rem .8rem;font-size:.85rem">Change to declined</button>'
+                        : '<button class="btn btn--ghost" data-leave-yes data-leave-change type="button" style="padding:.45rem .8rem;font-size:.85rem">Change to approved</button>') +
+                      '<span class="row__ok" data-leave-ok></span>' +
+                    "</div>"
+                  : "")) +
           "</div>";
         }).join("") + "</div>"
       : '<p class="msg">Nobody has asked for leave yet.</p>');
@@ -7412,6 +7989,14 @@ function drawLeave(box, rows) {
       var row = b.closest("[data-leave]");
       var ok = row.querySelector("[data-leave-ok]");
       var yes = b.hasAttribute("data-leave-yes");
+      /* A changed answer mails her again, so it asks. A first answer is what
+         she is waiting for, and asking would only slow it down. */
+      if (b.hasAttribute("data-leave-change") && !window.confirm(
+            "Change this answer to " + (yes ? "approved" : "declined") + "?\\n\\n" +
+            "This emails her straight away that we have changed our answer, and that her leave is " +
+            (yes ? "approved." : "declined."))) {
+        return;
+      }
       flash(ok, "Saving…");
       api("leave_requests?id=eq." + encodeURIComponent(row.getAttribute("data-leave")), {
         method: "PATCH",
@@ -7558,26 +8143,42 @@ function drawTimesheets(box, rows) {
 var CLIENTS = [];
 var PLACEMENTS = [];
 var RATES = {};
+/* Seat requests still open and not yet tied to a client, for the "From a
+   seat request" boxes on the match form and the add-a-client form (F15). */
+var SEAT_OPEN = [];
 
 var PLACE_LABEL = { matched: "Matched", trial: "On trial", ongoing: "Kept on", ended: "Ended" };
 
-function loadPlacements() {
+/* note, with the id of the client or placement it is about, is the sentence
+   a save leaves on that row after the redraw — the row in hand when the
+   button was pressed is about to be replaced, so a word written into it now
+   would go nowhere. Only a string counts: this is also handed to .then(). */
+function loadPlacements(note, clientId, placeId, bad) {
   var box = document.getElementById("place-card");
   if (!box) return;
   box.innerHTML = '<span class="spin"></span>Loading placements&hellip;';
+  var cbox = document.getElementById("client-card");
+  if (cbox) cbox.innerHTML = '<span class="spin"></span>Loading clients&hellip;';
   Promise.all([
-    /* Only the two columns the dropdown draws. 039 moved the rest into
-       client_private, and this list never showed them anyway — it was asking
-       for three columns it did not use. */
-    api("clients?select=id,name&order=name.asc"),
+    /* The private half now, because the Clients list shows it (F37, F40):
+       who to talk to, the address they sign in and get receipts with, and
+       how they pay. 039's staff policy already answers this embed; until
+       this the screen asked for the name alone, so a wrong or missing
+       address could be neither seen nor fixed from /admin. */
+    api("clients?select=id,name,client_private(contact_name,contact_email,billing_cycle,notes)&order=name.asc"),
     api("placements?select=id,application_id,client_id,status,started_on,ended_on," +
         "hours_per_week,trial_weeks,clients(name,client_private(billing_cycle))" +
         "&order=started_on.desc.nullslast"),
     api("placement_billing?select=placement_id,rate"),
     api("placement_pay?select=placement_id,rate"),
     api("swap_requests?select=id,placement_id,reason,status,created_at,resolved_at,resolved_by" +
-        "&order=created_at.desc")
+        "&order=created_at.desc"),
+    /* Caught: an empty list only hides the optional box. client_id is
+       sql/102's, and /admin is deployed after it. */
+    api("seat_requests?select=id,company,name,email,status,client_id&order=created_at.desc")
+      .catch(function () { return []; })
   ]).then(function (r) {
+    SEAT_OPEN = (r[5] || []).filter(function (x) { return x.status !== "closed" && !x.client_id; });
     CLIENTS = r[0] || [];
     PLACEMENTS = r[1] || [];
     RATES = {};
@@ -7590,10 +8191,20 @@ function loadPlacements() {
       RATES[p.placement_id].pay = p.rate;
     });
     drawPlacements(box, r[4] || []);
+    drawClientList();
+    if (typeof note === "string" && note) {
+      var at = clientId
+        ? document.querySelector('#client-card [data-client="' + clientId + '"] [data-client-ok]')
+        : placeId
+          ? document.querySelector('#place-card [data-place="' + placeId + '"] [data-pl-ok]')
+          : null;
+      if (at) flash(at, note, !!bad);
+    }
     loadInterviews();
     loadPayments();
   }).catch(function (e) {
     box.innerHTML = '<p class="msg msg--bad">Could not load placements: ' + esc(why(e)) + "</p>";
+    if (cbox) cbox.innerHTML = '<p class="msg msg--bad">Could not load clients: ' + esc(why(e)) + "</p>";
   });
 }
 
@@ -7607,9 +8218,64 @@ function money(n) {
    anyway: the same embed described as one-to-many comes back as an array, and
    which one you get is a property of the constraint rather than of this code.
    Staff are the only role whose policy returns the row at all. */
+/* Whether sql/107 (and 108, 109) have an address to write to for this
+   client: the contact address on client_private, which the trigger reads and
+   skips when blank. CLIENTS is loaded with it alongside the placements. */
+function clientHasAddress(clientId) {
+  var c = CLIENTS.filter(function (x) { return x.id === clientId; })[0];
+  var e = priv(c).contact_email;
+  return !!(e && String(e).replace(/^\\s+|\\s+$/g, ""));
+}
+
 function priv(c) {
   var p = c && c.client_private;
   return (Array.isArray(p) ? p[0] : p) || {};
+}
+
+/* What changing a placement's stage emails, and to whom. The dropdown below
+   writes on Save and sql/035's trigger mails her the moment it lands, the
+   same way the applicant stage does — so it asks first, and says which email
+   (F31's rule, kept the same on both screens). Ended mails the client contact
+   since sql/109; she is told by a person, as she always was. */
+var PLACE_MAIL = {
+  matched: ["her", "“We have found you a client”"],
+  trial:   ["her", "“You start with the client”, with her first day and hours"],
+  ongoing: ["her", "“You are staying on”"],
+  ended:   ["the client contact", "that the placement is recorded as ended. She is not emailed — tell her yourself"]
+};
+
+/* The question before end_placement() runs, which depends on the day: a day
+   gone by or today ends it now and mails the client; a day ahead only sets it,
+   and the daily job ends it after; an ended placement only has its date
+   corrected, and nobody is mailed twice. day null is taking an end back. */
+function endAsk(p, name, day) {
+  if (day === null) return "Take back the end? " + name + " stays placed with no last day set.";
+  if (p.status === "ended") {
+    return "Change the day " + name + "’s placement ended to " + when(day) + "?\\n\\nNobody is emailed again.";
+  }
+  if (day > todayCentral()) {
+    return "Set " + when(day) + " as " + name + "’s last day?\\n\\nThe placement stays live until then and " +
+      "ends by itself the morning after. The client contact is emailed when it ends. " +
+      "She is not emailed — tell her yourself.";
+  }
+  return "End " + name + "’s placement with " + when(day) + " as the last day?\\n\\n" +
+    "This emails the client contact straight away that it has ended. " +
+    "She is not emailed — tell her yourself.";
+}
+
+/* What end_placement() answered, said back in words.
+
+   'ended before starting' is sql/109's fix-up: a last day before her first
+   one, on a placement with not one hour logged, is a placement that never
+   began. It is ended with no ended_on at all (there was no last day), its
+   empty weeks are let go, and the client is emailed that it has ended. */
+function endSays(t) {
+  var s = String(t || "");
+  if (s === "ended") return "Ended";
+  if (s === "ended before starting") return "Ended before her first day. The client has been told.";
+  if (s === "no end date") return "End taken back";
+  if (s.indexOf("ends after ") === 0) return "Ends after " + when(s.slice(11));
+  return s || "Saved";
 }
 
 function drawPlacements(box, swaps) {
@@ -7634,14 +8300,15 @@ function drawPlacements(box, swaps) {
   }).join("");
 
   box.innerHTML =
-    "<h2>Clients and placements</h2>" +
+    "<h2>Placements</h2>" +
     '<p class="msg" style="margin-top:0">One client at a time. Matching somebody is what tells them &mdash; ' +
-      "and what makes their hours billable to the right business.</p>" +
+      "and what makes their hours billable to the right business. The businesses themselves, " +
+      "their contacts and their invites are under <b>Clients</b>.</p>" +
 
     (open.length
       ? '<div class="note note--warn"><b>' + open.length +
         (open.length === 1 ? " client has" : " clients have") + " asked for somebody different.</b> " +
-        "Nothing has changed for the assistant, and they have not been told. See below.</div>"
+        "Nothing has changed for the assistant, and she has not been told. See below.</div>"
       : "") +
 
     /* ── the match form ── */
@@ -7655,6 +8322,20 @@ function drawPlacements(box, swaps) {
           '<div class="fld"><label for="pl-client">Client</label><select id="pl-client">' +
             clientOpts + '<option value="__new">+ A client not listed</option></select></div>' +
         "</div>" +
+
+        /* The enquiry this match answers, when there is one (F15). Linking it
+           is what lets the business see its request and its assistant under
+           one sign-in, whatever address either was typed with; picking it
+           for a new client fills the client in from what they told us. */
+        (SEAT_OPEN.length
+          ? '<div class="fld"><label for="pl-req">From a seat request <em>&mdash; optional</em></label>' +
+              '<select id="pl-req"><option value="">None</option>' +
+              SEAT_OPEN.map(function (r) {
+                return '<option value="' + esc(r.id) + '">' +
+                  esc((r.company || r.name || "no company") + " · " + (r.email || "no address")) + "</option>";
+              }).join("") + "</select>" +
+              '<p class="fileinfo">Links the request to the client, so the business sees both under one sign-in.</p></div>'
+          : "") +
 
         '<div id="pl-new" hidden>' +
           '<div class="edit__grid">' +
@@ -7692,6 +8373,7 @@ function drawPlacements(box, swaps) {
           '<div class="fld"><label for="pl-pay">The assistant gets, an hour</label><input id="pl-pay" type="number" min="0" step="0.01" placeholder="4.50"></div>' +
         "</div>" +
         '<p class="msg">Neither of them can see the other\\'s number. The assistant\\'s portal shows hours and no money at all; the client\\'s shows what they are charged and nothing about what we pay.</p>' +
+        '<p class="msg">Matching emails her &ldquo;We have found you a client&rdquo; and, when the client has a contact address, sends them their invite to sign in.</p>' +
         '<p class="err" id="pl-err" aria-live="polite"></p>' +
         '<div class="edit__foot"><span></span><span class="edit__act">' +
           '<span class="row__ok" id="pl-ok"></span>' +
@@ -7711,11 +8393,19 @@ function drawPlacements(box, swaps) {
           var mine = swaps.filter(function (s) {
             return s.placement_id === p.id && s.status === "open";
           });
+          /* An end already set and not yet reached: she is working her
+             notice, and the daily job (sql/109) ends it the morning after. */
+          var ending = p.status !== "ended" && p.ended_on;
           return '<div class="row" data-place="' + esc(p.id) + '">' +
             '<div class="row__top"><span>' +
               '<span class="row__n">' + esc(a ? a.name : "Unknown assistant") + "</span>" +
               '<span class="row__meta"> &middot; ' + esc(p.clients ? p.clients.name : "a client") +
-                (p.started_on ? " &middot; from " + esc(when(p.started_on)) : "") + "</span>" +
+                (p.started_on ? " &middot; from " + esc(when(p.started_on)) : "") +
+                (p.ended_on ? " &middot; last day " + esc(when(p.ended_on))
+                  /* Ended with no last day is sql/109's "ended before
+                     starting": she never worked a day of it, and "last day"
+                     with nothing after it would say otherwise. */
+                  : p.status === "ended" ? " &middot; never started" : "") + "</span>" +
             "</span>" +
             '<span class="pill pill--pl_' + esc(p.status) + '">' +
               esc(PLACE_LABEL[p.status] || p.status) + "</span></div>" +
@@ -7723,12 +8413,29 @@ function drawPlacements(box, swaps) {
             '<div class="row__tags">' + esc(p.hours_per_week) + " h a week" +
               (p.trial_weeks ? " &middot; " + esc(p.trial_weeks) + "-week trial" : "") +
               (priv(p.clients).billing_cycle ? " &middot; billed " + esc(priv(p.clients).billing_cycle) : "") +
+              (ending ? " &middot; ends after " + esc(when(p.ended_on)) : "") +
             "</div>" +
 
+            /* What we told them goes to the client (sql/107) — the request
+               used to vanish from their page when it was marked handled, and
+               the outcome reached them only if somebody remembered to write
+               (F25). The box is optional; the email says it was dealt with
+               either way, and quotes this when there is something in it.
+               107 sends nothing when the client has no contact address, so
+               then the label and button stop promising an email and the
+               row says nobody was told (clientHasAddress). */
             (mine.length
               ? '<div class="note note--warn" style="margin-top:.6rem"><b>They have asked for somebody different.</b> ' +
-                esc(mine[0].reason) + '<br><button class="btn btn--ghost" data-swap="' + esc(mine[0].id) +
-                '" type="button" style="padding:.4rem .75rem;font-size:.84rem;margin-top:.5rem">Mark it handled</button></div>'
+                esc(mine[0].reason) +
+                (clientHasAddress(p.client_id)
+                  ? '<div class="fld" style="margin:.6rem 0 0"><label>What we told them <em>&mdash; emailed to the client contact</em></label>' +
+                    '<textarea data-swap-note rows="2" maxlength="4000" aria-label="What we told them, emailed to the client contact" '
+                  : '<div class="fld" style="margin:.6rem 0 0"><label>What we told them <em>&mdash; they have no contact address, so this is not emailed</em></label>' +
+                    '<textarea data-swap-note rows="2" maxlength="4000" aria-label="What we told them, not emailed: they have no contact address" ') +
+                    'placeholder="e.g. We have spoken to her and will offer you two other assistants this week."></textarea></div>' +
+                '<button class="btn btn--ghost" data-swap="' + esc(mine[0].id) +
+                '" type="button" style="padding:.4rem .75rem;font-size:.84rem;margin-top:.5rem">' +
+                (clientHasAddress(p.client_id) ? "Mark it handled and tell them" : "Mark it handled") + "</button></div>"
               : "") +
 
             '<div class="row__ctl">' +
@@ -7748,88 +8455,281 @@ function drawPlacements(box, swaps) {
               '<button class="btn btn--ghost" data-pl-del type="button" style="padding:.45rem .8rem;font-size:.85rem">Remove</button>' +
               '<span class="row__ok" data-pl-ok></span>' +
             "</div>" +
-          "</div>";
-        }).join("") + "</div>"
-      : '<p class="msg">Nobody is placed yet.</p>') +
 
-    /* Until now a client existed only as a name inside the select above, which
-       meant a business could be created here and then never seen again — and
-       a client made by a typo could not be removed from anywhere in the
-       product. */
-    '<div class="edit__sec">Clients</div>' +
-    (CLIENTS.length
-      ? '<div class="rows">' + CLIENTS.map(function (c) {
-          var mine = PLACEMENTS.filter(function (p) { return p.client_id === c.id; });
-          return '<div class="row" data-client="' + esc(c.id) + '">' +
-            '<div class="row__top"><span>' +
-              '<span class="row__n">' + esc(c.name) + "</span>" +
-              '<span class="row__meta"> &middot; ' + mine.length +
-                (mine.length === 1 ? " placement" : " placements") + "</span>" +
-            "</span></div>" +
-            (can("applications.edit")
-              ? '<div class="row__ctl">' +
-                  '<button class="btn btn--ghost" data-client-del type="button" ' +
-                    'style="padding:.45rem .8rem;font-size:.85rem">Remove client</button>' +
-                  '<span class="row__ok" data-client-ok></span>' +
-                "</div>"
-              : "") +
+            /* The last day, chosen (F28). Ending used to stamp today, Central,
+               whatever day she actually stopped: a notice period could not be
+               set ahead, and an ending recorded late left the days between
+               open for hours. end_placement() takes the day — past, today, or
+               up to four months ahead — and refuses one before a day the
+               client has already approved. */
+            '<div class="row__ctl">' +
+              '<label class="cal__set">Last day' +
+                '<input type="date" data-pl-end value="' + esc(p.ended_on || todayCentral()) + '" ' +
+                  'aria-label="Her last day with this client">' +
+              "</label>" +
+              '<button class="btn btn--ghost" data-pl-end-go type="button" style="padding:.45rem .8rem;font-size:.85rem">' +
+                (p.status === "ended" ? "Correct the last day" : ending ? "Change the last day" : "End on this day") +
+              "</button>" +
+              (ending
+                ? '<button class="btn btn--ghost" data-pl-unend type="button" style="padding:.45rem .8rem;font-size:.85rem">Take back the end</button>'
+                : "") +
+            "</div>" +
           "</div>";
         }).join("") + "</div>"
-      : '<p class="msg">No clients yet. One is made the first time you match somebody to a business that is not on the list.</p>');
+      : '<p class="msg">Nobody is placed yet.</p>');
 
   wirePlacementForm();
   wirePlacementRows(box);
   wireRemovals(box);
 }
 
-/* The two smaller removals. Neither asks for a name to be typed: a placement
-   is a match that can be made again in a minute, and a client is a name and a
-   contact address. The panel on the queue is the only one that removes
-   something nobody can reconstruct, and it is the only one with that friction.
+/* ── the clients ──
+   Until now a client existed only as a name inside the match form's select,
+   and then as a name with a placement count and a Remove button. What makes a
+   client usable — the contact address they sign in to /seats and /pay with,
+   where their invite goes (040) and where their payment receipts go (093) —
+   was written once, while matching somebody, and never shown again (F37,
+   F40). A wrong or missing address could only be fixed in the database, a
+   business could only be added while placing somebody with it (F38), and the
+   invite was sent once with no way to send it again (F16).
 
-   What both do have is the refusal, explained. clients and client_payments are
-   ON DELETE RESTRICT in sql/032 and sql/055 — deliberately, because a business
-   with money against its name should not be removable by accident. Without
-   this the page would hand somebody 23503 in an alert box. */
-function wireRemovals(box) {
-  box.querySelectorAll("[data-pl-del]").forEach(function (b) {
+   Every write here is one of sql/104's three functions, so the address rules
+   live in one place and a refusal comes back as its sentence. */
+function clientLive(c) {
+  return PLACEMENTS.filter(function (p) { return p.client_id === c.id && p.status !== "ended"; }).length;
+}
+
+function drawClientList() {
+  var box = document.getElementById("client-card");
+  if (!box) return;
+  var edit = can("applications.edit");
+  var noMail = CLIENTS.filter(function (c) { return !priv(c).contact_email; });
+  badge("tab-clients", noMail.length);
+
+  var cycleOpts = function (cur) {
+    return ["weekly", "monthly"].map(function (k) {
+      return '<option value="' + k + '"' + (cur === k ? " selected" : "") + ">" +
+        (k === "weekly" ? "Weekly" : "Monthly") + "</option>";
+    }).join("");
+  };
+
+  box.innerHTML =
+    "<h2>Clients</h2>" +
+    '<p class="msg" style="margin-top:0">The businesses we work for. The contact address is how ' +
+      "they sign in to see their assistant, approve hours and read their statement, and where " +
+      "their invite and their payment receipts go.</p>" +
+
+    (noMail.length
+      ? '<div class="note note--warn"><b>' + noMail.length +
+        (noMail.length === 1 ? " client has" : " clients have") + " no contact address.</b> " +
+        "Nobody there can sign in, and no invite or receipt can reach them. Add one with Edit.</div>"
+      : "") +
+
+    (edit
+      ? '<details class="cl__add" style="display:block"><summary class="lnk" style="cursor:pointer">Add a client</summary>' +
+          '<div class="edit__grid" style="margin-top:.8rem">' +
+            '<div class="fld"><label for="cn-name">Business name</label><input id="cn-name" type="text" maxlength="200" placeholder="Rosehill Plumbing"></div>' +
+            '<div class="fld"><label for="cn-who">Their contact</label><input id="cn-who" type="text" placeholder="Name"></div>' +
+          "</div>" +
+          '<div class="edit__grid">' +
+            '<div class="fld"><label for="cn-mail">Contact email</label><input id="cn-mail" type="email" placeholder="name@rosehill.com"></div>' +
+            '<div class="fld"><label for="cn-cycle">How they pay us</label><select id="cn-cycle">' + cycleOpts("weekly") + "</select></div>" +
+          "</div>" +
+          (SEAT_OPEN.length
+            ? '<div class="fld"><label for="cn-req">From a seat request <em>&mdash; optional</em></label>' +
+                '<select id="cn-req"><option value="">None</option>' +
+                SEAT_OPEN.map(function (r) {
+                  return '<option value="' + esc(r.id) + '">' +
+                    esc((r.company || r.name || "no company") + " · " + (r.email || "no address")) + "</option>";
+                }).join("") + "</select></div>"
+            : "") +
+          '<div class="fld"><label for="cn-note">Notes <em>&mdash; only staff see these</em></label><textarea id="cn-note" rows="2"></textarea></div>' +
+          '<p class="msg" style="margin-top:0">Nobody is emailed. Their invite goes when somebody is first matched to them.</p>' +
+          '<div class="edit__foot"><span class="row__ok" id="cn-ok"></span><span class="edit__act">' +
+            '<button class="btn btn--solid" id="cn-go" type="button">Add the client</button>' +
+          "</span></div>" +
+        "</details>"
+      : "") +
+
+    (CLIENTS.length
+      ? '<div class="rows" style="margin-top:1rem">' + CLIENTS.map(function (c) {
+          var pv = priv(c);
+          var all = PLACEMENTS.filter(function (p) { return p.client_id === c.id; }).length;
+          var live = clientLive(c);
+          return '<div class="row" data-client="' + esc(c.id) + '">' +
+            '<div class="row__top"><span>' +
+              '<span class="row__n">' + esc(c.name) + "</span>" +
+              '<span class="row__meta"> &middot; ' + all + (all === 1 ? " placement" : " placements") +
+                (live ? ", " + live + " live" : "") + "</span>" +
+            "</span></div>" +
+            '<ul class="meta" style="margin-top:.4rem">' +
+              "<li><b>Contact</b><span>" + esc(pv.contact_name || "—") + "</span></li>" +
+              "<li><b>Email</b><span>" +
+                (pv.contact_email
+                  ? esc(pv.contact_email)
+                  : '<span class="sit__wait">none &mdash; nobody there can sign in</span>') + "</span></li>" +
+              "<li><b>Billed</b><span>" + esc(pv.billing_cycle || "—") + "</span></li>" +
+              (pv.notes ? "<li><b>Notes</b><span>" + esc(pv.notes) + "</span></li>" : "") +
+            "</ul>" +
+            (edit
+              ? '<div class="row__ctl">' +
+                  '<button class="btn btn--ghost" data-client-edit type="button" ' +
+                    'style="padding:.45rem .8rem;font-size:.85rem">Edit</button>' +
+                  (pv.contact_email
+                    ? '<button class="btn btn--ghost" data-client-invite type="button" ' +
+                      'style="padding:.45rem .8rem;font-size:.85rem">Send the invite again</button>'
+                    : "") +
+                  '<button class="btn btn--ghost" data-client-del type="button" ' +
+                    'style="padding:.45rem .8rem;font-size:.85rem">Remove client</button>' +
+                  '<span class="row__ok" data-client-ok></span>' +
+                "</div>" +
+                '<div data-client-form hidden>' +
+                  '<div class="edit__grid" style="margin-top:.8rem">' +
+                    '<div class="fld"><label>Business name</label><input data-ce-name type="text" maxlength="200" aria-label="Business name" value="' + esc(c.name) + '"></div>' +
+                    '<div class="fld"><label>Their contact</label><input data-ce-who type="text" aria-label="Their contact" value="' + esc(pv.contact_name || "") + '"></div>' +
+                  "</div>" +
+                  '<div class="edit__grid">' +
+                    '<div class="fld"><label>Contact email</label><input data-ce-mail type="email" aria-label="Contact email" value="' + esc(pv.contact_email || "") + '">' +
+                      '<p class="fileinfo">' +
+                        (live
+                          ? "A new address here is sent their invite as soon as you save."
+                          : "Their invite goes when somebody is first matched to them.") + "</p></div>" +
+                    '<div class="fld"><label>How they pay us</label><select data-ce-cycle aria-label="How they pay us">' + cycleOpts(pv.billing_cycle || "weekly") + "</select></div>" +
+                  "</div>" +
+                  '<div class="fld"><label>Notes <em>&mdash; only staff see these</em></label><textarea data-ce-note rows="2" aria-label="Notes, only staff see these">' + esc(pv.notes || "") + "</textarea></div>" +
+                  '<div class="row__ctl">' +
+                    '<button class="btn btn--solid" data-client-save type="button" style="padding:.45rem .8rem;font-size:.85rem">Save</button>' +
+                    '<button class="btn btn--ghost" data-client-cancel type="button" style="padding:.45rem .8rem;font-size:.85rem">Cancel</button>' +
+                  "</div>" +
+                "</div>"
+              : "") +
+          "</div>";
+        }).join("") + "</div>"
+      : '<p class="msg">No clients yet. Add one above, or match somebody to a business that is not on the list.</p>');
+
+  wireClientList(box);
+}
+
+/* What update_client() answered, in words. 'saved, invite sent' is the one
+   that matters: changing the address of a client somebody is placed with
+   sends the invite they never had, or had at the wrong address. */
+function clientSays(t, mail) {
+  return String(t) === "saved, invite sent"
+    ? "Saved, and their invite went to " + mail
+    : "Saved";
+}
+
+function wireClientList(box) {
+  var add = document.getElementById("cn-go");
+  if (add) {
+    add.addEventListener("click", function () {
+      var ok = document.getElementById("cn-ok");
+      var name = document.getElementById("cn-name").value.trim();
+      if (!name) { flash(ok, "Give the business a name.", true); return; }
+      var req = document.getElementById("cn-req");
+      add.disabled = true;
+      flash(ok, "Saving\\u2026");
+      api("rpc/create_client", {
+        method: "POST",
+        body: {
+          business: name,
+          contact: document.getElementById("cn-who").value.trim() || null,
+          address: document.getElementById("cn-mail").value.trim() || null,
+          cycle: document.getElementById("cn-cycle").value,
+          note: document.getElementById("cn-note").value.trim() || null,
+          from_request: req && req.value ? req.value : null
+        }
+      }).then(function () {
+        loadPlacements();
+        loadSeats();
+      }).catch(function (e) {
+        add.disabled = false;
+        /* 104's refusals are sentences — "There is already a client called
+           Rosehill" — and why() shows them as written. */
+        flash(ok, why(e), true);
+      });
+    });
+  }
+
+  box.querySelectorAll("[data-client-edit], [data-client-cancel]").forEach(function (b) {
     b.addEventListener("click", function () {
-      var row = b.closest("[data-place]");
-      var id = row.getAttribute("data-place");
-      /* What sql/089 made true. Before it, a placement with any week filed
-         against it could not be removed at all — the weeks' foreign key
-         refused with a raw 23503 — while this box promised that only the
-         match would go. Now weeks nobody has approved or paid are kept and
-         come loose from the placement, and a placement with a billed week is
-         refused in a sentence (sjva-billed-weeks), which why() shows as
-         written. */
-      if (!window.confirm(
-            "Remove this placement?\\n\\nIts two rates, the agreed start and any interview " +
-            "times offered on it go with it. The assistant and the client both stay — only " +
-            "the match between them goes. Weeks already recorded are kept and become " +
-            "unattached. If any of its weeks has been approved or paid, it cannot be " +
-            "removed — end it instead.")) {
-        return;
-      }
-      b.disabled = true;
-      api("placements?id=eq." + encodeURIComponent(id), {
-        method: "DELETE",
-        headers: { Prefer: "return=minimal" }
-      }).then(loadPlacements)
-        .catch(function (e) {
-          b.disabled = false;
-          flash(row.querySelector("[data-pl-ok]"), why(e), true);
-        });
+      var form = b.closest("[data-client]").querySelector("[data-client-form]");
+      form.hidden = b.hasAttribute("data-client-cancel");
     });
   });
 
+  box.querySelectorAll("[data-client-save]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-client]");
+      var ok = row.querySelector("[data-client-ok]");
+      var mail = row.querySelector("[data-ce-mail]").value.trim();
+      b.disabled = true;
+      flash(ok, "Saving\\u2026");
+      /* Every field as it stands in the form: update_client() writes what it
+         is given, so an emptied box clears that field rather than keeping
+         the old value behind the screen's back. */
+      api("rpc/update_client", {
+        method: "POST",
+        body: {
+          client: row.getAttribute("data-client"),
+          business: row.querySelector("[data-ce-name]").value.trim(),
+          contact: row.querySelector("[data-ce-who]").value.trim() || null,
+          address: mail || null,
+          cycle: row.querySelector("[data-ce-cycle]").value,
+          note: row.querySelector("[data-ce-note]").value.trim() || null
+        }
+      }).then(function (said) {
+        var text = clientSays(said, mail);
+        /* The list is redrawn from the database, and the sentence goes on the
+           redrawn row — the one in hand is about to be thrown away. */
+        return loadPlacements(text, row.getAttribute("data-client"));
+      }).catch(function (e) {
+        b.disabled = false;
+        /* Shown exactly as create's are. Since 104's fix-up update_client
+           also refuses a rename onto ANOTHER client's name
+           (sjva-client-exists), and its sentence names the clash. */
+        flash(ok, why(e), true);
+      });
+    });
+  });
+
+  box.querySelectorAll("[data-client-invite]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-client]");
+      var ok = row.querySelector("[data-client-ok]");
+      b.disabled = true;
+      flash(ok, "Sending\\u2026");
+      /* The invite is Supabase's sign-in email, posted through the outbox
+         (sql/095), so a send that fails is tried again rather than lost. The
+         function answers with the address it went to, which is what this
+         says — the address is the thing most likely to be wrong. Twice
+         inside two minutes is refused (sjva-client-invite-just-sent). */
+      api("rpc/resend_client_invite", {
+        method: "POST",
+        body: { client: row.getAttribute("data-client") }
+      }).then(function (to) {
+        b.disabled = false;
+        flash(ok, "Invite sent to " + (to || "their address"));
+      }).catch(function (e) {
+        b.disabled = false;
+        flash(ok, why(e), true);
+      });
+    });
+  });
+
+  /* Removing a client. Not asked for a name to be typed: a client is a name
+     and a contact address. What it does have is the refusal, explained.
+     clients and client_payments are ON DELETE RESTRICT in sql/032 and
+     sql/055 — deliberately, because a business with money against its name
+     should not be removable by accident. Without this the page would hand
+     somebody 23503 in an alert box. */
   box.querySelectorAll("[data-client-del]").forEach(function (b) {
     b.addEventListener("click", function () {
       var row = b.closest("[data-client]");
       var id = row.getAttribute("data-client");
       var ok = row.querySelector("[data-client-ok]");
       b.disabled = true;
-      flash(ok, "Checking\u2026");
+      flash(ok, "Checking\\u2026");
       /* Counted now rather than when the panel was drawn, so the refusal is
          about what is true at the moment somebody presses the button. */
       Promise.all([
@@ -7870,7 +8770,7 @@ function wireRemovals(box) {
             method: "DELETE",
             headers: { Prefer: "return=minimal" }
           });
-        }).then(loadPlacements);
+        }).then(function () { loadPlacements(); });
       })["catch"](function (e) {
         b.disabled = false;
         flash(ok, why(e), true);
@@ -7879,10 +8779,48 @@ function wireRemovals(box) {
   });
 }
 
+/* The placement removal. Not asked for a name to be typed: a placement is a
+   match that can be made again in a minute. The panel on the queue is the
+   only one that removes something nobody can reconstruct, and it is the only
+   one with that friction. */
+function wireRemovals(box) {
+  box.querySelectorAll("[data-pl-del]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-place]");
+      var id = row.getAttribute("data-place");
+      /* What sql/089 made true. Before it, a placement with any week filed
+         against it could not be removed at all — the weeks' foreign key
+         refused with a raw 23503 — while this box promised that only the
+         match would go. Now weeks nobody has approved or paid are kept and
+         come loose from the placement, and a placement with a billed week is
+         refused in a sentence (sjva-billed-weeks), which why() shows as
+         written. */
+      if (!window.confirm(
+            "Remove this placement?\\n\\nIts two rates, the agreed start and any interview " +
+            "times offered on it go with it. The assistant and the client both stay — only " +
+            "the match between them goes. Weeks already recorded are kept and become " +
+            "unattached. If any of its weeks has been approved or paid, it cannot be " +
+            "removed — end it instead.")) {
+        return;
+      }
+      b.disabled = true;
+      api("placements?id=eq." + encodeURIComponent(id), {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" }
+      }).then(function () { loadPlacements(); })
+        .catch(function (e) {
+          b.disabled = false;
+          flash(row.querySelector("[data-pl-ok]"), why(e), true);
+        });
+    });
+  });
+}
+
 function wirePlacementForm() {
   var pick = document.getElementById("pl-client");
   if (!pick) return;
   var fresh = document.getElementById("pl-new");
+  var req = document.getElementById("pl-req");
   var show = function () {
     if (pick.value === "__new") fresh.removeAttribute("hidden");
     else fresh.setAttribute("hidden", "");
@@ -7890,6 +8828,24 @@ function wirePlacementForm() {
   pick.addEventListener("change", show);
   if (!CLIENTS.length) { pick.value = "__new"; }
   show();
+
+  /* A seat request picked for a new client fills the client in from it —
+     the company, the person and the address they wrote to us with — but
+     only boxes still empty, so nothing already typed is overwritten. */
+  if (req) {
+    req.addEventListener("change", function () {
+      var r = SEAT_OPEN.filter(function (x) { return x.id === req.value; })[0];
+      if (!r) return;
+      if (pick.value !== "__new") return;
+      var put = function (id, v) {
+        var el = document.getElementById(id);
+        if (el && !el.value.trim() && v) el.value = v;
+      };
+      put("pl-cname", r.company);
+      put("pl-cwho", r.name);
+      put("pl-cmail", r.email);
+    });
+  }
 
   document.getElementById("pl-go").addEventListener("click", function () {
     var err = document.getElementById("pl-err");
@@ -7907,87 +8863,56 @@ function wirePlacementForm() {
       err.textContent = "The assistant is set to be paid more than the client is charged. Check both numbers.";
       pay.focus(); return;
     }
+    /* Dollars and cents, as typed. place_assistant() refuses 7.755 rather
+       than rounding it, because on a site that sells "$7.75 flat" the rate
+       stored has to be the rate somebody typed; saying so here saves the
+       round trip. */
+    var cents = function (v) { return Math.round(Number(v) * 100) / 100 === Number(v); };
+    if (!cents(bill.value) || !cents(pay.value)) {
+      err.textContent = "A rate is dollars and cents: 7.75, not 7.755.";
+      return;
+    }
 
-    go.disabled = true;
-    flash(ok, "Saving\\u2026");
-
-    /* Checked before the request, which is where a check belongs. This used to
-       sit twenty lines below, AFTER clientStep had been built — and building
-       it fires the POST, so an empty name sent a row the constraint refused
-       and then returned early, leaving a rejected promise nobody was holding.
-       The database caught it, which is why nothing ever went wrong; it was
-       still a request made and abandoned on every mistyped form. */
     var wantNew = pick.value === "__new";
     if (wantNew && !document.getElementById("pl-cname").value.trim()) {
-      go.disabled = false;
       err.textContent = "Give the business a name.";
       return;
     }
 
-    /* A new client first, because the placement cannot point at one that does
-       not exist yet. return=representation so the id comes back rather than
-       being fetched again and hoped to be the right row. */
-    var clientStep = wantNew
-      ? api("clients", {
-          method: "POST",
-          headers: { Prefer: "return=representation" },
-          body: { name: document.getElementById("pl-cname").value.trim() }
-        }).then(function (rows) {
-          var c = (rows || [])[0];
-          if (!c) throw new Error("the client did not come back");
-          /* The details are a second row since 039, and the contact address
-             is the one field that must be right — it is how they sign in to
-             /seats. So a failure here is named rather than swallowed: the
-             business exists, and somebody has to go and finish it. */
-          return api("client_private", {
-            method: "POST",
-            headers: { Prefer: "return=minimal" },
-            body: {
-              client_id: c.id,
-              contact_name: document.getElementById("pl-cwho").value.trim() || null,
-              contact_email: document.getElementById("pl-cmail").value.trim() || null,
-              billing_cycle: document.getElementById("pl-cycle").value
-            }
-          }).then(function () { return c.id; }, function () {
-            throw new Error("The business was created, but their contact details did not save — " +
-              "so nobody there can sign in yet. Add them before matching anyone.");
-          });
-        })
-      : Promise.resolve(pick.value);
+    go.disabled = true;
+    flash(ok, "Saving\\u2026");
 
-    clientStep.then(function (clientId) {
-      return api("placements", {
-        method: "POST",
-        headers: { Prefer: "return=representation" },
-        body: {
-          application_id: document.getElementById("pl-who").value,
-          client_id: clientId,
-          status: "matched",
-          started_on: start.value,
-          hours_per_week: Number(document.getElementById("pl-hours").value || 40),
-          trial_weeks: Number(document.getElementById("pl-trial").value || 0) || null
-        }
-      });
-    }).then(function (rows) {
-      var p = (rows || [])[0];
-      if (!p) throw new Error("the placement did not come back");
-      /* The rates are two more rows. If either fails the placement still
-         exists, so the message says so rather than implying nothing happened —
-         and both are editable on the row below. */
-      return Promise.all([
-        api("placement_billing", { method: "POST", headers: { Prefer: "return=minimal" },
-          body: { placement_id: p.id, rate: Number(bill.value) } }),
-        api("placement_pay", { method: "POST", headers: { Prefer: "return=minimal" },
-          body: { placement_id: p.id, rate: Number(pay.value) } })
-      ]).catch(function () {
-        throw new Error("Matched, but the rates did not save. Set them on the row below.");
-      });
+    /* One request, one transaction (sql/105, F39). This used to be up to
+       five — the client, its private half, the placement and the two rates
+       — each its own transaction, so a failure between them left a client
+       with no contact address or a placement with no rates, and pressing
+       the button again made the client a second time. place_assistant()
+       writes all of it or none of it, and its emails are queued in the same
+       transaction, so a match that fails sends nobody anything. Its
+       refusals are sentences, shown as written. */
+    api("rpc/place_assistant", {
+      method: "POST",
+      body: {
+        application: document.getElementById("pl-who").value,
+        client: wantNew ? null : pick.value,
+        business: wantNew ? document.getElementById("pl-cname").value.trim() : null,
+        contact: wantNew ? (document.getElementById("pl-cwho").value.trim() || null) : null,
+        address: wantNew ? (document.getElementById("pl-cmail").value.trim() || null) : null,
+        cycle: wantNew ? document.getElementById("pl-cycle").value : null,
+        starts_on: start.value,
+        hours: Number(document.getElementById("pl-hours").value || 40),
+        trial_weeks: Number(document.getElementById("pl-trial").value || 0) || null,
+        bill_rate: Number(bill.value),
+        pay_rate: Number(pay.value),
+        from_request: req && req.value ? req.value : null
+      }
     }).then(function () {
       loadPlacements();
+      if (req && req.value) loadSeats();
     }).catch(function (e) {
       go.disabled = false;
-      flash(ok, why(e), true);
-      err.textContent = String(e && e.message ? e.message : e).slice(0, 300);
+      flash(ok, "Not saved", true);
+      err.textContent = why(e);
     });
   });
 }
@@ -7998,7 +8923,8 @@ function wirePlacementRows(box) {
       var row = b.closest("[data-place]");
       var id = row.getAttribute("data-place");
       var ok = row.querySelector("[data-pl-ok]");
-      var status = row.querySelector("[data-pl-status]").value;
+      var sel = row.querySelector("[data-pl-status]");
+      var status = sel.value;
       var bill = row.querySelector("[data-pl-bill]").value;
       var pay = row.querySelector("[data-pl-pay]").value;
 
@@ -8015,22 +8941,54 @@ function wirePlacementRows(box) {
         return;
       }
 
-      flash(ok, "Saving\\u2026");
-
       /* Only what actually changed. This used to PATCH status and ended_on on
          every save, so correcting a rate on a placement that ended in March
-         rewrote its end date to today \u2014 silently moving the boundary that
+         rewrote its end date to today — silently moving the boundary that
          decides which weeks the placement covers. A rate edit is a rate edit. */
       var wasStatus = null;
       for (var pi = 0; pi < PLACEMENTS.length; pi++) {
         if (PLACEMENTS[pi].id === id) { wasStatus = PLACEMENTS[pi].status; break; }
       }
+      var endBox = row.querySelector("[data-pl-end]");
+      var lastDay = (endBox && endBox.value) || todayCentral();
+
+      /* Asked before a stage that emails anybody, and put back on a no.
+         Ended asks the Last day button's question, because it does the same
+         thing with the same box. */
+      if (status !== wasStatus && PLACE_MAIL[status]) {
+        var who = row.querySelector(".row__n");
+        var name = (who && who.textContent) || "this placement";
+        var m = PLACE_MAIL[status];
+        var asked = status === "ended"
+          ? endAsk({ status: wasStatus }, name, lastDay)
+          : "Move " + name + " from “" + (PLACE_LABEL[wasStatus] || wasStatus) + "” to “" +
+            PLACE_LABEL[status] + "”?\\n\\nThis emails " + m[0] + " straight away: " + m[1] + ".";
+        if (!window.confirm(asked)) {
+          sel.value = wasStatus;
+          return;
+        }
+      }
+
+      flash(ok, "Saving\\u2026");
+
       var jobs = [];
+      var said = null;
       if (status !== wasStatus) {
-        jobs.push(api("placements?id=eq." + encodeURIComponent(id), {
-          method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: { status: status, ended_on: status === "ended" ? todayCentral() : null }
-        }));
+        if (status === "ended") {
+          /* Through end_placement(), with the day in the Last day box, never
+             today by default behind the screen's back (F28). */
+          jobs.push(api("rpc/end_placement", {
+            method: "POST", body: { placement: id, last_day: lastDay }
+          }).then(function (t) { said = endSays(t); }));
+        } else {
+          jobs.push(api("placements?id=eq." + encodeURIComponent(id), {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            /* Taking an ended placement back to live clears the day it
+               ended; any other move leaves an end already set alone, so a
+               placement working its notice keeps its last day. */
+            body: wasStatus === "ended" ? { status: status, ended_on: null } : { status: status }
+          }));
+        }
       }
 
       /* Upserted one at a time rather than with merge-duplicates: the update
@@ -8053,6 +9011,7 @@ function wirePlacementRows(box) {
            the number you were quoted", the rate stored has to be the rate
            somebody typed. */
         var cents = Math.round(Number(value) * 100);
+        if (had !== undefined && Number(had) === cents / 100) return null;
         return had === undefined
           ? api(table, { method: "POST", headers: { Prefer: "return=minimal" },
               body: { placement_id: id, rate: cents / 100 } })
@@ -8067,9 +9026,43 @@ function wirePlacementRows(box) {
       if (c) jobs.push(c);
 
       Promise.all(jobs).then(function () {
-        if (emptied) flash(ok, "Rates can be changed, not cleared", true);
-        loadPlacements();
+        /* Redrawn either way. Returning early on an emptied box left the
+           stage this same save had just written out of PLACEMENTS, so the
+           next save read the old stage, asked the email question again and
+           sent the stage write a second time. The note is shown as a refusal
+           because the rate the person cleared is still there. */
+        if (emptied) { loadPlacements("Rates can be changed, not cleared", null, id, true); return; }
+        loadPlacements(said || "Saved", null, id);
       }).catch(function (e) { flash(ok, why(e), true); });
+    });
+  });
+
+  /* The Last day box's own button: end on that day, move an end not yet
+     reached, or correct the day an ended placement ended. end_placement()
+     decides which from the date and says back what it did. */
+  box.querySelectorAll("[data-pl-end-go], [data-pl-unend]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-place]");
+      var id = row.getAttribute("data-place");
+      var ok = row.querySelector("[data-pl-ok]");
+      var undo = b.hasAttribute("data-pl-unend");
+      var day = row.querySelector("[data-pl-end]").value;
+      if (!undo && !day) { flash(ok, "Pick her last day first", true); return; }
+
+      var p = PLACEMENTS.filter(function (x) { return x.id === id; })[0] || {};
+      var who = row.querySelector(".row__n");
+      if (!window.confirm(endAsk(p, (who && who.textContent) || "her", undo ? null : day))) return;
+
+      b.disabled = true;
+      flash(ok, "Saving\\u2026");
+      api("rpc/end_placement", {
+        method: "POST", body: { placement: id, last_day: undo ? null : day }
+      }).then(function (t) {
+        loadPlacements(endSays(t), null, id);
+      }).catch(function (e) {
+        b.disabled = false;
+        flash(ok, why(e), true);
+      });
     });
   });
 
@@ -8077,18 +9070,27 @@ function wirePlacementRows(box) {
     b.addEventListener("click", function () {
       var row = b.closest("[data-place]");
       var ok = row.querySelector("[data-pl-ok]");
+      var noteEl = row.querySelector("[data-swap-note]");
+      var note = noteEl ? noteEl.value.trim() : "";
+      b.disabled = true;
       flash(ok, "Saving\\u2026");
-      /* Status alone. sql/046 revoked UPDATE on resolved_at and resolved_by
-         and put a trigger on the table instead, so sending either would now be
-         refused outright — and that is the point: who resolved something is a
-         record, and a record the browser fills is one the browser can choose.
-         Every other such field here is stamped from the verified token; these
-         two were the last that were not. */
+      /* Status and what we told them, in one request, so the email sql/107
+         sends on the move to resolved carries the note. resolved_at and
+         resolved_by are not sent: sql/046 revoked UPDATE on both and stamps
+         them from the verified token, because who resolved something is a
+         record, and a record the browser fills is one the browser can
+         choose. */
       api("swap_requests?id=eq." + encodeURIComponent(b.getAttribute("data-swap")), {
         method: "PATCH", headers: { Prefer: "return=minimal" },
-        body: { status: "resolved" }
-      }).then(loadPlacements)
-        .catch(function (e) { flash(ok, why(e), true); });
+        body: { status: "resolved", resolution_note: note ? note.slice(0, 4000) : null }
+      }).then(function () {
+        var p = PLACEMENTS.filter(function (x) { return x.id === row.getAttribute("data-place"); })[0];
+        loadPlacements(p && clientHasAddress(p.client_id)
+          ? "Handled — the client has been emailed"
+          : "Handled — they have no contact address, so nobody was emailed. Tell them yourself.",
+          null, row.getAttribute("data-place"), !(p && clientHasAddress(p.client_id)));
+      })
+        .catch(function (e) { b.disabled = false; flash(ok, why(e), true); });
     });
   });
 }
@@ -8108,7 +9110,55 @@ function loadNotices() {
     });
 }
 
+/* Every write the notice board makes, as the request it sends. One place, so
+   what each button does can be read in a list — and driven: the test for this
+   board (tools/test-admin-notices.mjs) lifts this function and checks every
+   request it builds, because none of it had ever been run (F43).
+
+     post     a new notice, published now or kept as a draft
+     toggle   publish a draft, or take a live one down
+     pin      pin or unpin
+     edit     the title and the words (sql/026 always granted it; nothing
+              offered it, so a typo meant taking the notice down and writing
+              it again — F42)
+     delete   gone for good (sql/110, staff only) */
+function noticeRequest(kind, n, f) {
+  var at = "notices?id=eq." + encodeURIComponent(n ? n.id : "");
+  var patch = function (body) {
+    return [at, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: body }];
+  };
+  if (kind === "post") {
+    return ["notices", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: {
+        title: f.title,
+        body: f.body,
+        pinned: !!f.pinned,
+        published_at: f.published ? new Date().toISOString() : null,
+        /* Overwritten from the token by sql/083 on insert and frozen after,
+           so a notice cannot be signed with somebody else's address. */
+        created_by: ME
+      }
+    }];
+  }
+  if (kind === "toggle") return patch({ published_at: n.published_at ? null : new Date().toISOString() });
+  if (kind === "pin") return patch({ pinned: !n.pinned });
+  if (kind === "edit") return patch({ title: f.title, body: f.body });
+  if (kind === "delete") return [at, { method: "DELETE", headers: { Prefer: "return=minimal" } }];
+  throw new Error("no such notice action: " + kind);
+}
+
+/* A title and some words, or the sentence saying which is missing. Shared by
+   the new notice and the edit, so both refuse the same things. */
+function noticeMissing(title, body) {
+  if (!title) return "Give it a title — that is what people see first.";
+  if (!body) return "A notice with no words in it is not a notice.";
+  return "";
+}
+
 function drawNotices(box, rows) {
+  var edit = can("applications.edit");
   box.innerHTML =
     "<h2>Notice board</h2>" +
     '<p class="msg" style="margin-top:0">Everybody who has been hired sees these on their portal. A draft stays here until you publish it.</p>' +
@@ -8133,17 +9183,37 @@ function drawNotices(box, rows) {
             "</span>" +
             '<span class="pill pill--' + (n.published_at ? "approved" : "applied") + '">' +
               (n.published_at ? "Live" : "Draft") + "</span></div>" +
-            '<p class="msg" style="margin:.3rem 0 0">' + esc(n.body) + "</p>" +
+            '<p class="msg" data-nt-text style="margin:.3rem 0 0">' + esc(n.body) + "</p>" +
+            /* Edited in place: the same two boxes, filled with what is there.
+               Saving a live notice changes it on every portal at once, which
+               is what correcting a typo should do. */
+            '<div data-nt-form hidden>' +
+              '<div class="fld" style="margin-top:.7rem"><label>Title</label>' +
+                '<input data-nt-etitle type="text" aria-label="Title" value="' + esc(n.title) + '"></div>' +
+              '<div class="fld"><label>What it says</label>' +
+                '<textarea data-nt-ebody rows="4" aria-label="What it says">' + esc(n.body) + "</textarea></div>" +
+            "</div>" +
             '<div class="row__ctl">' +
               '<button class="btn btn--ghost" data-nt-toggle type="button" style="padding:.45rem .8rem;font-size:.85rem">' +
                 (n.published_at ? "Take it down" : "Publish it") + "</button>" +
               '<button class="btn btn--ghost" data-nt-pin type="button" style="padding:.45rem .8rem;font-size:.85rem">' +
                 (n.pinned ? "Unpin" : "Pin") + "</button>" +
+              (edit
+                ? '<button class="btn btn--ghost" data-nt-edit type="button" style="padding:.45rem .8rem;font-size:.85rem">Edit</button>' +
+                  '<button class="btn btn--ghost" data-nt-del type="button" style="padding:.45rem .8rem;font-size:.85rem">Delete</button>'
+                : "") +
               '<span class="row__ok" data-nt-ok></span>' +
             "</div>" +
           "</div>";
         }).join("") + "</div>"
       : "");
+
+  var send = function (kind, n, f, ok) {
+    var req = noticeRequest(kind, n, f);
+    flash(ok, "Saving…");
+    return api(req[0], req[1]).then(function () { loadNotices(); })
+      .catch(function (e) { flash(ok, why(e), true); throw e; });
+  };
 
   var write = function (published) {
     var t = document.getElementById("nt-title");
@@ -8151,41 +9221,60 @@ function drawNotices(box, rows) {
     var err = document.getElementById("nt-err");
     var ok = document.getElementById("nt-ok");
     err.textContent = "";
-    if (!t.value.trim()) { err.textContent = "Give it a title — that is what people see first."; t.focus(); return; }
-    if (!b.value.trim()) { err.textContent = "A notice with no words in it is not a notice."; b.focus(); return; }
-    flash(ok, "Saving…");
-    api("notices", {
-      method: "POST",
-      headers: { Prefer: "return=minimal" },
-      body: {
-        title: t.value.trim(),
-        body: b.value.trim(),
-        pinned: document.getElementById("nt-pin").checked,
-        published_at: published ? new Date().toISOString() : null,
-        /* Overwritten from the token by sql/083 on insert and frozen after,
-           so a notice cannot be signed with somebody else's address. */
-        created_by: ME
-      }
-    }).then(loadNotices)
-      .catch(function (e) { flash(ok, why(e), true); });
+    var miss = noticeMissing(t.value.trim(), b.value.trim());
+    if (miss) { err.textContent = miss; (t.value.trim() ? b : t).focus(); return; }
+    send("post", null, {
+      title: t.value.trim(),
+      body: b.value.trim(),
+      pinned: document.getElementById("nt-pin").checked,
+      published: published
+    }, ok)["catch"](function () {});
   };
   document.getElementById("nt-pub").addEventListener("click", function () { write(true); });
   document.getElementById("nt-draft").addEventListener("click", function () { write(false); });
 
-  box.querySelectorAll("[data-nt-toggle], [data-nt-pin]").forEach(function (b) {
+  box.querySelectorAll("[data-nt-toggle], [data-nt-pin], [data-nt-edit], [data-nt-del]").forEach(function (b) {
     b.addEventListener("click", function () {
       var row = b.closest("[data-notice]");
       var id = row.getAttribute("data-notice");
       var rec = rows.filter(function (x) { return x.id === id; })[0];
       var ok = row.querySelector("[data-nt-ok]");
-      var body = b.hasAttribute("data-nt-pin")
-        ? { pinned: !rec.pinned }
-        : { published_at: rec.published_at ? null : new Date().toISOString() };
-      flash(ok, "Saving…");
-      api("notices?id=eq." + encodeURIComponent(id), {
-        method: "PATCH", headers: { Prefer: "return=minimal" }, body: body
-      }).then(loadNotices)
-        .catch(function (e) { flash(ok, why(e), true); });
+
+      if (b.hasAttribute("data-nt-edit")) {
+        var form = row.querySelector("[data-nt-form]");
+        var text = row.querySelector("[data-nt-text]");
+        /* First press opens the boxes; the second saves them. */
+        if (form.hidden) {
+          form.hidden = false;
+          if (text) text.hidden = true;
+          b.textContent = "Save changes";
+          return;
+        }
+        var nt = row.querySelector("[data-nt-etitle]").value.trim();
+        var nb = row.querySelector("[data-nt-ebody]").value.trim();
+        var miss = noticeMissing(nt, nb);
+        if (miss) { flash(ok, miss, true); return; }
+        send("edit", rec, { title: nt, body: nb }, ok)["catch"](function () {});
+        return;
+      }
+
+      if (b.hasAttribute("data-nt-del")) {
+        /* Two presses, like a logo: the first only arms it and says what the
+           second does. There is no undo, and a live notice disappears from
+           every portal with it. */
+        if (b.getAttribute("data-armed") !== "1") {
+          b.setAttribute("data-armed", "1");
+          b.textContent = "Press again to delete";
+          flash(ok, rec && rec.published_at
+            ? "This takes it off everybody’s portal and cannot be undone."
+            : "This draft goes for good.", true);
+          return;
+        }
+        send("delete", rec, null, ok)["catch"](function () {});
+        return;
+      }
+
+      send(b.hasAttribute("data-nt-pin") ? "pin" : "toggle", rec, null, ok)["catch"](function () {});
     });
   });
 }
@@ -8203,14 +9292,43 @@ function loadSeats() {
   var box = document.getElementById("seats-card");
   if (!box) return;
   box.innerHTML = '<span class="spin"></span>Loading seat requests&hellip;';
-  api("seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,name,company,email,phone,notes,status,status_changed_at&order=created_at.desc")
-    .then(function (rows) { drawSeats(box, rows || []); })
+  /* client_id is sql/102's: which client the request belongs to, so the
+     business sees its enquiry and its assistant under one sign-in whatever
+     address each was typed with (F15). The client names come with it, for
+     the Link box on each row — fetched here rather than borrowed from the
+     Placements load, which runs at the same time and may not be back. */
+  Promise.all([
+    api("seat_requests?select=id,created_at,seats,hours,weekly,weekly_cents,blocks,timezone,name,company,email,phone,notes,status,status_changed_at,client_id&order=created_at.desc"),
+    api("clients?select=id,name&order=name.asc").catch(function () { return []; })
+  ])
+    .then(function (r) { drawSeats(box, r[0] || [], r[1] || []); })
     .catch(function (e) {
       box.innerHTML = '<p class="msg msg--bad">Could not load seat requests. ' + esc(e.message) + "</p>";
     });
 }
 
-function drawSeats(box, rows) {
+/* Whether moving a seat request from was to st emails the address on it,
+   step for step with sql/103's notify_seat_stage, which is what sends it.
+   103 is silent when the request has no usable address. A move to Closed
+   always mails. Otherwise it counts stages along a list that has no Closed in
+   it: Received and anything unknown stay quiet, and so does every step that
+   is not forward -- but a request reopened FROM Closed has no place on that
+   list, so 103 treats it as forward and mails it. Comparing places on
+   SEAT_PIPE, where Closed is last, got that case backwards. */
+function seatStageMails(st, was, email) {
+  if (st === was) return false;
+  if (!email || !String(email).replace(/^\\s+|\\s+$/g, "")) return false;
+  if (st === "closed") return true;
+  var stages = ["received", "call_booked", "matching", "shortlist", "running"];
+  var now = stages.indexOf(st), then = stages.indexOf(was);
+  if (now < 1) return false;
+  return then === -1 || now > then;
+}
+
+function drawSeats(box, rows, clients) {
+  clients = clients || [];
+  var clientName = {};
+  clients.forEach(function (c) { clientName[c.id] = c.name; });
   badge("tab-seats", rows.filter(function (r) { return r.status !== "closed"; }).length);
   if (!rows.length) {
     box.innerHTML = '<h2 class="edit__h">Seat requests</h2><p class="msg">Nobody has asked for a seat yet.</p>';
@@ -8249,9 +9367,28 @@ function drawSeats(box, rows) {
               " &middot; asked " + esc(when(r.created_at)) +
             "</div>" +
             (r.notes ? '<p class="seat__note">' + esc(r.notes) + "</p>" : "") +
+            '<p class="msg" style="margin:.3rem 0 0">' +
+              (r.client_id
+                ? "Client: <b>" + esc(clientName[r.client_id] || "a client") + "</b>"
+                : "Not linked to a client yet.") + "</p>" +
             (can("applications.edit")
               ? '<div class="row__ctl">' +
                   '<select data-seat-status aria-label="Stage of this seat request">' + opts + "</select>" +
+                  /* Which business this is (F15). Linking is what puts the
+                     enquiry and the placement under one sign-in; Make a
+                     client turns the enquiry into the business, with its
+                     contact and address, in one step (sql/104). */
+                  '<select data-seat-client aria-label="The client this request belongs to">' +
+                    '<option value="">No client</option>' +
+                    clients.map(function (c) {
+                      return '<option value="' + esc(c.id) + '"' + (r.client_id === c.id ? " selected" : "") + ">" +
+                        esc(c.name) + "</option>";
+                    }).join("") +
+                  "</select>" +
+                  '<button class="btn btn--ghost" data-seat-link type="button" style="padding:.45rem .8rem;font-size:.85rem">Link</button>' +
+                  (r.client_id
+                    ? ""
+                    : '<button class="btn btn--ghost" data-seat-make type="button" style="padding:.45rem .8rem;font-size:.85rem">Make a client from this</button>') +
                   '<span class="row__ok" data-seat-ok></span>' +
                 "</div>"
               : "") +
@@ -8259,6 +9396,52 @@ function drawSeats(box, rows) {
         );
       }).join("") +
     "</div>";
+
+  box.querySelectorAll("[data-seat-link]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-seat]");
+      var ok = row.querySelector("[data-seat-ok]");
+      var pick = row.querySelector("[data-seat-client]").value;
+      b.disabled = true;
+      flash(ok, "Saving…");
+      api("rpc/link_seat_request", {
+        method: "POST",
+        body: { request: row.getAttribute("data-seat"), client: pick || null }
+      }).then(function () { loadSeats(); loadPlacements(); })
+        .catch(function (e) { b.disabled = false; flash(ok, why(e), true); });
+    });
+  });
+
+  box.querySelectorAll("[data-seat-make]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-seat]");
+      var ok = row.querySelector("[data-seat-ok]");
+      var id = row.getAttribute("data-seat");
+      var r = rows.filter(function (x) { return x.id === id; })[0] || {};
+      var name = (r.company || "").trim();
+      if (!name) { flash(ok, "This request has no company name to make a client from.", true); return; }
+      if (!window.confirm(
+            "Make " + name + " a client, with " + (r.name || "no contact name") + " at " +
+            (r.email || "no address") + " as the contact?\\n\\nNobody is emailed. Their invite goes " +
+            "when somebody is first matched to them.")) {
+        return;
+      }
+      b.disabled = true;
+      flash(ok, "Saving…");
+      api("rpc/create_client", {
+        method: "POST",
+        body: {
+          business: name,
+          contact: r.name || null,
+          address: r.email || null,
+          cycle: "weekly",
+          note: null,
+          from_request: id
+        }
+      }).then(function () { loadSeats(); loadPlacements(); })
+        .catch(function (e) { b.disabled = false; flash(ok, why(e), true); });
+    });
+  });
 
   /* Writes on change, like the applications table. A dropdown has no
      half-chosen state, so there is nothing a Save button was waiting for —
@@ -8284,10 +9467,16 @@ function drawSeats(box, rows) {
          you had made it. Cancelling puts the dropdown back rather than leaving
          it showing something the database does not hold. */
       var who = row.querySelector(".row__n");
+      /* And, since sql/103, it emails them on some moves (F13).
+         seatStageMails() mirrors 103 so the question only promises an email
+         when one will go. */
+      var me = rows.filter(function (x) { return x.id === id; })[0];
+      var mails = seatStageMails(st, was, me && me.email);
       var okToGo = window.confirm(
         "Move " + ((who && who.textContent) || "this request") +
         " from “" + (SEAT_LABEL[was] || was) + "” to “" + (SEAT_LABEL[st] || st) + "”?\\n\\n" +
-        "The client sees this stage on their own page as soon as it saves."
+        "The client sees this stage on their own page as soon as it saves." +
+        (mails ? " It also emails the address on the request straight away to say so." : "")
       );
       if (!okToGo) { sel.value = was; return; }
 
@@ -8324,8 +9513,14 @@ function drawSeats(box, rows) {
    see: that something has been sitting for a week.
 
    So this is a list ordered by who is stuck, worst first, and nothing on it is
-   a control. Reading it and picking up the phone is the intervention. */
+   a control. Reading it and picking up the phone is the intervention.
+
+   With one exception, since sql/100: a booked interview carries Move and
+   Cancel, because when either side asks us to change it, a phone call is
+   not something the database can hear. */
 var IV_STATE = [];
+/* The confirmed slot of each placement interview, by placement. */
+var IV_BOOKED = {};
 
 /* The two things behind the Placements tab that are worth a number on it: swap
    requests somebody has to resolve, and interviews that have stalled. Kept as
@@ -8353,9 +9548,23 @@ function loadInterviews() {
   var box = document.getElementById("iv-card");
   if (!box) return;
   box.innerHTML = '<span class="spin"></span>Loading interviews&hellip;';
-  api("interview_state?select=placement_id,client_id,application_id,offered,earliest," +
-      "chosen_at,confirmed_at,state,days_waiting")
-    .then(function (rows) { IV_STATE = rows || []; drawInterviews(box); })
+  Promise.all([
+    api("interview_state?select=placement_id,client_id,application_id,offered,earliest," +
+        "chosen_at,confirmed_at,state,days_waiting"),
+    /* The confirmed times themselves, for Move and Cancel (F18). The view
+       above says a placement is confirmed but not which slot, and the two
+       functions in sql/100 take the slot. Caught, so the list still draws if
+       this read is refused. */
+    api("interview_slots?select=id,placement_id,starts_at,minutes,confirmed_at" +
+        "&placement_id=not.is.null&confirmed_at=not.is.null")
+      .catch(function () { return []; })
+  ])
+    .then(function (r) {
+      IV_STATE = r[0] || [];
+      IV_BOOKED = {};
+      (r[1] || []).forEach(function (s) { IV_BOOKED[s.placement_id] = s; });
+      drawInterviews(box);
+    })
     .catch(function () {
       box.innerHTML =
         "<h2>Interviews being arranged</h2>" +
@@ -8392,7 +9601,8 @@ function drawInterviews(box) {
     "<h2>Interviews being arranged</h2>" +
     '<p class="msg" style="margin-top:0">Every matched placement where the two of them have not ' +
       "met yet. Nobody here is waiting on us &mdash; they arrange it themselves &mdash; so this " +
-      "is only for spotting the ones that have stopped moving.</p>" +
+      "is for spotting the ones that have stopped moving, and for moving or calling off a " +
+      "booked one when either side asks us to. Times are Central.</p>" +
 
     (stuck.length
       ? '<div class="note note--warn" style="margin-top:1.1rem"><b>' + esc(String(stuck.length)) +
@@ -8404,17 +9614,76 @@ function drawInterviews(box) {
       ? '<div class="rows" style="margin-top:1rem">' + rows.map(function (r) {
           var a = byId[r.application_id];
           var lab = IV_LABEL[r.state] || ["&mdash;", "none"];
-          return '<div class="row">' +
+          var slot = r.state === "confirmed" ? IV_BOOKED[r.placement_id] : null;
+          return '<div class="row"' + (slot ? ' data-pivslot="' + esc(slot.id) + '"' : "") + ">" +
             '<div class="row__top"><span>' +
               '<span class="row__n">' + esc(a ? a.name : "Unknown assistant") +
                 " &middot; " + esc(clientName[r.client_id] || "unknown client") + "</span>" +
               '<span class="row__meta"> &middot; ' + esc(ivSays(r)) + "</span>" +
             "</span>" +
             '<span class="pill pill--iv_' + esc(lab[1]) + '">' + lab[0] + "</span></div>" +
+            /* A booked interview could not be moved or called off from any
+               screen — a change meant an email to support and a fix by hand
+               (F18). sql/100 lets the client or staff do either; both sides
+               are emailed. The reason box used to say "for the notes, not
+               for them", and 100 kept it nowhere at all. 100 now hands it to
+               both emails as record.reason (post_interview_note_with_reason),
+               which api/notify quotes, so the box says who will read it. */
+            (slot && can("applications.edit")
+              ? '<div class="row__ctl">' +
+                  '<input type="datetime-local" data-piv-at value="' + esc(localDateTime(slot.starts_at)) + '" ' +
+                    'aria-label="Move this interview to, in Central time" title="Central time">' +
+                  '<button class="btn btn--ghost" data-piv-move type="button" style="padding:.45rem .8rem;font-size:.85rem">Move it</button>' +
+                  '<input type="text" data-piv-why maxlength="500" ' +
+                    'placeholder="Why, in a few words &mdash; optional, quoted to both of them in the email" ' +
+                    'aria-label="Why this interview is being moved or cancelled. Optional, quoted to both of them in the email">' +
+                  '<button class="btn btn--ghost" data-piv-cancel type="button" style="padding:.45rem .8rem;font-size:.85rem">Cancel this interview</button>' +
+                  '<span class="row__ok" data-piv-ok></span>' +
+                "</div>"
+              : "") +
           "</div>";
         }).join("") + "</div>"
       : '<div class="note" style="margin-top:1.1rem"><b>Nothing being arranged.</b> ' +
         "This fills in when a placement is set to matched.</div>");
+
+  box.querySelectorAll("[data-piv-move], [data-piv-cancel]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-pivslot]");
+      var ok = row.querySelector("[data-piv-ok]");
+      var slot = row.getAttribute("data-pivslot");
+      var whyEl = row.querySelector("[data-piv-why]");
+      var reason = whyEl && whyEl.value.trim() ? whyEl.value.trim().slice(0, 500) : null;
+      var call;
+
+      if (b.hasAttribute("data-piv-move")) {
+        /* The date box is the confirmation, as on an applicant's row: an
+           empty one does nothing, and nobody types a date by accident. */
+        var at = fromLocalDateTime(row.querySelector("[data-piv-at]").value);
+        if (!at) { flash(ok, "Pick the new time first.", true); return; }
+        call = api("rpc/reschedule_placement_interview", {
+          method: "POST", body: { slot: slot, at_time: at, why: reason }
+        });
+      } else {
+        /* Two presses: this mails both of them, takes the time off the
+           books, and the client then has to offer new ones. */
+        if (b.getAttribute("data-armed") !== "1") {
+          b.setAttribute("data-armed", "1");
+          b.textContent = "Press again to cancel it";
+          flash(ok, "This emails both of them that it is off. The client then offers new times. " +
+            "There is no undo.", true);
+          return;
+        }
+        call = api("rpc/cancel_placement_interview", {
+          method: "POST", body: { slot: slot, why: reason }
+        });
+      }
+
+      b.disabled = true;
+      flash(ok, "Saving…");
+      call.then(function () { loadInterviews(); })
+        .catch(function (e) { b.disabled = false; flash(ok, why(e), true); });
+    });
+  });
 }
 
 /* One sentence per row, and it has to carry the two things somebody reads:
@@ -8855,6 +10124,90 @@ function removePayment(id, btn) {
    Not on a timer and not on page load — this is a person deciding to clear up,
    and a page that quietly deletes files while somebody reads it is a page
    nobody should trust with a bucket of CVs. */
+/* ── emails that did not go ───────────────────────────────────────────────
+   sql/095. Every email the database asks for is written to notify_outbox
+   and tried again for about eight hours before it is given up on, and a
+   give-up sends staff one alert. This is where those land: what it was, how
+   it failed, and Try again, which posts the same row with the same key so
+   Resend never sends it twice (F51).
+
+   Quiet when there is nothing — no card at all, rather than an empty box
+   saying all is well about a table that may not exist yet. */
+var OUTBOX_SOURCE = {
+  notify_decision: "a stage or decision email", notify_swap: "a swap email",
+  post_interview_note: "an interview email", notify_payment_receipt: "a payment receipt",
+  invite_the_client: "a client invite", update_client: "a client invite",
+  resend_client_invite: "a client invite", post_client_invite: "a client invite",
+  notify_form: "a form receipt or staff alert",
+  /* notify_form() itself passes 'notify-' plus the table it fired on (096),
+     so these three are the names that actually land in the outbox. */
+  "notify-applications": "an application receipt and staff alert",
+  "notify-seat_requests": "a seat request receipt and staff alert",
+  "notify-contact_messages": "a contact form receipt and staff alert",
+  notify_outbox: "a staff alert about emails that did not go",
+  notify_assessment_sent: "a staff alert about the exams",
+  notify_interview: "an interview email",
+  post_interview_note_with_reason: "an interview email",
+  notify_seat_stage: "a seat request update",
+  notify_client_week: "an hours-waiting email to the client",
+  notify_swap_client: "a swap reply to the client",
+  keep_placement_on: "a kept-on email",
+  notify_placement_ended: "a placement-ended email to the client",
+  cancel_placement_interview: "an interview cancellation"
+};
+
+function loadOutbox() {
+  var box = document.getElementById("outbox-card");
+  if (!box) return;
+  box.hidden = true;
+  api("notify_outbox?select=id,created_at,source,last_status,last_error,attempts" +
+      "&gave_up_at=not.is.null&order=id.desc&limit=50")
+    .then(function (rows) { drawOutbox(box, rows || []); })
+    /* Before 095 the table is not there and PostgREST answers 404: nothing to
+       show, so nothing is shown. */
+    .catch(function () { box.hidden = true; });
+}
+
+function drawOutbox(box, rows) {
+  if (!rows.length) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML =
+    "<h2>Emails that did not go</h2>" +
+    '<p class="msg" style="margin-top:0">Each was tried for about eight hours and then given up on. ' +
+      "Try again once whatever stopped it is fixed &mdash; it is the same email, and nobody gets it twice.</p>" +
+    '<div class="rows">' + rows.map(function (r) {
+      return '<div class="row" data-outbox="' + esc(r.id) + '">' +
+        '<div class="row__top"><span>' +
+          '<span class="row__n">' + esc(OUTBOX_SOURCE[r.source] || r.source || "an email") + "</span>" +
+          '<span class="row__meta"> &middot; asked for ' + esc(whenTime(r.created_at)) +
+            " &middot; " + esc(String(r.attempts || 0)) + (r.attempts === 1 ? " try" : " tries") + "</span>" +
+        "</span></div>" +
+        '<p class="msg" style="margin:.3rem 0 0">' +
+          (r.last_status ? "Last answer " + esc(String(r.last_status)) : "No answer") +
+          (r.last_error ? " &mdash; " + esc(String(r.last_error).slice(0, 200)) : "") + "</p>" +
+        (can("applications.edit")
+          ? '<div class="row__ctl">' +
+              '<button class="btn btn--ghost" data-outbox-retry type="button" style="padding:.45rem .8rem;font-size:.85rem">Try again</button>' +
+              '<span class="row__ok" data-outbox-ok></span>' +
+            "</div>"
+          : "") +
+      "</div>";
+    }).join("") + "</div>";
+
+  box.querySelectorAll("[data-outbox-retry]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var row = b.closest("[data-outbox]");
+      var ok = row.querySelector("[data-outbox-ok]");
+      b.disabled = true;
+      flash(ok, "Sending…");
+      api("rpc/retry_notify", {
+        method: "POST", body: { item: Number(row.getAttribute("data-outbox")) }
+      }).then(function () { loadOutbox(); })
+        .catch(function (e) { b.disabled = false; flash(ok, why(e), true); });
+    });
+  });
+}
+
 function loadOrphans() {
   var box = document.getElementById("orphan-card");
   if (!box) return;
@@ -9737,10 +11090,18 @@ function save(row) {
   if (!jobs.length) return;
   flash(ok, "Saving\u2026");
 
+  var wasStage = rec ? rec.status : null;
   Promise.all(jobs).then(function () {
     if (rec) {
       if (st !== null) rec.status = st;
-
+      /* What sql/111's trigger has just done to the pipeline, put on the row
+         it is about to be redrawn from: into hired, the pipeline is hired;
+         out of it, rejected if declined and interviewed otherwise. Mirrored
+         rather than refetched for the same reason contacted_by is below. */
+      if (st !== null && wasStage !== st) {
+        if (st === "hired") rec.pipeline = "hired";
+        else if (wasStage === "hired") rec.pipeline = st === "declined" ? "rejected" : "interviewed";
+      }
     }
     if (st !== null) {
       var pill = row.querySelector("[data-pill]");
@@ -9805,6 +11166,10 @@ function save(row) {
              k.indexOf("score_") === 0 || k.indexOf("iv_") === 0;
     })) drawCalendar();
   }).catch(function (e) {
+    /* A refused pipeline goes back to what the row holds. sql/111 refuses
+       moving it onto or off Hired by hand (sjva-hired-is-the-stage), and a
+       dropdown left showing the refused value looks saved. */
+    if (ppEl && rec && rec.pipeline) ppEl.value = rec.pipeline;
     flash(ok, why(e), true);
   });
 }
@@ -9921,9 +11286,15 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
       '<span class="rail__k">The business</span>' +
       '<button class="rnav" data-tab="seats" type="button">' + ICON.seats +
         'Seats<span class="rnav__n" id="tab-seats"></span></button>' +
-      '<button class="rnav" data-tab="clients" type="button">' + ICON.clients + "Clients</button>" +
+      /* Clients is the businesses themselves — contact, address, billing,
+         the invite. It used to be the name of the logo strip, which is now
+         Logos and sits last in this group, because it is about the home page
+         rather than about anybody we work for (F46). */
+      '<button class="rnav" data-tab="clients" type="button">' + ICON.clients +
+        'Clients<span class="rnav__n" id="tab-clients"></span></button>' +
       '<button class="rnav" data-tab="place" type="button">' + ICON.place +
         'Placements<span class="rnav__n" id="tab-place"></span></button>' +
+      '<button class="rnav" data-tab="logos" type="button">' + ICON.logos + "Logos</button>" +
       '<span class="rail__k">The team</span>' +
       '<button class="rnav" data-tab="team" type="button">' + ICON.team +
         'Team<span class="rnav__n" id="tab-leave"></span></button>' +
@@ -10005,8 +11376,10 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
     "</div>" +
     '<div data-pane="seats" hidden><div class="card" id="seats-card"></div></div>' +
     '<div data-pane="inbox" hidden><div class="card" id="inbox-card"></div>' +
-      '<div class="card" id="orphan-card"></div></div>' +
-    '<div data-pane="clients" hidden><div class="card" id="clients-card"></div></div>' +
+      '<div class="card" id="orphan-card"></div>' +
+      '<div class="card" id="outbox-card" hidden></div></div>' +
+    '<div data-pane="clients" hidden><div class="card" id="client-card"></div></div>' +
+    '<div data-pane="logos" hidden><div class="card" id="logos-card"></div></div>' +
     '<div data-pane="cal" hidden><div class="card" id="cal-card"></div></div>' +
     '<div data-pane="team" hidden><div class="card" id="leave-card"></div>' +
       '<div class="card" id="notice-card"></div></div>' +
@@ -10031,7 +11404,8 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
   loadNotices();
   loadInbox();
   loadOrphans();
-  loadClients();
+  loadOutbox();
+  loadLogos();
   /* Every other pane is drawn here; this one was drawn from inside the
      client-logo upload handler, two spaces out of line with the callback it
      had landed in. So /admin opened with Interviews blank — not an empty
@@ -10054,6 +11428,9 @@ function render(email, apps, notes, socials, docs, disc, sits, slots) {
     var row = e.target.closest(".row");
     if (!row) return;
     if (e.target.matches("[data-status], [data-pipe], [data-replied], [data-score], [data-interview]")) {
+      /* The stage is the one control here that emails a person, so it alone
+         asks first (stageOk, F31). */
+      if (e.target.matches("[data-status]") && !stageOk(e.target, byRow(row))) return;
       save(row);
     }
   });
@@ -11624,9 +13001,26 @@ function load() {
           "We cannot find an application for " + esc(ME) + ". If you applied with a different address, sign out and use that one.");
         return;
       }
+      /* The gate is the stage and nothing else, so the sentence says the
+         stage. It used to say the portal appears on the day she is placed
+         with a client, which is a different day: she is marked Hired first, the portal opens
+         that moment, and a client may come later or not yet at all. Somebody
+         hired on Monday and matched on Friday was told to wait for Friday for
+         a page that had been open since Monday. */
+      /* Except that a declined application is not on its way to Hired, and
+         "nothing to do in the meantime" told her to wait for a portal that
+         is not coming. Her status page is where the decision is said. */
+      if (a.status === "declined") {
+        shut("This portal is for assistants on the team.",
+          "Your application did not go further this time, so there is no portal for this address. " +
+          'What we told you is on <a href="/status">your status page</a>.');
+        return;
+      }
       if (a.status !== "hired") {
         shut("This opens when you are hired.",
-          "Your application is at <b>" + esc(a.status) + "</b>. The portal appears here the day you are placed &mdash; nothing to do in the meantime.");
+          "Your application is at <b>" + esc(a.status) + "</b>. The portal opens here as soon as you are marked Hired &mdash; " +
+          "you do not need a client first, and there is nothing to do in the meantime. " +
+          'Where your application has got to is on <a href="/status">your status page</a>.');
         return;
       }
       /* Both are fenced by policy: the leave rows are matched to applications
@@ -12009,8 +13403,16 @@ function payCard() {
         '<span class="pm__mk">&#127974;</span>' +
         "<span>" +
           '<span class="pm__t">Bank transfer</span>' +
-          '<span class="pm__d">The way you agreed on your call. We send the details with each ' +
-            "week&rsquo;s summary, and a transfer shows up here once we have seen it land.</span>" +
+          /* It promised the bank details "with each week's summary", and
+             nothing sends a weekly summary or an invoice. A client waiting for
+             one never learned how to pay. Said as it is: this page is the
+             statement, a person sends the details, a receipt follows a
+             payment (sql/093). */
+          '<span class="pm__d">The way you agreed on your call. No invoice or weekly summary is ' +
+            "sent automatically &mdash; the figure above is what you owe, and it moves as you " +
+            "approve hours. For our bank details, or an invoice for your records, write to " +
+            '<a href="mailto:support@securejobva.com">support@securejobva.com</a>. A transfer ' +
+            "shows up here once we have recorded it, and we email you a receipt.</span>" +
         "</span>" +
         '<span class="tag tag--now">How it works today</span>' +
       "</div>" +
@@ -12036,7 +13438,7 @@ function payCard() {
     '<div class="gap">' +
       '<p class="gap__h">Why there is no Pay button here</p>' +
       '<p class="gap__p">A button that says <b>Pay</b> and does nothing is worse than no button: ' +
-        "somebody presses it, believes the money moved, and stops chasing the invoice. The shape " +
+        "somebody presses it, believes the money moved, and never sends it. The shape " +
         "of this panel is the payment provider&rsquo;s decision too &mdash; a hosted page redirects " +
         "away, an embedded form wants its own container &mdash; so the button arrives with the " +
         "provider rather than before it. Everything around it is ready for the day it does.</p>" +

@@ -3748,9 +3748,26 @@ function load() {
           "We cannot find an application for " + esc(ME) + ". If you applied with a different address, sign out and use that one.");
         return;
       }
+      /* The gate is the stage and nothing else, so the sentence says the
+         stage. It used to say the portal appears on the day she is placed
+         with a client, which is a different day: she is marked Hired first, the portal opens
+         that moment, and a client may come later or not yet at all. Somebody
+         hired on Monday and matched on Friday was told to wait for Friday for
+         a page that had been open since Monday. */
+      /* Except that a declined application is not on its way to Hired, and
+         "nothing to do in the meantime" told her to wait for a portal that
+         is not coming. Her status page is where the decision is said. */
+      if (a.status === "declined") {
+        shut("This portal is for assistants on the team.",
+          "Your application did not go further this time, so there is no portal for this address. " +
+          'What we told you is on <a href="/status">your status page</a>.');
+        return;
+      }
       if (a.status !== "hired") {
         shut("This opens when you are hired.",
-          "Your application is at <b>" + esc(a.status) + "</b>. The portal appears here the day you are placed &mdash; nothing to do in the meantime.");
+          "Your application is at <b>" + esc(a.status) + "</b>. The portal opens here as soon as you are marked Hired &mdash; " +
+          "you do not need a client first, and there is nothing to do in the meantime. " +
+          'Where your application has got to is on <a href="/status">your status page</a>.');
         return;
       }
       /* Both are fenced by policy: the leave rows are matched to applications

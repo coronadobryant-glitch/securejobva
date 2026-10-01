@@ -2625,8 +2625,11 @@ function ivCard(a) {
 
   if (declined) {
     return '<div class="card">' + head +
-      '<p class="msg" style="margin-top:1rem">You told us none of those worked. We will send ' +
-      "a new set &mdash; nothing else is needed from you.</p></div>";
+      /* "We will send" used to rest on somebody opening /admin. sql/099 now
+         emails the team the moment she turns the set down, so the card can
+         say they have been told rather than hope it. */
+      '<p class="msg" style="margin-top:1rem">You told us none of those worked, and the team ' +
+      "has been told. We will send a new set &mdash; nothing else is needed from you.</p></div>";
   }
 
   /* A time that has already started is not a choice. Times offered for Monday
@@ -2662,9 +2665,14 @@ function ivCard(a) {
             '">Choose</button>') +
         "</li>";
     }).join("") + "</ol>" +
+    /* "Waiting on us" was true and said nothing about how long: nobody on the
+       team heard about a pick until they opened the Interviews tab. sql/099
+       alerts them as she picks, and confirming is what sends her the "booked"
+       email (070), so both are said here as facts. */
     (chosen
-      ? '<p class="msg" style="margin-top:.9rem">Picked a different one? Choose it and we will ' +
-        "take the last one back.</p>"
+      ? '<p class="msg" style="margin-top:.9rem">The team has been told which time you picked; ' +
+        "you will get an email when it is confirmed. " +
+        "Picked a different one? Choose it and we will take the last one back.</p>"
       : '<button class="iv__none" type="button" data-none="' + esc(a.id) + '">' +
         "None of these work for me</button>") +
     '<p class="msg msg--bad" id="iv-err" style="display:none"></p>' +
@@ -2742,6 +2750,40 @@ function wireIv(a) {
 }
 
 
+/* What happens after she presses Send, said while it is still ahead of her.
+
+   This used to be "We have it ... you will hear from us either way", and that
+   was all she got: no person was told the work had arrived, and a pass sat at
+   Assessment until somebody happened to open /admin, type in her typing
+   figures and then move her by hand as well. So "either way" had no day
+   attached to it and depended on luck.
+
+   Both halves are now in the database, and this says exactly what they do:
+   sql/098 alerts the team the moment submitted_at is written, and sql/097
+   moves a passed sitting to Interview by itself once a person has checked her
+   typing screenshot — which emails her "interview next" (031). That email
+   does not carry times: they are offered afterwards, and come in an email of
+   their own ("pick a time"), so the card says the two in that order rather
+   than promising times with the move. A sitting below the line is still
+   declined by a person, and that emails her too. The timing is the same
+   three working days the careers page and the confirmation email give for
+   reading an application. Nothing enforces it for this check; it is the pace
+   the team keeps, and the card says "usually" for that reason.
+
+   Only while she is still at Assessment. Once she has been moved on, either
+   way, the next step has happened and her stage on the ladder above says
+   which; promising it again under a card she is past would be wrong. */
+function assessNext(a) {
+  if (a.status !== "assessment") {
+    return "We have it. There is nothing more for you to do on this part.";
+  }
+  return "We have it, and the team is told the moment it arrives. " +
+    "A person now checks your typing screenshot against the figures you entered. " +
+    "If your results clear the line, that check moves you to Interview and we email you, " +
+    "then send the interview times to pick from in an email of their own; if they do not, we email you to say so. " +
+    "That is usually within three working days &mdash; there is nothing more for you to do on this part.";
+}
+
 function assessCard(a, s) {
   /* Nothing to show unless she is actually at this stage. A finished
      assessment stays visible so she can see it was received — an empty space
@@ -2754,8 +2796,7 @@ function assessCard(a, s) {
       '<div class="row__top"><span><span class="row__n">Your assessment</span>' +
       '<span class="row__meta"> &middot; sent ' + esc(when(s.submitted_at)) + "</span></span>" +
       '<span class="pill pill--approved">Received</span></div>' +
-      '<p class="msg" style="margin-top:1rem">We have it. There is nothing more for you ' +
-      "to do on this part &mdash; you will hear from us either way.</p></div>";
+      '<p class="msg" style="margin-top:1rem">' + assessNext(a) + "</p></div>";
   }
 
   /* Sales is only asked of the track it gates. Nobody else answers eight

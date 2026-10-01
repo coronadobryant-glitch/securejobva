@@ -2854,8 +2854,16 @@ function payCard() {
         '<span class="pm__mk">&#127974;</span>' +
         "<span>" +
           '<span class="pm__t">Bank transfer</span>' +
-          '<span class="pm__d">The way you agreed on your call. We send the details with each ' +
-            "week&rsquo;s summary, and a transfer shows up here once we have seen it land.</span>" +
+          /* It promised the bank details "with each week's summary", and
+             nothing sends a weekly summary or an invoice. A client waiting for
+             one never learned how to pay. Said as it is: this page is the
+             statement, a person sends the details, a receipt follows a
+             payment (sql/093). */
+          '<span class="pm__d">The way you agreed on your call. No invoice or weekly summary is ' +
+            "sent automatically &mdash; the figure above is what you owe, and it moves as you " +
+            "approve hours. For our bank details, or an invoice for your records, write to " +
+            '<a href="mailto:support@securejobva.com">support@securejobva.com</a>. A transfer ' +
+            "shows up here once we have recorded it, and we email you a receipt.</span>" +
         "</span>" +
         '<span class="tag tag--now">How it works today</span>' +
       "</div>" +
@@ -2881,7 +2889,7 @@ function payCard() {
     '<div class="gap">' +
       '<p class="gap__h">Why there is no Pay button here</p>' +
       '<p class="gap__p">A button that says <b>Pay</b> and does nothing is worse than no button: ' +
-        "somebody presses it, believes the money moved, and stops chasing the invoice. The shape " +
+        "somebody presses it, believes the money moved, and never sends it. The shape " +
         "of this panel is the payment provider&rsquo;s decision too &mdash; a hosted page redirects " +
         "away, an embedded form wants its own container &mdash; so the button arrives with the " +
         "provider rather than before it. Everything around it is ready for the day it does.</p>" +

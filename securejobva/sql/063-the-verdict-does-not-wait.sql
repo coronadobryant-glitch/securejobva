@@ -1,3 +1,22 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the files that come later, because it
+-- defines functions they have since replaced — and `create or replace` does
+-- exactly what it says.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   advance_on_assessment
+--     -> re-run 097-a-pass-moves-on-when-the-typing-is-checked.sql to restore
+--
+-- 063's version only acts on the update where the verdict TURNS 'passed', so
+-- a pass whose typing is checked afterwards — every pass, since the verdict
+-- arrives the moment she sends it — is never moved to Interview. 097 fixes
+-- that. Running 097 again afterwards does not repeat its catch-up for anybody
+-- already moved; it only moves whoever this file left behind in between.
+--
+-- tools/check.mjs keeps this list honest.
 -- 063 — the verdict does not wait for a person
 
 -- Run after: 049 (the scorer this replaces), 050

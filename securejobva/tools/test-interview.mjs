@@ -48,15 +48,16 @@ const serverNow = () => NOW;
 
 const SHARED = ["tzOpts", "browserTz", "slotDay", "slotClock", "slotLabel", "slotAlso", "slotState"];
 
-/* The client's side. */
-const client = new Function("esc",
+/* The client's side. Given the same clock as hers: since sql/100 the
+   confirmed card offers Move and Call it off only while the time is ahead. */
+const client = new Function("esc", "serverNow",
   "var MY_TZ = null, CENTRAL = 'America/Chicago';\n" +
   "var C_SLOTS = [], C_NAMES = [];\n" +
   SHARED.concat(["todayLocal", "slotRow", "interviewBlock"])
     .map((n) => grab(seatsHtml, n, "seats.html")).join("\n") +
   "\nreturn { set: function (s) { C_SLOTS = s.slots; C_NAMES = s.names || []; MY_TZ = s.tz || null; }," +
   " card: interviewBlock, state: slotState, label: slotLabel, also: slotAlso };"
-)(esc);
+)(esc, serverNow);
 
 /* Hers. */
 const asst = new Function("esc", "serverNow",
@@ -182,14 +183,31 @@ ok("she sees the same link", /meet\.google\.com/.test(v.h), true);
   ok("nor on the client's", /href="\s*javascript:/i.test(bad.c), false);
 }
 ok("and the same moment on her own clock", /10:00\s*PM/.test(v.h), true);
-/* This asserted the opposite until 29 September: that the client was offered
-   "Change the time". The button called withdraw_interview_slot, which refuses
-   a confirmed slot by design, so it could only ever fail. Nothing moves a
-   confirmed placement interview yet (see seats.html), and the honest control
-   is the address that can. */
+/* Until 29 September the client was offered "Change the time", which called
+   withdraw_interview_slot — and that refuses a confirmed slot by design, so it
+   could only ever fail. Then the honest control was an address. Since
+   sql/100 a confirmed placement interview has its own two functions, and the
+   card offers exactly those: Move it and Call it off, each carrying the slot
+   it acts on, and never the withdraw call. */
 ok("the client is not offered a button that cannot work", /Change the time/.test(v.c), false,
    "withdraw_interview_slot refuses a confirmed slot");
-ok("and is told who can move it", /support@securejobva\.com/.test(v.c), true);
+ok("the client can move a confirmed interview", /data-iv-move="s1"/.test(v.c), true,
+   "reschedule_placement_interview, sql/100");
+ok("and call it off", /data-iv-cancel="s1"/.test(v.c), true,
+   "cancel_placement_interview, sql/100");
+ok("the confirmed card offers no withdraw", /data-iv-drop=/.test(v.c), false);
+ok("a new time is typed in the zone the label names", /America\/Chicago|Chicago time/.test(v.c), true);
+ok("and the card says both of them are told", /we email Maria and you/.test(v.c), true);
+{
+  /* Once the time has gone, moving it is not the question any more. */
+  const was = NOW;
+  NOW = Date.parse("2026-09-08T15:00:00Z");
+  const after = both(done).c;
+  NOW = was;
+  ok("after the interview there is nothing to move", /data-iv-move=/.test(after), false);
+  ok("or to call off", /data-iv-cancel=/.test(after), false);
+  ok("the details are still there", /meet\.google\.com/.test(after), true);
+}
 ok("she is not offered a way to cancel it", /None of these work/.test(v.h), false,
    "she agreed to it; unpicking it unilaterally is a phone call, not a button");
 

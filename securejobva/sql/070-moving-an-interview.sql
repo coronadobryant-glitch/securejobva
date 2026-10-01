@@ -1,7 +1,7 @@
 -- DO NOT RE-RUN THIS FILE ON ITS OWN
 --
 -- Every statement in it is repeatable, so on its own it is safe. What it is
--- not safe to do is run it AFTER the file that comes later.
+-- not safe to do is run it AFTER the files that come later.
 --
 -- What this file would take back, and what to run afterwards to undo it:
 --
@@ -13,9 +13,12 @@
 -- whose whole job is to say which of two times is which. The move itself is
 -- identical; only the note is worse.
 --
--- 070 also defines notify_interview, which 071 does NOT touch. Re-running
--- 070 is the right thing to do if that trigger ever needs restoring; run
--- 071 after it to get the note wording back.
+--   notify_interview
+--     -> re-run 099-staff-hear-when-she-picks-a-time.sql to restore. 099
+--        carries this file's 'moved' moment forward and adds staff alerts
+--        for her pick and decline, and 'moved' for placement interviews.
+--
+-- So 070 is no longer the file to re-run to restore notify_interview: 099 is.
 --
 -- tools/check.mjs keeps this list honest.
 

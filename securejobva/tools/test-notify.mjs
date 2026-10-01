@@ -171,11 +171,13 @@ is("it names no other applicant", /david@example\.com|bryant@example\.com/
   .test(all[1].body.text + all[1].body.html), false);
 is("it does not link the admin queue", /\/admin/.test(all[1].body.text + all[1].body.html), false);
 
-/* The other two forms promise nothing, so they must not start emailing people
-   who were never told to expect it. */
+/* The seat form's thank-you screen promises the call and hands over the
+   booking link; since F11 the business gets that in its inbox too (asserted
+   in full further down). The contact form promises nothing, so it must not
+   start emailing people who were never told to expect it. */
 await call({ type: "INSERT", table: "seat_requests",
   record: { name: "Ana", company: "Rosehill", email: "ana@example.com", hours: 30 } });
-is("a seat request sends one email, to you", all.length, 1);
+is("a seat request sends two emails: yours, then theirs", all.length, 2);
 await call({ type: "INSERT", table: "contact_messages",
   record: { name: "Sam", email: "sam@example.com", reason: "Billing", message: "A question" } });
 is("a contact message sends one email, to you", all.length, 1);
@@ -202,6 +204,20 @@ globalThis.fetch = realFetch;
 is("a refused confirmation still answers 200", half.code, 200);
 is("and reports it honestly", half.body.confirmed, false);
 is("and still counts your two", half.body.sent, 2);
+
+/* …but a confirmation lost to an outage is retried (sql/095). The retry
+   sends your alert again, which is only safe because both tries carry the
+   same idempotency key — asserted further down. */
+n = 0;
+globalThis.fetch = async (url, opt) => {
+  n++;
+  const r = await realFetch(url, opt);
+  return n === 1 ? r : { ok: false, status: 503, text: async () => "unavailable" };
+};
+const blip = await call(APPLICATION);
+globalThis.fetch = realFetch;
+is("a confirmation lost to an outage asks for a retry with 503", blip.code, 503);
+is("and says the confirmation did not go", [blip.body.retry, blip.body.confirmed], [true, false]);
 
 /* ── decisions, both directions ────────────────────────────────────────────
    031 posts these rather than Supabase, because a timesheet carries no address
@@ -725,12 +741,22 @@ const PAID = (over) => ({
   is("and is not mailed a confirmation", all.length, 1);
 }
 
-/* ── the reporting rule, which is the whole point of splitting them ── */
+/* ── the reporting rule, which is now a request to the outbox ──
+   sql/095 retries anything that is not 2xx or a plain 4xx about the message.
+   An outage must ask for another try, for staff and person alike; a dead
+   address must not, or the outbox spends eight hours asking Resend to mail
+   somebody who does not exist and then alerts you about it. */
 resendStatus = 500;
 is("a failed email to you is reported with 502", (await call(WEEK)).code, 502);
 const lost = await call(decided({ status: "approved" }));
-is("a failed email to them is not", lost.code, 200);
-is("and is reported rather than hidden", lost.body.told, false);
+is("a failed email to them, Resend down, asks for a retry with 503", lost.code, 503);
+is("and says so in the body", [lost.body.retry, lost.body.told], [true, false]);
+resendStatus = 429;
+is("rate-limited is a retry too", (await call(decided({ status: "approved" }))).code, 503);
+resendStatus = 422;
+const dead = await call(decided({ status: "approved" }));
+is("a dead address is answered 200 — another try cannot help", dead.code, 200);
+is("and is reported rather than hidden", dead.body.told, false);
 resendStatus = 200;
 
 /* ── a first word that is not a name ─────────────────────────────────────
@@ -788,6 +814,497 @@ resendStatus = 200;
   const r = await call(iv("link", { record: { side: "assistant", meeting_url: "https://meet.example/abc" } }));
   is("a link event on a placement interview is skipped", [r.code, all.length], [200, 0]);
   is("by name", r.body.skipped, "interview_slots/link (assistant)");
+}
+
+/* ══ fix run 1 Oct: the outbox and the mails it carries ════════════════════
+   Everything below is new with sql/094–111. The payload shapes are copied
+   from those files' jsonb_build_object calls, field for field. */
+
+const words = (m) => (m.subject || "") + "\n" + (m.text || "") + "\n" + (m.html || "");
+const STAFF = /david@example\.com|bryant@example\.com/;
+
+/* ── the idempotency key (sql/095, F51) ──────────────────────────────────
+   Every retry of one outbox row carries the same x-idempotency-key, and
+   Resend's key must be built from it — otherwise a retry is a second email. */
+{
+  const H = { "x-webhook-secret": "shh", "x-idempotency-key": "0b9f3c1e-7a51-4d1e-9c8a-2f6b1d0e4a77" };
+  await call(decided({ status: "approved" }), H);
+  const k1 = all[0].headers["Idempotency-Key"];
+  await call(decided({ status: "approved" }), H);
+  const k2 = all[0].headers["Idempotency-Key"];
+  is("with the header, Resend's key ends with the outbox row's key",
+    k1.endsWith(":0b9f3c1e-7a51-4d1e-9c8a-2f6b1d0e4a77"), true);
+  is("and a retry of the same row asks Resend with the same key", k1, k2);
+  is("the front still says what it was for", k1.startsWith("timesheets:decided:t1:person:"), true);
+
+  await call(APPLICATION, H);
+  is("the two emails of one request never share a key",
+    all.length === 2 && all[0].headers["Idempotency-Key"] !== all[1].headers["Idempotency-Key"], true);
+  is("but both carry the row's key",
+    all.every((c) => c.headers["Idempotency-Key"].endsWith(H["x-idempotency-key"])), true);
+
+  await call(decided({ status: "approved" }));
+  const r1 = all[0].headers["Idempotency-Key"];
+  await call(decided({ status: "approved" }));
+  is("without the header, every call gets a fresh key as before", r1 !== all[0].headers["Idempotency-Key"], true);
+
+  await call(decided({ status: "approved" }), { "x-webhook-secret": "shh", "x-idempotency-key": "a b\"c" });
+  is("a header that is not key-shaped is not put into Resend's header",
+    /a b|"/.test(all[0].headers["Idempotency-Key"]), false);
+  is("and no address is ever in the key", /@/.test(k1), false);
+}
+
+/* ── the exams, sent (sql/098, F4, F34) ─────────────────────────────────── */
+{
+  const EXAMS = (over) => ({
+    type: "STATUS", event: "arrived", table: "application_assessment",
+    person: { name: "Maria Santos", email: "maria@example.com" },
+    record: Object.assign({ id: "a1", track: "Customer Service", verdict: "passed",
+      typing_wpm: 52, typing_accuracy: 96, typing_checked: false, needs: "typing check" }, over || {})
+  });
+  const r = await call(EXAMS());
+  is("sent exams reach staff", [r.code, sent && sent.body.to], [200, ["david@example.com", "bryant@example.com"]]);
+  is("and nobody else", all.length, 1);
+  is("the subject says what is waiting on us", sent.body.subject, "Exams sent — Maria Santos passed — check her typing");
+  is("reply reaches her", sent.body.reply_to, "maria@example.com");
+  is("the claimed typing is in it", sent.body.text.includes("Typing claimed: 52 wpm, 96% accuracy"), true);
+  is("and that it is not checked yet", sent.body.text.includes("Typing checked: Not yet"), true);
+  is("it says what checking does", /moves her to Interview/.test(sent.body.text), true);
+  is("it links /admin", sent.body.text.includes("/admin"), true);
+
+  await call(EXAMS({ verdict: "below_line", needs: "a decision" }));
+  is("a fail asks for a decision", sent.body.subject, "Exams sent — Maria Santos — needs a decision");
+  is("and names the verdict in words", sent.body.text.includes("Verdict: Below the line"), true);
+
+  await call(EXAMS({ typing_checked: true, needs: "nothing" }));
+  is("an already-checked pass needs nothing", sent.body.text.includes("Needed: Nothing"), true);
+
+  resendStatus = 500;
+  is("a lost staff alert asks for a retry with 502", (await call(EXAMS())).code, 502);
+  resendStatus = 200;
+}
+
+/* ── her pick, to us (sql/099, F6, F35) ────────────────────────────────── */
+{
+  const herArrived = (moment) => iv("arrived", {
+    person: { name: "Maria Santos", email: "maria@example.com" },
+    record: { side: "applicant", moment, other: "SecureJobVA", application_id: "a1" }
+  });
+  const p = await call(herArrived("picked"));
+  is("her pick now reaches staff", [p.code, sent && sent.body.to], [200, ["david@example.com", "bryant@example.com"]]);
+  is("the subject names her and the time",
+    sent.body.subject, "Interview time picked — Maria Santos, Tuesday, September 8 at 9:00 AM Central, 30 minutes");
+  is("it says to confirm it", sent.body.text.includes("Confirm it in /admin"), true);
+  is("reply reaches her", sent.body.reply_to, "maria@example.com");
+  is("exactly one email, and not to her", [all.length, JSON.stringify(sent.body.to).includes("maria@")], [1, false]);
+
+  await call(herArrived("declined"));
+  is("all declined reaches staff too", sent.body.subject, "No interview time works — Maria Santos");
+  is("and asks for other times", sent.body.text.includes("Offer her others"), true);
+
+  const odd = await call(herArrived("confirmed"));
+  is("a moment that is not ours to act on is skipped", [odd.code, all.length], [200, 0]);
+
+  /* The placement handshake stays between client and assistant. */
+  const pl = await call(iv("arrived", { record: { side: "client", moment: "picked" } }));
+  is("a placement interview never mails staff", [pl.code, all.length, pl.body.skipped],
+    [200, 0, "interview_slots/arrived"]);
+  /* The old lock still holds for the client-shaped events. */
+  const lock = await call(ivHer("declined"));
+  is("her decline as a client-shaped event mails nobody", [lock.code, all.length], [200, 0]);
+}
+
+/* ── moved and cancelled, all three sides (F50, sql/099, 100) ───────────── */
+{
+  const MOVED_AT = "2026-09-10T19:30:00.000Z"; /* 2:30 PM Central, Thursday 10 September */
+
+  /* Her own interview, with us. */
+  await call(ivHer("moved", { record: { starts_at: MOVED_AT, meeting_url: "https://meet.example/new" } }));
+  is("her move goes to her alone", sent.body.to, ["maria@example.com"]);
+  is("the subject leads with the new time",
+    sent.body.subject, "Your interview has moved to Thursday, September 10 at 2:30 PM Central, 30 minutes");
+  is("it says it is still going ahead", sent.body.text.includes("still going ahead"), true);
+  is("the new link rides along", sent.body.text.includes("https://meet.example/new"), true);
+  is("and is clickable", sent.body.html.includes('href="https://meet.example/new"'), true);
+  is("she is sent to /status", /\/status/.test(sent.body.text) && !/\/hub|\/seats|\/admin/.test(words(sent.body)), true);
+  is("no client is invented", /client/i.test(sent.body.text), false);
+
+  await call(ivHer("moved"));
+  is("with no link, no empty 'Where to join'", /Where to join/.test(sent.body.text), false);
+
+  await call(ivHer("cancelled"));
+  is("her cancellation names the time", sent.body.subject, "Your interview on Tuesday, September 8 at 9:00 AM Central, 30 minutes is cancelled");
+  is("and says it is not a decision", sent.body.text.includes("not a decision about your application"), true);
+  is("and that new times are coming", sent.body.text.includes("send new times"), true);
+  is("on her page", /\/status/.test(sent.body.html) && !/\/hub|\/seats|\/admin/.test(words(sent.body)), true);
+
+  /* The assistant's copy of a placement interview. */
+  await call(iv("moved", { record: { starts_at: MOVED_AT, meeting_url: "https://meet.example/pl" } }));
+  is("the assistant's move goes to her", sent.body.to, ["maricel@example.com"]);
+  is("and names the client",
+    sent.body.subject, "Your interview with Rosehill Plumbing has moved to Thursday, September 10 at 2:30 PM Central, 30 minutes");
+  is("it says still going ahead", sent.body.text.includes("still going ahead"), true);
+  is("the link rides along", sent.body.text.includes("https://meet.example/pl"), true);
+  is("the clock is the client's", sent.body.text.includes("the client's clock"), true);
+  is("she is sent to /hub, not /status or /seats",
+    /\/hub/.test(sent.body.text) && !/\/status|\/seats|\/admin/.test(words(sent.body)), true);
+  is("no applicant wording leaks in", /application/i.test(sent.body.text), false);
+
+  await call(iv("cancelled"));
+  is("the assistant's cancellation names the client",
+    sent.body.subject, "Your interview with Rosehill Plumbing on Tuesday, September 8 at 9:00 AM Central, 30 minutes is cancelled");
+  is("and says the client offers new times", sent.body.text.includes("Rosehill Plumbing will offer new times"), true);
+  is("and that she will be emailed", sent.body.text.includes("you will get an email"), true);
+  is("on /hub", /\/hub/.test(sent.body.text + sent.body.html) && !/\/status|\/seats/.test(words(sent.body)), true);
+
+  /* The client's copy. */
+  const DANA = { name: "Dana Whitfield", email: "dana@rosehill.example" };
+  await call(iv("moved", { person: DANA, record: { side: "client", other: "Maricel Ordoñez", starts_at: MOVED_AT } }));
+  is("the client's move goes to them", sent.body.to, ["dana@rosehill.example"]);
+  is("and names the assistant",
+    sent.body.subject.startsWith("Your interview with Maricel Ordoñez has moved to Thursday"), true);
+  is("it says she has been told", sent.body.text.includes("She has been told"), true);
+  is("they are sent to /seats", /\/seats/.test(sent.body.html) && !/\/status|\/hub|\/admin/.test(words(sent.body)), true);
+
+  await call(iv("cancelled", { person: DANA, record: { side: "client", other: "Maricel Ordoñez" } }));
+  is("the client's cancellation asks them to offer new times",
+    sent.body.text.includes("offer new times at https://www.securejobva.com/seats"), true);
+  is("with a button that says so", sent.body.html.includes("Offer new times"), true);
+  is("and never sends them to /status or /hub", /\/status|\/hub/.test(words(sent.body)), false);
+  /* The client typed the meeting link and owns the room; cancelling here
+     does not close it, so the applicant's "will not work now" is false on
+     this side, and this email never shows the link anyway. */
+  is("the client's cancellation says nothing about the link dying",
+    /will not work now|that link/.test(words(sent.body)), false);
+  await call(iv("cancelled"));
+  is("nor does the assistant's", /will not work now|that link/.test(words(sent.body)), false);
+  is("she is told to take it out of her calendar",
+    sent.body.text.includes("Take it out of your calendar; that time is no longer happening.") &&
+    sent.body.html.includes("Take it out of your calendar"), true);
+
+  /* None of the six may reach staff or carry anybody else's address. */
+  for (const [label, body] of [
+    ["her move", ivHer("moved")], ["her cancellation", ivHer("cancelled")],
+    ["assistant move", iv("moved")], ["assistant cancellation", iv("cancelled")],
+    ["client move", iv("moved", { person: DANA, record: { side: "client", other: "Maricel Ordoñez" } })],
+    ["client cancellation", iv("cancelled", { person: DANA, record: { side: "client", other: "Maricel Ordoñez" } })]
+  ]) {
+    await call(body);
+    is(label + ": one email, to one person, naming nobody on staff",
+      [all.length, sent.body.to.length, STAFF.test(words(sent.body) + sent.body.to.join())], [1, 1, false]);
+  }
+
+  /* The reason given for moving or cancelling (sql/100, record.reason). The
+     /admin box promises it is "quoted to both of them in the email", so both
+     sides' copies must carry it, escaped, and an absent or blank one must
+     leave the email as it always read. */
+  const WHY = "Dana's van broke down & she needs the <morning>";
+  for (const [label, body] of [
+    ["assistant move", iv("moved", { record: { starts_at: MOVED_AT, reason: WHY } })],
+    ["assistant cancellation", iv("cancelled", { record: { reason: WHY } })],
+    ["client move", iv("moved", { person: DANA, record: { side: "client", other: "Maricel Ordoñez", starts_at: MOVED_AT, reason: WHY } })],
+    ["client cancellation", iv("cancelled", { person: DANA, record: { side: "client", other: "Maricel Ordoñez", reason: WHY } })]
+  ]) {
+    await call(body);
+    is(label + ": the reason is quoted in the text",
+      sent.body.text.includes("The note that came with it:\n  " + WHY), true);
+    is(label + ": and in the HTML, escaped",
+      sent.body.html.includes("Dana&#39;s van broke down &amp; she needs the &lt;morning&gt;") &&
+      !sent.body.html.includes("<morning>"), true);
+  }
+  for (const [label, body] of [
+    ["assistant move", iv("moved")], ["assistant cancellation", iv("cancelled")],
+    ["client move", iv("moved", { person: DANA, record: { side: "client", other: "Maricel Ordoñez" } })],
+    ["client cancellation", iv("cancelled", { person: DANA, record: { side: "client", other: "Maricel Ordoñez", reason: "   " } })]
+  ]) {
+    await call(body);
+    is(label + ": no reason, no note and no empty quote",
+      /note that came with it|FFF6E0/.test(words(sent.body)), false);
+  }
+  await call(iv("cancelled", { record: { reason: WHY } }));
+  is("a quoted reason leaves the cancellation's own lines intact",
+    sent.body.text.includes("Rosehill Plumbing will offer new times") &&
+    sent.body.text.includes("Take it out of your calendar"), true);
+
+  /* Markup in a name reaches an email we sign. */
+  await call(iv("moved", { record: { other: '<b>Rose"hill</b>' } }));
+  is("the other party's name is escaped in the HTML", sent.body.html.includes("<b>Rose"), false);
+}
+
+/* ── a seat request moving on (sql/103, F13) ────────────────────────────── */
+{
+  const SEAT = (status, over) => ({
+    type: "STATUS", event: "decided", table: "seat_requests",
+    person: { name: "Ana Reyes", email: "ana@rosehill.example" },
+    record: Object.assign({ id: "sr1", status, previous: "received",
+      company: "Rosehill ACTION REQUIRED evil.example", seats: ["Customer Service", "evil.example/login"] }, over || {})
+  });
+  await call(SEAT("call_booked"));
+  is("a stage move reaches the address on the request", sent.body.to, ["ana@rosehill.example"]);
+  is("the subject names the stage", sent.body.subject, "Your seat request — call booked");
+  is("it uses /seats' own words", sent.body.text.includes("Twenty minutes to agree the hours, the tasks and the rate."), true);
+  is("it names only the seats this site offers", sent.body.text.includes("for an assistant in Customer Service") &&
+    !/evil\.example/.test(words(sent.body)), true);
+  is("and never repeats the company typed into a public form", /Rosehill|ACTION REQUIRED/.test(words(sent.body)), false);
+  is("it points at /seats", sent.body.text.includes("/seats"), true);
+  is("greets by first name", sent.body.text.startsWith("Hi Ana,"), true);
+
+  for (const [st, words_] of [["matching", "already trained in your track"],
+                              ["shortlist", "You choose; we handle the handover."],
+                              ["running", "working the hours you set"]]) {
+    await call(SEAT(st));
+    is(st + " says what /seats says", sent.body.text.includes(words_), true);
+  }
+
+  await call(SEAT("closed"));
+  is("closed says so", sent.body.subject, "Your seat request is closed");
+  is("and how to pick it up again", sent.body.text.includes("If you want to pick it up again, book a call"), true);
+  is("with the booking link", sent.body.text.includes("https://cal.com/securejobva.com/20min"), true);
+  is("which carries the request's id, so a booking from it can be matched",
+    sent.body.text.includes("https://cal.com/securejobva.com/20min?email=ana%40rosehill.example&metadata[seat_request]=sr1") &&
+    sent.body.html.includes("metadata[seat_request]=sr1"), true);
+
+  const rec = await call(SEAT("received"));
+  is("received is never mailed — the receipt said it", [rec.code, all.length], [200, 0]);
+  const unk = await call(SEAT("parked"));
+  is("an unknown stage is skipped", [unk.code, all.length], [200, 0]);
+  is("no staff copy", STAFF.test(JSON.stringify(sent)), false);
+}
+
+/* ── the receipt a business gets (F11) ──────────────────────────────────── */
+{
+  const { readFileSync } = await import("node:fs");
+  const cal = (readFileSync(new URL("../index.html", import.meta.url), "utf8")
+    .match(/scheduler:\s*"([^"]+)"/) || [])[1];
+
+  await call({ type: "INSERT", table: "seat_requests",
+    record: { id: "sr2", name: "Ana Reyes", company: "Click evil.example now", email: "ana@rosehill.example",
+              seats: ["Admin Tasks", "Visit evil.example"], hours: 30, notes: "PAYMENT ON HOLD evil.example" } });
+  is("two emails: yours, then the business's", all.length, 2);
+  const m = all[1] ? all[1].body : {};
+  is("the receipt goes to the address on the request alone", m.to, ["ana@rosehill.example"]);
+  is("the subject is a receipt", m.subject, "We have your request — SecureJobVA");
+  is("it greets by first name", (m.text || "").startsWith("Hi Ana,"), true);
+  is("it names the call and the 20 minutes", /20-minute call/.test(m.text), true);
+  /* The thank-you screen's booking() adds email= and metadata[seat_request]=
+     so a booking can be matched to its request by id. The email builds the
+     same link from the two values that are ours to repeat — the recipient's
+     own address and the row id — and nothing else typed into the form. */
+  const BOOK = cal + "?email=ana%40rosehill.example&metadata[seat_request]=sr2";
+  is("it carries the same booking link the thank-you screen does", !!cal && (m.text || "").includes(BOOK), true);
+  is("and as a button", (m.html || "").includes('href="' + BOOK.replace(/&/g, "&amp;") + '"'), true);
+  is("the link carries no name or notes", /name=|notes=/.test((m.text || "") + (m.html || "")), false);
+  is("it repeats the screen's shortlist timing, nothing more",
+    (m.text || "").includes("within three working days of the call"), true);
+  is("it points at /seats", (m.text || "").includes("/seats"), true);
+  is("only the offered seats are named", (m.text || "").includes("for an assistant in Admin Tasks"), true);
+  is("nothing typed into the public form goes back out", /evil\.example|Click|PAYMENT/.test(words(m)), false);
+  is("it names nobody on staff", STAFF.test(words(m)), false);
+  is("it promises no price", /\$|rate is|per hour/.test(m.text || ""), false);
+
+  await call({ type: "INSERT", table: "seat_requests", record: { name: "Ana", email: "ana@rosehill" } });
+  is("an address that is not one gets no receipt", all.length, 1);
+}
+
+/* ── hours waiting for the client (sql/106, F20) ────────────────────────── */
+{
+  const WAIT = (over) => ({
+    type: "STATUS", event: "waiting", table: "timesheets",
+    person: { name: "Dana Whitfield", email: "dana@rosehill.example" },
+    record: Object.assign({ id: "t9", week_starts_on: "2026-09-21", hours: 38.5,
+      days: "Mon 8 · Tue 8 · Wed 8 · Thu 7.5 · Fri 7", assistant: "Maricel Ordoñez",
+      business: "Rosehill Plumbing", trial_week: false, again: false }, over || {})
+  });
+  await call(WAIT());
+  is("a sent week reaches the client", sent.body.to, ["dana@rosehill.example"]);
+  is("the subject names her and the week", sent.body.subject, "Maricel's hours for 21 to 27 September are waiting for you");
+  is("the total and the days are in it", sent.body.text.includes("38.5 hours (Mon 8 · Tue 8"), true);
+  is("it asks them to approve or send back at /seats",
+    sent.body.text.includes("Approve them, or send them back with a note, at https://www.securejobva.com/seats"), true);
+  is("and not at /admin or /hub", /\/admin|\/hub/.test(words(sent.body)), false);
+  is("no staff copy", all.length, 1);
+
+  await call(WAIT({ again: true }));
+  is("sent again says so", sent.body.subject, "Maricel's hours for 21 to 27 September — sent again");
+  is("and that it came back first", sent.body.text.includes("again, after they were sent back"), true);
+  is("without guessing who sent it back", /your note/.test(sent.body.text), false);
+}
+
+/* ── a swap, heard back on (sql/107, F25, F19) ──────────────────────────── */
+{
+  const SW = (event, over) => ({
+    type: "STATUS", event, table: "swap_requests",
+    person: { name: "Dana Whitfield", email: "dana@rosehill.example" },
+    record: Object.assign({ id: "s1", business: "Rosehill Plumbing", assistant: "Maricel Ordoñez",
+      asked_on: "2026-09-25", reason: "We need mornings covered.", placement: "ongoing", reply: null }, over || {})
+  });
+  await call(SW("received"));
+  is("the client hears their request arrived", sent.body.to, ["dana@rosehill.example"]);
+  is("the subject says so", sent.body.subject, "We have your request for a different assistant");
+  is("their reason is quoted back", sent.body.text.includes("We need mornings covered."), true);
+  is("on a working placement it says billing carries on, as the page does",
+    sent.body.text.includes("keeps working and you keep being billed as normal"), true);
+
+  await call(SW("received", { placement: "matched" }));
+  is("F19: before she has started, it says nothing about billing or working",
+    /billed|keeps working/.test(words(sent.body)), false);
+
+  /* A trial is only "working" once its first day has come, on Central's
+     clock — the page calls one that has not "She has not started". */
+  await call(SW("received", { placement: "trial", started_on: "2099-01-05" }));
+  is("F19: a trial whose first day is ahead says nothing about billing or working",
+    /billed|keeps working/.test(words(sent.body)), false);
+  await call(SW("received", { placement: "trial", started_on: "2026-09-01" }));
+  is("a trial that has started says billing carries on",
+    sent.body.text.includes("keeps working and you keep being billed as normal"), true);
+  await call(SW("received", { placement: "trial" }));
+  is("a trial with no start date in the payload claims nothing",
+    /billed|keeps working/.test(words(sent.body)), false);
+
+  await call(SW("resolved", { reply: "We have two candidates on mornings; a shortlist follows Monday." }));
+  is("resolved reaches the client", sent.body.to, ["dana@rosehill.example"]);
+  is("and quotes what we told them", sent.body.text.includes("a shortlist follows Monday"), true);
+  is("in the HTML too", sent.body.html.includes("a shortlist follows Monday"), true);
+
+  await call(SW("resolved"));
+  is("with no note it makes no outcome up", /Here is what we said/.test(sent.body.text), false);
+  is("and asks them to reply if they have not heard", sent.body.text.includes("If you have not heard from us"), true);
+
+  for (const ev of ["received", "resolved"]) {
+    await call(SW(ev));
+    is(ev + ": one email, never to the assistant or staff",
+      [all.length, /maricel@/.test(sent.body.to.join()), STAFF.test(sent.body.to.join())], [1, false, false]);
+  }
+  await call(SW("resolved", { reply: "<img src=x onerror=alert(1)>" }));
+  is("a typed reply is escaped in the HTML", sent.body.html.includes("<img"), false);
+}
+
+/* ── kept on, and ended (sql/108, 109, F26, F27) ────────────────────────── */
+{
+  const KEPT = {
+    type: "STATUS", event: "arrived", table: "placements",
+    person: { name: "Dana Whitfield", email: "dana@rosehill.example" },
+    record: { id: "p1", moment: "kept_on", business: "Rosehill Plumbing", assistant: "Maricel Ordoñez",
+      started_on: "2026-09-07", trial_weeks: 2 }
+  };
+  const k = await call(KEPT);
+  is("a client keeping her on reaches staff", [k.code, sent && sent.body.to], [200, ["david@example.com", "bryant@example.com"]]);
+  is("the subject says who kept whom", sent.body.subject, "Kept on — Rosehill Plumbing are keeping Maricel Ordoñez");
+  is("reply reaches the client", sent.body.reply_to, "dana@rosehill.example");
+  is("the start is in it", sent.body.text.includes("Started: 7 September 2026"), true);
+  const other = await call({ ...KEPT, record: { ...KEPT.record, moment: "poked" } });
+  is("another moment is skipped", [other.code, all.length], [200, 0]);
+
+  const END = (over) => ({
+    type: "STATUS", event: "ended", table: "placements",
+    person: { name: "Dana Whitfield", email: "dana@rosehill.example" },
+    record: Object.assign({ id: "p1", business: "Rosehill Plumbing", assistant: "Maricel Ordoñez",
+      ended_on: "2026-10-02" }, over || {})
+  });
+  await call(END());
+  is("an ended placement reaches the client", sent.body.to, ["dana@rosehill.example"]);
+  is("the subject names her", sent.body.subject, "Placement ended — Maricel Ordoñez");
+  is("it names the day it was recorded as ending",
+    sent.body.text.includes("as ended on 2 October 2026"), true);
+  is("and that the statement stays at /pay", sent.body.text.includes("/pay"), true);
+  is("and promises nothing about money", /refund|owe|balance|due/i.test(sent.body.text), false);
+  await call(END({ ended_on: null }));
+  is("no date still reads as a sentence", /ended on \.|on undefined/.test(sent.body.text), false);
+
+  /* Called off before her first day (109's 'ended before starting'):
+     never_started, ended_on null. It must not say she worked and stopped. */
+  await call(END({ ended_on: null, never_started: true }));
+  is("a placement that never started reaches the client", sent.body.to, ["dana@rosehill.example"]);
+  is("its subject says closed, not ended", sent.body.subject, "Placement closed — Maricel Ordoñez");
+  is("it says it will not go ahead and has been closed",
+    sent.body.text.includes("The placement with Maricel Ordoñez at Rosehill Plumbing will not go ahead, and we have closed it."), true);
+  is("and prints no 'ended on' date", /ended on|as ended/.test(words(sent.body)), false);
+  await call(END({ ended_on: "2026-10-02", never_started: true }));
+  is("even a stray ended_on prints no date", /2 October 2026|ended on/.test(words(sent.body)), false);
+  await call(END({ never_started: false }));
+  is("never_started false is the ordinary ended copy",
+    sent.body.text.includes("as ended on 2 October 2026"), true);
+  is("the decided 'ended' still sends her nothing",
+    (await call(PLACED("ended"))).code === 200 && all.length === 0, true);
+}
+
+/* ── leave, a changed answer (F44) ──────────────────────────────────────── */
+{
+  await call({ ...LEAVE, event: "decided", record: { ...LEAVE.record, status: "declined", previous: "approved" } });
+  is("a changed answer says so first", sent.body.subject,
+    "We have changed our answer — your leave for 14 September to 18 September is not approved");
+  is("in the body too", sent.body.text.includes("We have changed our answer about your leave"), true);
+  is("and that it is no longer approved", sent.body.text.includes("no longer approved"), true);
+  await call({ ...LEAVE, event: "decided", record: { ...LEAVE.record, status: "approved", previous: "declined" } });
+  is("the other way round", sent.body.text.includes("it is now approved"), true);
+  await call({ ...LEAVE, event: "decided", record: { ...LEAVE.record, status: "approved", previous: null } });
+  is("a first decision reads as before", sent.body.subject, "Your leave for 14 September to 18 September is approved");
+  await call({ ...LEAVE, event: "decided", record: { ...LEAVE.record, status: "approved", previous: "approved" } });
+  is("the same answer again is not called a change", /changed our answer/.test(sent.body.text), false);
+}
+
+/* ── the outbox giving up (sql/095) ─────────────────────────────────────── */
+{
+  const r = await call({ type: "STATUS", event: "arrived", table: "notify_outbox", person: {},
+    record: { id: 41, count: 3, sources: "notify_decision, notify_swap", oldest: "2026-09-30T14:02:11.5+00:00" } });
+  is("emails given up on reach staff", [r.code, sent && sent.body.to], [200, ["david@example.com", "bryant@example.com"]]);
+  is("the subject counts them", sent.body.subject, "3 emails could not be sent");
+  is("it says where they came from", sent.body.text.includes("notify_decision, notify_swap"), true);
+  is("and the oldest", sent.body.text.includes("30 September 2026"), true);
+  is("with no reply_to, there being no person", sent.body.reply_to, undefined);
+  /* 095 gives up on a 400/405/413/422 at the first try, and those rows are
+     counted here too, so "after ten tries" would be false for them. */
+  is("it does not claim ten tries", /ten tries/.test(words(sent.body)), false);
+  await call({ type: "STATUS", event: "arrived", table: "notify_outbox", person: {}, record: { count: 1 } });
+  is("one is one email", sent.body.subject, "1 email could not be sent");
+}
+
+/* ── Resend's two kinds of 409 ─────────────────────────────────────────────
+   concurrent_idempotent_requests: the same key still being worked on, which
+   the next try answers — worth a retry. invalid_idempotent_request: the same
+   key with a different body (the words, RESEND_FROM or NOTIFY_TO changed in
+   a deploy mid-retry, or a first try went and its answer was lost), which
+   every try is refused the same way — final. */
+{
+  const realFetch = globalThis.fetch;
+  const with409 = (name) => async (url, opt) => {
+    await realFetch(url, opt);
+    return { ok: false, status: 409, text: async () => JSON.stringify({ statusCode: 409, name, message: "x" }) };
+  };
+
+  globalThis.fetch = with409("concurrent_idempotent_requests");
+  const pc = await call(decided({ status: "approved" }));
+  const sc = await call(WEEK);
+  globalThis.fetch = realFetch;
+  is("a concurrent 409 to a person asks for a retry", pc.code, 503);
+  is("a concurrent 409 to staff asks for a retry", sc.code, 502);
+
+  globalThis.fetch = with409("invalid_idempotent_request");
+  const pi = await call(decided({ status: "approved" }));
+  is("a conflicting 409 to a person is final: 200, told false",
+    [pi.code, pi.body.told, pi.body.idempotency_conflict], [200, false, true]);
+  const si = await call(WEEK);
+  is("a conflicting 409 to staff is a logged 200, not a 502",
+    [si.code, si.body.idempotency_conflict], [200, true]);
+  const ai = await call(APPLICATION);
+  is("on a row landing it is not retried either",
+    [ai.code, ai.body.idempotency_conflict, ai.body.confirmed], [200, true, false]);
+  is("and the applicant's copy is still tried after it", all.length, 2);
+  globalThis.fetch = realFetch;
+
+  /* Staff conflict, applicant's copy lost to an outage: the copy is still
+     owed, so the outbox is asked back. */
+  let k = 0;
+  globalThis.fetch = async (url, opt) => {
+    k++;
+    await realFetch(url, opt);
+    return k === 1
+      ? { ok: false, status: 409, text: async () => '{"name":"invalid_idempotent_request"}' }
+      : { ok: false, status: 503, text: async () => "unavailable" };
+  };
+  const mixed = await call(APPLICATION);
+  globalThis.fetch = realFetch;
+  is("a staff conflict with the copy lost to an outage still asks for a retry", mixed.code, 503);
 }
 
 console.log("");

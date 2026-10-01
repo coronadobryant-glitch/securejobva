@@ -9,11 +9,10 @@
    instead of /seats. Nothing errors. Every check stays green. This is the
    check that goes red.
 
-   The rest is the contract the trigger in sql/ relies on: refusals are
-   refusals, and a failure to send is answered 200 and logged. Nothing retries
-   this call either way — the trigger in 040 is a pg_net post, which fires once
-   and keeps the answer — so a 200 is about what net._http_response reads as a
-   failure, not about stopping a retry loop.
+   The rest is the contract the outbox in sql/095 relies on: refusals are
+   refusals, a failure that might pass is answered 502 so the outbox tries
+   again, and a refusal about the address is answered 200 so it does not.
+   Both are logged, without the address.
 
    Everything is faked except the handler. Nothing is sent anywhere.
 
@@ -168,18 +167,30 @@ otpStatus = 200;
   is("a body that arrives as a JSON string is read the same", r.body && r.body.sent, 1);
 }
 
-/* ── a failure is logged and answered 200 ──────────────────────────────── */
+/* ── a failure is logged, and the status code asks the outbox ──────────────
+   sql/095 tries again on anything but a 2xx or a plain refusal. A failure
+   that might pass must ask for that (502); a refusal about the address must
+   not, or the outbox spends eight hours asking and then alerts staff about
+   an address only /admin can fix. */
 
-otpStatus = 429;
-{
+for (const st of [429, 500, 503]) {
+  otpStatus = st;
   const r = await call(INVITE);
-  is("the auth server refusing is still answered 200", r.code, 200);
-  is("…reporting nothing sent", r.body && r.body.sent, 0);
+  is("the auth server answering " + st + " asks for a retry with 502", r.code, 502);
+  is("…reporting nothing sent, and why", r.body && [r.body.sent, r.body.why, r.body.retry], [0, st, true]);
   ok("…and it is logged, so somebody can chase it", logged.length > 0);
   /* P17: the log is Vercel's, readable by anyone with the project, and kept.
      The address is a client's; the status is what is needed to chase it. */
   ok("the log line does not carry the client's address",
     logged.every((l) => l.indexOf(INVITE.email) < 0), logged[0]);
+}
+
+for (const st of [400, 422]) {
+  otpStatus = st;
+  const r = await call(INVITE);
+  is("a " + st + " refusal is answered 200 — asking again cannot help", r.code, 200);
+  is("…reporting nothing sent and no retry", r.body && [r.body.sent, r.body.retry], [0, false]);
+  ok("…and it is logged", logged.length > 0);
 }
 otpStatus = 200;
 
@@ -188,9 +199,27 @@ otpThrows = true;
   let r, threw = null;
   try { r = await call(INVITE); } catch (e) { threw = e; }
   ok("the network dropping does not throw out of the handler", !threw, threw && threw.message);
-  is("…it is answered 200 with nothing sent", r && [r.code, r.body && r.body.sent], [200, 0]);
+  is("…it asks for a retry with 502, nothing sent", r && [r.code, r.body && r.body.sent], [502, 0]);
 }
 otpThrows = false;
+
+/* ── the bodies sql/104 posts ──────────────────────────────────────────────
+   update_client and resend_client_invite post the same body with the
+   assistant and the date null — a client with no placement yet. Only the
+   address and the business are read; null in the others must not matter. */
+{
+  const r = await call({ email: "owner@northwind.example", business: "Northwind", assistant: null, starts_on: null });
+  is("a resend with no assistant or date still sends", [r.code, r.body && r.body.sent], [200, 1]);
+  is("…to the same place", calls[0] && new URL(calls[0].url).searchParams.get("redirect_to"), SITE + "/seats");
+}
+
+/* ── the outbox's header is harmless here ─────────────────────────────────
+   095 sends x-idempotency-key to /api/invite as well. Nothing here uses it,
+   and it must not change what is sent. */
+{
+  const r = await call(INVITE, { "x-webhook-secret": "shh", "x-idempotency-key": "0b9f3c1e-7a51-4d1e-9c8a-2f6b1d0e4a77" });
+  is("an invite carrying the outbox key sends exactly as before", [r.code, calls.length], [200, 1]);
+}
 
 console.error = realError;
 console.log(bad ? "\n" + bad + " failed\n" : "\nevery invite lands on /seats\n");

@@ -2638,8 +2638,8 @@ function render(email, rows) {
      And the bill goes with it. This branch drew the placement cards and
      stopped, so the one card that subtracts what has been paid — Left to pay,
      the payments received, the credit note — never appeared for the very
-     clients this branch exists for. Worse, clientBlock() draws only placements
-     that have not ended, so a hand-matched client whose placement had ended
+     clients this branch exists for. Worse, clientBlock() drew only placements
+     that had not ended (it keeps a line for each ended one now), so a hand-matched client whose placement had ended
      with weeks still unpaid was told there was nothing under their address and
      to try another email, while /pay showed them a balance. The bill is drawn
      whenever there is any placement at all, ended or not, and the "nothing
@@ -2730,8 +2730,11 @@ function start() {
      has_permission is what makes /admin possible at all. So being handed your
      own is half the database's job and half this page's, and the half that was
      missing put another company's name on this account. */
-  api("seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks,timezone,company,status,status_changed_at&order=created_at.desc")
-    .then(function (rows) { return loadClient(claims.email, onlyMine(rows || [])); })
+  seatRows()
+    /* Narrowed inside loadClient now, by mySeatRows: a request is mine by its
+       address OR by the client it was linked to (sql/102), and the second half
+       needs MY_CLIENTS, which loadClient is what fills. */
+    .then(function (rows) { return loadClient(claims.email, rows || []); })
     .catch(function (e) {
       if (String(e.message) === "signed out") { signedOut("Your session expired. Sign in again."); return; }
       view('<div class="card"><p class="msg msg--bad">We could not load your seats just now. ' +
@@ -2800,7 +2803,18 @@ function loadClient(email, rows) {
     api("placement_billing?select=placement_id,rate"),
     api("timesheets?select=id,placement_id,week_starts_on,status,note,submitted_at,decided_at," +
         "trial_week,timesheet_days(worked_on,hours)&status=neq.draft&order=week_starts_on.desc,id.desc&limit=" + C_WEEK_LIMIT),
-    api("swap_requests?select=id,placement_id,reason,status,created_at&order=created_at.desc"),
+    /* resolution_note is 107's — what staff told the client when they dealt
+       with it — and until 107 is pasted the column does not exist, PostgREST
+       refuses the whole select, and the catch below would hide every
+       placement behind it. So the old select is the fallback, and a request
+       handled before then simply has no words to show. */
+    api("swap_requests?select=id,placement_id,reason,status,created_at,resolved_at,resolution_note" +
+        "&order=created_at.desc")
+      .catch(function (e) {
+        if (String(e.message) === "signed out") throw e;
+        return api("swap_requests?select=id,placement_id,reason,status,created_at,resolved_at" +
+                   "&order=created_at.desc");
+      }),
     /* 042. A row here means this client has already said when the work starts,
        so the card asking them stops asking. */
     api("placement_starts?select=placement_id,starts_on,confirmed_at"),
@@ -2909,7 +2923,36 @@ function loadClient(email, rows) {
     C_SETTLED = {};
     (r[7] || []).forEach(function (a) { C_SETTLED[a.timesheet_id] = true; });
     C_SLOTS = (r[8] || []).filter(function (w) { return onMine[w.placement_id]; });
-    render(email, rows);
+    render(email, mySeatRows(rows));
+  });
+}
+
+/* The seat requests, with the client they were linked to when there is one.
+
+   sql/102 gave a request a client_id, because matching the enquiry to the
+   account by address alone split one business in two the moment staff typed a
+   different contact address from the one on the form: the request under one
+   sign-in, the assistant and the bill under another. Asked for here, and the
+   old select kept as the fallback, because until 102 is pasted the column is
+   not granted and PostgREST refuses the whole query — which would take the
+   seats half of the page down for every client. */
+function seatRows() {
+  return api("seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks," +
+             "timezone,company,status,status_changed_at,client_id&order=created_at.desc")
+    .catch(function (e) {
+      if (String(e.message) === "signed out") throw e;
+      return api("seat_requests?select=id,created_at,email,seats,hours,weekly,weekly_cents,blocks," +
+                 "timezone,company,status,status_changed_at&order=created_at.desc");
+    });
+}
+
+/* Mine by the address on it, as before, or by the client staff linked it to —
+   but only a client this address is the contact for. The policy hands staff
+   everybody's, and both halves of this test hold for a role exactly as they
+   hold for anybody else: a role is not a client, and not every address. */
+function mySeatRows(rows) {
+  return (rows || []).filter(function (r) {
+    return isMine(r) || !!(r.client_id && MY_CLIENTS[r.client_id]);
   });
 }
 
@@ -3151,13 +3194,42 @@ function cDays(w) {
    her hours were missing from the statement entirely — a total that looked
    right, was internally consistent, and was wrong. */
 function clientBlock() {
-  var live = [];
+  var live = [], ended = [];
   for (var i = 0; i < C_PLACE.length; i++) {
     if (C_PLACE[i].status !== "ended") live.push(C_PLACE[i]);
+    else ended.push(C_PLACE[i]);
   }
-  if (!live.length) return "";
 
-  return live.map(function (pl, k) { return placeBlock(pl, k); }).join("");
+  /* An ended placement keeps one line. Its card used to vanish without a
+     word while its weeks stayed on the bill below, so a client looking for
+     the person they had just stopped working with found a total and nobody
+     it belonged to. The line says when, and where the money went. */
+  /* An ended placement with no ended_on is sql/109's "ended before
+     starting": called off before her first day, with not one hour logged.
+     It has no last day to name, and nothing of it is on the bill, so it says
+     it did not go ahead rather than "ended" and a promise about weeks. */
+  var gone = ended.map(function (pl) {
+    var name = "Your assistant";
+    for (var n = 0; n < C_NAMES.length; n++) {
+      if (C_NAMES[n].application_id === pl.application_id && C_NAMES[n].name) {
+        name = C_NAMES[n].name;
+        break;
+      }
+    }
+    return '<div class="card" data-place-ended="' + esc(pl.id) + '">' +
+      '<div class="row__top"><span><span class="row__n">' + esc(name) + "</span>" +
+        '<span class="row__meta"> &middot; ' +
+          (pl.ended_on ? "ended on " + esc(when(pl.ended_on)) : "did not go ahead") + "</span></span>" +
+        '<span class="pill pill--pl_ended">' + esc(C_LABEL.ended) + "</span></div>" +
+      (pl.ended_on
+        ? '<p class="msg" style="margin:.5rem 0 0">This placement has ended. Any weeks you approved ' +
+          "stay on your bill below.</p>"
+        : '<p class="msg" style="margin:.5rem 0 0">This placement ended before her first day, ' +
+          "so there is nothing of it on your bill.</p>") +
+    "</div>";
+  }).join("");
+
+  return live.map(function (pl, k) { return placeBlock(pl, k); }).join("") + gone;
 }
 
 /* ── the bill ──────────────────────────────────────────────────────────────
@@ -3290,10 +3362,16 @@ function billingBlock() {
            provider rather than before it. */
         '<div class="bill__pay">' +
           '<p class="bill__payh">Paying this</p>' +
-          '<p class="bill__payp">Card payment is not switched on yet. For now we invoice you ' +
-            "separately and you pay us the way we agreed on the call. When card payment is " +
-            "live it appears here, and this total is the number it will charge. " +
-            'Your <a href="/pay">payment page</a> has the same figure with the details on it.</p>' +
+          /* It used to say "we invoice you separately". Nothing does: there is
+             no invoice and no weekly summary sent from here, and a client
+             waiting for one would wait for good. What is true is that this
+             page is the statement, and the bank details come from a person. */
+          '<p class="bill__payp">Card payment is not switched on yet. Pay by bank transfer, the ' +
+            "way we agreed on the call. No invoice or summary is sent to you automatically: this " +
+            "total is what you owe, and it moves as you approve hours. For our bank details, or " +
+            'an invoice for your records, write to <a href="mailto:support@securejobva.com">' +
+            "support@securejobva.com</a>. " +
+            'Your <a href="/pay">payment page</a> has the same figure.</p>' +
         "</div>"
       : '<p class="msg">Nothing to pay yet. Approved hours appear here as they come in.</p>') +
   "</div>";
@@ -3322,15 +3400,26 @@ function interviewBlock(live) {
      point at; the code finds the fields by data attribute inside the card
      that was clicked. */
   var sfx = "-" + live.id;
-  var who = "your assistant";
+  /* first is what goes in a sentence ("we email Ana and you"). Cut from the
+     fallback it used to read "we email your and you", so it stays whole
+     when there is no name to cut. */
+  var who = "your assistant", first = who;
   for (var n = 0; n < C_NAMES.length; n++) {
     if (C_NAMES[n].application_id === live.application_id && C_NAMES[n].name) {
       who = C_NAMES[n].name;
+      first = who.split(" ")[0];
     }
   }
 
+  /* A trial with no times at all is a client who has already said yes to
+     the start date — either the interview they had booked was called off
+     (sql/100), or they agreed the date without one. Meeting her is optional
+     by then, so the card offers it rather than reading as a step still owed. */
+  var optional = live.status === "trial" && !mine.length;
   var head = '<div class="card" data-iv="' + esc(live.id) + '"><h2>' +
-    (st.state === "confirmed" ? "Your interview" : "Arrange the interview") + "</h2>";
+    (st.state === "confirmed" ? "Your interview"
+      : optional ? "Talk to " + esc(first) + " before she starts?"
+      : "Arrange the interview") + "</h2>";
 
   /* ── it is on ── */
   if (st.confirmed) {
@@ -3361,14 +3450,40 @@ function interviewBlock(live) {
          work. It called withdraw_interview_slot, which refuses a confirmed
          slot in so many words — "that interview is confirmed, change the time
          instead" — so a client who pressed it and agreed to the dialog was
-         told to use the button they had just used. No function moves or calls
-         off a confirmed placement interview yet (070 did that for applicants
-         only), and one needs its own email to the assistant before it can
-         exist. Until then the honest control is an address. */
-      '<p class="hint" style="margin-top:.9rem">Something come up? This page cannot move a ' +
-        "confirmed interview yet. Write to " +
-        '<a href="mailto:support@securejobva.com">support@securejobva.com</a> and we will ' +
-        "sort out a new time with you both.</p>" +
+         told to use the button they had just used. The honest control was an
+         address until sql/100 gave a confirmed placement interview its own
+         two functions, each of which emails her and the client before it
+         changes anything: reschedule_placement_interview moves it, and
+         cancel_placement_interview calls it off and deletes the time, which
+         puts this card back to offering times.
+
+         Only while it is still ahead. Once the time has gone the meeting has
+         happened or it has not, and either way moving it is not the question
+         any more — the card under the placement asks the one that is. */
+      (new Date(c.starts_at).getTime() + (Number(c.minutes) || 30) * 60000 > serverNow()
+        ? '<p class="hint" style="margin-top:.9rem">Something come up? Move it, or call it off. ' +
+            "Either way we email " + esc(first) + " and you straight away.</p>" +
+          '<div class="iv__add">' +
+            '<div class="fld"><label for="iv-day' + sfx + '">New day</label>' +
+              '<input id="iv-day' + sfx + '" data-iv-day type="date" min="' + esc(todayLocal()) + '"></div>' +
+            '<div class="fld"><label for="iv-at' + sfx + '">Starting at' +
+              ((MY_TZ || browserTz())
+                ? " <em>&mdash; " + esc((MY_TZ || browserTz()).replace(/_/g, " ")) + " time</em>" : "") +
+              "</label>" +
+              '<input id="iv-at' + sfx + '" data-iv-at type="time" value="09:00"></div>' +
+            /* sql/100 quotes this in the email to her and in yours, so the
+               label says both of you will read it. */
+            '<div class="fld"><label for="iv-why' + sfx + '">A line for ' + esc(first) +
+              " <em>&mdash; optional, and in your copy too</em></label>" +
+              '<input id="iv-why' + sfx + '" data-iv-why type="text" maxlength="500"></div>' +
+            '<button class="btn btn--ghost" data-iv-move="' + esc(c.id) + '" type="button">Move it</button>' +
+          "</div>" +
+          '<div class="edit__foot"><span class="hint">Calling it off frees the time, and you can ' +
+            "offer new ones here.</span>" +
+            '<span class="edit__act"><span class="row__ok" data-iv-ok></span>' +
+            '<button class="btn btn--ghost" data-iv-cancel="' + esc(c.id) + '" type="button">' +
+            "Call it off</button></span></div>"
+        : "") +
     "</div>";
   }
 
@@ -3408,6 +3523,10 @@ function interviewBlock(live) {
       '<div class="iv__slots">' +
         st.slots.map(function (s) { return slotRow(s, "", "Offered"); }).join("") +
       "</div>";
+  } else if (optional) {
+    body += '<p class="msg" style="margin-top:0">Her start date is agreed, so there is nothing ' +
+      "you have to do here. If you would like to talk to " + esc(first) + " first, offer a few " +
+      "times that suit you and she will pick one.</p>";
   } else {
     body += '<p class="msg" style="margin-top:0">' + esc(who) + " is matched to your seat. Offer " +
       "a few times that suit you and she will pick one. Twenty to thirty minutes is usually " +
@@ -3495,8 +3614,37 @@ function wireInterview() {
     var offer = e.target.closest("[data-iv-offer]");
     if (offer) { if (!offer.disabled) offerSlot(offer, card, ok); return; }
 
-    /* Only a time not yet confirmed can be taken back from here — see
-       interviewBlock for why a confirmed one has no button at all. */
+    /* sql/100. A confirmed interview moves or is called off through its own
+       functions; withdraw_interview_slot below still refuses one, by design. */
+    var move = e.target.closest("[data-iv-move]");
+    if (move) {
+      if (move.disabled) return;
+      var to = ivTypedAt(card, ok);
+      if (!to) return;
+      ivCall("rpc/reschedule_placement_interview", {
+        slot: move.getAttribute("data-iv-move"),
+        at_time: to.toISOString(),
+        why: ivReason(card)
+      }, move, ok);
+      return;
+    }
+
+    var off = e.target.closest("[data-iv-cancel]");
+    if (off) {
+      if (off.disabled) return;
+      /* Asked first, because it cannot be taken back: the email to her goes
+         the moment it is pressed, and the time is gone from both pages. */
+      if (!window.confirm("Call off this interview? We will email you both, and you can " +
+                          "offer new times on this page.")) return;
+      ivCall("rpc/cancel_placement_interview", {
+        slot: off.getAttribute("data-iv-cancel"),
+        why: ivReason(card)
+      }, off, ok);
+      return;
+    }
+
+    /* Only a time not yet confirmed can be taken back from here — a
+       confirmed one is moved or called off above. */
     var drop = e.target.closest("[data-iv-drop]");
     if (drop) {
       if (drop.disabled) return;
@@ -3524,15 +3672,38 @@ function wireInterview() {
 }
 
 function offerSlot(btn, card, ok) {
+  var when_ = ivTypedAt(card, ok);
+  if (!when_) return;
+  var mins = card.querySelector("[data-iv-mins]");
+
+  ivCall("rpc/offer_interview", {
+    placement: btn.getAttribute("data-iv-offer"),
+    at_time: when_.toISOString(),
+    mins: Number(mins && mins.value) || 30
+  }, btn, ok);
+}
+
+/* The optional line that goes to her with a move or a call-off. 100 refuses
+   more than 500 characters; the field stops at 500, so that is never met. */
+function ivReason(card) {
+  var el = card.querySelector("[data-iv-why]");
+  var t = el ? el.value.trim() : "";
+  return t || null;
+}
+
+/* The day and time typed on the card, as the instant they mean, or null with
+   the reason flashed beside the button. Shared by offering a time and moving
+   a confirmed one, because both are typed into the same pair of fields and
+   both must be read in the same zone the label names. */
+function ivTypedAt(card, ok) {
   /* From the card that was clicked, never from the document — see the note
      on sfx in interviewBlock. */
   var day = card.querySelector("[data-iv-day]");
   var at = card.querySelector("[data-iv-at]");
-  var mins = card.querySelector("[data-iv-mins]");
-  if (!day || !at) return;
+  if (!day || !at) return null;
 
-  if (!day.value) { ivFlash(ok, "Pick a day", true); day.focus(); return; }
-  if (!at.value) { ivFlash(ok, "Pick a time", true); at.focus(); return; }
+  if (!day.value) { ivFlash(ok, "Pick a day", true); day.focus(); return null; }
+  if (!at.value) { ivFlash(ok, "Pick a time", true); at.focus(); return null; }
 
   /* Built from the parts and sent as an instant. The parts are a wall-clock
      time in the zone the field is labelled with: the zone saved on the
@@ -3544,14 +3715,9 @@ function offerSlot(btn, card, ok) {
      no zone saved the two are the same thing, and the browser does it. */
   var when_ = MY_TZ ? zonedInstant(day.value, at.value, MY_TZ)
                     : new Date(day.value + "T" + at.value);
-  if (!when_ || isNaN(when_)) { ivFlash(ok, "That is not a time we can read", true); return; }
-  if (when_.getTime() < serverNow()) { ivFlash(ok, "That time has already passed", true); return; }
-
-  ivCall("rpc/offer_interview", {
-    placement: btn.getAttribute("data-iv-offer"),
-    at_time: when_.toISOString(),
-    mins: Number(mins && mins.value) || 30
-  }, btn, ok);
+  if (!when_ || isNaN(when_)) { ivFlash(ok, "That is not a time we can read", true); return null; }
+  if (when_.getTime() < serverNow()) { ivFlash(ok, "That time has already passed", true); return null; }
+  return when_;
 }
 
 /* "2026-09-08" and "09:00" read as a wall-clock time in a named zone, as the
@@ -3591,7 +3757,7 @@ function zonedInstant(dayStr, timeStr, zone) {
   return new Date(at);
 }
 
-/* One path for all five, because they fail the same way and every one of them
+/* One path for all seven, because they fail the same way and every one of them
    ends with the page being redrawn from what the database now says rather than
    from what this browser thinks it just did. */
 function ivCall(fn, body, btn, ok) {
@@ -3636,13 +3802,18 @@ function placeBlock(live, k) {
 
   /* Matched up here rather than embedded — see loadClient for why that embed
      was a 400 and what it cost. */
-  var who = "your assistant";
+  /* first goes in sentences and on the keep-on button. Cut from the
+     fallback it read "Happy with your?" and "We're keeping your on". */
+  var who = "your assistant", whoFirst = who;
   for (var n = 0; n < C_NAMES.length; n++) {
     if (C_NAMES[n].application_id === live.application_id && C_NAMES[n].name) {
       who = C_NAMES[n].name;
+      whoFirst = who.split(" ")[0];
       break;
     }
   }
+  /* The same at the start of a sentence: "Your assistant has been told". */
+  var WhoFirst = whoFirst.charAt(0).toUpperCase() + whoFirst.slice(1);
   var rate = C_RATE[live.id];
   var mine = C_WEEKS.filter(function (w) { return w.placement_id === live.id; });
   var waiting = mine.filter(function (w) { return w.status === "submitted"; });
@@ -3663,13 +3834,49 @@ function placeBlock(live, k) {
   var asked = C_SWAPS.filter(function (s) {
     return s.placement_id === live.id && s.status === "open";
   });
+  /* sql/107. The last request staff dealt with, and what they said. It used
+     to vanish the moment it was marked handled — the "we are on it" note went
+     and the form came back, as if the client had never asked. Shown for two
+     months after it was dealt with, which is long enough to be read and short
+     enough not to sit on the page for good. Newest first, as read. */
+  var nowMs = serverNow();
+  var lastDone = null;
+  for (var sd = 0; sd < C_SWAPS.length; sd++) {
+    var sw = C_SWAPS[sd];
+    if (sw.placement_id === live.id && sw.status === "resolved" &&
+        (!sw.resolved_at || nowMs - new Date(sw.resolved_at).getTime() < 60 * 86400000)) {
+      lastDone = sw;
+      break;
+    }
+  }
+
+  /* Today on the office's calendar, which is the one 108 and 109 count days
+     on. Worked out here rather than by a helper so the harnesses that lift
+     this function out of the page need nothing new to run it. */
+  var todayC = "";
+  try {
+    todayC = new Intl.DateTimeFormat("en-CA", {
+      timeZone: CENTRAL, year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date(nowMs));
+  } catch (e) {}
+  /* Not started: matched, or on trial with a first day still ahead. Before
+     that day she has worked nothing and nothing has been billed, and the
+     cards below must not say otherwise. */
+  var started = live.status === "matched" ? false
+              : live.status !== "trial" ? true
+              : !live.started_on || !todayC || live.started_on <= todayC;
 
   var html =
     '<section data-place-block="' + esc(live.id) + '">' +
     '<div class="card">' +
       '<div class="row__top"><span><span class="row__n">' + esc(who) + "</span>" +
         '<span class="row__meta"> &middot; ' +
-          (live.started_on ? "with you since " + esc(when(live.started_on)) + " &middot; " : "") +
+          (live.started_on
+            ? (started ? "with you since " : "starting ") + esc(when(live.started_on)) + " &middot; "
+            : "") +
+          /* 109. Staff can now set the last day ahead of time; the placement
+             stays live until then, and the client should see the date. */
+          (live.ended_on ? "last day " + esc(when(live.ended_on)) + " &middot; " : "") +
           esc(live.hours_per_week) + " hours a week</span></span>" +
         '<span class="pill pill--pl_' + esc(live.status) + '">' +
           esc(C_LABEL[live.status] || live.status) + "</span></div>" +
@@ -3697,13 +3904,19 @@ function placeBlock(live, k) {
      the client was emailed to confirm, and there was nothing on this page to
      confirm it with. Nothing else about the interview depends on the status,
      so the card now follows the slots. Only times still ahead count: an
-     offer nobody took, months ago, is not an interview being arranged. */
-  var nowMs = serverNow();
+     offer nobody took, months ago, is not an interview being arranged.
+
+     And on a trial that has not started and has no times at all. That is
+     where calling off a confirmed interview (sql/100) leaves a client who had
+     already said yes to the start date: cancel_placement_interview deletes the
+     time, and without this the card that offers new ones went with it. */
   var inPlay = C_SLOTS.some(function (x) {
     return x.placement_id === live.id && !x.declined_at && !x.confirmed_at &&
            new Date(x.starts_at).getTime() > nowMs;
   });
+  var anySlot = C_SLOTS.some(function (x) { return x.placement_id === live.id; });
   if (live.status === "matched" || inPlay ||
+      (live.status === "trial" && !started && !anySlot) ||
       (live.status === "trial" && C_SLOTS.some(function (x) {
         return x.placement_id === live.id && x.confirmed_at;
       }))) {
@@ -3716,7 +3929,7 @@ function placeBlock(live, k) {
         "<h2>When can they start?</h2>" +
         (said
           ? '<div class="note"><b>You said ' + esc(when(said.starts_on)) + ".</b> " +
-            esc(who.split(" ")[0]) + " has been told, and the trial runs from that day.</div>"
+            esc(WhoFirst) + " has been told, and the trial runs from that day.</div>"
           : '<p class="msg" style="margin-top:0">We have pencilled in <b>' +
               esc(when(live.started_on) || "a date to agree") + "</b>. Confirm it, or give us " +
               "the day that actually suits you &mdash; the trial is counted from the day work " +
@@ -3817,7 +4030,8 @@ function placeBlock(live, k) {
       '<div class="card">' +
         "<h2>Your statement</h2>" +
         '<p class="msg" style="margin-top:0">What the hours you have approved come to. ' +
-          "This is a running total rather than a bill &mdash; we invoice you separately.</p>" +
+          "This is a running total for this person &mdash; what you owe across everybody is in " +
+          '<a href="#billing">your bill</a> below.</p>' +
         '<ul class="meta">' +
           "<li><b>Chargeable hours</b><span>" + esc(cNum(billedH)) + "</span></li>" +
           /* Shown rather than quietly left out. A client who adds up the weeks
@@ -3858,31 +4072,89 @@ function placeBlock(live, k) {
       '<div class="card">' +
         "<h2>Your statement</h2>" +
         '<div class="note note--warn"><b>We have not finished setting up your rate.</b> ' +
-          esc(who.split(" ")[0]) + "&rsquo;s hours are being recorded and nothing is lost &mdash; " +
+          esc(WhoFirst) + "&rsquo;s hours are being recorded and nothing is lost &mdash; " +
           "the statement appears here as soon as the rate is on your account. " +
           'If that is not within a day, write to <a href="mailto:support@securejobva.com">' +
           "support@securejobva.com</a>.</div>" +
       "</div>";
   }
 
-  /* ── asking for somebody different ── */
+  /* ── keeping her on ──
+     sql/108. Staff used to hear "we are keeping her" by email and flip the
+     status in /admin before she was told. The client can say it here now,
+     once the trial has actually begun; keep_placement_on refuses anything
+     else with its own sentence, shown as written. It changes nothing about
+     the bill — the trial's free days are counted from the first day whatever
+     the status says (085) — and the card says so, because "keep her on"
+     sounds like the moment charging starts. */
+  /* And only with a first day on record. keep_placement_on (sql/108)
+     refuses a trial with no started_on as not started yet, so without this
+     a trial missing its date offered a button that could only be refused.
+     started itself is left counting it as started, because 109 lets hours
+     be logged on it and the cards below must not say nothing is billed. */
+  if (live.status === "trial" && started && live.started_on) {
+    html +=
+      '<div class="card">' +
+        "<h2>After the trial</h2>" +
+        '<p class="msg" style="margin-top:0">Happy with ' + esc(whoFirst) +
+          "? Tell us you are keeping her on and we will let her know straight away. " +
+          "It does not change what you pay: the free trial days end on their own date either way.</p>" +
+        '<p class="err" data-keep-err aria-live="polite"></p>' +
+        '<div class="edit__foot"><span></span><span class="edit__act">' +
+          '<span class="row__ok" data-keep-ok></span>' +
+          '<button class="btn btn--solid" data-keep-go type="button" data-place="' +
+            esc(live.id) + '" data-who="' + esc(whoFirst) + '">' +
+            "We&rsquo;re keeping " + esc(whoFirst) + " on</button>" +
+        "</span></div>" +
+      "</div>";
+  }
+
+  /* ── asking for somebody different ──
+     Two cards in one, chosen by whether she has started. After the interview
+     and before her first day, the question a client actually has is "not
+     this person", and the old copy answered it with "she keeps working and
+     you keep being billed as normal" — neither of which was true of somebody
+     who had not worked a minute. Same request either way (swap_requests, and
+     107 tells the client by email when it arrives and when it is dealt with);
+     only the words change, to what is true at that moment. */
+  var first = esc(whoFirst);
   html +=
     '<div class="card">' +
-      "<h2>Not working out?</h2>" +
+      "<h2>" + (started ? "Not working out?" : "Not the right person?") + "</h2>" +
+      (lastDone && !asked.length
+        ? '<div class="note" style="margin-top:0;margin-bottom:1rem"><b>We dealt with your request of ' +
+          esc(when(lastDone.created_at)) + ".</b> " +
+          (lastDone.resolution_note
+            ? "What we told you: &ldquo;" + esc(lastDone.resolution_note) + "&rdquo;"
+            : "If you have not heard from us about it, write to " +
+              '<a href="mailto:support@securejobva.com">support@securejobva.com</a>.') +
+          "</div>"
+        : "") +
       (asked.length
-        ? '<div class="note"><b>You have asked us for somebody different.</b> ' +
-          "We are on it, and we will come back to you. Nothing changes in the meantime &mdash; " +
-          esc(who.split(" ")[0]) + " is still working and you are billed as normal.</div>"
-        : '<p class="msg" style="margin-top:0">Tell us what is not working and we will find you ' +
-          "somebody else. Nothing changes today: " + esc(who.split(" ")[0]) +
-          " keeps working and you keep being billed as normal until a replacement is agreed with you.</p>" +
-          '<div class="fld"><label for="c-why' + sfx + '">What is not working?</label>' +
+        ? (started
+          ? '<div class="note"><b>You have asked us for somebody different.</b> ' +
+            "We are on it, and we will come back to you. Nothing changes in the meantime &mdash; " +
+            first + " is still working and you are billed as normal.</div>"
+          : '<div class="note"><b>You have told us ' + first + " is not the right fit.</b> " +
+            "We are on it, and we will come back to you. She has not started, so nothing is " +
+            "being billed.</div>")
+        : (started
+          ? '<p class="msg" style="margin-top:0">Tell us what is not working and we will find you ' +
+            "somebody else. Nothing changes today: " + first +
+            " keeps working and you keep being billed as normal until a replacement is agreed with you.</p>"
+          : '<p class="msg" style="margin-top:0">Met ' + first + " and she is not the one? Tell us " +
+            "why and we will look for somebody else. She has not started, and nothing has been " +
+            "billed.</p>") +
+          '<div class="fld"><label for="c-why' + sfx + '">' +
+            (started ? "What is not working?" : "What did not fit?") + "</label>" +
             '<textarea id="c-why' + sfx + '" data-swap-why rows="3"></textarea></div>' +
           '<p class="err" data-swap-err aria-live="polite"></p>' +
           '<div class="edit__foot"><span></span><span class="edit__act">' +
             '<span class="row__ok" data-swap-ok></span>' +
             '<button class="btn btn--ghost" data-swap-go type="button" data-place="' +
-              esc(live.id) + '">Ask for a different assistant</button>' +
+              esc(live.id) + '">' +
+              (started ? "Ask for a different assistant" : "Not this person &mdash; find somebody else") +
+              "</button>" +
           "</span></div>") +
     "</div>" +
     "</section>";
@@ -3907,6 +4179,35 @@ function wireClient() {
     wireWeeks(sec);
     wireStart(sec);
     wireSwap(sec);
+    wireKeep(sec);
+  });
+}
+
+/* sql/108. Asked first, because the email to her goes the moment it saves
+   and there is no taking back "they would like to keep you on". */
+function wireKeep(sec) {
+  var go = sec.querySelector("[data-keep-go]");
+  if (!go) return;
+  go.addEventListener("click", function () {
+    if (go.disabled) return;
+    var err = sec.querySelector("[data-keep-err]");
+    var ok = sec.querySelector("[data-keep-ok]");
+    if (!window.confirm("Keep " + (go.getAttribute("data-who") || "her") + " on? We will email " +
+                        "her to say so.")) return;
+    err.textContent = "";
+    go.disabled = true;
+    ok.textContent = "Saving…";
+    ok.classList.add("is-on");
+    api("rpc/keep_placement_on", { method: "POST", body: { placement: go.getAttribute("data-place") } })
+      .then(function () { location.reload(); })
+      .catch(function (e) {
+        go.disabled = false;
+        ok.classList.remove("is-on");
+        /* keep_placement_on's refusals ("sjva-keep-not-trial",
+           "sjva-keep-not-started") carry a sentence written for the client;
+           ivWhy shows it rather than a generic failure. */
+        err.textContent = ivWhy(e);
+      });
   });
 }
 
@@ -3937,16 +4238,30 @@ function wireWeeks(sec) {
       ok.classList.remove("is-bad");
       ok.textContent = "Saving…";
       ok.classList.add("is-on");
-      api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-week")), {
+      /* return=representation, and the select keeps it to two columns the
+         page already reads. A PATCH the policy refuses — the week is no
+         longer 'submitted' because SecureJobVA decided it while this page sat
+         open — is not an error to PostgREST: it answers 200 with no rows. With
+         return=minimal that looked exactly like success, the page reloaded,
+         and a client who was not watching closely took the staff's decision
+         for their own. An empty answer now says what happened instead. */
+      api("timesheets?id=eq." + encodeURIComponent(row.getAttribute("data-week")) + "&select=id,status", {
         method: "PATCH",
-        headers: { Prefer: "return=minimal" },
+        headers: { Prefer: "return=representation" },
         /* The note reaches the assistant now. Until sql/046 the trigger from
            030 put it back to whatever it had been for anybody without
            applications.edit — which is every client — so this field was
            required by the form above, sent, discarded before it was stored,
            and then left out of the email telling her a week needed changing. */
         body: yes ? { status: "approved" } : { status: "returned", note: note }
-      }).then(function () { location.reload(); })
+      }).then(function (saved) {
+        if (saved && saved.length) { location.reload(); return; }
+        ok.classList.add("is-bad");
+        ok.innerHTML = "SecureJobVA had already decided this week, so your click did not change it. " +
+          '<button class="lnk" type="button" data-c-reload>Refresh to see what we decided</button>';
+        var again = ok.querySelector("[data-c-reload]");
+        if (again) again.addEventListener("click", function () { location.reload(); });
+      })
         .catch(function (e) {
           Array.prototype.forEach.call(pair, function (x) { x.disabled = false; });
           ok.textContent = "Did not save";

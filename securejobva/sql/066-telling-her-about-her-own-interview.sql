@@ -6,9 +6,10 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   notify_interview
---     -> re-run 070-moving-an-interview.sql to restore. That file defines
---        notify_interview in full, carrying 066, 067 and 069 forward, so it
---        is the only one needed however long this chain gets.
+--     -> re-run 099-staff-hear-when-she-picks-a-time.sql to restore. That
+--        file defines notify_interview in full, carrying 066, 067, 069 and
+--        070 forward, so it is the only one needed however long this chain
+--        gets.
 --
 -- 066's version has no 'link' moment, so pasting a joining link onto a
 -- confirmed interview stops telling her where to go — and her confirmation

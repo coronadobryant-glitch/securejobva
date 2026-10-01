@@ -1,3 +1,22 @@
+-- DO NOT RE-RUN THIS FILE ON ITS OWN
+--
+-- Every statement in it is repeatable, so on its own it is safe. What it is
+-- not safe to do is run it AFTER the files that come later, because it
+-- defines functions they have since replaced — and `create or replace` does
+-- exactly what it says.
+--
+-- What this file would take back, and what to run afterwards to undo it:
+--
+--   notify_payment_receipt
+--     -> re-run 096-every-sender-reads-the-one-secret.sql to restore
+--
+-- This version carries its own copy of the webhook secret (the placeholder,
+-- in the repo copy) and posts straight to pg_net. 096 replaced it with one
+-- that reads the secret from 094's store and posts through 095's outbox, so
+-- re-running this would put a stale or placeholder secret back into one kind
+-- of email, with no retry — and it would look like it worked.
+--
+-- tools/check.mjs keeps this list honest.
 -- 093 — a receipt for a payment
 --
 -- Run after: 092

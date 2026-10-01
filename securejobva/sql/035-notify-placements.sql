@@ -13,7 +13,8 @@
 -- What this file would take back, and what to run afterwards to undo it:
 --
 --   notify_decision
---     -> re-run 037-fix-notify-record-fields.sql to restore
+--     -> re-run 096-every-sender-reads-the-one-secret.sql to restore (it
+--        carries 037's fix forward, and posts through the outbox)
 --
 -- So if you ever run this file again, run every later file it names above,
 -- in number order, straight afterwards. tools/check.mjs keeps this list

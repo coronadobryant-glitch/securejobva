@@ -24,6 +24,21 @@
  * They can set a password afterwards from the portal if they want one; a
  * client who never bothers just clicks a fresh link, which is a reasonable
  * way to live for somebody who signs in once a week to approve hours.
+ *
+ * WHAT THE EMAIL SAYS IS NOT WRITTEN HERE (F17)
+ *
+ * The auth server writes and sends it, from the project's email templates,
+ * so it reads as a generic "click here to sign in" that names no assistant
+ * and no start date. Sending our own instead means minting the link
+ * ourselves, and the only endpoint that hands a link back rather than
+ * mailing it (admin generate_link) needs the service-role key — the trade
+ * refused above, and refused by tools/check.mjs for every file in api/. So
+ * the wording is changed where it lives: Supabase dashboard -> Authentication
+ * -> Email Templates, "Magic Link" and "Confirm signup" (an address the
+ * auth server has never seen can get the second, depending on the
+ * project's confirm-email setting). Both receive {{ .RedirectTo }}, which is this
+ * file's /seats for a client and something else for everybody else, so one
+ * template can say the client's version only to clients.
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -76,13 +91,11 @@ export default async function handler(req, res) {
   }
   const email = String(body.email || "").trim();
 
-  /* Not an error, and answered 200 so it does not read as one in
-     net._http_response. (Nothing retries this call either way: the trigger in
-     040 is a pg_net post, which fires once and keeps the answer — see the note
-     on send() in api/notify.js.) A client with no address on file, or one
+  /* Not an error, and answered 200 so the outbox (sql/095) records it as
+     done rather than asking again. A client with no address on file, or one
      that is not an address, is a normal state — the field is optional in
      /admin — and it means there is nobody to write to, not that something
-     went wrong. */
+     went wrong. Asking ten more times would not give them one. */
   if (!EMAIL.test(email)) {
     return res.status(200).json({ skipped: "no address on the client" });
   }
@@ -118,6 +131,16 @@ export default async function handler(req, res) {
      is worse, and the trigger already refuses to let this call take the
      transaction down with it.
 
+     And the status code is now a request (sql/095, 096): every caller posts
+     through public.notify_send(), whose outbox tries again on anything but a
+     2xx or a plain refusal. So a failure that might pass — the auth server
+     down (5xx), its email rate limit (429), the network gone (0) — answers
+     502 and the invite goes again a minute later, then at growing gaps for
+     about eight hours. A refusal about this address (any other 4xx) answers
+     200: it will be refused the same way every time, and the place to fix it
+     is the address in /admin, which sends the invite again when it changes
+     (sql/104), or its "Send the invite again" button.
+
      The log names the business, not the address. Vercel keeps function logs
      where anybody with the project can read them, and the business is enough
      to find the client in /admin and send the invite again by hand. The auth
@@ -125,7 +148,8 @@ export default async function handler(req, res) {
   if (!out.ok) {
     console.error("[invite] could not send the invite for " + String(body.business || "a client"),
       out.status, String(out.detail || "").replace(/[^\s@"'<>,;:]+@[^\s@"'<>,;:]+/g, "<address>"));
-    return res.status(200).json({ sent: 0, why: out.status });
+    const again = out.status === 0 || out.status === 429 || out.status >= 500;
+    return res.status(again ? 502 : 200).json({ sent: 0, why: out.status, retry: again });
   }
 
   return res.status(200).json({ sent: 1, business: body.business || null });

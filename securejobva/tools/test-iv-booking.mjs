@@ -165,6 +165,9 @@ console.log("\n  She picked one, waiting on us");
   ok("she is not asked to decline any more", has(v.h, "data-none"), false,
      "she has answered; the way out now is choosing a different one");
   ok("and is told she may still change it", has(v.h, "Picked a different one?"), true);
+  /* F6 / F35: sql/099 alerts the team as she picks, so the card says so. */
+  ok("and that the team has been told her pick", has(v.h, "The team has been told which time you picked"), true);
+  ok("and that confirming it emails her", has(v.h, "you will get an email when it is confirmed"), true);
   ok("the one she picked is still choosable on the other row",
      (v.h.match(/data-slot=/g) || []).length, 1);
 
@@ -226,6 +229,7 @@ console.log("\n  None of them worked");
   const v = both([slot("s1", T1, { declined_at: d }), slot("s2", T2, { declined_at: d })]);
   ok("she is told a new set is coming", has(v.h, "New times coming"), true);
   ok("and that nothing is needed from her", has(v.h, "nothing else is needed from you"), true);
+  ok("and that the team has been told (sql/099)", has(v.h, "and the team " + "has been told"), true);
   ok("she is not asked to pick from times she declined", has(v.h, "data-slot"), false);
   ok("nor to decline them twice", has(v.h, "data-none"), false);
 

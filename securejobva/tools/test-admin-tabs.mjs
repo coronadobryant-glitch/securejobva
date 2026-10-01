@@ -71,8 +71,9 @@ const RAIL = [
   ["tab", "inbox", "Messages"],
   ["k", "The business"],
   ["tab", "seats", "Seats3"],
-  ["tab", "clients", "Clients"],
+  ["tab", "clients", "Clients1"],
   ["tab", "place", "Placements"],
+  ["tab", "logos", "Logos"],
   ["k", "The team"],
   ["tab", "team", "Team"],
   ["tab", "hours", "Timesheets"],
@@ -90,7 +91,7 @@ const tabs = {
   addEventListener(_, fn) { this._fire = fn; },
 };
 
-const panes = ["apps", "cal", "inbox", "seats", "clients", "place", "team", "hours", "accts"]
+const panes = ["apps", "cal", "inbox", "seats", "clients", "place", "logos", "team", "hours", "accts"]
   .map((p, i) => {
     const n = el("div", i === 0 ? { "data-pane": p } : { "data-pane": p, hidden: "" });
     n.hidden = i !== 0;
@@ -175,8 +176,36 @@ is("the queue shows its own pane again", pane("apps").hidden, false);
 is("the queue hides Clients again", pane("clients").hidden, true);
 is("the queue keeps its count out of its title", heading.textContent, "Applications");
 
+/* The logo strip is Logos, and Clients is the client list (F46). The tab
+   called Clients used to open the home page's logos, so staff looking for a
+   business went there first and found pictures. */
+click("logos");
+is("Logos shows its own pane", pane("logos").hidden, false);
+is("Logos hides Clients", pane("clients").hidden, true);
+is("Logos is titled Logos", heading.textContent, "Logos");
+click("clients");
+is("Clients keeps its warning count out of its title", heading.textContent, "Clients");
+
+/* And the rail above is the page's rail. Read off the built page, so a tab
+   added there and not here — or a tab with no pane to show — fails this
+   rather than passing a test about a page that no longer exists. */
+{
+  const tabsInPage = [...new Set([...js.matchAll(/data-tab="([a-z]+)"/g)].map((m) => m[1]))].sort();
+  const panesInPage = [...new Set([...js.matchAll(/data-pane="([a-z]+)"/g)].map((m) => m[1]))].sort();
+  const tabsHere = RAIL.filter((r) => r[0] === "tab").map((r) => r[1]).sort();
+  is("every tab on the page is on the rail this drives", tabsInPage.join(","), tabsHere.join(","));
+  is("every tab on the page has a pane", tabsInPage.filter((t) => panesInPage.indexOf(t) < 0).join(","), "");
+  const paneHtml = (p) => {
+    const at = js.indexOf('data-pane="' + p + '"');
+    return at < 0 ? "" : js.slice(at, js.indexOf("</div></div>", at));
+  };
+  is("the Clients pane holds the client list", paneHtml("clients").indexOf('id="client-card"') > -1, true);
+  is("the Clients pane is not the logos", paneHtml("clients").indexOf("logos-card") > -1, false);
+  is("the Logos pane holds the logos", paneHtml("logos").indexOf('id="logos-card"') > -1, true);
+}
+
 /* Exactly one pane at a time, on every stop of the round trip. */
-for (const t of ["cal", "inbox", "team", "accts", "apps"]) {
+for (const t of ["cal", "inbox", "team", "accts", "logos", "apps"]) {
   click(t);
   is("only " + t + " is showing", panes.filter((p) => !p.hidden).length, 1);
 }
@@ -186,4 +215,4 @@ if (fails.length) {
   console.log(fails.length + " failed of " + (ok + fails.length));
   process.exit(1);
 }
-console.log(ok + " behaviours, nine tabs and one toolbar");
+console.log(ok + " behaviours, ten tabs and one toolbar");

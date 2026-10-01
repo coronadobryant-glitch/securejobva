@@ -88,9 +88,29 @@ grants with it. So the rule is:
 | `090-who-an-interview-is-waiting-on.sql` | `interview_state` stops saying "declined" after new times are offered |
 | `091-a-track-is-one-of-three.sql` | A new application's tracks are the three on the form |
 | `092-a-message-needs-an-address.sql` | A contact message needs a real address — deploy contact.html first |
-| `093-a-receipt-for-a-payment.sql` | A receipt email when a payment is recorded — needs the secret pasted in |
+| `093-a-receipt-for-a-payment.sql` | A receipt email when a payment is recorded — needs the secret pasted in (the last file that does) |
+| `094-one-place-for-the-webhook-secret.sql` | The webhook secret in one private row, copied out of `notify_decision` — nothing pasted in |
+| `095-an-email-that-failed-is-tried-again.sql` | `notify_outbox`, `notify_send()`, and a pg_cron job that retries failed posts with backoff |
+| `096-every-sender-reads-the-one-secret.sql` | Every sender (and the three form webhooks) reads the one secret and posts through the outbox |
+| `097-a-pass-moves-on-when-the-typing-is-checked.sql` | A pass moves to Interview when the typing is checked. Emails nobody: its check lists who the bug left behind |
+| `098-staff-hear-when-the-exams-are-sent.sql` | Staff are emailed when an assessment is sent, with the verdict and what is needed |
+| `099-staff-hear-when-she-picks-a-time.sql` | Staff are emailed when an applicant picks or declines interview times; placement 'moved' |
+| `100-a-confirmed-placement-interview-can-move.sql` | `reschedule_placement_interview()` and `cancel_placement_interview()`, both sides emailed, with the reason |
+| `101-an-application-says-yes-to-both.sql` | A new application must say 18+ and carry consent — old queued rows drain for 8 days first |
+| `102-a-seat-request-belongs-to-a-client.sql` | `seat_requests.client_id`, `link_seat_request()`, and the client reads requests linked to it |
+| `103-the-business-hears-its-request-moved.sql` | The business is emailed when its seat request moves forward a stage |
+| `104-a-client-staff-can-add-and-correct.sql` | `create_client()`, `update_client()`, `resend_client_invite()` |
+| `105-matching-is-one-save.sql` | `place_assistant()`: client, placement and both rates in one transaction |
+| `106-the-client-hears-hours-are-waiting.sql` | The client is emailed when a week is sent for them to approve |
+| `107-the-client-hears-back-about-a-swap.sql` | The client is emailed when they ask for somebody different, and when it is handled; `resolution_note` |
+| `108-the-client-keeps-her-on.sql` | `keep_placement_on()`: the client moves a trial to kept on |
+| `109-ending-a-placement-on-the-day-it-ends.sql` | `end_placement(placement, last_day)` (also ends one that never began), a daily job that ends it, and the client's email |
+| `110-a-notice-can-be-corrected-or-removed.sql` | Staff may delete a notice (editing was always allowed) |
+| `111-hired-is-said-in-one-place.sql` | The stage is the truth for hired; the pipeline's 'hired' follows it |
+| `112-a-contact-message-names-itself.sql` | anon may send a contact message's own id, so a resend is refused rather than stored twice — before contact.html sends one |
 | `rescore-sales-without-a-sales-part.sql` | Not a migration. One-off, by hand: Sales applicants never shown the Sales part |
-| `verify.sql` | Read-only. Prints what is actually in place. Changes nothing. |
+| `catch-up-passes-left-at-assessment.sql` | Not a migration. One-off, by hand, after 097: moves (and EMAILS) the passes 063 left at Assessment |
+| `verify.sql` | Read-only. One result: a row per thing checked, every PROBLEM first. Changes nothing. |
 
 On a fresh database: 001 through the highest number in order, then `verify.sql`
 to confirm. The table above stops at 029 and the folder does not — for what has
@@ -130,12 +150,19 @@ until you do.
 **Never edit a file that has already been run.** The database has no memory of
 what a file used to say. Add the next number instead.
 
-**Stamp it.** The last statement of every file from 044 on records its own
-number, so that something can answer whether it ran:
+**Stamp it.** Every file from 044 on records its own number, so that something
+can answer whether it ran:
 
 ```sql
 insert into public.schema_migrations (n) values (45) on conflict (n) do nothing;
 ```
+
+From 094 on the stamp goes just BEFORE the file's "Check it worked" query,
+and that query is the file's last statement and a single result set. The
+Supabase SQL editor shows only the last statement's result: a file that ends
+on the stamp shows "Success. No rows returned" and nothing else, and a file
+with three check queries shows only the third. One query, last, is the one
+that is read.
 
 `node tools/check.mjs` fails the build without it, because forgetting the line
 is silent in the worst way — the file runs, the schema changes, and the one
@@ -171,6 +198,24 @@ internet.
 that breaks it. It catches a plain grant, a column-level grant, and a select
 policy aimed at `anon`. It is not a substitute for reading what you wrote, but it
 has caught a real one already.
+
+## The webhook secret
+
+Up to 093, every file that sends email had to be copied to a `.local.sql`,
+filled in with WEBHOOK_SECRET by hand, pasted, and deleted. From 094 the
+secret lives in one private row, `private.webhook_secret`, which 094 fills by
+copying it out of `notify_decision` at paste time — nobody types it — and 096
+makes every sender read it from there. Nothing from 094 on carries a
+placeholder; paste the files exactly as committed.
+
+To change the secret: in the SQL editor,
+`update private.webhook_secret set value = '<new>', set_at = now();`, and
+WEBHOOK_SECRET in Vercel, then redeploy. Either order: posts refused in
+between are retried by 095's outbox.
+
+Re-running any of 021, 028, 031, 035, 036, 037, 040, 058 or 093 now puts an
+old sender back with its own copy of the secret and no retry. Each says so in
+its DO NOT RE-RUN block; run 096 straight afterwards.
 
 ## If a paste fails
 

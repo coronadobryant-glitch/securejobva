@@ -153,8 +153,89 @@ const CONFIRM = {
       "</div>";
 
     return { subject: "We have your application — SecureJobVA", text: body, html };
+  },
+
+  /* ── the one a business gets (F11) ──────────────────────────────────────
+     The thank-you screen in index.html says "We have it", names the 20-minute
+     call and hands over the booking link — and that screen was the only
+     place any of it was said. A business that closed it without booking had
+     nothing in its inbox to say the request existed or what came next, and
+     the request sat at Received with nobody on either side chasing it.
+
+     So this repeats that screen and stops: the call, the link to book it, the
+     shortlist timing the screen already promises, and /seats. The same rules
+     as the applicant's copy hold, for the same reason — the seat form is
+     public and anybody can put a stranger's address in it — so nothing typed
+     goes back out: not the company, not the notes. The seats are named only
+     when they are the three this site offers, and the greeting goes through
+     firstName(). */
+  seat_requests: (r, site) => {
+    const first = firstName(r.name);
+    const what = knownTracks({ tracks: r.seats });
+    const asked = " for an assistant" + (what ? " in " + what : "");
+
+    const body = [
+      "Hi " + first + ",",
+      "",
+      "We have your request" + asked + ". A person reads every one.",
+      "",
+      "The next step is a 20-minute call to agree the hours, the tasks and the rate. " +
+        "If you have not picked a time yet, you can do it here: " + bookCall(r.email, r.id),
+      "",
+      "The shortlist follows within three working days of the call.",
+      "",
+      "You can see where your request has got to at " + site + "/seats — sign in " +
+        "with this address.",
+      "",
+      "If something in it needs correcting, reply to this email and tell us.",
+      "",
+      "SecureJobVA"
+    ].join("\n");
+
+    const html = wrap([
+      "<p>Hi " + esc(first) + ",</p>",
+      "<p>We have your request for an assistant" + (what ? " in <b>" + esc(what) + "</b>" : "") +
+        ". A person reads every one.</p>",
+      "<p>The next step is a 20-minute call to agree the hours, the tasks and the rate. " +
+        "If you have not picked a time yet, you can do it here:</p>",
+      '<p><a href="' + esc(bookCall(r.email, r.id)) + '" ' +
+        'style="background:#0072EE;color:#fff;text-decoration:none;padding:10px 18px;' +
+        'border-radius:6px;display:inline-block">Pick a time for the call</a></p>',
+      "<p>The shortlist follows within three working days of the call.</p>",
+      "<p>You can see where your request has got to at " +
+        '<a href="' + esc(site) + '/seats">' + esc(site.replace(/^https?:\/\//, "")) +
+        "/seats</a> &mdash; sign in with this address. If something in it needs " +
+        "correcting, reply to this email and tell us.</p>"
+    ], site, null, null);
+
+    return { subject: "We have your request — SecureJobVA", text: body, html };
   }
 };
+
+/* The booking link the home page hands over on its thank-you screen
+   (CFG.scheduler in index.html). Written twice, so tools/test-notify.mjs reads
+   that page and fails if the two ever stop agreeing. */
+const CAL = "https://cal.com/securejobva.com/20min";
+
+/* The booking link as the thank-you screen builds it (booking() in
+   index.html), less what was typed: the address the email is going to, and
+   the request's own id as metadata[seat_request]. cal.com keeps that on the
+   booking and hands it to a webhook unchanged, so a call booked from this
+   email can be matched to its request by id, the same as one booked from the
+   screen. Without it, the business that closed the screen and booked from
+   its inbox (the case F11 is for) made the one booking nothing could match.
+
+   The screen also passes the name and the notes. Those stay out: the form
+   is public, anybody can put a stranger's address in it, and a prefilled
+   field is text we would be mailing back out under our name. The address is
+   the recipient's own and the id is ours. */
+function bookCall(email, id) {
+  const q = [];
+  const who = address(email);
+  if (who) q.push("email=" + encodeURIComponent(who));
+  if (id != null && String(id) !== "") q.push("metadata[seat_request]=" + encodeURIComponent(String(id)));
+  return CAL + (q.length ? "?" + q.join("&") : "");
+}
 
 /* Quotes as well as brackets. Several callers put the result inside a
    double-quoted href, and escaping only & < > let a meeting link carrying a
@@ -227,6 +308,24 @@ function weekText(iso) {
 function hoursText(n) {
   const v = Number(n || 0);
   return (Math.round(v * 100) / 100).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+/* Whether a date (YYYY-MM-DD, a placement's started_on) is today or earlier
+   on the client's clock, which is Central — the same clock the pages count a
+   placement's days on. An empty or malformed date is not begun: the callers
+   use this to decide whether to say somebody is working, and not saying it
+   is the safe way to be wrong. Plain string comparison works because both
+   sides are zero-padded ISO dates. */
+function begun(day) {
+  const d = String(day || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  let today;
+  try {
+    today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  } catch (e) {
+    today = new Date().toISOString().slice(0, 10);
+  }
+  return d <= today;
 }
 
 /* The first word of a name, when it looks like one.
@@ -347,16 +446,173 @@ const STAGE_MAIL = {
   }
 };
 
+/* The reason somebody gave for moving or cancelling a placement interview
+   (sql/100, record.reason), as the two emails below quote it. The /admin box
+   promises staff that what they type is "quoted to both of them in the
+   email", and a placement has no note log for it to land in instead (070's
+   applicant reason has one), so the email is the only place it is ever read.
+   Quoted the way a swap's reply is — the words as typed, in the yellow block,
+   escaped — and labelled as a note rather than as "their" note, because the
+   client or staff may have written it and these emails do not say which.
+   Absent or blank, nothing is added and the email reads as it did before. */
+function changeNote(r) {
+  const why = String(r.reason || "").trim();
+  return {
+    text: why ? ["", "The note that came with it:", "  " + why] : [],
+    html: why
+      ? "<p>The note that came with it:</p>" +
+        '<p style="border-left:3px solid #FFC233;background:#FFF6E0;margin:0 0 16px;' +
+        'padding:10px 14px;color:#001232">' + esc(why) + "</p>"
+      : ""
+  };
+}
+
+/* A confirmed placement interview, moved (sql/099, 100). Both people on it are
+   told, and told different things: the assistant is sent to /hub and reads the
+   time as the client's clock; the client is sent to /seats and is told she has
+   been told. `other` is the client's name on her copy and hers on theirs.
+
+   It says "still going ahead" first for the same reason the applicant's copy
+   does — the subject line alone reads like news that it is off. It does not
+   say who moved it: the client or staff can, and a sentence that guesses
+   wrong is worse than one that does not say. */
+function interviewMoved(r, p, site) {
+  const mine = r.side === "assistant";
+  const hi = "Hi " + firstName(p.name) + ",";
+  const where = mine ? "/hub" : "/seats";
+  const clock = mine
+    ? "That time is in Central, which is the client's clock. Open " + site + "/hub to see it on yours."
+    : "She has been told, and sees the time on her own clock.";
+  const note = changeNote(r);
+  return {
+    subject: "Your interview with " + r.other + " has moved to " + slotText(r),
+    text: [hi, "",
+      "Your interview with " + r.other + " is still going ahead. It has moved, and it is now " +
+        slotText(r) + ".",
+      ...note.text,
+      "", (r.meeting_url ? "Where to join: " + r.meeting_url : ""),
+      "", clock,
+      "", "If the new time does not work, reply to this email.",
+      "", "SecureJobVA"]
+      .filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n"),
+    html: wrap([
+      "<p>" + esc(hi) + "</p>",
+      "<p><b>Your interview with " + esc(r.other) + " is still going ahead.</b> It has " +
+        "moved, and it is now <b>" + esc(slotText(r)) + "</b>.</p>",
+      note.html,
+      (r.meeting_url ? "<p>Where to join: " + linkHtml(r.meeting_url) + "</p>" : ""),
+      "<p>" + esc(mine
+        ? "That time is in Central, which is the client's clock. Open your portal to see it " +
+          "on yours."
+        : clock) + " If the new time does not work, reply to this email.</p>"
+    ], site, where, mine ? "See your interview" : "See the details")
+  };
+}
+
+/* A confirmed placement interview, called off (sql/100). The client cancels
+   it and the slot goes, so the next move is theirs: offer new times, which
+   /seats does with the same form it used the first time. Her copy says new
+   times will come and that she will be emailed when they do — which 058's
+   `offered` already makes true — and nothing about what the cancellation
+   means for the placement, because this mail cannot know.
+
+   The applicant's cancellation (interview_slots, further down) ends with
+   "If that link was in your calendar, it will not work now", and there it is
+   true: the room is ours and goes with the slot. Here it is not. The client
+   typed the link and it is their own meeting room, which cancelling on this
+   site does nothing to, and this email never shows the link anyway. So she
+   is told the time is off, which is what her calendar needs to hear, and the
+   client, who owns the room, is told nothing about it. */
+function interviewCancelled(r, p, site) {
+  const mine = r.side === "assistant";
+  const hi = "Hi " + firstName(p.name) + ",";
+  const lead = "Your interview with " + r.other + " on " + slotText(r) + " is cancelled.";
+  const next = mine
+    ? r.other + " will offer new times, and you will get an email when they do. There is " +
+      "nothing for you to do until then."
+    : "When you are ready, offer new times at " + site + "/seats and she will pick one. " +
+      "She has been told.";
+  const note = changeNote(r);
+  return {
+    subject: "Your interview with " + r.other + " on " + slotText(r) + " is cancelled",
+    text: [hi, "", lead, ...note.text, "", next,
+      ...(mine ? ["", "Take it out of your calendar; that time is no longer happening."] : []),
+      "", "SecureJobVA"].join("\n"),
+    html: wrap([
+      "<p>" + esc(hi) + "</p>",
+      "<p>Your interview with <b>" + esc(r.other) + "</b> on <b>" + esc(slotText(r)) +
+        "</b> is cancelled.</p>",
+      note.html,
+      "<p>" + esc(mine
+        ? next
+        : "When you are ready, offer new times and she will pick one. She has been told.") +
+        "</p>",
+      mine ? "<p>Take it out of your calendar; that time is no longer happening.</p>" : ""
+    ], site, mine ? "/hub" : "/seats", mine ? "See your portal" : "Offer new times")
+  };
+}
+
+/* A seat request's stages, in /seats' own words (SEAT_STAGES in
+   tools/build-portal.mjs), so the email and the page never describe the
+   same moment differently. 103 posts only forward moves into these and any
+   move into closed; Received is never mailed, because F11's receipt already
+   said it. */
+const SEAT_STAGE_MAIL = {
+  call_booked: ["Call booked", "Twenty minutes to agree the hours, the tasks and the rate."],
+  matching:    ["Matching", "We are shortlisting from assistants already trained in your track."],
+  shortlist:   ["Shortlist sent", "Names with you. You choose; we handle the handover."],
+  running:     ["Seat running", "Your assistant is working the hours you set."]
+};
+
 const DECIDE = {
   /* ── an interview being arranged ────────────────────────────────────────
      sql/057 and sql/058. Four moments, each addressed to the one person who
-     now has to do something. None of them goes to staff: this is the one
-     exchange in the product a client and an assistant settle between
+     now has to do something. None of a placement's goes to staff: this is
+     the one exchange in the product a client and an assistant settle between
      themselves, and mailing us every offered time would quietly undo that.
 
-     There is no `arrived` half, which is what keeps that true — the branch in
-     decision() that mails you and Bryant cannot be reached from here. */
+     The `arrived` half below is the applicant's alone, and answers null for
+     any other side — decision() skips a null, so the branch that mails you
+     and Bryant still cannot be reached from a placement interview. */
   interview_slots: {
+    /* Her pick, or her turning every time down, to us (sql/099, F6, F35).
+
+       The skip further down used to say mailing ourselves about our own queue
+       is how a queue stops being read. What happened instead was that nobody
+       read it: she picked a time, her page said "Waiting on us", and she
+       waited until somebody happened to open the Interviews tab. These are
+       the two moments where the next move is ours and she can do nothing
+       until we make it, which is exactly what an alert is for.
+
+       Her own side still gets nothing for these — she knows what she just
+       clicked. */
+    arrived: (r, p) => {
+      if (r.side !== "applicant") return null;
+      const name = p.name || "An applicant";
+      if (r.moment === "picked") {
+        return {
+          subject: "Interview time picked — " + name + ", " + slotText(r),
+          lines: [
+            ["Applicant", p.name],
+            ["Picked", slotText(r)],
+            ["Needed", "Confirm it in /admin, with the joining link. She is waiting on us."]
+          ],
+          where: "/admin"
+        };
+      }
+      if (r.moment === "declined") {
+        return {
+          subject: "No interview time works — " + name,
+          lines: [
+            ["Applicant", p.name],
+            ["Needed", "She could not make any of the times offered. Offer her others in /admin."]
+          ],
+          where: "/admin"
+        };
+      }
+      return null;
+    },
+
     /* Three sides now, not two. 057 built this for a client and an assistant
        settling a placement interview between themselves; 062 reused the table
        for an applicant's interview with us and wired no mail at all, so she
@@ -424,8 +680,7 @@ const DECIDE = {
       ], site, "/status", "See your interview")
     }),
 
-    /* Calling one off. Applicant only: on a placement the two parties settle
-       it between themselves and there is no equivalent moment.
+    /* Calling one off — her copy, which is the `cancelled` after `moved`.
 
        It is the one message in this flow that is bad news, so it says the one
        useful thing straight away — new times are coming, she does not have to
@@ -439,8 +694,14 @@ const DECIDE = {
        somebody an afternoon of thinking she has been dropped.
 
        The link rides along: a move that also changed the room is one piece of
-       news, and 058 already refuses to send the same fact twice. */
-    moved: (r, p, site) => ({
+       news, and 058 already refuses to send the same fact twice.
+
+       Three sides since sql/099 and 100: a confirmed placement interview can be
+       moved too, and both people on it are told. The applicant's copy is the
+       one below; the other two are in interviewMoved(). */
+    moved: (r, p, site) => (r.side === "assistant" || r.side === "client"
+      ? interviewMoved(r, p, site)
+      : {
       subject: "Your interview has moved to " + slotText(r),
       text: [
         "Hi " + firstName(p.name) + ",", "",
@@ -464,7 +725,12 @@ const DECIDE = {
       ], site, "/status", "See your interview")
     }),
 
-    cancelled: (r, p, site) => ({
+    /* Calling a placement interview off (sql/100) is the client's move, and
+       the next one is theirs too: offer new times. The applicant's copy is the
+       one below; the other two are in interviewCancelled(). */
+    cancelled: (r, p, site) => (r.side === "assistant" || r.side === "client"
+      ? interviewCancelled(r, p, site)
+      : {
       subject: "Your interview on " + slotText(r) + " is cancelled",
       text: [
         "Hi " + firstName(p.name) + ",", "",
@@ -711,6 +977,161 @@ const DECIDE = {
             "simply carries on. Nothing changes and there is nothing you need to do.</p>"
         ], site, "/hub", "See your portal")
       };
+    },
+
+    /* To you and Bryant, when the CLIENT pressed "We're keeping her on" on
+       /seats (sql/108, F26). When staff do it from /admin, 108 posts nothing
+       here — you already know. She has her own mail from `decided` above. */
+    arrived: (r, p) => (r.moment !== "kept_on" ? null : {
+      subject: "Kept on — " + (r.business || "a client") + " are keeping " +
+        (r.assistant || "their assistant"),
+      lines: [
+        ["Client", r.business],
+        ["Contact", p.name],
+        ["Assistant", r.assistant],
+        ["Started", r.started_on ? fullDate(r.started_on) : ""],
+        ["Trial", r.trial_weeks ? r.trial_weeks + " weeks" : ""],
+        ["Needed", "Nothing. The placement is now ongoing and she has been emailed that she " +
+          "is staying on."]
+      ],
+      where: "/admin"
+    }),
+
+    /* To the client, when a placement is recorded as ended (sql/109, F27) —
+       from end_placement, its daily job, or the /admin dropdown. Before this
+       the card on /seats simply vanished. It says what was recorded and where
+       the statement is, and nothing else: the bill does not end with the
+       placement, and anything about why it ended is a conversation, not an
+       email. The assistant is still told by a person.
+
+       never_started (109's fix-up) is a placement called off before its first
+       day, with no hour logged: it has no ended_on, and "ended" would tell the
+       client somebody worked for them and stopped. So that copy says it will
+       not go ahead and has been closed, and prints no date at all — even if a
+       stray ended_on arrived with it, the one thing that copy must not do is
+       name a last day of work that never happened. */
+    ended: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name) + ",";
+      const who = r.assistant || "your assistant";
+      const never = r.never_started === true;
+      const on = never ? "" : fullDate(r.ended_on);
+      const line = never
+        ? "The placement with " + who + (r.business ? " at " + r.business : "") +
+          " will not go ahead, and we have closed it."
+        : "We have recorded " + who + "'s placement" +
+          (r.business ? " with " + r.business : "") + " as ended" + (on ? " on " + on : "") + ".";
+      const pay = "Your statement stays at " + site + "/pay.";
+      return {
+        subject: (never ? "Placement closed — " : "Placement ended — ") + who,
+        text: [hi, "", line, "", pay,
+          "", "If that is not right, reply to this email.", "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>" + esc(line) + "</p>",
+          "<p>Your statement stays on your account. If that is not right, reply to this " +
+            "email.</p>"
+        ], site, "/pay", "See your statement")
+      };
+    }
+  },
+
+  /* ── the exams, sent (sql/098, F4, F34) ──────────────────────────────────
+     To you and Bryant, once, when she presses send. Before this a pass sat at
+     Assessment until somebody opened /admin, and a fail sat there until
+     somebody declined her by hand — in both cases she had been told
+     "Received" and nothing else. `needs` is 098's reading of what happens
+     next: a pass moves to Interview on its own once the typing is checked
+     (097), so a pass with unchecked typing is the one that waits on us. */
+  application_assessment: {
+    arrived: (r, p) => {
+      const name = p.name || "an applicant";
+      const head = r.needs === "typing check" ? name + " passed — check her typing"
+        : r.needs === "nothing" ? name + " passed"
+        : name + " — needs a decision";
+      const claimed = r.typing_wpm != null
+        ? r.typing_wpm + " wpm" + (r.typing_accuracy != null ? ", " + r.typing_accuracy + "% accuracy" : "")
+        : "";
+      return {
+        subject: "Exams sent — " + head,
+        lines: [
+          ["Applicant", p.name],
+          ["Track", r.track],
+          ["Verdict", ASSESS_VERDICT[r.verdict] || r.verdict],
+          ["Typing claimed", claimed],
+          ["Typing checked", r.typing_checked ? "Yes" : "Not yet"],
+          ["Needed", ASSESS_NEEDS[r.needs] || r.needs]
+        ],
+        where: "/admin"
+      };
+    }
+  },
+
+  /* ── a seat request moving on (sql/103, F13) ─────────────────────────────
+     To the address on the request. Until this the business found out by
+     signing in to /seats and noticing, which nobody does. The name and the
+     seats are the only things repeated back: the request came from a public
+     form, so the company stays out for the same reason it stays out of the
+     receipt (see CONFIRM). */
+  seat_requests: {
+    decided: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name) + ",";
+      const what = knownTracks({ tracks: r.seats });
+      const yours = "Your request for an assistant" + (what ? " in " + what : "");
+
+      if (r.status === "closed") {
+        const again = "If you want to pick it up again, book a call and we will start from " +
+          "what we already know: " + bookCall(p.email, r.id);
+        return {
+          subject: "Your seat request is closed",
+          text: [hi, "", yours + " is closed.", "", again,
+            "", "You can see it at " + site + "/seats.", "", "SecureJobVA"].join("\n"),
+          html: wrap([
+            "<p>" + esc(hi) + "</p>",
+            "<p>" + esc(yours) + " is <b>closed</b>.</p>",
+            "<p>If you want to pick it up again, " + '<a href="' + esc(bookCall(p.email, r.id)) + '">book a call</a>' +
+              " and we will start from what we already know.</p>"
+          ], site, "/seats", "See your request")
+        };
+      }
+
+      const s = SEAT_STAGE_MAIL[r.status];
+      if (!s) return null;
+      return {
+        subject: "Your seat request — " + s[0].toLowerCase(),
+        text: [hi, "", yours + " has moved on: " + s[0] + ".", "", s[1],
+          "", "You can see where it has got to at " + site + "/seats — sign in with this " +
+          "address.", "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>" + esc(yours) + " has moved on: <b>" + esc(s[0]) + "</b>.</p>",
+          "<p>" + esc(s[1]) + "</p>",
+          "<p>Sign in with this address to see where it has got to.</p>"
+        ], site, "/seats", "See your request")
+      };
+    }
+  },
+
+  /* ── an email that could not go (sql/095, F51) ───────────────────────────
+     To you and Bryant, once per sweep, about every row the outbox gave up on
+     in it. Each one is somebody who was owed an email and did not get it, and
+     /admin lists them with a Try again button. */
+  notify_outbox: {
+    arrived: (r) => {
+      const n = Number(r.count || 0);
+      const many = n === 1 ? "1 email" : n + " emails";
+      return {
+        subject: many + " could not be sent",
+        lines: [
+          /* Not "after ten tries": 095 gives up on a 400, 405, 413 or 422 at
+             the first, and calling that a long outage sends staff looking for
+             the wrong thing. /admin shows the tries and the reason per row. */
+          ["Given up on", many],
+          ["From", r.sources],
+          ["Oldest", r.oldest ? fullDate(String(r.oldest).slice(0, 10)) : ""],
+          ["Needed", "See Emails that did not go in /admin, and try again or tell them by hand."]
+        ],
+        where: "/admin"
+      };
     }
   },
 
@@ -728,6 +1149,32 @@ const DECIDE = {
       ],
       where: "/admin"
     }),
+
+    /* To the client contact, the same moment `arrived` tells you (sql/106,
+       F20). The client is the one who approves the week, and until this only
+       staff were told it existed — so a week sat waiting until somebody
+       chased the client or approved it for them. `again` is a week that was
+       sent back and has come in once more; it does not say who sent it back,
+       because either side can. */
+    waiting: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name) + ",";
+      const who = firstName(r.assistant) === "there" ? "Your assistant" : firstName(r.assistant);
+      const week = weekText(r.week_starts_on);
+      const total = hoursText(r.hours) + " hours" + (r.days ? " (" + r.days + ")" : "");
+      const line = who + " sent " + (r.again ? "the hours for " + week + " again, after they " +
+        "were sent back: " : "the hours for " + week + ": ") + total + ".";
+      return {
+        subject: who + "'s hours for " + week + (r.again ? " — sent again" : " are waiting for you"),
+        text: [hi, "", line,
+          "", "Approve them, or send them back with a note, at " + site + "/seats.",
+          "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>" + esc(line) + "</p>",
+          "<p>Approve them, or send them back with a note saying what needs changing.</p>"
+        ], site, "/seats", "Review the week")
+      };
+    },
 
     decided: (r, p, site) => {
       const week = weekText(r.week_starts_on);
@@ -778,11 +1225,82 @@ const DECIDE = {
   },
 
   /* ── a client wants somebody different ──────────────────────────────────
-     To you and Bryant, and there is deliberately no `decided` half. The
-     assistant is not told and must never be: 032 keeps her out of the table
-     and this keeps her out of the mail. Somebody tells her in their own words
-     once it is known what is actually happening. */
+     To you and Bryant, and to the client who asked — and there is
+     deliberately no `decided` half. The assistant is not told and must never
+     be: 032 keeps her out of the table and this keeps her out of the mail.
+     Somebody tells her in their own words once it is known what is actually
+     happening. `received` and `resolved` (sql/107) go to the client contact
+     alone; 107 looks the address up through the client, never through her. */
   swap_requests: {
+    /* The client asked; this says we have it (F25). The sentence about her
+       carrying on and being billed is the page's own, and it is only true
+       once she has started — on a placement still at `matched` she has not,
+       and saying so is how F19 put a bill in a client's head that did not
+       exist. So it is said for ongoing, and for a trial only once its first
+       day has come, and left out otherwise. A trial whose first day is still
+       ahead is the case /seats calls "She has not started", and the email
+       must not tell the same client she is working and being billed. A
+       trial with no started_on in the payload (107 before it carried one,
+       or a placement with no date set) gets the sentence left out: saying
+       nothing about a bill is the safe way to be wrong. */
+    received: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name) + ",";
+      const who = r.assistant || "your assistant";
+      const first = firstName(r.assistant) === "there" ? "She" : firstName(r.assistant);
+      const working = r.placement === "ongoing" ||
+        (r.placement === "trial" && begun(r.started_on));
+      const why = String(r.reason || "").trim();
+      const lead = "We have your request for somebody other than " + who + ". A person is on " +
+        "it, and we will come back to you.";
+      const meantime = working
+        ? "Nothing changes in the meantime: " + first + " keeps working and you keep being " +
+          "billed as normal until a replacement is agreed with you."
+        : "";
+      return {
+        subject: "We have your request for a different assistant",
+        text: [hi, "", lead,
+          ...(why ? ["", "What you told us:", "  " + why] : []),
+          ...(meantime ? ["", meantime] : []),
+          "", "You can see it at " + site + "/seats.", "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>" + esc(lead) + "</p>",
+          why ? '<p style="border-left:3px solid #FFC233;background:#FFF6E0;margin:0 0 16px;' +
+                'padding:10px 14px;color:#001232">' + esc(why) + "</p>" : "",
+          meantime ? "<p>" + esc(meantime) + "</p>" : ""
+        ], site, "/seats", "See your request")
+      };
+    },
+
+    /* Staff marked it handled (F25). Until this the "we are on it" note on
+       /seats simply disappeared and the form came back, and the client heard
+       the outcome only if somebody remembered to write. `reply` is what staff
+       typed in "What we told them" — quoted when there is one, and when there
+       is not, this does not make an outcome up. */
+    resolved: (r, p, site) => {
+      const hi = "Hi " + firstName(p.name) + ",";
+      const who = r.assistant || "your assistant";
+      const reply = String(r.reply || "").trim();
+      const lead = "We have closed your request for somebody other than " + who +
+        (reply ? ". Here is what we said:" : ".");
+      const after = reply
+        ? "If anything is still not right, reply to this email."
+        : "If you have not heard from us about it, or anything is still not right, reply to " +
+          "this email.";
+      return {
+        subject: "About your request for a different assistant",
+        text: [hi, "", lead, ...(reply ? ["", "  " + reply] : []), "", after,
+          "", "You can see your account at " + site + "/seats.", "", "SecureJobVA"].join("\n"),
+        html: wrap([
+          "<p>" + esc(hi) + "</p>",
+          "<p>" + esc(lead) + "</p>",
+          reply ? '<p style="border-left:3px solid #FFC233;background:#FFF6E0;margin:0 0 16px;' +
+                  'padding:10px 14px;color:#001232">' + esc(reply) + "</p>" : "",
+          "<p>" + esc(after) + "</p>"
+        ], site, "/seats", "See your account")
+      };
+    },
+
     arrived: (r) => ({
       subject: "Replacement asked for — " + (r.client || "a client") +
         " on " + (r.assistant || "an assistant"),
@@ -813,6 +1331,32 @@ const DECIDE = {
       const span = dayText(r.starts_on) + " to " + dayText(r.ends_on);
       const hi = "Hi " + firstName(p.name) + ",";
       const yes = r.status === "approved";
+
+      /* A decision changed in /admin (sql/096 carries `previous`, F44).
+         "Not approved" means something different to somebody who was told
+         yesterday that it was — she may already have booked the trip — so a
+         changed answer says it is a change, first, in the subject as well. */
+      if ((r.previous === "approved" || r.previous === "declined") && r.previous !== r.status) {
+        const now = yes ? "it is now approved." : "it is no longer approved.";
+        const after = yes
+          ? "Sorry for the earlier answer."
+          : "If the dates could work differently, ask again or reply to this email.";
+        return {
+          subject: "We have changed our answer — your leave for " + span +
+            (yes ? " is approved" : " is not approved"),
+          text: [hi, "",
+            "We have changed our answer about your leave for " + span + ": " + now,
+            "", after,
+            "", "You can see it at " + site + "/hub.", "", "SecureJobVA"].join("\n"),
+          html: wrap([
+            "<p>" + esc(hi) + "</p>",
+            "<p><b>We have changed our answer</b> about your leave for <b>" + esc(span) +
+              "</b>: " + esc(now) + "</p>",
+            "<p>" + esc(after) + "</p>"
+          ], site, "/hub", "See your leave")
+        };
+      }
+
       return {
         subject: yes ? "Your leave for " + span + " is approved"
                      : "Your leave for " + span + " was not approved",
@@ -876,6 +1420,20 @@ const PAY_METHOD = {
   card: "card", cheque: "cheque", cash: "cash"
 };
 
+/* The assessment's verdict and 098's `needs`, as the staff alert says them.
+   A value not listed is printed as it came, because this one goes to us and
+   an unexpected value is something we should see rather than lose. */
+const ASSESS_VERDICT = {
+  passed: "Passed", below_line: "Below the line", in_progress: "Not fully scored yet"
+};
+const ASSESS_NEEDS = {
+  "typing check": "Check her typing screenshot in /admin. Once the checked figures are in, " +
+    "a pass moves her to Interview and she is emailed.",
+  "nothing": "Nothing. Her typing is already checked.",
+  "a decision": "A decision in /admin. She has not passed on the scores so far, so she " +
+    "waits on us."
+};
+
 /* Cents to dollars, with thousands grouped by hand — toLocaleString would
    make the figure in a receipt depend on the machine that happens to run it,
    the same reason dayText() spells out its months. */
@@ -916,18 +1474,38 @@ function render(kind, row, site) {
 }
 
 /* ── getting it to Resend ─────────────────────────────────────────────────
-   NOTHING OUTSIDE THIS FILE RETRIES A SEND.
+   THE OUTBOX RETRIES, AND THE STATUS CODE IS HOW IT KNOWS TO (sql/095, F51).
 
-   This file used to say that answering 502 told Supabase to retry, and built
-   its rules around a retry loop: the staff alert "must be retried until it
-   lands", the applicant's copy must never decide the status code or it would
-   mail you the same application forever. None of that loop exists. Every
-   caller is a pg_net call from a trigger — supabase_functions.http_request in
-   021 and 028, net.http_post in 031, 040, 058 and 093 — and pg_net fires once,
-   writes whatever came back into net._http_response, and moves on. A 502 from
-   here was never a request for another try. It was the email, lost.
+   Until 095 nothing outside this file retried a send: every caller was a
+   pg_net post from a trigger, which fires once and keeps whatever came back,
+   so a Resend outage longer than a second was the email, lost. Now every
+   caller posts through public.notify_send(), which writes the payload to
+   public.notify_outbox first, and a sweep every minute reads the answer:
 
-   So the one retry there is happens here, inside this request:
+     2xx                 delivered — never posted again
+     400 405 413 422     given up at once — asking again cannot help
+     anything else       tried again after 1, 2, 4 … 128 minutes, then every
+                         4 hours; ten tries, about 8¼ hours, then given up and
+                         staff are told once
+
+   So the status code here is now a request, and it has to be the right one.
+   A send that failed for a reason that might pass — Resend down or
+   rate-limited, the network gone, a 409 because the same key is still being
+   worked on — answers 503 (502 for the staff alert, as it always has), and the
+   outbox comes back. A send refused for good — a dead address, a 4xx about
+   the message itself — answers 200 and says so in the body, because ten more
+   tries would get ten more refusals and one alert about nothing anybody can
+   fix from here.
+
+   And a retry is safe because of the key. The outbox sends the same
+   x-idempotency-key on every try of one row, sendKey() builds Resend's key
+   from it, and Resend answers a key it has seen with the first answer and
+   sends nothing. That is what lets the INSERT path below answer 503 for a
+   lost applicant confirmation even though your alert in the same request
+   already went: the retry sends your alert again under the same key, Resend
+   drops it, and only the confirmation goes.
+
+   One retry still happens here, inside this request, before any of that:
 
      - A refusal that looks like the reply_to address (400 or 422 while one
        was set) goes again once without it. The reply address is typed by
@@ -935,21 +1513,46 @@ function render(kind, row, site) {
        alert — staff lose a reply button, not the message.
      - A refusal that looks temporary (Resend down, rate-limited, the network
        gone: 5xx, 429 or no answer at all) goes again once after a short
-       pause. Enough for a blip. An outage longer than a second is not fixed
-       here, and nothing pretends it is.
+       pause. Enough for a blip; anything longer is the outbox's.
 
-   And a send that still fails is made visible rather than retried: it is
-   logged to the function log with the table, the event and the row id —
-   enough to find the row in /admin and act on it by hand — and the staff
-   alert's failure still answers 502, which is what lands in
-   net._http_response for anybody who looks there. No address goes into the
-   log: the row id finds the person, and a log is not where their email
-   should live.
+   And a send that still fails is logged to the function log with the table,
+   the event and the row id — enough to find the row in /admin — whatever
+   the status code then asks for. No address goes into the log: the row id
+   finds the person, and a log is not where their email should live.
 
-   A real queue — an outbox table and a scheduled job that re-sends what is
-   still unsent — is the fix that makes an outage survivable. It needs a
-   table, a cron and every notify trigger rewritten, so it is not in this
-   file, and this comment is here so nobody assumes it already exists. */
+   A post that arrives WITHOUT the header — anything still on the old pg_net
+   path because 096 has not been pasted, or a payload sent by hand — gets a
+   fresh random key as before, and its 503 lands in net._http_response with
+   nothing to act on it, exactly as the 502 always did. */
+
+/* A failure worth asking the outbox to try again: Resend down (5xx),
+   rate-limited (429), the network gone (0), or a 409 that is the same key
+   still being worked on (concurrent_idempotent_requests), which the next try
+   answers with the first one's result. Every other 4xx is about this message
+   and will be refused again.
+
+   Resend also answers 409 for a key it has seen with a DIFFERENT body
+   (invalid_idempotent_request), and that one never passes: the key is the
+   outbox row's and stays the same on every try, so every try is refused the
+   same way. It happens when a deploy changes an email's words, RESEND_FROM
+   or NOTIFY_TO while a row is mid-retry — or when a first try was taken and
+   only its answer was lost, in which case the email already went. Treating
+   it as a blip cost eight hours of refusals and then a staff alert about an
+   email that, often, had been delivered. So only the concurrent kind is
+   asked for again; see conflict() for what the other kind answers. */
+function mightPass(r) {
+  if (r.status === 409) return /concurrent_idempotent_requests/.test(String(r.detail || ""));
+  return r.status === 0 || r.status === 429 || r.status >= 500;
+}
+
+/* The 409 that will never pass (above). For a person it is answered like
+   any final refusal — a 200 that says told:false. For staff it is a 200
+   marked idempotency_conflict rather than a 502: a 502 would be retried for
+   eight hours to the same refusal, and send() has already logged it, which
+   is where somebody looking for the row will find it. */
+function conflict(r) {
+  return !r.ok && r.status === 409 && !mightPass(r);
+}
 
 /* The same rule 073 holds applications and seat requests to, and 092 holds
    contact messages to: something, an @, something, a dot, two or more. An
@@ -1001,25 +1604,32 @@ async function attempt(env, msg, key) {
    money is how a client comes to believe they paid twice. With one, Resend
    answers the second request with the first one's result and sends nothing.
 
-   The key is made fresh for every call to send(), not built from the row
-   alone. The only repeats this is meant to catch happen inside this one
-   request — pg_net never asks twice (see the note above) — and a key made
-   of the table, the event and the row id would also swallow a real second
-   email: an application moved to interview, back, and to interview again
-   inside the 24 hours Resend remembers a key would tell her once. The
-   table, event, row and who it is for go in front anyway, so a key seen in
-   Resend's log says what it was for. Never the address, for the same reason
-   the log line below leaves it out.
+   The unique part of the key is the outbox row's own (x-idempotency-key,
+   sql/095), which every retry of that row carries unchanged — so a retry
+   ten minutes later is the same email to Resend as the first try, and is
+   sent at most once. It is not built from the table, the event and the row
+   id: that would also swallow a real second email — an application moved to
+   interview, back, and to interview again inside the 24 hours Resend
+   remembers a key would tell her once. Each of those is its own outbox row
+   with its own key. Without the header (see above) a fresh random one stands
+   in, which covers the repeats inside this one request and nothing more.
+
+   The table, event, row and who it is for go in front, so a key seen in
+   Resend's log says what it was for — and so the two emails one request can
+   send (your alert and the applicant's copy) never share a key. Never the
+   address, for the same reason the log line below leaves it out.
 
    Resend refuses a key it has seen with a different body (409), so the send
-   without reply_to below is a different email and gets a key of its own.
-   A 409 because the first try is still being worked on when the retry
-   arrives comes back as a failure and is logged as one — with its status,
-   so whoever reads the log knows that one may in fact have gone. */
-function sendKey(what) {
+   without reply_to below is a different email and gets a key of its own,
+   built the same way from the same header, so its retries match too. */
+const IDEM = /^[\w-]{8,64}$/;
+
+function sendKey(what, idem) {
   const w = what || {};
-  return [w.table, w.event, w.id, w.to, randomUUID()]
-    .map((v) => String(v == null ? "-" : v).replace(/[^\w.-]/g, "_").slice(0, 40))
+  const mine = IDEM.test(String(idem || "")) ? String(idem) : randomUUID();
+  return [w.table, w.event, w.id, w.to].map((v) =>
+      String(v == null ? "-" : v).replace(/[^\w.-]/g, "_").slice(0, 40))
+    .concat([mine])
     .join(":");
 }
 
@@ -1028,7 +1638,7 @@ function sendKey(what) {
    if it fails. Returns the outcome; the caller decides what it means. */
 async function send(env, msg, what) {
   let m = msg;
-  let key = sendKey(what);
+  let key = sendKey(what, env.idem);
   let r = await attempt(env, m, key);
 
   if (!r.ok && m.reply_to && (r.status === 400 || r.status === 422)) {
@@ -1039,8 +1649,9 @@ async function send(env, msg, what) {
   }
 
   /* The same key as the try it repeats: if that one went through, Resend
-     drops this one. */
-  if (!r.ok && (r.status === 0 || r.status === 429 || r.status >= 500)) {
+     drops this one. A 409 is not repeated here — 800ms is not long enough
+     for the first try to finish, and the outbox's next minute is. */
+  if (!r.ok && mightPass(r) && r.status !== 409) {
     await wait(PAUSE_MS);
     r = await attempt(env, m, key);
   }
@@ -1078,14 +1689,14 @@ function staffOr500(env, res) {
 
 /* A decision, and which way it is going is the whole difference.
 
-   `arrived` goes to you and Bryant. Its failure answers 502, the one status
-   code in this file that means an email was lost — see the note on send()
-   for what does and does not happen next.
+   `arrived` goes to you and Bryant. Any failure answers 502, and the outbox
+   tries again — see the note on send().
 
-   Everything else goes to the one person it is about, and its outcome is
-   reported in the body of a 200. A dead address there is that person's
-   missing email, not a fault in the endpoint, and folding it into the status
-   code would make a real outage harder to see among them. */
+   Everything else goes to the one person it is about. A failure that might
+   pass answers 503 so the outbox tries again; a refusal for good — a dead
+   address — is that person's missing email, not a fault in the endpoint,
+   and is reported in the body of a 200, because ten more tries would only
+   be ten more refusals. */
 async function decision(body, res, env) {
   const shapes = DECIDE[body.table];
   const shape = shapes && shapes[body.event];
@@ -1099,14 +1710,15 @@ async function decision(body, res, env) {
     return res.status(200).json({ skipped: String(body.table) + "/" + String(body.event) });
   }
 
-  /* Her picking a time, or declining every one, tells nobody by mail. On a
-     placement those two moments go to the client, who is waiting on somebody
-     else; on her interview the other party is us, and /admin already shows her
-     pick as a Confirm button on the row in front of the person who acts on it.
-     Mailing ourselves about our own queue is how a queue stops being read.
+  /* `picked` and `declined` are the client's mails — "she has picked a time,
+     confirm it at /seats". On her own interview the party waiting is us, and
+     since 099 that reaches us as `arrived` with a `moment` (see the template),
+     never as these two: one of them sent to her address would tell her to go
+     and confirm her own pick on a page that is not hers.
 
-     066 does not post these, so this is the second lock rather than the first
-     — and it is the one that holds if anybody ever posts the payload by hand. */
+     099 does not post these for her, so this is the second lock rather than
+     the first — and it is the one that holds if anybody ever posts the
+     payload by hand. */
   if (body.table === "interview_slots" && record.side === "applicant" &&
       (body.event === "picked" || body.event === "declined")) {
     return res.status(200).json({ skipped: "interview_slots/" + body.event + " (applicant)" });
@@ -1123,8 +1735,14 @@ async function decision(body, res, env) {
   }
 
   if (body.event === "arrived") {
-    if (!staffOr500(env, res)) return;
     const m = shape(record, person, env.site);
+    /* A shape may decline: interview_slots answers null for anything but the
+       applicant's side, so a placement interview can never mail staff. Asked
+       before NOTIFY_TO, because declining needs no staff address. */
+    if (!m) {
+      return res.status(200).json({ skipped: String(body.table) + "/arrived" });
+    }
+    if (!staffOr500(env, res)) return;
     /* Rendered through the same function the other three notifications use, so
        there is one table style and not a second one drifting away from it. */
     const { text, html } = render({ lines: () => m.lines, where: m.where }, record, env.site);
@@ -1134,6 +1752,11 @@ async function decision(body, res, env) {
       subject: m.subject,
       text, html
     }, Object.assign({ to: "staff" }, what));
+    if (conflict(out)) {
+      return res.status(200).json({
+        sent: 0, table: body.table, event: "arrived", idempotency_conflict: true
+      });
+    }
     if (!out.ok) {
       return res.status(502).json({
         error: "resend refused", status: out.status, table: body.table, detail: redact(out.detail)
@@ -1157,9 +1780,14 @@ async function decision(body, res, env) {
 
   const out = await send(env, { to: [who], subject: m.subject, text: m.text, html: m.html },
     Object.assign({ to: "person" }, what));
-  return res.status(200).json({
+  if (!out.ok && mightPass(out)) {
+    return res.status(503).json({
+      retry: true, sent: 0, table: body.table, event: body.event, told: false, status: out.status
+    });
+  }
+  return res.status(200).json(Object.assign({
     sent: out.ok ? 1 : 0, table: body.table, event: body.event, told: out.ok
-  });
+  }, conflict(out) ? { idempotency_conflict: true } : {}));
 }
 
 export default async function handler(req, res) {
@@ -1188,7 +1816,11 @@ export default async function handler(req, res) {
   if (!key) {
     return res.status(500).json({ error: "RESEND_API_KEY is not set" });
   }
-  const env = { key, to, from, site };
+  /* The outbox row's key, the same on every try of that row (sql/095). Only
+     its shape is checked — sendKey() takes it or falls back to a random one —
+     because it names an email, it does not grant anything. */
+  const idem = String(req.headers["x-idempotency-key"] || "");
+  const env = { key, to, from, site, idem };
 
   /* A body that is not JSON is the caller's mistake, and says so with a 400
      rather than crashing the function into a stack trace and a 500. */
@@ -1231,38 +1863,53 @@ export default async function handler(req, res) {
     html
   }, Object.assign({ to: "staff" }, what));
 
-  if (!out.ok) {
-    /* Not a retry request — nothing retries (see send()). The 502 is what
-       net._http_response keeps, and the log line is what finds the row. */
+  /* A 409 that will never pass (see conflict()) is not retried, and it does
+     not stop the sender's copy below: on a retry it usually means your alert
+     went on an earlier try and only the confirmation is still owed. */
+  const clash = conflict(out);
+  if (!out.ok && !clash) {
+    /* The outbox tries again (see send()); the log line is what finds the
+       row if it never lands. */
     return res.status(502).json({
       error: "resend refused", status: out.status, table: body.table, detail: redact(out.detail)
     });
   }
 
-  /* ── then the applicant's own copy ───────────────────────────────────────
-     Second, and never allowed to change the answer. The status code reports
-     the email to you, which is the one holding somebody's reply; one
-     applicant mistyping their address is their missing confirmation, and it
-     is reported in the body, not folded into a 502 that would read as the
-     staff alert failing.
+  /* ── then the sender's own copy ──────────────────────────────────────────
+     The applicant's receipt, and since F11 the business's. Second, and only
+     ever able to change the answer one way. One person mistyping their
+     address is their missing confirmation, reported in the body of a 200 —
+     never a 502 that would read as the staff alert failing, and never a
+     retry, because a dead address stays dead.
+
+     A failure that might pass (see mightPass()) is different: it answers 503
+     so the outbox comes back. Your alert above goes again on that retry, but
+     under the same idempotency key, so Resend drops it and you get it once.
 
      The address has to pass the same rule as everything else here. And what
      the email says is built from values this file controls — see CONFIRM —
      because the address and the text both come from whoever filled in the
      form. */
   const theirs = CONFIRM[body.table];
-  const applicant = address(body.record.email);
-  if (!theirs || !applicant) {
-    return res.status(200).json({ sent: to.length, table: body.table, confirmed: false });
+  const sender = address(body.record.email);
+  if (!theirs || !sender) {
+    return res.status(200).json(Object.assign({ sent: clash ? 0 : to.length, table: body.table, confirmed: false },
+      clash ? { idempotency_conflict: true } : {}));
   }
 
   const c = theirs(body.record, site);
   const mine = await send(env, {
-    to: [applicant],
+    to: [sender],
     subject: c.subject,
     text: c.text,
     html: c.html
-  }, Object.assign({ to: "applicant" }, what));
+  }, Object.assign({ to: body.table === "applications" ? "applicant" : "sender" }, what));
 
-  return res.status(200).json({ sent: to.length, table: body.table, confirmed: mine.ok });
+  if (!mine.ok && mightPass(mine)) {
+    return res.status(503).json({
+      retry: true, sent: clash ? 0 : to.length, table: body.table, confirmed: false, status: mine.status
+    });
+  }
+  return res.status(200).json(Object.assign({ sent: clash ? 0 : to.length, table: body.table, confirmed: mine.ok },
+    clash || conflict(mine) ? { idempotency_conflict: true } : {}));
 }

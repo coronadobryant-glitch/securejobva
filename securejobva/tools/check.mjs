@@ -2970,6 +2970,124 @@ await check("the interviews tab raises what nobody would notice", async () => {
   }
 });
 
+/* The 1 October fixes, each with its own offline test. They were written
+   alongside sql/094-112 and the pages that call them, and until they were run
+   from here they were tests somebody had to remember to run — which is the
+   state every one of the bugs they cover was found in. Each is the same shape
+   as the blocks above: run it, count its oks, and on a failure send whoever
+   is reading to the file itself, which says which case and why. */
+
+/* One way out for every email: the secret in one private row (094), every
+   post through the outbox (095), every sender moved onto both (096). A later
+   migration that copies an old trigger brings back its own copy of the
+   secret, and that one kind of email stops the day the secret changes (F52). */
+await check("every email the database sends leaves through the outbox", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-sql-senders.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours across sql/";
+  } catch (e) {
+    throw new Error("tools/test-sql-senders.mjs failed — run it directly for the detail");
+  }
+});
+
+/* The notice board on /admin had never been pressed (F43), and could not edit
+   or delete at all (F42). Every button is driven against what 026, 083 and
+   110 grant. */
+await check("the notice board posts, edits and removes what the database allows", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-admin-notices.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours on the notice board";
+  } catch (e) {
+    throw new Error("tools/test-admin-notices.mjs failed — run it directly for the detail");
+  }
+});
+
+/* Picking a stage mails her at once, so /admin asks first and names the email
+   (F31). The name lives in three files — sql/096, api/notify.js and admin.html
+   — and a question naming an email she will not get is worse than none. */
+await check("a stage that emails her is asked about by its own subject", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-admin-stage-mail.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours, every emailing stage";
+  } catch (e) {
+    throw new Error("tools/test-admin-stage-mail.mjs failed — run it directly for the detail");
+  }
+});
+
+/* Every promise /admin makes about email — the assessment save, a reopened
+   seat request, a handled swap, the reason box on a moved interview —
+   against the trigger in sql/ that decides it (097, 100, 103, 107), and the
+   outbox card's label for every sender since 095. A new SQL sender with no
+   label, or a question that has drifted from its trigger, fails here. */
+await check("what /admin says about email is what the database sends", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-admin-mail-asks.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours, every promise held to its trigger";
+  } catch (e) {
+    throw new Error("tools/test-admin-mail-asks.mjs failed — run it directly for the detail");
+  }
+});
+
+/* PostgREST finds a function by its name and its argument names together, so
+   a key spelt differently from the SQL answers 404 and reads as "not switched
+   on yet". The function-name check further down proves each name exists;
+   this proves each call would find it. */
+await check("every rpc call on /admin passes the arguments the SQL declares", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-admin-rpc-args.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours, every call matched";
+  } catch (e) {
+    throw new Error("tools/test-admin-rpc-args.mjs failed — run it directly for the detail");
+  }
+});
+
+/* Matching is one save (F39), ending a placement sends the day in the box and
+   not today (F28), a client's update is said back (F37, F40), and a removed
+   logo's file is only ever looked for inside our own bucket (F45). */
+await check("the client and placement controls on /admin do one thing each", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-admin-clients.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours for clients, matching and ending";
+  } catch (e) {
+    throw new Error("tools/test-admin-clients.mjs failed — run it directly for the detail");
+  }
+});
+
+/* /hub opens the moment she is marked Hired, and used to tell her it opened
+   the day she was placed — a different, later day (F8). The gate and the
+   sentence under it are read from the built hub.html and held together. */
+await check("/hub says the stage it actually waits for", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-hub-gate.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours, gate and sentence";
+  } catch (e) {
+    throw new Error("tools/test-hub-gate.mjs failed — run it directly for the detail");
+  }
+});
+
+/* Every turn of a client's placement where /seats or /pay rendered fine and
+   said nothing, or said something untrue: a seat request nobody owned (F15),
+   a "keep being billed" before she had worked (F19), a refused approval that
+   reloaded as saved (F21), an invoice nothing sends (F23), a handled swap
+   that vanished (F25), no way to keep her on (F26), an ended placement gone
+   without a word (F27). */
+await check("/seats and /pay say what is true at each turn of a placement", async () => {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    const out = execFileSync(process.execPath, ["tools/test-seats-flows.mjs"], { stdio: "pipe" }).toString();
+    return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours across a placement";
+  } catch (e) {
+    throw new Error("tools/test-seats-flows.mjs failed — run it directly for the detail");
+  }
+});
+
 /* The Spanish half of the public site is generated from the English half by
    tools/build-es.mjs, which refuses to write a page until every segment on it
    has a translation. Running it here is how that refusal reaches the build:
@@ -4360,6 +4478,43 @@ if (!existsSync("dist/index.html")) {
     return esPages.length + " pages, every link to a translated page stays in Spanish";
   });
 }
+
+/* The Content-Security-Policy is enforced now (F53), not report-only, and
+   enforcing a policy nobody has held against every page is how a site goes
+   blank. tools/test-csp.mjs is that check: every page in the root, es/ and —
+   when it exists — dist/, which is what Vercel serves. It runs after the dist
+   section so a missing build has already been warned about above.
+
+   .htaccess carries the same header for the day the site is served by Apache
+   instead, and it sat on report-only after vercel.json moved on. Two hosts
+   with two policies means the one nobody is looking at is the wrong one, so
+   the two values are compared here as well. */
+await check("the enforced CSP breaks no page, and both hosts send the same one", async () => {
+  const { execFileSync } = await import("node:child_process");
+  let out;
+  try {
+    out = execFileSync(process.execPath, ["tools/test-csp.mjs"], { stdio: "pipe" }).toString();
+  } catch (e) {
+    throw new Error("tools/test-csp.mjs failed — run it directly for the detail");
+  }
+  const want = [];
+  for (const h of JSON.parse(read("vercel.json")).headers || []) {
+    for (const kv of h.headers || []) {
+      if (/^content-security-policy$/i.test(kv.key)) want.push(kv.value);
+    }
+  }
+  if (existsSync(".htaccess")) {
+    const ht = read(".htaccess");
+    if (/^[ \t]*Header\b[^\n]*Content-Security-Policy-Report-Only/im.test(ht)) {
+      throw new Error(".htaccess still sends Content-Security-Policy-Report-Only — vercel.json enforces it");
+    }
+    const got = [...ht.matchAll(/^[ \t]*Header\s+always\s+set\s+Content-Security-Policy\s+"([^"]*)"/gim)].map((m) => m[1]);
+    if (got.join("|") !== want.join("|")) {
+      throw new Error(".htaccess sends " + JSON.stringify(got) + " but vercel.json sends " + JSON.stringify(want));
+    }
+  }
+  return (out.match(/^ {2}ok {4}/gm) || []).length + " behaviours, every page under the enforced policy";
+});
 
 /* ── against the running site ────────────────────────────────────────────── */
 

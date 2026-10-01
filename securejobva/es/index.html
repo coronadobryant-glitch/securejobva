@@ -1348,7 +1348,7 @@ function forwardAuthFragment(loc) {
    there is one thing to read and nothing to keep in step. Values arrive as
    {named} placeholders rather than by concatenation, because "Group " + n +
    " is not finished" cannot be put into Spanish a fragment at a time. */
-var SAYS = {" and ":" y ","{money} <span>/ week</span>":"{money} <span>/ semana</span>","{h} hrs &times; ${rate}/hr<br>&asymp; {month} a month":"{h} h &times; ${rate}/hora<br>&asymp; {month} al mes","Pick at least one seat so we know who to shortlist.":"Elija al menos un puesto para que sepamos a quién preseleccionar.","Choose a block — it decides the shift we hire for.":"Elija un bloque — decide el turno para el que contratamos.","We need a name for the intro email.":"Necesitamos un nombre para el correo de presentación.","Which company is this for?":"¿Para qué empresa es?","Check this address — the shortlist goes here.":"Revise esta dirección — la preselección llega aquí.","Seat":"Puesto","Cover":"Cobertura","Hours":"Horas","{n} a week":"{n} a la semana","Estimate":"Estimado","{money} / week":"{money} / semana","We have it.":"La tenemos.","Next is the 20-minute scoping call — pick a time below. The shortlist for {company} follows in {email} within three working days of the call.":"Lo siguiente es la llamada de 20 minutos para definir el alcance — elija un horario abajo. La preselección para {company} llega a {email} en un plazo de tres días hábiles después de la llamada.","Pick your time":"Elija su horario","Email us directly":"Escríbanos directamente","One tap left.":"Falta un toque.","Your email is written and ready — send it and we reply within one to two business days.":"Su correo está escrito y listo — envíelo y respondemos en uno o dos días hábiles.","Send the email":"Enviar el correo","Or pick a time":"O elija un horario","Something in the form is longer than we can store. Shorten your note and send it again, or use the email button below.":"Algo del formulario es más largo de lo que podemos guardar. Acorte su nota y envíelo de nuevo, o use el botón de correo de abajo.","That is more submissions than we accept from one place in an hour. Write to support@securejobva.com and a person will pick it up.":"Son más envíos de los que aceptamos desde un mismo lugar en una hora. Un correo a support@securejobva.com llega a una persona que se encarga.","Sending…":"Enviando…","One moment.":"Un momento.","That did not send, so we saved it and will keep trying. Use the email button below to reach us now.":"No se envió, así que lo guardamos y seguiremos intentándolo. El botón de correo de abajo sirve para escribirnos ahora.","Send it":"Enviar","Step {n} of {last}":"Paso {n} de {last}","Continue":"Continuar","Copied  {what}":"Copiado  {what}","most":"la que más","least":"la que menos"};
+var SAYS = {" and ":" y ","{money} <span>/ week</span>":"{money} <span>/ semana</span>","{h} hrs &times; ${rate}/hr<br>&asymp; {month} a month":"{h} h &times; ${rate}/hora<br>&asymp; {month} al mes","Pick at least one seat so we know who to shortlist.":"Elija al menos un puesto para que sepamos a quién preseleccionar.","Choose a block — it decides the shift we hire for.":"Elija un bloque — decide el turno para el que contratamos.","We need a name for the intro email.":"Necesitamos un nombre para el correo de presentación.","Which company is this for?":"¿Para qué empresa es?","Check this address — the shortlist goes here.":"Revise esta dirección — la preselección llega aquí.","Seat":"Puesto","Cover":"Cobertura","Hours":"Horas","{n} a week":"{n} a la semana","Estimate":"Estimado","{money} / week":"{money} / semana","We have it.":"La tenemos.","Next is the 20-minute scoping call — pick a time below. The shortlist for {company} follows in {email} within three working days of the call.":"Lo siguiente es la llamada de 20 minutos para definir el alcance — elija un horario abajo. La preselección para {company} llega a {email} en un plazo de tres días hábiles después de la llamada.","A confirmation is on its way to {email}.":"Una confirmación va en camino a {email}.","Pick your time":"Elija su horario","Email us directly":"Escríbanos directamente","One tap left.":"Falta un toque.","Your email is written and ready — send it and we reply within one to two business days.":"Su correo está escrito y listo — envíelo y respondemos en uno o dos días hábiles.","Send the email":"Enviar el correo","Or pick a time":"O elija un horario","Something in the form is longer than we can store. Shorten your note and send it again, or use the email button below.":"Algo del formulario es más largo de lo que podemos guardar. Acorte su nota y envíelo de nuevo, o use el botón de correo de abajo.","That is more submissions than we accept from one place in an hour. Write to support@securejobva.com and a person will pick it up.":"Son más envíos de los que aceptamos desde un mismo lugar en una hora. Un correo a support@securejobva.com llega a una persona que se encarga.","Sending…":"Enviando…","One moment.":"Un momento.","That did not send, so we saved it and will keep trying. Use the email button below to reach us now.":"No se envió, así que lo guardamos y seguiremos intentándolo. El botón de correo de abajo sirve para escribirnos ahora.","Send it":"Enviar","Step {n} of {last}":"Paso {n} de {last}","Continue":"Continuar","Copied  {what}":"Copiado  {what}","most":"la que más","least":"la que menos"};
 function say(en, vars) {
   var s = Object.prototype.hasOwnProperty.call(SAYS, en) ? SAYS[en] : en;
   if (!vars) return s;
@@ -1820,6 +1820,27 @@ function sayList(items) {
     return lines.join("\n");
   }
 
+  /* The booking link, filled in. cal.com reads name, email and notes off the
+     address into its own form, so the visitor does not type them twice — and,
+     the part that matters to us, the booking arrives carrying the same
+     address and company as the request, which is what staff match on when
+     they move it to "Call booked" in /admin. metadata[seat_request] is the
+     request's id: cal.com keeps it on the booking and hands it to a webhook
+     unchanged, so the day one is set up it can find the row by id rather
+     than by guessing from an address.
+
+     Every value through encodeURIComponent, so a quote or an ampersand in a
+     company name cannot end the attribute or start a parameter of its own;
+     esc() at the call site turns the joining & into &amp; for the HTML. */
+  function booking(d) {
+    var q = [];
+    if (d.name) q.push("name=" + encodeURIComponent(d.name));
+    if (d.email) q.push("email=" + encodeURIComponent(d.email));
+    if (d.company) q.push("notes=" + encodeURIComponent("Seat request for " + d.company));
+    if (d.id) q.push("metadata[seat_request]=" + encodeURIComponent(d.id));
+    return CFG.scheduler + (q.length ? (CFG.scheduler.indexOf("?") > -1 ? "&" : "?") + q.join("&") : "");
+  }
+
   function finish(mode, d) {
     var actions = document.getElementById("done-actions");
 
@@ -1841,14 +1862,22 @@ function sayList(items) {
        same working day" while /contact said one to two. Whichever of two
        promises somebody remembers, the other one is the one they were let
        down by. */
+    /* The receipt is api/notify.js's CONFIRM.seat_requests, sent off the same
+       insert that tells us — the business used to get nothing but this screen,
+       so somebody who closed it before booking had no reminder in their inbox
+       of the request or of the call. The sentence is only said on "sent":
+       a parked or refused request has written nothing yet, so nothing is on
+       its way. */
     if (mode === "sent") {
       document.getElementById("done-h").textContent = say("We have it.");
       document.getElementById("done-p").textContent =
         say("Next is the 20-minute scoping call — pick a time below. The shortlist for " +
             "{company} follows in {email} within three working days of the call.",
-            { company: d.company, email: d.email });
+            { company: d.company, email: d.email }) + " " +
+        say("A confirmation is on its way to {email}.",
+            { email: d.email });
       actions.innerHTML = CFG.scheduler
-        ? "<a class=\"btn btn--solid\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">" + say("Pick your time") + "</a>"
+        ? "<a class=\"btn btn--solid\" href=\"" + esc(booking(d)) + "\" target=\"_blank\" rel=\"noopener\">" + say("Pick your time") + "</a>"
         : "<a class=\"btn btn--ghost\" href=\"mailto:" + CFG.email + "\">" + say("Email us directly") + "</a>";
     } else {
       document.getElementById("done-h").textContent = say("One tap left.");
@@ -1860,7 +1889,7 @@ function sayList(items) {
       actions.innerHTML =
         "<a class=\"btn btn--solid\" href=\"" + href + "\">" + say("Send the email") + "</a>" +
         (CFG.scheduler
-          ? "<a class=\"btn btn--ghost\" href=\"" + CFG.scheduler + "\" target=\"_blank\" rel=\"noopener\">" + say("Or pick a time") + "</a>"
+          ? "<a class=\"btn btn--ghost\" href=\"" + esc(booking(d)) + "\" target=\"_blank\" rel=\"noopener\">" + say("Or pick a time") + "</a>"
           : "");
     }
 

@@ -74,14 +74,17 @@ ErrorDocument 404 /404.html
   # the part that cannot be walked back quickly: it is compiled into browsers.
   Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains" env=HTTPS
 
-  # Report-only: browsers log a violation in the console and block nothing.
-  # These four directives restrict things no page here does — being framed by
-  # another site, a <base> tag, a form posting off-site, a plugin — so they are
-  # the part of a policy that can be switched to enforcing with no page
-  # changes, once nothing has shown up for a while. Scripts and styles are not
+  # Enforced, and the same value vercel.json sends — two hosts with two
+  # policies means the one nobody is looking at is wrong. It sat on report-only
+  # for its whole life (F53) with nowhere set to send the reports, so it
+  # protected nothing and nobody would have heard. These four directives
+  # restrict things no page here does — being framed by another site, a <base>
+  # tag, a form posting off-site, a plugin — and tools/test-csp.mjs checks every
+  # page against them, which is what makes enforcing them safe; tools/check.mjs
+  # fails if this line and vercel.json part ways. Scripts and styles are not
   # covered: every page carries inline ones, and a policy for those is a
   # rewrite, not a header.
-  Header always set Content-Security-Policy-Report-Only "frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  Header always set Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 
   # The signed-in pages say noindex in a meta tag too; this covers a crawler
   # that reads headers and not markup.

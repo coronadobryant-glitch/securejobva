@@ -75,6 +75,9 @@ const card = new Function(
      track before the assessment row exists (see the section on tracks below). */
   ["esc", "tzOpts", "when", "assessCard"]
     .concat(html.indexOf("function trackFor(") > -1 ? ["trackFor"] : [])
+    /* assessNext() is the sentence under a sent assessment: what happens next,
+       said only while she is still at Assessment. Lifted when present. */
+    .concat(html.indexOf("function assessNext(") > -1 ? ["assessNext"] : [])
     .map((n) => grab(html, n, FILE)).join("\n") +
   "\nreturn assessCard;"
 )();
@@ -101,6 +104,21 @@ const sent = card({ status: "approved", track: "Customer Service" },
                   { submitted_at: "2026-09-02T10:00:00Z", part_done: {} });
 ok("it stays visible after she has sent it", sent.indexOf("Received") > -1, true);
 ok("and offers nothing more to press", starts(sent), 0);
+
+/* F4 / F34: "you will hear from us either way" had no day and no person behind
+   it. sql/098 now alerts the team when she sends, and sql/097 moves a pass to
+   Interview once her typing is checked — so while she is still at Assessment
+   the card says that, with the timing every applicant is already promised. */
+const waiting = card({ status: "assessment", track: "Customer Service" },
+                     { submitted_at: "2026-09-02T10:00:00Z", part_done: {} });
+ok("sent and still at assessment: says the team is told", waiting.indexOf("the team is told") > -1, true);
+ok("says a person checks the typing screenshot", waiting.indexOf("checks your typing screenshot") > -1, true);
+ok("says a pass moves her to Interview and she is emailed", waiting.indexOf("moves you to Interview and we email you") > -1, true);
+ok("says a miss is emailed too", waiting.indexOf("we email you to say so") > -1, true);
+ok("gives the timing the site already promises", waiting.indexOf("usually within three working days") > -1, true);
+ok("no longer the bare 'either way' with nothing behind it", waiting.indexOf("you will hear from us either way") > -1, false);
+ok("once she has moved on, the promise is not repeated", sent.indexOf("three working days") > -1, false);
+ok("but the card still says it arrived", sent.indexOf("We have it.") > -1, true);
 
 /* ── the shape of it ───────────────────────────────────────────────────── */
 console.log("\n  What she is asked for");
