@@ -21,6 +21,13 @@
   --signal-ink:#3A2600;
   --price-bg:#001232;
   --price-fg:#F0F6FE;
+  /* The navy bars: the admin and hub sidebar and top bar, the hub tiles'
+     labels, the "copied" toast. They used to paint themselves var(--ink),
+     which is navy only in light; dark flips --ink to near-white while their
+     text stays white, and the whole sidebar went white-on-white. These two
+     do not flip with the page, so the bar and its text always come as a pair. */
+  --chrome:#001232;
+  --chrome-ink:#FFFFFF;
   --shadow:0 1px 2px rgba(0,26,70,.05), 0 14px 32px -20px rgba(0,26,70,.35);
 
   /* The mark. Its gradient runs from the shield's bright corner to its point,
@@ -62,6 +69,10 @@
   --signal-ink:#3A2600;
   --price-bg:#152034;
   --price-fg:#EAF1FB;
+  /* Still navy on dark — every grey in the sidebar was picked against
+     #001232 — and the hue is what tells it from the near-black page. */
+  --chrome:#001232;
+  --chrome-ink:#FFFFFF;
 
   /* Both ends lift on dark, or the shield's point dissolves into the page. */
   --mark-from:#6FBBFF;
@@ -746,6 +757,9 @@ details[open] > .row__sum::after{content:"−"}
 .track__age{font-family:"IBM Plex Mono",monospace;font-size:.7rem}
 .track.is-late .track__age{color:#B3261E;font-weight:600}
 .track__ghost{background:var(--surface-2);color:#B3261E;font-weight:600;font-size:.68rem;padding:.14rem .4rem;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
+/* The dark red is under 3:1 on the dark cards; the pink the other errors use. */
+:root[data-theme="dark"] .track.is-late .track__age,
+:root[data-theme="dark"] .track__ghost{color:#F2B8B5}
 .pill--pipe{background:var(--ink-2);color:var(--paper)}
 .chk{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--ink-2)}
 .opts--stack{display:grid;grid-template-columns:1fr;gap:.55rem}
@@ -777,7 +791,11 @@ details[open] > .row__sum::after{content:"−"}
   .rail{min-height:100vh}
 }
 .adm__main{min-width:0}
-.rail{display:flex;flex-direction:column;gap:.12rem;background:var(--ink);border-radius:0;padding:0 0 1rem;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
+/* The sidebar and the top bar are navy in both themes. They used to be
+   var(--ink), which dark turns near-white, while every colour inside them is a
+   fixed light grey or white — so on dark the whole sidebar and header went
+   white-on-white. --chrome does not flip; the rules below all assume it. */
+.rail{display:flex;flex-direction:column;gap:.12rem;background:var(--chrome);border-radius:0;padding:0 0 1rem;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
 @media(max-width:899px){.rail{position:static;flex-direction:column;max-height:none;gap:.12rem}}
 .rail__k{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:#5C769A;padding:.75rem .5rem .25rem}
 @media(max-width:899px){.rail__k{display:none}}
@@ -791,7 +809,9 @@ details[open] > .row__sum::after{content:"−"}
 .rnav--sub.is-on{border-left-color:#fff}
 .rnav--sub.is-empty{color:#61799C}
 .rnav--sub.is-empty .rnav__n{opacity:.5}
-.rnav--sub.is-on.is-empty{color:var(--accent-ink)}
+/* White, not var(--accent-ink): that flips to navy on dark, which is
+   invisible on a sidebar that stays navy. Light is white either way. */
+.rnav--sub.is-on.is-empty{color:var(--chrome-ink)}
 @media(max-width:899px){.rnav{width:auto;font-size:.82rem}}
 .rnav:hover{background:rgba(255,255,255,.06);color:#fff}
 .rnav.is-on{background:var(--accent);color:var(--accent-ink);font-weight:600}
@@ -816,8 +836,15 @@ body:has(.adm__wrap) main{padding:0}
 .rail__acts{display:flex;gap:.4rem;margin-top:.6rem}
 .rbtn{font:inherit;font-size:.76rem;color:#B9C8DE;background:none;border:1px solid rgba(255,255,255,.18);border-radius:5px;padding:.25rem .6rem;cursor:pointer}
 .rbtn:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+/* On dark the page beside the sidebar is nearly as dark as the sidebar, so it
+   takes a hairline edge — drawn as a shadow so nothing moves. The two
+   smallest greys are lifted there too: at .6rem they were under 4.5:1. */
+:root[data-theme="dark"] .rail{box-shadow:inset -1px 0 0 var(--line)}
+:root[data-theme="dark"] .adm__top{box-shadow:inset 0 -1px 0 var(--line)}
+:root[data-theme="dark"] .rail__k,
+:root[data-theme="dark"] .rnav--sub.is-empty:not(.is-on){color:#7C93B4}
 .adm__main{display:flex;flex-direction:column;background:var(--surface-2,var(--paper))}
-.adm__top{background:var(--ink);color:#fff;padding:.9rem 1.2rem;display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+.adm__top{background:var(--chrome);color:var(--chrome-ink);padding:.9rem 1.2rem;display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .adm__top h2{margin:0;font-size:1.3rem;color:#fff;font-family:"IBM Plex Sans Condensed",sans-serif}
 .adm__top .k{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:#7C93B4;display:block}
 .adm__topn{margin-left:auto;text-align:right}
@@ -841,6 +868,11 @@ body:has(.adm__wrap) main{padding:0}
 .kpi--warn{border-color:var(--signal)}
 .kpi--warn b{color:var(--signal-ink)}
 .kpi--good b{color:#0B7A63}
+/* --signal-ink is the dark brown that sits on the yellow, and it does not
+   flip — on a dark card it is 1.2:1. The yellow itself reads there. The green
+   gets the same lift the paid total has. */
+:root[data-theme="dark"] .kpi--warn b{color:var(--signal)}
+:root[data-theme="dark"] .kpi--good b{color:#63D69B}
 /* The cards below the tiles used to be one narrow column down the middle of
    however wide a screen was, which on a large monitor is a thin ribbon in a
    field of nothing. Columns flow them side by side once there is room, and
@@ -865,7 +897,7 @@ body:has(.adm__wrap) main{padding:0}
 .tl:hover{border-color:var(--accent)}
 .tl__art{background:var(--surface-2);display:grid;place-items:center;padding:1.2rem .8rem;border-bottom:1px solid var(--line)}
 .tl__art svg{width:32px;height:32px;stroke:var(--accent);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.tl__l{background:var(--ink);color:var(--paper);padding:.55rem .6rem;text-align:center;font-size:.82rem;font-weight:600}
+.tl__l{background:var(--chrome);color:var(--chrome-ink);padding:.55rem .6rem;text-align:center;font-size:.82rem;font-weight:600}
 .tl__l small{display:block;font-weight:400;font-size:.7rem;opacity:.72;margin-top:.1rem}
 .tl--soon{opacity:.62;cursor:default}
 .tl--soon .tl__art svg{stroke:var(--muted)}
@@ -957,6 +989,7 @@ body:has(.adm__wrap) main{padding:0}
 .acct__r{display:flex;flex-wrap:wrap;gap:.35rem}
 .rolechip{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;padding:.2rem .45rem;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .rolechip:hover{border-color:#B3261E;color:#B3261E}
+:root[data-theme="dark"] .rolechip:hover{border-color:#F2B8B5;color:#F2B8B5}
 /* The assessment panel in /admin. Two of the controls on it are the only
    things a person decides; everything else came from the trigger. */
 .sit{margin-top:.6rem;padding:.7rem .85rem;border:1px solid var(--line);border-radius:9px;
@@ -976,6 +1009,7 @@ body:has(.adm__wrap) main{padding:0}
 .sit__v--passed{background:#0B7A63;color:#fff}
 .sit__v--below_line{background:#FAE6EB;color:#B5123A}
 .sit__v--in_progress{background:var(--line);color:var(--muted)}
+:root[data-theme="dark"] .sit__v--in_progress{color:var(--ink-2)}
 .sit__row{display:flex;flex-wrap:wrap;gap:.45rem .7rem;align-items:center;
   padding:.4rem 0;border-top:1px dashed var(--line)}
 .sit__row:first-of-type{border-top:0;padding-top:0}
@@ -984,6 +1018,9 @@ body:has(.adm__wrap) main{padding:0}
 .sit__s b{font-variant-numeric:tabular-nums}
 .sit__ok{color:#0B7A63}
 .sit__low{color:#B5123A}
+/* Fixed green and red are both under 3.5:1 on the dark cards. */
+:root[data-theme="dark"] .sit__ok{color:#63D69B}
+:root[data-theme="dark"] .sit__low{color:#F2B8B5}
 .sit__off,.sit__s.sit__off{color:var(--muted);font-size:.82rem}
 .sit__claim{font-family:"IBM Plex Mono",monospace;font-size:.84rem}
 /* An anchor when the proof is a link she pasted, a button when it is a

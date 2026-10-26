@@ -207,6 +207,36 @@ for (const p of SHIPPED.map((file) => ({ file }))) {
   });
 }
 
+/* --ink is the TEXT colour. It is navy on light and near-white on dark, so
+   anything painted with it as a background turns near-white on dark — and
+   whatever text sits on it is almost always a fixed white or light grey that
+   does not turn with it. That is how the /admin sidebar and top bar, the hub
+   tiles' labels and the "copied" toast all went white-on-white in dark mode:
+   each was background:var(--ink) with color:#fff, and only light was ever
+   looked at.
+
+   A navy bar is var(--chrome), with var(--chrome-ink) on it; those two do not
+   flip. This fails on any rule that reaches for --ink as a background again,
+   in every page that ships, the Spanish ones included. */
+await check("nothing paints a background with the text colour", () => {
+  const files = [...SHIPPED, ...readdirSync("es").filter((f) => f.endsWith(".html")).map((f) => "es/" + f)];
+  const hits = [];
+  for (const f of files) {
+    for (const block of read(f).matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)) {
+      for (const rule of block[1].replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (/(^|;)\s*background(-color)?\s*:\s*var\(--ink\)\s*(;|$)/.test(rule[2])) {
+          hits.push(f + ": " + rule[1].trim().replace(/\s+/g, " ").slice(0, 50));
+        }
+      }
+    }
+  }
+  if (hits.length) {
+    throw new Error(hits.join("; ") + " — background:var(--ink) is near-white on dark while the " +
+      "text on it usually stays white. Use var(--chrome) and var(--chrome-ink), which do not flip.");
+  }
+  return files.length + " pages, every background is a background colour";
+});
+
 /* esc() turns & into &amp;, which is the whole point of it — it is what stops a
    name containing markup from becoming markup. So an HTML entity handed to it
    comes out as its own source text: `esc(a.track || "&mdash;")` renders the
